@@ -1,0 +1,6 @@
+.dmypy.json
+.idea/
+*.pyc
+venv/
+.run/
+results/

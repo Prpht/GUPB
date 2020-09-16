@@ -1,0 +1,129 @@
+from __future__ import annotations
+from enum import Enum
+from functools import partial
+import logging
+import random
+from typing import NamedTuple, Optional
+
+from gupb import controller
+from gupb.model import arenas
+from gupb.model import coordinates
+from gupb.model import tiles
+from gupb.model import weapons
+
+CHAMPION_STARTING_HP: int = 5
+
+
+class ChampionKnowledge(NamedTuple):
+    position: coordinates.Coords
+    visible_tiles: dict[coordinates.Coords, tiles.TileDescription]
+
+
+class ChampionDescription(NamedTuple):
+    controller_name: str
+    health: int
+    weapon: weapons.WeaponDescription
+    facing: Facing
+
+
+class Champion:
+    def __init__(self, starting_position: coordinates.Coords, arena: arenas.Arena) -> None:
+        self.facing: Facing = Facing.random()
+        self.weapon: weapons.Weapon = weapons.Knife()
+        self.health: int = CHAMPION_STARTING_HP
+        self.position: coordinates.Coords = starting_position
+        self.arena: arenas.Arena = arena
+        self.controller: Optional[controller.Controller] = None
+
+    def description(self) -> ChampionDescription:
+        return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)
+
+    def act(self) -> None:
+        action = self.pick_action()
+        logging.debug(f"Champion {self.controller.name} picked action {action}.")
+        action(self)
+        self.arena.stay(self)
+
+    def pick_action(self) -> Action:
+        if self.controller:
+            visible_tiles = self.arena.visible_tiles(self)
+            knowledge = ChampionKnowledge(self.position, visible_tiles)
+            return self.controller.decide(knowledge)
+        else:
+            return Action.DO_NOTHING
+
+    def turn_left(self) -> None:
+        self.facing = self.facing.turn_left()
+        logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+
+    def turn_right(self) -> None:
+        self.facing = self.facing.turn_right()
+        logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+
+    def step_forward(self) -> None:
+        self.arena.step_forward(self)
+
+    def attack(self) -> None:
+        self.weapon.cut(self.arena, self.position, self.facing)
+        logging.debug(f"Champion {self.controller.name} attacked with its {self.weapon.description().name}.")
+
+    def do_nothing(self) -> None:
+        pass
+
+    def damage(self, wounds: int) -> None:
+        self.health -= wounds
+        self.health = self.health if self.health > 0 else 0
+        logging.debug(f"Champion {self.controller.name} took {wounds} wounds, it has now {self.health} health left.")
+        if not self.alive:
+            self.die()
+
+    def die(self) -> None:
+        self.arena.terrain[self.position].character = None
+        self.arena.terrain[self.position].loot = self.weapon
+        logging.debug(f"Champion {self.controller.name} died.")
+
+    @property
+    def alive(self) -> bool:
+        return self.health > 0
+
+
+class Facing(Enum):
+    UP = coordinates.Coords(0, -1)
+    DOWN = coordinates.Coords(0, 1)
+    LEFT = coordinates.Coords(-1, 0)
+    RIGHT = coordinates.Coords(1, 0)
+
+    @staticmethod
+    def random() -> Facing:
+        return random.choice([Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT])
+
+    def turn_left(self) -> Facing:
+        if self == Facing.UP:
+            return Facing.LEFT
+        elif self == Facing.LEFT:
+            return Facing.DOWN
+        elif self == Facing.DOWN:
+            return Facing.RIGHT
+        elif self == Facing.RIGHT:
+            return Facing.UP
+
+    def turn_right(self) -> Facing:
+        if self == Facing.UP:
+            return Facing.RIGHT
+        elif self == Facing.RIGHT:
+            return Facing.DOWN
+        elif self == Facing.DOWN:
+            return Facing.LEFT
+        elif self == Facing.LEFT:
+            return Facing.UP
+
+
+class Action(Enum):
+    TURN_LEFT = partial(Champion.turn_left)
+    TURN_RIGHT = partial(Champion.turn_right)
+    STEP_FORWARD = partial(Champion.step_forward)
+    ATTACK = partial(Champion.attack)
+    DO_NOTHING = partial(Champion.do_nothing)
+
+    def __call__(self, *args):
+        self.value(*args)
