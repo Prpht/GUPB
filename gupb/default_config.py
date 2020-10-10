@@ -3,7 +3,7 @@ from gupb.controller import random
 from gupb.controller import botelka
 
 KEYBOARD_CONTROLLER = keyboard.KeyboardController()
-BOTELKA =  botelka.BotElkaController("Elka")
+BOTELKA = botelka.BotElkaController("Elka")
 
 CONFIGURATION = {
     'arenas': [

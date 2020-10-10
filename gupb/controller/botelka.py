@@ -1,10 +1,18 @@
 import operator
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Facing, Action, ChampionKnowledge
+from gupb.model.coordinates import Coords, add_coords
 
 from gupb.model.tiles import TileDescription
+
+RIGHT_SIDE_TRANSITIONS = {
+    Facing.UP: Facing.RIGHT,
+    Facing.RIGHT: Facing.DOWN,
+    Facing.DOWN: Facing.LEFT,
+    Facing.LEFT: Facing.UP,
+}
 
 
 # noinspection PyUnusedLocal
@@ -15,6 +23,7 @@ class BotElkaController:
         self.directions_info: Dict[Facing, int] = {
             Facing.UP: 0, Facing.LEFT: 0, Facing.RIGHT: 0, Facing.DOWN: 0
         }
+        self.tiles_info: Dict[Facing, TileDescription] = {}
         self.moves_queue: List[Action] = []
         self.counter: int = 0
 
@@ -30,11 +39,13 @@ class BotElkaController:
         pass
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        # Determine current Facing of the bot
+        current_facing, current_coords = self.get_current_position(knowledge)
+
+        self.defense(current_facing, current_coords, knowledge)
+
         if self.moves_queue:
             return self.moves_queue.pop(0)
-
-        # Determine current Facing of the bot
-        current_facing = self.get_current_facing(knowledge)
 
         # Count how many save tiles Bot can see in given direction
         self.directions_info[current_facing] = len([
@@ -42,17 +53,19 @@ class BotElkaController:
             for visible_tile in knowledge.visible_tiles.values()
             if _is_safe_land(visible_tile)
         ])
+        # Remember what was if front of us at given facing
+        self.tiles_info[current_facing] = knowledge.visible_tiles[add_coords(current_coords, current_facing.value)]
 
         self.control_movement(current_facing)
 
         return self.moves_queue.pop(0)
 
-    def get_current_facing(self, knowledge: ChampionKnowledge) -> Facing:
-        facing = next(
-            (visible_tile.character.facing
-             for visible_tile in knowledge.visible_tiles.values()
-             if visible_tile.character and visible_tile.character.controller_name == self.name), None
-        )
+    def get_current_position(self, knowledge: ChampionKnowledge) -> Tuple[Facing, Coords]:
+        facing = next((
+            (visible_tile.character.facing, coords)
+            for coords, visible_tile in knowledge.visible_tiles.items()
+            if visible_tile.character and visible_tile.character.controller_name == self.name
+        ), None)
 
         assert facing, "Bot facing always present"
 
@@ -68,9 +81,16 @@ class BotElkaController:
 
         self.counter = 0
         # Calculate the best direction to run away
-        desired_direction = max(self.directions_info.items(), key=operator.itemgetter(1))[0]
-        self.moves_queue += self.rotate_character(current_facing, desired_direction)
+        desired_facing = self.get_good_facing()
+
+        self.moves_queue += self.rotate_character(current_facing, desired_facing)
         self.moves_queue.append(Action.STEP_FORWARD)
+
+    def defense(self, facing: Facing, coords: Coords, knowledge: ChampionKnowledge) -> None:
+        tile_in_front = add_coords(coords, facing.value)
+
+        if knowledge.visible_tiles[tile_in_front].character:
+            self.moves_queue.insert(0, Action.ATTACK)
 
     def rotate_character(self, starting_facing: Facing, desired_facing: Facing) -> List[Action]:
         """
@@ -78,18 +98,20 @@ class BotElkaController:
         """
         result = []
 
-        right_side_transitions = {
-            Facing.UP: Facing.RIGHT,
-            Facing.RIGHT: Facing.DOWN,
-            Facing.DOWN: Facing.LEFT,
-            Facing.LEFT: Facing.UP,
-        }
-
         while starting_facing != desired_facing:
             result.append(Action.TURN_RIGHT)
-            starting_facing = right_side_transitions[starting_facing]
+            starting_facing = RIGHT_SIDE_TRANSITIONS[starting_facing]
 
         return result
+
+    def get_good_facing(self) -> Facing:
+        desired_facing: Facing = max(self.directions_info.items(), key=operator.itemgetter(1))[0]
+
+        if _is_safe_land(self.tiles_info[desired_facing]):
+            return desired_facing
+
+        # Turn right, to prevent being stuck
+        return RIGHT_SIDE_TRANSITIONS[desired_facing]
 
     @property
     def name(self) -> str:
