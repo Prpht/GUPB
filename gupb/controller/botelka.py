@@ -35,6 +35,10 @@ class BotElkaController:
     def __hash__(self) -> int:
         return hash(self.first_name)
 
+    @property
+    def name(self) -> str:
+        return f"BotElka{self.first_name}"
+
     def reset(self, arena_description: ArenaDescription) -> None:
         pass
 
@@ -61,6 +65,9 @@ class BotElkaController:
         return self.moves_queue.pop(0)
 
     def get_current_position(self, knowledge: ChampionKnowledge) -> Tuple[Facing, Coords]:
+        """
+        Determine current facing and coordinates of the bot.
+        """
         facing = next((
             (visible_tile.character.facing, coords)
             for coords, visible_tile in knowledge.visible_tiles.items()
@@ -72,6 +79,9 @@ class BotElkaController:
         return facing
 
     def control_movement(self, current_facing: Facing) -> None:
+        """
+        Determine the best direction to go, basing on the availability of the free space.
+        """
         self.counter += 1
 
         if self.counter != 4:
@@ -87,6 +97,9 @@ class BotElkaController:
         self.moves_queue.append(Action.STEP_FORWARD)
 
     def defense(self, facing: Facing, coords: Coords, knowledge: ChampionKnowledge) -> None:
+        """
+        If there is an enemy in front of the bot, attack it.
+        """
         tile_in_front = add_coords(coords, facing.value)
 
         if knowledge.visible_tiles[tile_in_front].character:
@@ -105,6 +118,9 @@ class BotElkaController:
         return result
 
     def get_good_facing(self) -> Facing:
+        """
+        Avoid being stuck on the map.
+        """
         desired_facing: Facing = max(self.directions_info.items(), key=operator.itemgetter(1))[0]
 
         if _is_safe_land(self.tiles_info[desired_facing]):
@@ -113,12 +129,11 @@ class BotElkaController:
         # Turn right, to prevent being stuck
         return RIGHT_SIDE_TRANSITIONS[desired_facing]
 
-    @property
-    def name(self) -> str:
-        return f"BotElka{self.first_name}"
-
 
 def _is_safe_land(visible_tile: TileDescription) -> bool:
+    """
+    Determine if Tile is safe for the bot.
+    """
     dangerous_effects = [
         effect for effect in visible_tile.effects if effect.type == "mist"
     ]
@@ -132,5 +147,5 @@ def _is_safe_land(visible_tile: TileDescription) -> bool:
 
 
 POTENTIAL_CONTROLLERS = [
-    BotElkaController("")
+    BotElkaController("Z nami na pewno zdasz")
 ]
