@@ -1,4 +1,3 @@
-from enum import Enum
 from queue import SimpleQueue
 from typing import Dict, Type, Optional
 
@@ -7,10 +6,6 @@ from gupb.model import characters
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 
-
-# class MoveOptions(Enum):
-#     MOVE_VERTICALLY,
-#     MOVE_HORIZONTALLY
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -21,10 +16,13 @@ class TupTupController:
         self.facing: Optional[characters.Facing] = None
         self.position: coordinates.Coords = None
         self.weapon: Type[weapons.Weapon] = weapons.Knife
+        self.reached_middle: bool = False
+        self.direction: Optional[characters.Facing] = None
+        self.moved: bool = False
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, TupTupController):
+        if isinstance(other, TupTupController) and other.name == self.name:
             return True
         return False
 
@@ -40,33 +38,47 @@ class TupTupController:
         if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
             return characters.Action.ATTACK
 
-        self.display_info(knowledge)
-
         if not self.action_queue.empty():
             return self.action_queue.get()
-        self.move(knowledge)
 
-        return characters.Action.DO_NOTHING
+        if self.direction:
+            self.__avoid_obstacle(knowledge)
+        elif not self.reached_middle:
+            self.__move(knowledge)
+        else:
+            self.__guard_area()
 
-    def move(self, knowledge):
-        x_distance, y_distance = self.calc_coords_diff(self.menhir_pos, self.position)
+        return self.action_queue.get()
 
-        expected_facing = self.facing
-        if x_distance or y_distance:  # if there is a need to move
-            if y_distance == 0 or abs(x_distance) <= abs(y_distance):  # changes in horizontal direction
-                expected_facing = self.get_expected_facing(x_distance, 'horizontal')
-            else:  # changes in vertical direction
-                expected_facing = self.get_expected_facing(y_distance, 'vertical')
+    def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.position = knowledge.position
+        char_description = knowledge.visible_tiles[knowledge.position].character
+        self.weapon = char_description.weapon
+        self.facing = char_description.facing
+
+    def __move(self, knowledge: characters.ChampionKnowledge) -> None:
+        x_distance, y_distance = self.__calc_coords_diff(self.menhir_pos, self.position)
+        if abs(x_distance) < 2 and abs(y_distance) < 2:
+            self.reached_middle = True
+            self.action_queue.put(characters.Action.TURN_RIGHT)
+            return None
+
+        if x_distance == 0:     # changes in vertical direction
+            expected_facing = self.__get_expected_facing(y_distance, True)
+        elif y_distance == 0 or abs(x_distance) <= abs(y_distance):  # changes in horizontal direction
+            expected_facing = self.__get_expected_facing(x_distance, False)
+        else:                   # changes in vertical direction
+            expected_facing = self.__get_expected_facing(y_distance, True)
 
         if self.facing != expected_facing:
-            self.rotate(expected_facing)
-        elif self.can_move_forward(self.position, self.facing, knowledge):
+            self.__rotate(expected_facing)
+        elif self.__can_move_forward(knowledge):
             self.action_queue.put(characters.Action.STEP_FORWARD)
         else:
-            self.avoid_obstacle()  # todo for now ATTACK to see the result
-        self.display_info(knowledge)
+            self.direction = self.facing
+            self.__avoid_obstacle(knowledge)
 
-    def rotate(self, expected_facing):
+    def __rotate(self, expected_facing: characters.Facing) -> None:
         curr_facing_index = FACING_ORDER.index(self.facing)
         expected_facing_index = FACING_ORDER.index(expected_facing)
 
@@ -82,43 +94,44 @@ class TupTupController:
         elif diff_expected_curr == 3:
             self.action_queue.put(characters.Action.TURN_LEFT)
 
-    def get_expected_facing(self, distance, direction):
-        if direction == 'vertical':
-            if distance < 0:
-                return characters.Facing.UP
-            elif distance > 0:
-                return characters.Facing.DOWN
-        elif direction == 'horizontal':
-            if distance < 0:
-                return characters.Facing.LEFT
-            elif distance > 0:
-                return characters.Facing.RIGHT
+    def __get_expected_facing(self, distance: int, is_move_vertical: bool) -> characters.Facing:
+        if is_move_vertical:
+            return characters.Facing.UP if distance < 0 else characters.Facing.DOWN
+        else:
+            return characters.Facing.LEFT if distance < 0 else characters.Facing.RIGHT
 
-    def can_move_forward(self, position, facing, knowledge):
-        next_tile_coords = position + facing.value
+    def __can_move_forward(self, knowledge: characters.ChampionKnowledge) -> bool:
+        next_tile_coords = self.position + self.facing.value
         return next_tile_coords in knowledge.visible_tiles.keys() \
                and knowledge.visible_tiles[next_tile_coords].type == 'land'
 
-    def avoid_obstacle(self):
-        # check if the same (x,y) [as when started]
-        # check if the same 'facing'
-        self.action_queue.put(characters.Action.ATTACK)
+    def __avoid_obstacle(self, knowledge):
+        if self.facing == self.direction:
+            if self.__can_move_forward(knowledge):
+                self.direction = None
+                self.moved = False
+                self.action_queue.put(characters.Action.STEP_FORWARD)
+            else:
+                self.moved = False
+                self.action_queue.put(characters.Action.TURN_RIGHT)
+        else:
+            if self.moved:
+                self.moved = False
+                self.action_queue.put(characters.Action.TURN_LEFT)
+            else:
+                if self.__can_move_forward(knowledge):
+                    self.moved = True
+                    self.action_queue.put(characters.Action.STEP_FORWARD)
+                else:
+                    self.moved = False
+                    self.action_queue.put(characters.Action.TURN_RIGHT)
 
-    def display_info(self, knowledge: characters.ChampionKnowledge):
-        character = knowledge.visible_tiles[knowledge.position].character
-        hero_info = {'weapon': character.weapon, 'facing': character.facing, 'position': knowledge.position}
-        print("Menhir position ", self.menhir_pos)
-        print("Hero ", hero_info['weapon'], hero_info['facing'], hero_info['position'])
+    def __guard_area(self) -> None:
+        self.action_queue.put(characters.Action.TURN_RIGHT)
 
-    def calc_coords_diff(self, end_coords, start_coords):
+    def __calc_coords_diff(self, end_coords: int, start_coords: int) -> int:
         coords_dif = coordinates.sub_coords(end_coords, start_coords)
         return coords_dif
-
-    def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
-        self.position = knowledge.position
-        char_description = knowledge.visible_tiles[knowledge.position].character
-        self.weapon = char_description.weapon
-        self.facing = char_description.facing
 
     def __is_enemy_in_range(self, position: coordinates.Coords,
                             visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> bool:
@@ -151,5 +164,5 @@ class TupTupController:
 
 
 POTENTIAL_CONTROLLERS = [
-    TupTupController('1'),
+    TupTupController('Bot'),
 ]
