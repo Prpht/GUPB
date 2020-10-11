@@ -1,5 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import claret_wolf
 
 KEYBOARD_CONTROLLER = keyboard.KeyboardController()
 
@@ -9,6 +10,7 @@ CONFIGURATION = {
     ],
     'controllers': [
         KEYBOARD_CONTROLLER,
+        claret_wolf.ClaretWolfController(),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
