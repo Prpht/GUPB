@@ -5,6 +5,9 @@ from enum import auto, Enum
 import functools
 from typing import NamedTuple
 
+from gupb.logger.core import log
+from gupb.logger.primitives import LogSeverity, ChampionDamagedByMistReport, \
+    ChampionDamagedByWeaponCutReport
 from gupb.model import characters
 
 CUT_DAMAGE: int = 1
@@ -54,6 +57,10 @@ class Mist(Effect):
     @staticmethod
     def stay(champion: characters.Champion) -> None:
         logging.debug(f"Champion {champion.controller.name} was damaged by deadly mist.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionDamagedByMistReport(champion.controller.name, MIST_DAMAGE)
+        )
         champion.damage(MIST_DAMAGE)
 
     @staticmethod
@@ -65,6 +72,10 @@ class WeaponCut(Effect):
     @staticmethod
     def instant(champion: characters.Champion) -> None:
         logging.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionDamagedByWeaponCutReport(champion.controller.name, CUT_DAMAGE)
+        )
         champion.damage(CUT_DAMAGE)
 
     @staticmethod
