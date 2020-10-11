@@ -11,17 +11,28 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
+
+def should_attack(knowledge):
+    current_pos = knowledge.visible_tiles[knowledge.position]
+    in_front = knowledge.visible_tiles[knowledge.position + current_pos.character.facing.value]
+
+    return in_front.character is not None
+
+
 class CommandInterface:
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         pass
 
+
 class DoNothingCommand(CommandInterface):
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return characters.Action.DO_NOTHING
 
+
 class RandomCommand(CommandInterface):
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
+
 
 class GoToTargetCommand(CommandInterface):
     def __init__(self, controller, target):
@@ -30,8 +41,11 @@ class GoToTargetCommand(CommandInterface):
         self.target = target
         self.prevDist = 999
 
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
-        if(self.forceGoingStrainght == True):
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if should_attack(knowledge):
+            return characters.Action.ATTACK
+
+        if (self.forceGoingStrainght == True):
             self.forceGoingStrainght = False
             return characters.Action.STEP_FORWARD
         newDist = math.dist(self.target, knowledge.position)
@@ -43,24 +57,32 @@ class GoToTargetCommand(CommandInterface):
             self.forceGoingStrainght = True
             return characters.Action.TURN_RIGHT
 
+
 class ScanCommand(CommandInterface):
     def __init__(self, controller):
         self.controller = controller
         self.iteration = 0
         self.scanResults = {}
 
-
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.scanResults.update(knowledge.visible_tiles)
         self.iteration += 1
+
+        if should_attack(knowledge):
+            return characters.Action.ATTACK
+
         if (self.iteration == 4):
             target = None
             for (key, value) in self.scanResults.items():
-                if(value.type == 'menhir'):
+                if (value.type == 'menhir'):
                     self.controller.currentCommand = GoToTargetCommand(self.controller, key)
                     return characters.Action.DO_NOTHING
-            self.controller.currentCommand = RandomCommand()
+
+            self.iteration = 0
+            return RandomCommand().decide(knowledge)
+
         return characters.Action.TURN_RIGHT
+
 
 # class DIRECTIONS:
 #     NORTH = 0,
@@ -70,7 +92,7 @@ class ScanCommand(CommandInterface):
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BBBotController:    
+class BBBotController:
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.currentCommand = ScanCommand(self)
@@ -86,7 +108,7 @@ class BBBotController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         pass
 
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.currentCommand.decide(knowledge)
 
     @property
