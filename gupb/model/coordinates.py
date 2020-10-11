@@ -8,7 +8,7 @@ def add_coords(self: Coords, other: Coords) -> Coords:
 
 
 def sub_coords(self: Coords, other: Coords) -> Coords:
-    return Coords(self[0] + other[0], self[1] - other[1])
+    return Coords(self[0] - other[0], self[1] - other[1])
 
 
 Coords.__add__ = add_coords
