@@ -157,7 +157,6 @@ class Krowa1233Controller:
         )
         if closest_enemy is None:
             return random.choice(POSSIBLE_ACTIONS[:-1])
-        print(closest_enemy)
         dx, dy = int((closest_enemy[0] - champion_position[0]) > 0), int((closest_enemy[1] - champion_position[1]) > 0)
         if dx == self.champion.facing.value.x or dy == self.champion.facing.value.y:
             return characters.Action.STEP_FORWARD
