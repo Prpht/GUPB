@@ -19,10 +19,6 @@ from gupb import runner
 
 
 # noinspection PyUnresolvedReferences
-from gupb.logger.core import set_up_logger, log
-from gupb.logger.primitives import LogSeverity, RandomArenaPickReport
-
-
 @lru_cache()
 def possible_controllers() -> list[controller.Controller]:
     controllers = []
@@ -133,15 +129,34 @@ def configuration_inquiry(initial_config: dict[str, Any]) -> dict[str, Any]:
 
 
 def configure_logging(log_directory: str) -> None:
+    logging_dir_path = pathlib.Path(log_directory)
+    logging_dir_path.mkdir(parents=True, exist_ok=True)
+    logging_dir_path.chmod(0o777)
     time = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    logging_path = pathlib.Path(log_directory) / f'gupb__{time}.log'
-    logging_path.parent.mkdir(parents=True, exist_ok=True)
-    logging_path.parent.chmod(0o777)
-    logging.basicConfig(
-        filename=logging_path.as_posix(),
-        level=logging.DEBUG,
-        format="%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s"
+
+    verbose_logger = logging.getLogger('verbose')
+    verbose_file_path = logging_dir_path / f'gupb__{time}.log'
+    verbose_file_handler = logging.FileHandler(verbose_file_path.as_posix())
+    verbose_formatter = logging.Formatter(
+        '%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s'
     )
+    verbose_file_handler.setFormatter(verbose_formatter)
+    verbose_logger.addHandler(verbose_file_handler)
+    verbose_logger.setLevel(logging.DEBUG)
+
+    json_logger = logging.getLogger('json')
+    json_file_path = logging_dir_path / f'gupb__{time}.json'
+    json_file_handler = logging.FileHandler(json_file_path.as_posix())
+    json_formatter = logging.Formatter(
+        '{"time_stamp": "%(asctime)s",'
+        ' "severity": "%(levelname)s",'
+        ' "line": "%(module)s.%(funcName)s:%(lineno)d",'
+        ' "type": "%(event_type)s",'
+        ' "value": %(message)s}'
+    )
+    json_file_handler.setFormatter(json_formatter)
+    json_logger.addHandler(json_file_handler)
+    json_logger.setLevel(logging.DEBUG)
 
 
 @click.command()
@@ -153,7 +168,6 @@ def configure_logging(log_directory: str) -> None:
               type=click.Path(exists=False), help="The path to log storage directory.")
 def main(config_path: str, inquiry: bool, log_directory: str) -> None:
     configure_logging(log_directory)
-    set_up_logger(log_directory)
     current_config = load_initial_config(config_path)
     current_config = configuration_inquiry(current_config) if inquiry else current_config
     game_runner = runner.Runner(current_config)
