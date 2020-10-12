@@ -1,3 +1,4 @@
+import queue
 from queue import SimpleQueue
 from typing import Dict, Type, Optional
 
@@ -48,7 +49,10 @@ class TupTupController:
         else:
             self.__guard_area()
 
-        return self.action_queue.get()
+        if not self.action_queue.empty():
+            return self.action_queue.get()
+        else:  # prevent the game from exploding
+            return characters.Action.DO_NOTHING
 
     def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
@@ -63,11 +67,11 @@ class TupTupController:
             self.action_queue.put(characters.Action.TURN_RIGHT)
             return None
 
-        if x_distance == 0:     # changes in vertical direction
+        if x_distance == 0:  # changes in vertical direction
             expected_facing = self.__get_expected_facing(y_distance, True)
         elif y_distance == 0 or abs(x_distance) <= abs(y_distance):  # changes in horizontal direction
             expected_facing = self.__get_expected_facing(x_distance, False)
-        else:                   # changes in vertical direction
+        else:  # changes in vertical direction
             expected_facing = self.__get_expected_facing(y_distance, True)
 
         if self.facing != expected_facing:
