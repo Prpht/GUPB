@@ -5,6 +5,8 @@ from typing import NamedTuple, Optional
 
 import sortedcontainers
 
+from gupb.logger.core import log
+from gupb.logger.primitives import LogSeverity, ChampionPickedWeaponReport
 from gupb.model import effects
 from gupb.model import characters
 from gupb.model import weapons
@@ -58,6 +60,10 @@ class Tile(ABC):
         if self.loot:
             champion.weapon, self.loot = self.loot, champion.weapon
             logging.debug(f"Champion {champion.controller.name} picked up a {champion.weapon.description().name}.")
+            log(
+                severity=LogSeverity.DEBUG,
+                value=ChampionPickedWeaponReport(champion.controller.name, champion.weapon.description().name)
+            )
 
     # noinspection PyUnusedLocal
     def leave(self, champion: characters.Champion) -> None:

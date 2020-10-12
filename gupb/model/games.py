@@ -7,6 +7,9 @@ from typing import Iterator, NamedTuple
 import statemachine
 
 from gupb import controller
+from gupb.logger.core import log
+from gupb.logger.primitives import LogSeverity, ChampionSpawnedReport, \
+    EpisodeStartReport, LastManStandingReport
 from gupb.model import arenas
 from gupb.model import characters
 
@@ -60,6 +63,10 @@ class Game(statemachine.StateMachine):
             champion.controller = controller_to_spawn
             champions.append(champion)
             logging.debug(f"Champion for {controller_to_spawn.name} spawned at {coords} facing {champion.facing}.")
+            log(
+                severity=LogSeverity.DEBUG,
+                value=ChampionSpawnedReport(controller_to_spawn.name, coords, champion.facing.value)
+            )
         return champions
 
     def _environment_action(self) -> None:
@@ -67,6 +74,7 @@ class Game(statemachine.StateMachine):
         self.action_queue = self.champions.copy()
         self.episode += 1
         logging.debug(f"Starting episode {self.episode}.")
+        log(severity=LogSeverity.DEBUG, value=EpisodeStartReport(self.episode))
         if self.episode % MIST_TTH == 0:
             self.arena.increase_mist()
 
@@ -81,6 +89,10 @@ class Game(statemachine.StateMachine):
         self.champions = alive
         if len(self.champions) == 1:
             logging.debug(f"Champion {self.champions[0].controller.name} was the last one standing.")
+            log(
+                severity=LogSeverity.DEBUG,
+                value=LastManStandingReport(self.champions[0].controller.name)
+            )
             champion = self.champions.pop()
             death = ChampionDeath(champion, self.episode)
             self.deaths.append(death)

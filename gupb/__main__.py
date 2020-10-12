@@ -19,6 +19,10 @@ from gupb import runner
 
 
 # noinspection PyUnresolvedReferences
+from gupb.logger.core import set_up_logger, log
+from gupb.logger.primitives import LogSeverity, RandomArenaPickReport
+
+
 @lru_cache()
 def possible_controllers() -> list[controller.Controller]:
     controllers = []
@@ -149,6 +153,7 @@ def configure_logging(log_directory: str) -> None:
               type=click.Path(exists=False), help="The path to log storage directory.")
 def main(config_path: str, inquiry: bool, log_directory: str) -> None:
     configure_logging(log_directory)
+    set_up_logger(log_directory)
     current_config = load_initial_config(config_path)
     current_config = configuration_inquiry(current_config) if inquiry else current_config
     game_runner = runner.Runner(current_config)

@@ -6,6 +6,10 @@ import random
 from typing import NamedTuple, Optional
 
 from gupb import controller
+from gupb.logger.core import log
+from gupb.logger.primitives import LogSeverity, ChampionPickedActionReport, \
+    ChampionFacingReport, ChampionAttackReport, ChampionWoundsReport, \
+    ChampionDeathReport
 from gupb.model import arenas
 from gupb.model import coordinates
 from gupb.model import tiles
@@ -41,6 +45,10 @@ class Champion:
     def act(self) -> None:
         action = self.pick_action()
         logging.debug(f"Champion {self.controller.name} picked action {action}.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionPickedActionReport(self.controller.name, action.name)
+        )
         action(self)
         self.arena.stay(self)
 
@@ -55,10 +63,18 @@ class Champion:
     def turn_left(self) -> None:
         self.facing = self.facing.turn_left()
         logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionFacingReport(self.controller.name, self.facing.value)
+        )
 
     def turn_right(self) -> None:
         self.facing = self.facing.turn_right()
         logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionFacingReport(self.controller.name, self.facing.value)
+        )
 
     def step_forward(self) -> None:
         self.arena.step_forward(self)
@@ -66,6 +82,10 @@ class Champion:
     def attack(self) -> None:
         self.weapon.cut(self.arena, self.position, self.facing)
         logging.debug(f"Champion {self.controller.name} attacked with its {self.weapon.description().name}.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionAttackReport(self.controller.name, self.weapon.description().name)
+        )
 
     def do_nothing(self) -> None:
         pass
@@ -74,6 +94,10 @@ class Champion:
         self.health -= wounds
         self.health = self.health if self.health > 0 else 0
         logging.debug(f"Champion {self.controller.name} took {wounds} wounds, it has now {self.health} health left.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionWoundsReport(self.controller.name, wounds, self.health)
+        )
         if not self.alive:
             self.die()
 
@@ -81,6 +105,10 @@ class Champion:
         self.arena.terrain[self.position].character = None
         self.arena.terrain[self.position].loot = self.weapon
         logging.debug(f"Champion {self.controller.name} died.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=ChampionDeathReport(self.controller.name)
+        )
 
     @property
     def alive(self) -> bool:

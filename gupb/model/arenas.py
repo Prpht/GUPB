@@ -6,6 +6,9 @@ from typing import Dict, NamedTuple, Optional
 
 import bresenham
 
+from gupb.logger.core import log
+from gupb.logger.primitives import LogSeverity, ChampionEnteredTileReport, \
+    MenhirSpawnedReport, MistRadiusReducedReport
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model import effects
@@ -102,6 +105,10 @@ class Arena:
             champion.position = new_position
             self.terrain[champion.position].enter(champion)
             logging.debug(f"Champion {champion.controller.name} entered tile {new_position}.")
+            log(
+                severity=LogSeverity.DEBUG,
+                value=ChampionEnteredTileReport(champion.controller.name, new_position)
+            )
 
     def stay(self, champion: characters.Champion) -> None:
         self.terrain[champion.position].stay()
@@ -112,11 +119,19 @@ class Arena:
         self.menhir_position = random.sample(self.empty_coords(), 1)[0]
         self.terrain[self.menhir_position] = tiles.Menhir()
         logging.debug(f"Menhir spawned at {self.menhir_position}.")
+        log(
+            severity=LogSeverity.DEBUG,
+            value=MenhirSpawnedReport(self.menhir_position)
+        )
 
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
         if self.mist_radius:
             logging.debug(f"Radius of mist-free space decreased to {self.mist_radius}.")
+            log(
+                severity=LogSeverity.DEBUG,
+                value=MistRadiusReducedReport(self.mist_radius)
+            )
             for coords in self.terrain:
                 distance = int(((coords.x - self.menhir_position.x) ** 2 +
                                 (coords.y - self.menhir_position.y) ** 2) ** 0.5)
