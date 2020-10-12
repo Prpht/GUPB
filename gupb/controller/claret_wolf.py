@@ -51,7 +51,7 @@ class ClaretWolfController:
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
                                                                   Move.RIGHT: characters.Action.TURN_RIGHT,
-                                                                  Move.DO_NOTHING: characters.Action.DO_NOTHING, #ATTACK
+                                                                  Move.DO_NOTHING: characters.Action.ATTACK, #ATTACK
                                                                   }
 
     def __eq__(self, other: object) -> bool:
@@ -67,7 +67,6 @@ class ClaretWolfController:
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         mist_vector = self.find_vector_to_nearest_mist_tile(knowledge)
-        #print("RPY::mist_vector = ", mist_vector)
         action: characters.Action = self.choose_next_step(knowledge, mist_vector)
         return action
 
@@ -88,7 +87,6 @@ class ClaretWolfController:
         if len(mist_tiles) > 0:
             min_dist_tuple = min(mist_tiles, key=mist_tiles.get)
             min_dist_vec = coordinates.Coords(min_dist_tuple[0], min_dist_tuple[1])
-            #print("RPY::min_vec = ", min_dist_vec)
             self.last_observed_mist_vec = (min_dist_vec - my_position)
             return self.last_observed_mist_vec
         return None
@@ -118,7 +116,6 @@ class ClaretWolfController:
             if q_value > max_q_value:
                 max_q_value = q_value
                 best_new_move = next_coord
-        #print("RPY::max_q_val = ", max_q_value)
         if random.uniform(0,1) < EXPLORATION_PROB:
             best_new_move = random.choice(POSSIBLE_MOVES)
         return self.get_mapping_on_action(best_new_move)
