@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import NamedTuple
+from typing import NamedTuple, List
 
 from gupb.model import arenas
 from gupb.model import characters
@@ -15,6 +15,11 @@ class WeaponDescription(NamedTuple):
 class Weapon(ABC):
     def description(self) -> WeaponDescription:
         return WeaponDescription(self.__class__.__name__.lower())
+
+    @classmethod
+    @abstractmethod
+    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+        raise NotImplementedError
 
     @classmethod
     @abstractmethod
@@ -34,13 +39,22 @@ class LineWeapon(Weapon, ABC):
         raise NotImplementedError
 
     @classmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+        cut_positions = []
         cut_position = position
         for _ in range(cls.reach()):
             cut_position += facing.value
-            cls.cut_transparent(arena, cut_position)
-            if cut_position not in arena.terrain or not arena.terrain[cut_position].transparent:
+            if cut_position not in terrain:
                 break
+            cut_positions.append(cut_position)
+            if not terrain[cut_position].transparent:
+                break
+        return cut_positions
+
+    @classmethod
+    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        for cut_position in cls.cut_positions(arena.terrain, position, facing):
+            cls.cut_transparent(arena, cut_position)
 
 
 class Knife(LineWeapon):
@@ -62,17 +76,27 @@ class Bow(LineWeapon):
 
 
 class Axe(Weapon):
+
     @classmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
         centre_position = position + facing.value
         left_position = centre_position + facing.turn_left().value
         right_position = centre_position + facing.turn_right().value
-        for cut_position in [left_position, centre_position, right_position]:
+        return [left_position, centre_position, right_position]
+
+    @classmethod
+    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        for cut_position in cls.cut_positions(arena.terrain, position, facing):
             cls.cut_transparent(arena, cut_position)
 
 
 class Amulet(Weapon):
+
+    @classmethod
+    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+        return [position + (1, 1), position + (-1, 1), position + (1, -1), position + (-1, -1)]
+
     @classmethod
     def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
-        for cut_position in [position + (1, 1), position + (-1, 1), position + (1, -1), position + (-1, -1)]:
+        for cut_position in cls.cut_positions(arena.terrain, position, facing):
             cls.cut_transparent(arena, cut_position)
