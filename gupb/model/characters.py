@@ -49,11 +49,17 @@ class Champion:
         action(self)
         self.arena.stay(self)
 
+    # noinspection PyBroadException
     def pick_action(self) -> Action:
         if self.controller:
             visible_tiles = self.arena.visible_tiles(self)
             knowledge = ChampionKnowledge(self.position, visible_tiles)
-            return self.controller.decide(knowledge)
+            try:
+                return self.controller.decide(knowledge)
+            except Exception as e:
+                verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
+                ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)
+                return Action.DO_NOTHING
         else:
             return Action.DO_NOTHING
 
@@ -167,3 +173,9 @@ class ChampionWoundsReport(logger_core.LoggingMixin):
 @dataclass(frozen=True)
 class ChampionDeathReport(logger_core.LoggingMixin):
     controller_name: str
+
+
+@dataclass(frozen=True)
+class ControllerExceptionReport(logger_core.LoggingMixin):
+    controller_name: str
+    exception: str
