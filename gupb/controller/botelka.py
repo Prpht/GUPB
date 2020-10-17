@@ -1,17 +1,34 @@
 import operator
 from typing import Dict, List, Tuple
 
-from gupb.model.arenas import ArenaDescription
+from pathfinding.core.grid import Grid
+from pathfinding.finder.dijkstra import DijkstraFinder
+
+from gupb.model.arenas import ArenaDescription, WEAPON_ENCODING
 from gupb.model.characters import Facing, Action, ChampionKnowledge
-from gupb.model.coordinates import Coords, add_coords
+from gupb.model.coordinates import Coords, add_coords, sub_coords
 
 from gupb.model.tiles import TileDescription
+from gupb.model.weapons import Weapon
+import os
 
 RIGHT_SIDE_TRANSITIONS = {
     Facing.UP: Facing.RIGHT,
     Facing.RIGHT: Facing.DOWN,
     Facing.DOWN: Facing.LEFT,
     Facing.LEFT: Facing.UP,
+}
+
+# Used for path finding
+MAP_SYMBOLS_COST = {
+    '=': 0,  # Sea - obstacle
+    '#': 0,  # Wall  - obstacle
+    'S': 1,  # Sword
+    'A': 1,  # Axe
+    'B': 1,  # Bow
+    'M': 1,  # Amulet
+    '.': 2,  # Land
+    'K': 3,  # Knife - start weapon, we usually want to avoid it
 }
 
 
@@ -26,6 +43,12 @@ class BotElkaController:
         self.tiles_info: Dict[Facing, TileDescription] = {}
         self.moves_queue: List[Action] = []
         self.counter: int = 0
+        self.grid = None
+        self.current_coords = None
+        self.current_facing = None
+        self.menhir_pos = None
+        self.menhir_found = False
+        self.initial_weapon_positions = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -37,32 +60,78 @@ class BotElkaController:
 
     @property
     def name(self) -> str:
-        return f"BotElka{self.first_name}"
+        return f"BotElka<{self.first_name}>"
 
     def reset(self, arena_description: ArenaDescription) -> None:
-        pass
+        self.menhir_pos = arena_description.menhir_position
+
+        arena_file = os.path.join(os.path.dirname(__file__), f"../../resources/arenas/{arena_description.name}.gupb")
+        with open(arena_file, 'r') as file:
+            self.grid = Grid(
+                matrix=[
+                    [MAP_SYMBOLS_COST.get(symbol, 0) for symbol in row.replace('\n', '')]
+                    for row in file.readlines()
+                ]
+            )
+
+            self.initial_weapon_positions = {
+                Coords(x, y): WEAPON_ENCODING[symbol]
+                for y, row in enumerate(file.readlines())
+                for x, symbol in enumerate(row.replace('\n', ''))
+            }
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         # Determine current Facing of the bot
         current_facing, current_coords = self.get_current_position(knowledge)
 
-        self.defense(current_facing, current_coords, knowledge)
+        self.current_coords = current_coords
+        self.current_facing = current_facing
 
+        if not self.menhir_found:
+            self.moves_queue += self.find_path(self.menhir_pos)
+            self.menhir_found = True
+
+        # There are moves available
         if self.moves_queue:
             return self.moves_queue.pop(0)
 
-        # Count how many save tiles Bot can see in given direction
-        self.directions_info[current_facing] = len([
-            visible_tile
-            for visible_tile in knowledge.visible_tiles.values()
-            if _is_safe_land(visible_tile)
-        ])
-        # Remember what was if front of us at given facing
-        self.tiles_info[current_facing] = knowledge.visible_tiles[add_coords(current_coords, current_facing.value)]
-
-        self.control_movement(current_facing)
+        # self.defense(current_facing, current_coords, knowledge)
+        #
+        # # Count how many save tiles Bot can see in given direction
+        # self.directions_info[current_facing] = len([
+        #     visible_tile
+        #     for visible_tile in knowledge.visible_tiles.values()
+        #     if _is_safe_land(visible_tile)
+        # ])
+        # # Remember what was if front of us at given facing
+        # self.tiles_info[current_facing] = knowledge.visible_tiles[add_coords(current_coords, current_facing.value)]
+        #
+        # self.control_movement(current_facing)
 
         return self.moves_queue.pop(0)
+
+    def find_weapons(self, weapon: Weapon) -> List[Coords]:
+        pass
+
+    def find_path(self, coords: Coords) -> List[Action]:
+        steps = []
+
+        assert self.current_coords, "current_coords at this step always present"
+        assert self.current_facing, "current_facing at this step always present"
+
+        start = self.grid.node(self.current_coords.x, self.current_coords.y)
+        end = self.grid.node(coords.x, coords.y)
+
+        finder = DijkstraFinder()
+        path, _ = finder.find_path(start, end, self.grid)
+
+        facing = self.current_facing
+
+        for x in range(len(path) - 1):
+            actions, facing = _move_one_tile(facing, path[x], path[x + 1])
+            steps += actions
+
+        return steps
 
     def get_current_position(self, knowledge: ChampionKnowledge) -> Tuple[Facing, Coords]:
         """
@@ -144,6 +213,29 @@ def _is_safe_land(visible_tile: TileDescription) -> bool:
         return False
 
     return True
+
+
+def _move_one_tile(starting_facing: Facing, coord_0: Coords, coord_1: Coords) -> Tuple[List[Action], Facing]:
+    exit_facing = Facing(sub_coords(coord_1, coord_0))
+
+    # Determine what is better, turning left or turning right.
+    # Builds 2 lists and compares length.
+    facing_turning_left = starting_facing
+    left_actions = []
+    while facing_turning_left != exit_facing:
+        facing_turning_left = facing_turning_left.turn_left()
+        left_actions.append(Action.TURN_LEFT)
+
+    facing_turning_right = starting_facing
+    right_actions = []
+    while facing_turning_right != exit_facing:
+        facing_turning_right = facing_turning_right.turn_right()
+        right_actions.append(Action.TURN_RIGHT)
+
+    actions = right_actions if len(left_actions) > len(right_actions) else left_actions
+    actions.append(Action.STEP_FORWARD)
+
+    return actions, exit_facing
 
 
 POTENTIAL_CONTROLLERS = [

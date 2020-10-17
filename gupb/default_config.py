@@ -5,19 +5,21 @@ from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import krowa123
 from gupb.controller import tup_tup
 
+b = botelka.BotElkaController("Z nami na pewno zdasz")
+
 CONFIGURATION = {
     'arenas': [
         'island',
     ],
     'controllers': [
-        bb_bot.BBBotController("Bartek"),
-        botelka.BotElkaController("Z nami na pewno zdasz"),
-        claret_wolf.ClaretWolfController(),
-        ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
+        # bb_bot.BBBotController("Bartek"),
+        b,
+        # claret_wolf.ClaretWolfController(),
+        # ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
-        tup_tup.TupTupController('Bot'),
+        # tup_tup.TupTupController('Bot'),
     ],
     'visualise': True,
-    'show_sight': None,
+    'show_sight': b,
     'runs_no': 1,
 }
