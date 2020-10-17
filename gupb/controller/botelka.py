@@ -23,12 +23,12 @@ RIGHT_SIDE_TRANSITIONS = {
 MAP_SYMBOLS_COST = {
     '=': 0,  # Sea - obstacle
     '#': 0,  # Wall  - obstacle
-    'S': 1,  # Sword
-    'A': 1,  # Axe
     'B': 1,  # Bow
-    'M': 1,  # Amulet
-    '.': 2,  # Land
-    'K': 3,  # Knife - start weapon, we usually want to avoid it
+    'S': 2,  # Sword
+    'A': 2,  # Axe
+    'M': 2,  # Amulet
+    '.': 3,  # Land
+    'K': 4,  # Knife - start weapon, we usually want to avoid it
 }
 
 
@@ -46,6 +46,7 @@ class BotElkaController:
         self.grid = None
         self.current_coords = None
         self.current_facing = None
+        self.current_weapon = None
         self.menhir_pos = None
         self.menhir_found = False
         self.initial_weapon_positions = {}
@@ -81,11 +82,7 @@ class BotElkaController:
             }
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        # Determine current Facing of the bot
-        current_facing, current_coords = self.get_current_position(knowledge)
-
-        self.current_coords = current_coords
-        self.current_facing = current_facing
+        self.update_current_bot_attributes(knowledge)
 
         if not self.menhir_found:
             self.moves_queue += self.find_path(self.menhir_pos)
@@ -133,19 +130,21 @@ class BotElkaController:
 
         return steps
 
-    def get_current_position(self, knowledge: ChampionKnowledge) -> Tuple[Facing, Coords]:
+    def update_current_bot_attributes(self, knowledge: ChampionKnowledge) -> None:
         """
-        Determine current facing and coordinates of the bot.
+        Determine current facing, weapon and coordinates of the bot.
         """
-        facing = next((
-            (visible_tile.character.facing, coords)
+        coords, visible_tile = next((
+            (coords, visible_tile)
             for coords, visible_tile in knowledge.visible_tiles.items()
             if visible_tile.character and visible_tile.character.controller_name == self.name
-        ), None)
+        ), (None, None))
 
-        assert facing, "Bot facing always present"
+        assert visible_tile and coords, "Bot attributes always present"
 
-        return facing
+        self.current_coords = coords
+        self.current_facing = visible_tile.character.facing
+        self.current_weapon = visible_tile.character.weapon
 
     def control_movement(self, current_facing: Facing) -> None:
         """
