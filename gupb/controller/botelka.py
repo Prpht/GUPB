@@ -1,16 +1,15 @@
 import operator
+import os
+import random
 from typing import Dict, List, Tuple
 
 from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
 
-from gupb.model.arenas import ArenaDescription, WEAPON_ENCODING
+from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Facing, Action, ChampionKnowledge
 from gupb.model.coordinates import Coords, add_coords, sub_coords
-
 from gupb.model.tiles import TileDescription
-from gupb.model.weapons import Weapon, Knife, Sword, Axe, Bow, Amulet
-import os
 
 RIGHT_SIDE_TRANSITIONS = {
     Facing.UP: Facing.RIGHT,
@@ -48,6 +47,7 @@ WEAPON_DECODING = {
     'B': 'bow',
     'M': 'amulet',
 }
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -97,30 +97,46 @@ class BotElkaController:
             self.weapon_positions = {
                 Coords(x, y): WEAPON_DECODING[symbol]
                 for y, row in enumerate(lines)
-                for x, symbol in enumerate(row.replace('\n', '')) if symbol in WEAPONS_SYMBOLS
+                for x, symbol in enumerate(row.replace('\n', ''))
+                if symbol in WEAPONS_SYMBOLS
             }
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.update_current_bot_attributes(knowledge)
-        
+
         # There are moves available
         if self.moves_queue:
             return self.moves_queue.pop(0)
 
         if self.current_weapon == 'knife':
-            self.select_weapon()
+            self.find_better_weapon()
             return self.moves_queue.pop(0)
 
         if self.go_to_menhir:
-            self.moves_queue.clear()
-            self.moves_queue += self.find_path(self.menhir_pos)
+            self.moves_queue = self.find_path(self.menhir_pos)
+            self.go_to_menhir = False
             return self.moves_queue.pop(0)
-        
-        self.moves_queue += 4*[Action.TURN_RIGHT]
-        return Action.DO_NOTHING
 
-    def find_weapons(self, weapon: Weapon) -> List[Coords]:
-        pass
+        self.protect_menhir()
+
+        return self.moves_queue.pop(0)
+
+    def protect_menhir(self):
+        actions = []
+        menhir_surrounding = [
+            add_coords(self.menhir_pos, Facing.UP.value),
+            add_coords(self.menhir_pos, Facing.DOWN.value),
+            add_coords(self.menhir_pos, Facing.LEFT.value),
+            add_coords(self.menhir_pos, Facing.RIGHT.value),
+        ]
+
+        destination = random.choice(menhir_surrounding)
+        path = self.find_path(destination)
+        for instruction in path:
+            actions.append(Action.ATTACK)
+            actions.append(instruction)
+
+        self.moves_queue += actions
 
     def find_path(self, coords: Coords) -> List[Action]:
         steps = []
@@ -154,92 +170,25 @@ class BotElkaController:
         ), (None, None))
 
         assert visible_tile and coords, "Bot attributes always present"
-        
+
         visible_weapons = {
             coords: visible_tile.loot.name
             for coords, visible_tile in knowledge.visible_tiles.items()
             if visible_tile.loot
-            }
+        }
 
         self.weapon_positions.update(visible_weapons)
         self.current_coords = coords
         self.current_facing = visible_tile.character.facing
         self.current_weapon = visible_tile.character.weapon.name
 
-    def select_weapon(self) -> None:
+    def find_better_weapon(self) -> None:
         distances = {}
         for coords, weapon in self.weapon_positions.items():
-            distances[(weapon, coords)] = len(self.find_path(coords))*WEAPON_INDEX[weapon]
+            distances[(weapon, coords)] = len(self.find_path(coords)) * WEAPON_INDEX[weapon]
         weapon, coord = min(distances.items(), key=operator.itemgetter(1))[0]
+
         self.moves_queue = self.find_path(coord)
-
-
-    def control_movement(self, current_facing: Facing) -> None:
-        """
-        Determine the best direction to go, basing on the availability of the free space.
-        """
-        self.counter += 1
-
-        if self.counter != 4:
-            # Bot needs to spin around, to see whats is around it
-            self.moves_queue.append(Action.TURN_RIGHT)
-            return
-
-        self.counter = 0
-        # Calculate the best direction to run away
-        desired_facing = self.get_good_facing()
-
-        self.moves_queue += self.rotate_character(current_facing, desired_facing)
-        self.moves_queue.append(Action.STEP_FORWARD)
-
-    def defense(self, facing: Facing, coords: Coords, knowledge: ChampionKnowledge) -> None:
-        """
-        If there is an enemy in front of the bot, attack it.
-        """
-        tile_in_front = add_coords(coords, facing.value)
-
-        if knowledge.visible_tiles[tile_in_front].character:
-            self.moves_queue.insert(0, Action.ATTACK)
-
-    def rotate_character(self, starting_facing: Facing, desired_facing: Facing) -> List[Action]:
-        """
-        Rotate character until starting position becomes desired position.
-        """
-        result = []
-
-        while starting_facing != desired_facing:
-            result.append(Action.TURN_RIGHT)
-            starting_facing = RIGHT_SIDE_TRANSITIONS[starting_facing]
-
-        return result
-
-    def get_good_facing(self) -> Facing:
-        """
-        Avoid being stuck on the map.
-        """
-        desired_facing: Facing = max(self.directions_info.items(), key=operator.itemgetter(1))[0]
-
-        if _is_safe_land(self.tiles_info[desired_facing]):
-            return desired_facing
-
-        # Turn right, to prevent being stuck
-        return RIGHT_SIDE_TRANSITIONS[desired_facing]
-
-
-def _is_safe_land(visible_tile: TileDescription) -> bool:
-    """
-    Determine if Tile is safe for the bot.
-    """
-    dangerous_effects = [
-        effect for effect in visible_tile.effects if effect.type == "mist"
-    ]
-    if dangerous_effects:
-        return False
-
-    if visible_tile.type != "land":
-        return False
-
-    return True
 
 
 def _move_one_tile(starting_facing: Facing, coord_0: Coords, coord_1: Coords) -> Tuple[List[Action], Facing]:
