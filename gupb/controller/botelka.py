@@ -24,19 +24,29 @@ MAP_SYMBOLS_COST = {
     '=': 0,  # Sea - obstacle
     '#': 0,  # Wall  - obstacle
     'B': 1,  # Bow
-    'S': 2,  # Sword
-    'A': 2,  # Axe
-    'M': 2,  # Amulet
+    'S': 4,  # Sword
+    'A': 4,  # Axe
+    'M': 4,  # Amulet
     '.': 3,  # Land
-    'K': 4,  # Knife - start weapon, we usually want to avoid it
+    'K': 10000,  # Knife - start weapon, we usually want to avoid it
 }
 
-WEAPON_NAMES_MAPPING = {
-    'knife': Knife,
-    'sword': Sword,
-    'axe': Axe,
-    'bow': Bow,
-    'amulet': Amulet,
+WEAPONS_SYMBOLS = 'BSAMK'
+
+WEAPON_INDEX = {
+    'knife': 1000,
+    'sword': 3,
+    'axe': 3,
+    'bow': 1,
+    'amulet': 3,
+}
+
+WEAPON_DECODING = {
+    'K': 'knife',
+    'S': 'sword',
+    'A': 'axe',
+    'B': 'bow',
+    'M': 'amulet',
 }
 
 # noinspection PyUnusedLocal
@@ -75,24 +85,30 @@ class BotElkaController:
 
         arena_file = os.path.join(os.path.dirname(__file__), f"../../resources/arenas/{arena_description.name}.gupb")
         with open(arena_file, 'r') as file:
+            lines = file.readlines()
+
             self.grid = Grid(
                 matrix=[
                     [MAP_SYMBOLS_COST.get(symbol, 0) for symbol in row.replace('\n', '')]
-                    for row in file.readlines()
+                    for row in lines
                 ]
             )
 
             self.weapon_positions = {
-                Coords(x, y): WEAPON_ENCODING[symbol]
-                for y, row in enumerate(file.readlines())
-                for x, symbol in enumerate(row.replace('\n', ''))
+                Coords(x, y): WEAPON_DECODING[symbol]
+                for y, row in enumerate(lines)
+                for x, symbol in enumerate(row.replace('\n', '')) if symbol in WEAPONS_SYMBOLS
             }
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.update_current_bot_attributes(knowledge)
-
+        
         # There are moves available
         if self.moves_queue:
+            return self.moves_queue.pop(0)
+
+        if self.current_weapon == 'knife':
+            self.select_weapon()
             return self.moves_queue.pop(0)
 
         if self.go_to_menhir:
@@ -100,6 +116,7 @@ class BotElkaController:
             self.moves_queue += self.find_path(self.menhir_pos)
             return self.moves_queue.pop(0)
         
+        self.moves_queue += 4*[Action.TURN_RIGHT]
         return Action.DO_NOTHING
 
     def find_weapons(self, weapon: Weapon) -> List[Coords]:
@@ -107,6 +124,7 @@ class BotElkaController:
 
     def find_path(self, coords: Coords) -> List[Action]:
         steps = []
+        self.grid.cleanup()
 
         assert self.current_coords, "current_coords at this step always present"
         assert self.current_facing, "current_facing at this step always present"
@@ -138,7 +156,7 @@ class BotElkaController:
         assert visible_tile and coords, "Bot attributes always present"
         
         visible_weapons = {
-            coords: WEAPON_NAMES_MAPPING[visible_tile.loot.name]
+            coords: visible_tile.loot.name
             for coords, visible_tile in knowledge.visible_tiles.items()
             if visible_tile.loot
             }
@@ -146,7 +164,15 @@ class BotElkaController:
         self.weapon_positions.update(visible_weapons)
         self.current_coords = coords
         self.current_facing = visible_tile.character.facing
-        self.current_weapon = visible_tile.character.weapon
+        self.current_weapon = visible_tile.character.weapon.name
+
+    def select_weapon(self) -> None:
+        distances = {}
+        for coords, weapon in self.weapon_positions.items():
+            distances[(weapon, coords)] = len(self.find_path(coords))*WEAPON_INDEX[weapon]
+        weapon, coord = min(distances.items(), key=operator.itemgetter(1))[0]
+        self.moves_queue = self.find_path(coord)
+
 
     def control_movement(self, current_facing: Facing) -> None:
         """
