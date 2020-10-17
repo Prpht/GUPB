@@ -15,7 +15,11 @@ class Move(Enum):
     RIGHT = coordinates.Coords(1, 0)
     DO_NOTHING = coordinates.Coords(0, 0) #ATTACK
 
-#DOWN to add in future
+
+class Axis(Enum):
+    HORIZONTAL = 0
+    VERTICAL = 1
+
 
 POSSIBLE_MOVES = [
     Move.LEFT,
@@ -38,9 +42,9 @@ INVALID_Q_VALUE = -1000000
 MAX_PUNISHMENT = -50
 DANGEROUS_DIST = 1500
 SIGHT_RANGE = 3000
-LONG_SEQ = 5
+LONG_SEQ = 6
 SHORT_SEQ = 2
-EXPLORATION_PROB = 0.3
+EXPLORATION_PROB = 0.1
 alpha = 0.5
 gamma = 0
 epsilon = 0.1
@@ -56,7 +60,7 @@ class ClaretWolfController:
         self.last_observed_mist_vec: coordinates.Coords = None
         self.bot_position = None
         self.run_seq_step = 0
-        self.min_dist_from_mist = 10e6
+        self.position_axis: Axis= None
         self.q_values: dict[(coordinates.Coords, Move), int] = defaultdict(int)
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
@@ -76,6 +80,8 @@ class ClaretWolfController:
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.position_axis = Axis.HORIZONTAL if (self.bot_position and knowledge.position[1] == self.bot_position[1])\
+                                             else Axis.VERTICAL
         self.bot_position = knowledge.position
         mist_vector = self.find_vector_to_nearest_mist_tile(knowledge)
         action: characters.Action = self.choose_next_step(knowledge, mist_vector)
@@ -94,23 +100,24 @@ class ClaretWolfController:
 
 
     def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
-        my_position: coordinates.Coords = knowledge.position
+        #my_position: coordinates.Coords = knowledge.position
         mist_tiles: dict[coordinates.Coords, int] = defaultdict(int) #dict for storing distance to each mist tile from current bot position
         visible_tiles = knowledge.visible_tiles
 
         for coord in visible_tiles.keys():
             if g_distance(self.bot_position, coord) <= SIGHT_RANGE and self.is_given_type_tile(knowledge, coord, MIST_DESCRIPTOR):
-                dist = g_distance(my_position, coord)
+                dist = g_distance(self.bot_position, coord)
                 mist_tiles[coord] = dist
 
         if len(mist_tiles) > 0:
             min_dist_tuple = min(mist_tiles, key=mist_tiles.get)
             min_dist_coord = coordinates.Coords(min_dist_tuple[0], min_dist_tuple[1])
-            min_dist_vec = (min_dist_coord - my_position)
+            min_dist_vec = (min_dist_coord - self.bot_position)
             if self.last_observed_mist_vec is None:
                 self.last_observed_mist_vec = min_dist_vec
                 self.run_seq_step = 1
             elif g_distance_vec(min_dist_vec) < g_distance_vec(self.last_observed_mist_vec):
+                print("RPY:: MIN_VEC_MIST = ", min_dist_vec)
                 self.last_observed_mist_vec = min_dist_vec
                 if self.run_seq_step == LONG_SEQ:
                     self.run_seq_step = 1
@@ -132,6 +139,8 @@ class ClaretWolfController:
         #if not self.is_bot_safe(mist_vector):
         if self.last_observed_mist_vec is None:
             return self.mapping_on_actions[best_new_move]
+        elif self.is_bot_safe(mist_vector) and random.uniform(0, 1) < EXPLORATION_PROB:
+            return self.explore_map()
         else:
             return self.run_away_from_mist()
 
@@ -139,19 +148,37 @@ class ClaretWolfController:
     def run_away_from_mist(self):
         if self.run_seq_step == 1:
             self.run_seq_step += 1
-            if self.last_observed_mist_vec[0] > 0: #closer from left, x coord > 0
+            if self.is_mist_closer_from_left(): #closer from left
                 return self.mapping_on_actions[Move.RIGHT]
-            else:
+            elif self.is_mist_closer_from_right():
                 return self.mapping_on_actions[Move.LEFT]
+            else:
+                return self.mapping_on_actions[random.choice([Move.RIGHT, Move.LEFT])]
         elif self.run_seq_step > 1 and self.run_seq_step < LONG_SEQ:
             self.run_seq_step += 1
             return self.mapping_on_actions[Move.UP]
         else:
-            return self.mapping_on_actions[random.choice([Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
+            return self.mapping_on_actions[random.choice([Move.UP, Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
+
+    def is_mist_closer_from_left(self):
+        (self.position_axis == Axis.VERTICAL and \
+        (self.last_observed_mist_vec[0] * self.last_observed_mist_vec[1] < 0)) \
+        or (self.position_axis == Axis.HORIZONTAL and \
+        (self.last_observed_mist_vec[0] * self.last_observed_mist_vec[1] > 0))
+
+    def is_mist_closer_from_right(self):
+        (self.position_axis == Axis.VERTICAL and \
+        (self.last_observed_mist_vec[0] * self.last_observed_mist_vec[1] > 0)) \
+        or (self.position_axis == Axis.HORIZONTAL and \
+        (self.last_observed_mist_vec[0] * self.last_observed_mist_vec[1] < 0))
 
 
     def get_mapping_on_action(self, move: Move):
         return self.mapping_on_actions[move]
+
+
+    def explore_map(self):
+        return self.mapping_on_actions[random.choice([Move.UP, Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
 
 
 POTENTIAL_CONTROLLERS = [
