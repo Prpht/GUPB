@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 import logging
@@ -6,10 +7,13 @@ import random
 from typing import NamedTuple, Optional
 
 from gupb import controller
+from gupb.logger import core as logger_core
 from gupb.model import arenas
 from gupb.model import coordinates
 from gupb.model import tiles
 from gupb.model import weapons
+
+verbose_logger = logging.getLogger('verbose')
 
 CHAMPION_STARTING_HP: int = 5
 
@@ -39,33 +43,44 @@ class Champion:
         return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)
 
     def act(self) -> None:
-        action = self.pick_action()
-        logging.debug(f"Champion {self.controller.name} picked action {action}.")
-        action(self)
-        self.arena.stay(self)
+        if self.alive:
+            action = self.pick_action()
+            verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
+            ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
+            action(self)
+            self.arena.stay(self)
 
+    # noinspection PyBroadException
     def pick_action(self) -> Action:
         if self.controller:
             visible_tiles = self.arena.visible_tiles(self)
             knowledge = ChampionKnowledge(self.position, visible_tiles)
-            return self.controller.decide(knowledge)
+            try:
+                return self.controller.decide(knowledge)
+            except Exception as e:
+                verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
+                ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)
+                return Action.DO_NOTHING
         else:
             return Action.DO_NOTHING
 
     def turn_left(self) -> None:
         self.facing = self.facing.turn_left()
-        logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        verbose_logger.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        ChampionFacingReport(self.controller.name, self.facing.value).log(logging.DEBUG)
 
     def turn_right(self) -> None:
         self.facing = self.facing.turn_right()
-        logging.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        verbose_logger.debug(f"Champion {self.controller.name} is now facing {self.facing}.")
+        ChampionFacingReport(self.controller.name, self.facing.value).log(logging.DEBUG)
 
     def step_forward(self) -> None:
         self.arena.step_forward(self)
 
     def attack(self) -> None:
         self.weapon.cut(self.arena, self.position, self.facing)
-        logging.debug(f"Champion {self.controller.name} attacked with its {self.weapon.description().name}.")
+        verbose_logger.debug(f"Champion {self.controller.name} attacked with its {self.weapon.description().name}.")
+        ChampionAttackReport(self.controller.name, self.weapon.description().name).log(logging.DEBUG)
 
     def do_nothing(self) -> None:
         pass
@@ -73,14 +88,16 @@ class Champion:
     def damage(self, wounds: int) -> None:
         self.health -= wounds
         self.health = self.health if self.health > 0 else 0
-        logging.debug(f"Champion {self.controller.name} took {wounds} wounds, it has now {self.health} health left.")
+        verbose_logger.debug(f"Champion {self.controller.name} took {wounds} wounds, it has now {self.health} hp left.")
+        ChampionWoundsReport(self.controller.name, wounds, self.health).log(logging.DEBUG)
         if not self.alive:
             self.die()
 
     def die(self) -> None:
         self.arena.terrain[self.position].character = None
         self.arena.terrain[self.position].loot = self.weapon
-        logging.debug(f"Champion {self.controller.name} died.")
+        verbose_logger.debug(f"Champion {self.controller.name} died.")
+        ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 
     @property
     def alive(self) -> bool:
@@ -127,3 +144,39 @@ class Action(Enum):
 
     def __call__(self, *args):
         self.value(*args)
+
+
+@dataclass(frozen=True)
+class ChampionPickedActionReport(logger_core.LoggingMixin):
+    controller_name: str
+    action_name: str
+
+
+@dataclass(frozen=True)
+class ChampionFacingReport(logger_core.LoggingMixin):
+    controller_name: str
+    facing_value: coordinates.Coords
+
+
+@dataclass(frozen=True)
+class ChampionAttackReport(logger_core.LoggingMixin):
+    controller_name: str
+    weapon_name: str
+
+
+@dataclass(frozen=True)
+class ChampionWoundsReport(logger_core.LoggingMixin):
+    controller_name: str
+    wounds: int
+    rest_health: int
+
+
+@dataclass(frozen=True)
+class ChampionDeathReport(logger_core.LoggingMixin):
+    controller_name: str
+
+
+@dataclass(frozen=True)
+class ControllerExceptionReport(logger_core.LoggingMixin):
+    controller_name: str
+    exception: str
