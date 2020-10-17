@@ -149,9 +149,10 @@ class TupTupController:
                     tile_to_check = tile_to_check + self.facing.value
                     if visible_tiles[tile_to_check].character:
                         return True
-            elif isinstance(self.weapon, weapons.Amulet):  # only sees the tile in front
-                if visible_tiles[position + self.facing.value].character:   # TODO fix
-                    return True
+            elif isinstance(self.weapon, weapons.Amulet):
+                for tile in [position + (1, 1), position + (-1, 1), position + (1, -1), position + (-1, -1)]:
+                    if tile in visible_tiles and visible_tiles[tile].character:
+                        return True
             elif isinstance(self.weapon, weapons.Axe):
                 tiles_to_check = [coordinates.Coords(self.facing.value.x, i) for i in [-1, 0, 1]] \
                     if self.facing.value.x != 0 else [coordinates.Coords(i, self.facing.value.y) for i in [-1, 0, 1]]
