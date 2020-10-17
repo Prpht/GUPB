@@ -57,7 +57,9 @@ class TupTupController:
     def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
         char_description = knowledge.visible_tiles[knowledge.position].character
-        self.weapon = char_description.weapon
+        weapons_map = {w.__name__.lower(): w for w in [weapons.Knife, weapons.Sword, weapons.Bow,
+                                                       weapons.Amulet, weapons.Axe]}
+        self.weapon = weapons_map.get(char_description.weapon.name, weapons.Knife)
         self.facing = char_description.facing
 
     def __move(self, knowledge: characters.ChampionKnowledge) -> None:
@@ -140,26 +142,26 @@ class TupTupController:
     def __is_enemy_in_range(self, position: coordinates.Coords,
                             visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> bool:
         try:
-            if isinstance(self.weapon, weapons.LineWeapon):
+            if issubclass(self.weapon, weapons.LineWeapon):
                 weapon_reach = self.weapon.reach()
                 tile_to_check = position
                 for _ in range(1, self.weapon.reach() + 1):
-                    tile_to_check = tile_to_check + self.facing
+                    tile_to_check = tile_to_check + self.facing.value
                     if visible_tiles[tile_to_check].character:
                         return True
             elif isinstance(self.weapon, weapons.Amulet):  # only sees the tile in front
-                if visible_tiles[position + self.facing].character:
+                if visible_tiles[position + self.facing.value].character:   # TODO fix
                     return True
             elif isinstance(self.weapon, weapons.Axe):
                 tiles_to_check = [coordinates.Coords(self.facing.value.x, i) for i in [-1, 0, 1]] \
                     if self.facing.value.x != 0 else [coordinates.Coords(i, self.facing.value.y) for i in [-1, 0, 1]]
                 for tile in tiles_to_check:
-                    if tile in visible_tiles and visible_tiles[position + self.facing].character:
+                    if tile in visible_tiles and visible_tiles[position + self.facing.value].character:
                         return True
+            else:
+                return False
         except KeyError:
             # tile was not visible
-            pass
-        finally:
             return False
 
     @property
