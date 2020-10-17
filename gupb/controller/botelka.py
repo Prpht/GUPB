@@ -9,7 +9,7 @@ from gupb.model.characters import Facing, Action, ChampionKnowledge
 from gupb.model.coordinates import Coords, add_coords, sub_coords
 
 from gupb.model.tiles import TileDescription
-from gupb.model.weapons import Weapon
+from gupb.model.weapons import Weapon, Knife, Sword, Axe, Bow, Amulet
 import os
 
 RIGHT_SIDE_TRANSITIONS = {
@@ -31,6 +31,13 @@ MAP_SYMBOLS_COST = {
     'K': 4,  # Knife - start weapon, we usually want to avoid it
 }
 
+WEAPON_NAMES_MAPPING = {
+    'knife': Knife,
+    'sword': Sword,
+    'axe': Axe,
+    'bow': Bow,
+    'amulet': Amulet,
+}
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -48,8 +55,8 @@ class BotElkaController:
         self.current_facing = None
         self.current_weapon = None
         self.menhir_pos = None
-        self.menhir_found = False
-        self.initial_weapon_positions = {}
+        self.go_to_menhir = True
+        self.weapon_positions = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -75,7 +82,7 @@ class BotElkaController:
                 ]
             )
 
-            self.initial_weapon_positions = {
+            self.weapon_positions = {
                 Coords(x, y): WEAPON_ENCODING[symbol]
                 for y, row in enumerate(file.readlines())
                 for x, symbol in enumerate(row.replace('\n', ''))
@@ -84,28 +91,16 @@ class BotElkaController:
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.update_current_bot_attributes(knowledge)
 
-        if not self.menhir_found:
-            self.moves_queue += self.find_path(self.menhir_pos)
-            self.menhir_found = True
-
         # There are moves available
         if self.moves_queue:
             return self.moves_queue.pop(0)
 
-        # self.defense(current_facing, current_coords, knowledge)
-        #
-        # # Count how many save tiles Bot can see in given direction
-        # self.directions_info[current_facing] = len([
-        #     visible_tile
-        #     for visible_tile in knowledge.visible_tiles.values()
-        #     if _is_safe_land(visible_tile)
-        # ])
-        # # Remember what was if front of us at given facing
-        # self.tiles_info[current_facing] = knowledge.visible_tiles[add_coords(current_coords, current_facing.value)]
-        #
-        # self.control_movement(current_facing)
-
-        return self.moves_queue.pop(0)
+        if self.go_to_menhir:
+            self.moves_queue.clear()
+            self.moves_queue += self.find_path(self.menhir_pos)
+            return self.moves_queue.pop(0)
+        
+        return Action.DO_NOTHING
 
     def find_weapons(self, weapon: Weapon) -> List[Coords]:
         pass
@@ -141,7 +136,14 @@ class BotElkaController:
         ), (None, None))
 
         assert visible_tile and coords, "Bot attributes always present"
+        
+        visible_weapons = {
+            coords: WEAPON_NAMES_MAPPING[visible_tile.loot.name]
+            for coords, visible_tile in knowledge.visible_tiles.items()
+            if visible_tile.loot
+            }
 
+        self.weapon_positions.update(visible_weapons)
         self.current_coords = coords
         self.current_facing = visible_tile.character.facing
         self.current_weapon = visible_tile.character.weapon
