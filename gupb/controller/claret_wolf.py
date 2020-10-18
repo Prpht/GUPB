@@ -131,20 +131,15 @@ class ClaretWolfController:
             self.set_bot_axis_from_his_facing(knowledge)
             
             if self.has_next_defined():
-                print("GETTING MOVE LEFT FROM QUEUE")
                 next_move = self.queue.pop(0)
-                print(next_move)
                 return next_move
 
             self.choose_next_step(knowledge)
 
-            if self.queue:
-                print("GETTING MOVE FROM QUEUE AFTER PERFORMING CALCS")
+            if self.has_next_defined():
                 next_move = self.queue.pop(0)
-                print(next_move)
                 return next_move
             else:
-                print("Exploring map")
                 return self.explore_map()
         except:
             pass
@@ -172,18 +167,15 @@ class ClaretWolfController:
         if next:
             self.enqueue_target(next)
 
-        # maybe chase? TODO
+        # maybe chase?
 
         # maybe explore DEFAULT
-        # best_new_move = random.choice(POSSIBLE_MOVES)
-        print(self.queue)
 
 
     def enqueue_target(self, target):
         next_coords = self.go_to_coords(target)
         if len(next_coords) > 1:
-            print("NEXT TARGET: " + str(next_coords))
-            self.queue += self._move_one_tile(self.facing, self.bot_position ,next_coords[-2])
+            self.queue += self.move(self.facing, self.bot_position ,next_coords[-2])
 
 
     def can_attack(self, knowledge: characters.ChampionKnowledge):
@@ -202,12 +194,7 @@ class ClaretWolfController:
             left_position = centre_position + self.facing.turn_left().value
             right_position = centre_position + self.facing.turn_right().value
             tiles_in_range =  [left_position, centre_position, right_position]
-        # print("BOT POSITION: " + str(self.bot_position))
-        # print("BOT FACING: " + str(self.facing))
-        
-        # print(tiles_in_range)
         enemies = self.get_enemies(knowledge)
-        # print(enemies)
         common_points = list(set(tiles_in_range) & set(enemies))
         return len(common_points) > 0
 
@@ -238,22 +225,12 @@ class ClaretWolfController:
     def update_weapons_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
         weapons = dict(filter(lambda elem: elem[1].loot, knowledge.visible_tiles.items()))
         weapons = {k: v.loot.name for k, v in weapons.items()}
-        # print("WEAPONS IN SIGHT")
-        # print(weapons)
         for weapon in weapons.items():
             self.weapons_knowledge[weapon[0]] = weapon[1]
         self.weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.weapons_knowledge.items()))
-        # print("GOOD WEAPONS")
-        # print(self.weapons_knowledge)
-
 
     def determine_next_weapon(self):
-        # print("CHOOSING NEXT WEPON")
-        # print("BEFORE")
-        # print(self.weapons_knowledge)
         temp_weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[1] != self.bot_position, self.weapons_knowledge.items()))
-        # print("AFTER")
-        # print(temp_weapons_knowledge)
         weapons_scores = {k: WEAPONS_DESCRIPTORS[v]/(1 + g_distance(self.bot_position, k)) for k, v in temp_weapons_knowledge.items()}
         if weapons_scores: 
             max_value = max(weapons_scores.values())
@@ -272,22 +249,17 @@ class ClaretWolfController:
         return path
 
 
-    def _move_one_tile(self, starting_facing: characters.Facing, coord_0: coordinates.Coords, coord_1: coordinates.Coords):
-        # print("Moving")
-        # print(starting_facing)
-        # print(coord_0)
-        # print(coord_1)
-
-        exit_facing = characters.Facing(coordinates.sub_coords(coord_1, coord_0))
+    def move(self, starting_facing: characters.Facing, bot: coordinates.Coords, target: coordinates.Coords):
+        expected_direction = characters.Facing(coordinates.sub_coords(target, bot))
         facing_turning_left = starting_facing
         left_actions = []
-        while facing_turning_left != exit_facing:
+        while facing_turning_left != expected_direction:
             facing_turning_left = facing_turning_left.turn_left()
             left_actions.append(characters.Action.TURN_LEFT)
 
         facing_turning_right = starting_facing
         right_actions = []
-        while facing_turning_right != exit_facing:
+        while facing_turning_right != expected_direction:
             facing_turning_right = facing_turning_right.turn_right()
             right_actions.append(characters.Action.TURN_RIGHT)
 
@@ -303,8 +275,8 @@ class ClaretWolfController:
                              else Axis.VERTICAL
 
 
-    def is_bot_safe(self, mist_vector: coordinates.Coords):
-        return g_distance(self.bot_position, mist_vector) < DANGEROUS_DIST
+    # def is_bot_safe(self, mist_vector: coordinates.Coords):
+    #     return g_distance(self.bot_position, mist_vector) < DANGEROUS_DIST
 
 
     def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
@@ -325,7 +297,7 @@ class ClaretWolfController:
                 self.last_observed_mist_vec = min_dist_vec
                 self.run_seq_step = 1
             elif g_distance_vec(min_dist_vec) < g_distance_vec(self.last_observed_mist_vec):
-                print("RPY:: MIN_VEC_MIST = ", min_dist_vec)
+                # print("RPY:: MIN_VEC_MIST = ", min_dist_vec)
                 self.last_observed_mist_vec = min_dist_vec
                 if self.run_seq_step == LONG_SEQ:
                     self.run_seq_step = 1
