@@ -55,3 +55,8 @@ def path_to_actions(position: Coords, facing: Facing, path: List[Coords]) -> Lis
 
 def get_champion_positions(terrain: Terrain, coords: Optional[List[Coords]] = None) -> List[Coords]:
     return [coord for coord, tile in terrain.items() if tile.character and (not coords or coord in coords)]
+
+
+def distance(a: Coords, b: Coords):
+    diff = b - a
+    return int((diff.x ** 2 + diff.y ** 2) ** 0.5)

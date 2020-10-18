@@ -1,12 +1,12 @@
 import math
 import random
 from queue import SimpleQueue
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from gupb.model import arenas, coordinates, tiles, weapons
 from gupb.model import characters
 from gupb.model.characters import Action
-from gupb.model.coordinates import add_coords
+from gupb.model.coordinates import add_coords, Coords
 from . import utils
 from .knowledge import Knowledge
 from .. import Controller
@@ -30,7 +30,7 @@ class Krowa1233Controller(Controller):
         self.knowledge: Optional[Knowledge] = None
         self.last_action: Optional[Action] = None
         self.last_position: Optional[coordinates.Coords] = None
-        self.path = []
+        self.path: List[Coords] = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Krowa1233Controller):
@@ -42,25 +42,44 @@ class Krowa1233Controller(Controller):
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.knowledge = Knowledge(arena_description)
+        self.path = []
         self.last_action = None
         self.last_position = None
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
-        self.knowledge.update(knowledge)
+    def path_to_weapon(self, weapon_name: str):
+        return sorted([self.knowledge.find_path(self.knowledge.position, axe, False)
+                       for axe in self.knowledge.loot([weapon_name])], key=lambda p: len(p))[0]
 
-        if not self.path and self.knowledge.weapon_type != weapons.Axe:
-            paths = sorted([self.knowledge.find_path(self.knowledge.position, axe, False) +
-                            self.knowledge.find_path(axe, self.knowledge.menhir_position)
-                            for axe in self.knowledge.loot(["axe"])], key=lambda p: len(p))
-            self.path = paths[0]
+    def path_to_menhir(self):
+        return self.knowledge.find_path(self.knowledge.position, self.knowledge.menhir_position)
+
+    def follow_path(self, path: List[Coords]):
+        self.action_queue = SimpleQueue()
+        self.path = path
+        if path:
             for action in utils.path_to_actions(self.knowledge.position, self.knowledge.facing, self.path):
                 self.action_queue.put(action)
+
+    def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
+        self.knowledge.update(knowledge)
+        if self.path and self.last_action == Action.STEP_FORWARD:
+            if self.knowledge.position == self.path[0]:
+                self.path.pop(0)
+            else:
+                self.path = []
+
+        if self.knowledge.weapon_type != weapons.Axe:
+            if not self.path or not self.knowledge.check_loot(self.path[-1], weapons.Axe):
+                self.follow_path(self.path_to_weapon("axe"))
+        elif not self.path and 5 < utils.distance(self.knowledge.position, self.knowledge.menhir_position):
+            self.follow_path(self.path_to_menhir())
 
         if self._check_if_hit(knowledge.visible_tiles):
             action = Action.ATTACK
         elif not self.action_queue.empty():
             action = self.action_queue.get()
         else:
+            path = []
             action = random.choice(POSSIBLE_ACTIONS[:-1])
 
         # if self._mist_is_coming(knowledge.position, knowledge.visible_tiles):

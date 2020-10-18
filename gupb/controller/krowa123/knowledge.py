@@ -37,6 +37,12 @@ class Knowledge:
                 and (not filter or seen_tile.loot.name in filter)
                 and (not filter_out or seen_tile.loot.name not in filter_out)}
 
+    def check_loot(self, coord: Coords, is_type: Optional[Type[utils.W]]):
+        return self.terrain[coord].loot and (not is_type or self.terrain[coord].loot_type() == is_type)
+
+    def tile(self, coord: Coords):
+        return self.terrain[coord]
+
     def visible_terrain(self) -> Terrain:
         return {coord: seen_tile for coord, seen_tile in self.terrain.items() if seen_tile.seen == self.time}
 
@@ -63,7 +69,6 @@ class Knowledge:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
         if self.mist_radius:
             for coords in self.terrain:
-                distance = int(((coords.x - self.menhir_position.x) ** 2 +
-                                (coords.y - self.menhir_position.y) ** 2) ** 0.5)
+                distance = utils.distance(coords, self.menhir_position)
                 if distance == self.mist_radius:
                     self.terrain[coords].tile.effects.append(effects.Mist().description())

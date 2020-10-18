@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Type
+from typing import Type, Optional
 
 from gupb.controller.krowa123 import utils
 from gupb.model.tiles import Tile, TileDescription
+from gupb.model.weapons import Weapon
 
 
 @dataclass
@@ -19,6 +20,9 @@ class SeenTile(Tile):
 
     def type(self) -> Type[Tile]:
         return utils.tiles_dict[self.tile.type]
+
+    def loot_type(self) -> Optional[Type[Weapon]]:
+        return utils.weapons_dict[self.loot.name] if self.loot else None
 
     def mist(self) -> bool:
         return any([e.type == "mist" for e in self.tile.effects])
