@@ -48,6 +48,17 @@ WEAPON_DECODING = {
     'M': 'amulet',
 }
 
+def generate_coords_front(list_of_values, add_val, n):
+    if n == 0: return list_of_values
+    return generate_coords_front(list_of_values.append((list_of_values[-1] + add_val).value), add_val, n-1)
+
+WEAPON_RANGE = {
+    'knife': lambda coords, facing: [coords + facing.value],
+    'sword': lambda coords, facing: [facing.value*i + coords  for i in range(1,4)],
+    'axe': lambda coords, facing: [coords + facing.value, coords + facing.value + facing.turn_left().value,  coords + facing.value + facing.turn_right().value],
+    'bow': lambda coords, facing: [facing.value*i + coords  for i in range(1,50)],
+    'amulet': lambda coords, _: [coords + (1,1), coords + (-1,1), coords + (1,-1), coords + (-1,-1)]
+}
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -67,6 +78,7 @@ class BotElkaController:
         self.menhir_pos = None
         self.go_to_menhir = True
         self.weapon_positions = {}
+        self.players_in_sight = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -104,12 +116,19 @@ class BotElkaController:
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.update_current_bot_attributes(knowledge)
 
+        players_coords_set = set(self.players_in_sight)
+        weapon_coords_range_list =  WEAPON_RANGE[self.current_weapon](self.current_coords, self.current_facing)
+
+        if players_coords_set.intersection(weapon_coords_range_list):
+            self.moves_queue.insert(0, Action.ATTACK)
+
         # There are moves available
         if self.moves_queue:
             return self.moves_queue.pop(0)
 
         if self.current_weapon == 'knife':
             self.find_better_weapon()
+            self.go_to_menhir = True
             return self.moves_queue.pop(0)
 
         if self.go_to_menhir:
@@ -122,7 +141,6 @@ class BotElkaController:
         return self.moves_queue.pop(0)
 
     def protect_menhir(self):
-        actions = []
         menhir_surrounding = [
             add_coords(self.menhir_pos, Facing.UP.value),
             add_coords(self.menhir_pos, Facing.DOWN.value),
@@ -131,11 +149,7 @@ class BotElkaController:
         ]
 
         destination = random.choice(menhir_surrounding)
-        path = self.find_path(destination)
-        for instruction in path:
-            actions.append(Action.ATTACK)
-            actions.append(instruction)
-
+        actions = self.find_path(destination)
         self.moves_queue += actions
 
     def find_path(self, coords: Coords) -> List[Action]:
@@ -177,17 +191,23 @@ class BotElkaController:
             if visible_tile.loot
         }
 
+        visible_players = [
+            Coords(coords[0], coords[1])
+            for coords, visible_tile in knowledge.visible_tiles.items()
+            if visible_tile.character and visible_tile.character.controller_name != self.name
+        ]
+
         self.weapon_positions.update(visible_weapons)
         self.current_coords = coords
         self.current_facing = visible_tile.character.facing
         self.current_weapon = visible_tile.character.weapon.name
+        self.players_in_sight = visible_players
 
     def find_better_weapon(self) -> None:
         distances = {}
         for coords, weapon in self.weapon_positions.items():
             distances[(weapon, coords)] = len(self.find_path(coords)) * WEAPON_INDEX[weapon]
         weapon, coord = min(distances.items(), key=operator.itemgetter(1))[0]
-
         self.moves_queue = self.find_path(coord)
 
 
