@@ -87,6 +87,8 @@ class GoToTargetCommand(CommandInterface):
         if(self.path == None):
             return False
         for coord in self.path:
+            if(coord not in self.controller.scanedArena): 
+                continue
             tile = self.controller.scanedArena[coord]
             if(not self.isTerrainPassable(coord)):
                 return False
@@ -177,7 +179,9 @@ class BBBotController:
         return hash(self.first_name)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.__init__(self.first_name)
         self.menhirPos = arena_description.menhir_position
+        
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
