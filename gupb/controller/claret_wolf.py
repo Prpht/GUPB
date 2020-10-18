@@ -1,12 +1,19 @@
 import pygame
+
 from enum import Enum
 from collections import defaultdict
+
 import random
 
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model import tiles
+from gupb.model import weapons
+
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 
 
 class Move(Enum):
@@ -32,13 +39,28 @@ MIST_DESCRIPTOR = "mist"
 WALL_DESCRIPTOR = "wall"
 SEA_DESCRIPTOR = "sea"
 MENHIR_DESCRIPTOR = "menhir"
+
 KNIFE_DESCRIPTOR = "knife"
 AXE_DESCRIPTOR = "axe"
 BOW_DESCRIPTOR = "bow"
 SWORD_DESCRIPTOR = "sword"
 AMULET_DESCRIPTOR = "amulet"
 
+TERRAIN_DESCRIPTORS = {
+    "mist": -1,
+    "wall": -1,
+    "sea": -1,
+    "menhir": -1,
+    "land":1
+}
 
+WEAPONS_DESCRIPTORS = {
+    "bow": 40,
+    "amulet": 30,
+    "sword": 20,
+    "axe": 20,
+    "knife": 1
+}
 
 SIGHT_RANGE = 3000
 DANGEROUS_DIST = 1500
@@ -55,7 +77,13 @@ g_distance_vec = lambda vec: ((vec[0]) ** 2 + (vec[1]) ** 2)
 class ClaretWolfController:
     def __init__(self):
         self.last_observed_mist_vec: coordinates.Coords = None
+        self.weapon = "knife"
+        self.weapons_knowledge = {}
         self.bot_position = None
+        self.facing = None
+        self.enviroment_map = None
+        self.bot_position = None
+        self.queue = []
         self.run_seq_step = 0
         self.position_axis: Axis= None
         self.is_bot_in_rotation = False
@@ -70,18 +98,128 @@ class ClaretWolfController:
             return True
         return False
 
+
     def __hash__(self) -> int:
         return 47
 
+
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.init_enviroment_map(arena_description.name)
+
+
+    def terrain_mapping(self, terrain, coords: coordinates.Coords)->int:
+        field_type = (terrain[coords]).description().type.lower()
+        return TERRAIN_DESCRIPTORS[field_type]
+
+
+    def init_enviroment_map(self, map_name: str):
+        arena = None
+        try:
+            arena_object = arenas.Arena.load(map_name)
+            size = arena_object.size
+            terrain = arena_object.terrain
+            arena = [[self.terrain_mapping(terrain, coordinates.Coords(*(x,y))) for x in range(size[0])] for y in range(size[1])] 
+            self.enviroment_map = Grid(matrix=arena)
+        except:
+            pass
+
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.bot_position = knowledge.position
-        self.set_bot_axis_from_his_facing(knowledge)
+        try:
+            self.update_bot(knowledge)
+            self.update_weapons_knowledge(knowledge)
+            self.set_bot_axis_from_his_facing(knowledge)
+            
+            if self.has_next_defined():
+                print("GETTING MOVE LEFT FROM QUEUE")
+                next_move = self.queue.pop(0)
+                print(next_move)
+                return next_move
+
+            self.choose_next_step(knowledge)
+
+            if self.queue:
+                print("GETTING MOVE FROM QUEUE AFTER PERFORMING CALCS")
+                next_move = self.queue.pop(0)
+                print(next_move)
+                return next_move
+            else:
+                print("Exploring map")
+                return self.explore_map()
+        except:
+            pass
+
+
+    def has_next_defined(self):
+        return len(self.queue) > 0
+
+
+    def choose_next_step(self, knowledge: characters.ChampionKnowledge) -> None:
+
+        # can we attack?
+        if self.can_attack(knowledge):
+            self.queue =[]
+            self.queue.append(characters.Action.ATTACK)
+
+        # is mist a danger?
         mist_vector = self.find_vector_to_nearest_mist_tile(knowledge)
-        action: characters.Action = self.choose_next_step(knowledge, mist_vector)
-        return action
+        if self.last_observed_mist_vec is not None:
+            self.queue =[]
+            self.queue.append(self.run_away_from_mist())
+            
+        # maybe look for new weapon?
+        next = self.determine_next_weapon()
+        if next:
+            self.enqueue_target(next)
+
+        # maybe chase? TODO
+
+        # maybe explore DEFAULT
+        # best_new_move = random.choice(POSSIBLE_MOVES)
+        print(self.queue)
+
+
+    def enqueue_target(self, target):
+        next_coords = self.go_to_coords(target)
+        if len(next_coords) > 1:
+            print("NEXT TARGET: " + str(next_coords))
+            self.queue += self._move_one_tile(self.facing, self.bot_position ,next_coords[-2])
+
+
+    def can_attack(self, knowledge: characters.ChampionKnowledge):
+        tiles_in_range = []
+        position = self.bot_position
+        if self.weapon == KNIFE_DESCRIPTOR:
+            tiles_in_range = [position + self._mul(self.facing.value, i) for i in range(1, weapons.Knife.reach() + 1)]
+        elif self.weapon == SWORD_DESCRIPTOR:
+            tiles_in_range = [position + self._mul(self.facing.value, i) for i in range(1, weapons.Sword.reach() + 1)]
+        elif self.weapon == BOW_DESCRIPTOR:
+            tiles_in_range = [position + self._mul(self.facing.value, i) for i in range(1, weapons.Bow.reach() + 1)]
+        elif self.weapon == AMULET_DESCRIPTOR:
+            tiles_in_range = [position + (1, 1), position + (-1, 1), position + (1, -1), position + (-1, -1)]
+        else:   
+            centre_position = position + self.facing.value
+            left_position = centre_position + self.facing.turn_left().value
+            right_position = centre_position + self.facing.turn_right().value
+            tiles_in_range =  [left_position, centre_position, right_position]
+        # print("BOT POSITION: " + str(self.bot_position))
+        # print("BOT FACING: " + str(self.facing))
+        
+        # print(tiles_in_range)
+        enemies = self.get_enemies(knowledge)
+        # print(enemies)
+        common_points = list(set(tiles_in_range) & set(enemies))
+        return len(common_points) > 0
+
+
+    def get_enemies(self, knowledge):
+        enemies = dict(filter(lambda elem: elem[1].character != None and elem[0] != self.bot_position, knowledge.visible_tiles.items()))
+        return list(enemies.keys())
+
+
+    def _mul(self, coor, scalar: int):
+        return coordinates.Coords(*(coor[0]*scalar, coor[1]*scalar))
+
 
     @property
     def name(self) -> str:
@@ -91,12 +229,78 @@ class ClaretWolfController:
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.BROWN
 
+    def update_bot(self, knowledge: characters.ChampionKnowledge):
+        self.bot_position = knowledge.position
+        self.weapon       = knowledge.visible_tiles[self.bot_position].character.weapon.name
+        self.facing       = knowledge.visible_tiles[self.bot_position].character.facing
+
+
+    def update_weapons_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
+        weapons = dict(filter(lambda elem: elem[1].loot, knowledge.visible_tiles.items()))
+        weapons = {k: v.loot.name for k, v in weapons.items()}
+        # print("WEAPONS IN SIGHT")
+        # print(weapons)
+        for weapon in weapons.items():
+            self.weapons_knowledge[weapon[0]] = weapon[1]
+        self.weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.weapons_knowledge.items()))
+        # print("GOOD WEAPONS")
+        # print(self.weapons_knowledge)
+
+
+    def determine_next_weapon(self):
+        # print("CHOOSING NEXT WEPON")
+        # print("BEFORE")
+        # print(self.weapons_knowledge)
+        temp_weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[1] != self.bot_position, self.weapons_knowledge.items()))
+        # print("AFTER")
+        # print(temp_weapons_knowledge)
+        weapons_scores = {k: WEAPONS_DESCRIPTORS[v]/(1 + g_distance(self.bot_position, k)) for k, v in temp_weapons_knowledge.items()}
+        if weapons_scores: 
+            max_value = max(weapons_scores.values())
+            max_keys = [k for k, v in weapons_scores.items() if v == max_value]
+            return max_keys[0]
+        return None
+
+
+    def go_to_coords(self, target: coordinates.Coords):
+        start = self.enviroment_map.node(target[0], target[1])
+        end = self.enviroment_map.node(self.bot_position[0], self.bot_position[1])
+
+        self.enviroment_map.cleanup()
+        finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+        path, _ = finder.find_path(start, end, self.enviroment_map)
+        return path
+
+
+    def _move_one_tile(self, starting_facing: characters.Facing, coord_0: coordinates.Coords, coord_1: coordinates.Coords):
+        # print("Moving")
+        # print(starting_facing)
+        # print(coord_0)
+        # print(coord_1)
+
+        exit_facing = characters.Facing(coordinates.sub_coords(coord_1, coord_0))
+        facing_turning_left = starting_facing
+        left_actions = []
+        while facing_turning_left != exit_facing:
+            facing_turning_left = facing_turning_left.turn_left()
+            left_actions.append(characters.Action.TURN_LEFT)
+
+        facing_turning_right = starting_facing
+        right_actions = []
+        while facing_turning_right != exit_facing:
+            facing_turning_right = facing_turning_right.turn_right()
+            right_actions.append(characters.Action.TURN_RIGHT)
+
+        actions = right_actions if len(left_actions) > len(right_actions) else left_actions
+        actions.append(characters.Action.STEP_FORWARD)
+        return actions
+
+
     def set_bot_axis_from_his_facing(self, knowledge: characters.ChampionKnowledge):
         tile_descr: tiles.TileDescription =  knowledge.visible_tiles[self.bot_position]
         facing: characters.Facing = tile_descr.character.facing
         self.position_axis = Axis.HORIZONTAL if (facing == characters.Facing.LEFT or facing == characters.Facing.RIGHT)\
                              else Axis.VERTICAL
-
 
 
     def is_bot_safe(self, mist_vector: coordinates.Coords):
@@ -136,18 +340,6 @@ class ClaretWolfController:
                 if effect_desc.type == descriptor:
                     return True
         return False
-
-
-    def choose_next_step(self, knowledge: characters.ChampionKnowledge, mist_vector: coordinates.Coords) -> characters.Action:
-        best_new_move = random.choice(POSSIBLE_MOVES)
-        #if not self.is_bot_safe(mist_vector):
-        if self.last_observed_mist_vec is None:
-            return self.mapping_on_actions[best_new_move]
-        #elif self.is_bot_safe(mist_vector) and random.uniform(0, 1) < EXPLORATION_PROB:
-        #   return self.explore_map()
-        else:
-            return self.run_away_from_mist()
-
 
     def run_away_from_mist(self):
         if self.run_seq_step == 1:
