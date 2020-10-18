@@ -3,7 +3,7 @@ import random
 from queue import SimpleQueue
 from typing import Dict, List, Optional
 
-from gupb.model import arenas, coordinates, tiles
+from gupb.model import arenas, coordinates, tiles, weapons
 from gupb.model import characters
 from gupb.model.characters import Action
 from gupb.model.coordinates import add_coords
@@ -48,14 +48,29 @@ class Krowa1233Controller(Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
         self.knowledge.update(knowledge)
 
-        if self._mist_is_coming(knowledge.position, knowledge.visible_tiles):
-            action = self._escape_from_mist(knowledge.position, knowledge.visible_tiles)
-        elif self._check_if_hit(knowledge.visible_tiles):
+        if not self.path and self.knowledge.weapon_type != weapons.Axe:
+            paths = sorted([self.knowledge.find_path(self.knowledge.position, axe, False) +
+                            self.knowledge.find_path(axe, self.knowledge.menhir_position)
+                            for axe in self.knowledge.loot(["axe"])], key=lambda p: len(p))
+            self.path = paths[0]
+            for action in utils.path_to_actions(self.knowledge.position, self.knowledge.facing, self.path):
+                self.action_queue.put(action)
+
+        if self._check_if_hit(knowledge.visible_tiles):
             action = Action.ATTACK
+        elif not self.action_queue.empty():
+            action = self.action_queue.get()
         else:
-            action = self._find_enemy()
-        if action == self.last_action and knowledge.position == self.last_position:
             action = random.choice(POSSIBLE_ACTIONS[:-1])
+
+        # if self._mist_is_coming(knowledge.position, knowledge.visible_tiles):
+        #     action = self._escape_from_mist(knowledge.position, knowledge.visible_tiles)
+        # elif self._check_if_hit(knowledge.visible_tiles):
+        #     action = Action.ATTACK
+        # else:
+        #     action = self._find_enemy()
+        # if action == self.last_action and knowledge.position == self.last_position:
+        #     action = random.choice(POSSIBLE_ACTIONS[:-1])
         self.last_action = action
         self.last_position = knowledge.position
         return action

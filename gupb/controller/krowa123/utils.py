@@ -1,10 +1,23 @@
-from typing import List, Optional
+import inspect
+from typing import List, Optional, TypeVar, Dict
 
+from gupb.model import tiles, weapons
 from gupb.model.arenas import Terrain
 from gupb.model.characters import Facing, Action
 from gupb.model.coordinates import Coords
 
 __all__ = ["neighboring_coords", "facing_from_value", "turn_actions", "path_to_actions", "get_champion_positions"]
+
+W = TypeVar("W", bound=weapons.Weapon)
+T = TypeVar("T", bound=tiles.Tile)
+
+weapons_dict: Dict[str, W] = \
+    {name.lower(): clazz for name, clazz in
+     inspect.getmembers(weapons, lambda o: inspect.isclass(o) and issubclass(o, weapons.Weapon) and not inspect.isabstract(o))}
+
+tiles_dict: Dict[str, T] = \
+    {name.lower(): clazz for name, clazz in
+     inspect.getmembers(tiles, lambda o: inspect.isclass(o) and issubclass(o, tiles.Tile) and not inspect.isabstract(o))}
 
 
 def neighboring_coords(coord: Coords) -> List[Coords]:

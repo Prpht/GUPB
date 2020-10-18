@@ -7,7 +7,7 @@ from ..utils import neighboring_coords
 
 
 # A* search
-def astar_search(terrain: Dict[Coords, SeenTile], start: Coords, end: Coords) -> Optional[List[Coords]]:
+def astar_search(terrain: Dict[Coords, SeenTile], start: Coords, end: Coords, avoid_loot: bool = True) -> Optional[List[Coords]]:
     # Create lists for open nodes and closed nodes
     open = []
     closed = []
@@ -43,9 +43,9 @@ def astar_search(terrain: Dict[Coords, SeenTile], start: Coords, end: Coords) ->
         # Loop neighbors
         for next in neighbors:
             # Get value from terrain
-            terrain_value = terrain.get(next)
+            tile = terrain.get(next)
             # Check if the node is a wall
-            if not terrain_value.tile.terrain_passable():
+            if not tile.terrain_passable() or tile.mist() or (avoid_loot and tile.loot):
                 continue
             # Create a neighbor node
             neighbor = Node(next, current_node)
