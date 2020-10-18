@@ -43,11 +43,12 @@ class Champion:
         return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)
 
     def act(self) -> None:
-        action = self.pick_action()
-        verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
-        ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
-        action(self)
-        self.arena.stay(self)
+        if self.alive:
+            action = self.pick_action()
+            verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
+            ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
+            action(self)
+            self.arena.stay(self)
 
     # noinspection PyBroadException
     def pick_action(self) -> Action:
