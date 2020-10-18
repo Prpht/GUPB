@@ -74,6 +74,10 @@ class ClaretWolfController:
     def name(self) -> str:
         return 'ClaretWolfController'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.BROWN
+
     def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
         my_position: coordinates.Coords = knowledge.position
         mist_tiles: dict[coordinates.Coords, int] = defaultdict(int) #dict for storing distance to each mist tile from current bot position

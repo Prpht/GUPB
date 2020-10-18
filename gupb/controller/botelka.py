@@ -2,7 +2,7 @@ import operator
 from typing import Dict, List, Tuple
 
 from gupb.model.arenas import ArenaDescription
-from gupb.model.characters import Facing, Action, ChampionKnowledge
+from gupb.model.characters import Facing, Action, ChampionKnowledge, Tabard
 from gupb.model.coordinates import Coords, add_coords
 
 from gupb.model.tiles import TileDescription
@@ -38,6 +38,10 @@ class BotElkaController:
     @property
     def name(self) -> str:
         return f"BotElka{self.first_name}"
+
+    @property
+    def preferred_tabard(self) -> Tabard:
+        return Tabard.BLUE
 
     def reset(self, arena_description: ArenaDescription) -> None:
         pass

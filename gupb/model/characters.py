@@ -30,6 +30,16 @@ class ChampionDescription(NamedTuple):
     facing: Facing
 
 
+class Tabard(Enum):
+    BLUE = 'Blue'
+    BROWN = 'Brown'
+    GREY = 'Grey'
+    RED = 'Red'
+    VIOLET = 'Violet'
+    WHITE = 'White'
+    YELLOW = 'Yellow'
+
+
 class Champion:
     def __init__(self, starting_position: coordinates.Coords, arena: arenas.Arena) -> None:
         self.facing: Facing = Facing.random()
@@ -38,6 +48,11 @@ class Champion:
         self.position: coordinates.Coords = starting_position
         self.arena: arenas.Arena = arena
         self.controller: Optional[controller.Controller] = None
+        self.tabard: Optional[Tabard] = None
+
+    def assign_controller(self, assigned_controller: controller.Controller) -> None:
+        self.controller = assigned_controller
+        self.tabard = self.controller.preferred_tabard
 
     def description(self) -> ChampionDescription:
         return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)

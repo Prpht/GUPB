@@ -19,3 +19,8 @@ class Controller(Protocol):
     @abstractmethod
     def name(self) -> str:
         raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def preferred_tabard(self) -> characters.Tabard:
+        raise NotImplementedError
