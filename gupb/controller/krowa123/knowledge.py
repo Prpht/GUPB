@@ -4,6 +4,7 @@ from typing import Dict, Optional, List, Type
 
 from gupb.controller.krowa123 import pathfinding, utils
 from gupb.controller.krowa123.model import SeenTile
+from gupb.controller.krowa123.pathfinding.dijkstra import determine_path_bot
 from gupb.model import weapons, effects
 from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.characters import ChampionKnowledge, Facing, ChampionDescription
@@ -11,6 +12,8 @@ from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
 
 __all__ = ["Knowledge"]
+
+from gupb.model.tiles import Tile
 
 from gupb.model.weapons import Weapon
 
@@ -58,6 +61,19 @@ class Knowledge:
 
     def find_path(self, start: Coords, end: Coords, avoid_loot: bool = True) -> Optional[List[Coords]]:
         return pathfinding.astar_search(self.terrain, start, end, avoid_loot)
+
+    def find_dijkstra_path(
+        self,
+        weapons_to_take: List[Type[Weapon]],
+        strict: bool = False
+    ) -> List[Coords]:
+        return determine_path_bot(
+            terrain=self.terrain,
+            start=self.position,
+            weapons_to_take=weapons_to_take,
+            menhir_position=self.menhir_position,
+            strict=strict
+        )
 
     def champions_to_attack(self) -> List[Coords, ChampionDescription]:
         return utils.get_champion_positions(

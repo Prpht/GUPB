@@ -45,8 +45,10 @@ def turn_actions(start: Facing, end: Facing) -> List[Action]:
 def path_to_actions(position: Coords, facing: Facing, path: List[Coords]) -> List[Action]:
     actions = []
     for coord in path:
-        desired_facing = facing_from_value(coord - position)
-        actions += turn_actions(facing, desired_facing)
+        desired_facing = facing
+        if coord - position != (0, 0):
+            desired_facing = facing_from_value(coord - position)
+            actions += turn_actions(facing, desired_facing)
         actions.append(Action.STEP_FORWARD)
         position = coord
         facing = desired_facing
