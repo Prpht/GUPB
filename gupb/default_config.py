@@ -14,7 +14,6 @@ CONFIGURATION = {
         botelka.BotElkaController("Z nami na pewno zdasz"),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         tup_tup.TupTupController('Bot'),
-      
     ],
     'visualise': True,
     'show_sight': None,
