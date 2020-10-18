@@ -38,12 +38,10 @@ BOW_DESCRIPTOR = "bow"
 SWORD_DESCRIPTOR = "sword"
 AMULET_DESCRIPTOR = "amulet"
 
-INVALID_Q_VALUE = -1000000
-MAX_PUNISHMENT = -50
-DANGEROUS_DIST = 1500
+
+
 SIGHT_RANGE = 3000
 LONG_SEQ = 6
-SHORT_SEQ = 2
 EXPLORATION_PROB = 0.1
 alpha = 0.5
 gamma = 0
@@ -53,15 +51,13 @@ g_distance = lambda my_p, ref_p: ((ref_p[0] - my_p[0]) ** 2 + (ref_p[1] - my_p[1
 g_distance_vec = lambda vec: ((vec[0]) ** 2 + (vec[1]) ** 2)
 
 
-'''q_values: state - vector(coordinates.Coords) from bot position to nearest mist tile and action(Move) - move is defined in POSSIBLE_MOVES
-  mapping_on_actions: map Move to Action'''
 class ClaretWolfController:
     def __init__(self):
         self.last_observed_mist_vec: coordinates.Coords = None
         self.bot_position = None
         self.run_seq_step = 0
         self.position_axis: Axis= None
-        self.q_values: dict[(coordinates.Coords, Move), int] = defaultdict(int)
+        self.is_bot_in_rotation = False
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
                                                                   Move.RIGHT: characters.Action.TURN_RIGHT,
@@ -80,9 +76,8 @@ class ClaretWolfController:
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.position_axis = Axis.HORIZONTAL if (self.bot_position and knowledge.position[1] == self.bot_position[1])\
-                                             else Axis.VERTICAL
         self.bot_position = knowledge.position
+        self.set_bot_axis_from_his_facing(knowledge)
         mist_vector = self.find_vector_to_nearest_mist_tile(knowledge)
         action: characters.Action = self.choose_next_step(knowledge, mist_vector)
         return action
@@ -94,6 +89,14 @@ class ClaretWolfController:
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.BROWN
+
+    def set_bot_axis_from_his_facing(self, knowledge: characters.ChampionKnowledge):
+        tile_descr: tiles.TileDescription =  knowledge.visible_tiles[self.bot_position]
+        facing: characters.Facing = tile_descr.character.facing
+        self.position_axis = Axis.HORIZONTAL if (facing == characters.Facing.LEFT or facing == characters.Facing.RIGHT)\
+                             else Axis.VERTICAL
+
+
 
     def is_bot_safe(self, mist_vector: coordinates.Coords):
         return g_distance(self.bot_position, mist_vector) < DANGEROUS_DIST
@@ -139,8 +142,8 @@ class ClaretWolfController:
         #if not self.is_bot_safe(mist_vector):
         if self.last_observed_mist_vec is None:
             return self.mapping_on_actions[best_new_move]
-        elif self.is_bot_safe(mist_vector) and random.uniform(0, 1) < EXPLORATION_PROB:
-            return self.explore_map()
+        #elif self.is_bot_safe(mist_vector) and random.uniform(0, 1) < EXPLORATION_PROB:
+        #   return self.explore_map()
         else:
             return self.run_away_from_mist()
 
@@ -152,8 +155,13 @@ class ClaretWolfController:
                 return self.mapping_on_actions[Move.RIGHT]
             elif self.is_mist_closer_from_right():
                 return self.mapping_on_actions[Move.LEFT]
-            else:
-                return self.mapping_on_actions[random.choice([Move.RIGHT, Move.LEFT])]
+            else: # mist directly in front of bot
+                self.is_bot_in_rotation = True
+                return self.mapping_on_actions[Move.RIGHT]
+        elif self.is_bot_in_rotation: #continue rotation
+            self.run_seq_step += 2
+            self.is_bot_in_rotation = False
+            return self.mapping_on_actions[Move.RIGHT]
         elif self.run_seq_step > 1 and self.run_seq_step < LONG_SEQ:
             self.run_seq_step += 1
             return self.mapping_on_actions[Move.UP]
