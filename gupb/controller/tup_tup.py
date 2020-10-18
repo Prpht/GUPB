@@ -4,6 +4,8 @@ from typing import Dict, Type, Optional, Tuple, List
 
 from gupb.model import arenas, coordinates, weapons, tiles, characters
 
+import random
+
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 ALLOWED_TILES = {tiles.Land}
 WEAPON_TYPES = arenas.WEAPON_ENCODING.keys()
@@ -18,15 +20,15 @@ class TupTupController:
         self.facing: Optional[characters.Facing] = None
         self.position: coordinates.Coords = None
         self.weapon: Type[weapons.Weapon] = weapons.Knife
-        self.reached_middle: bool = False
-        self.direction: Optional[characters.Facing] = None
-        self.moved: bool = False
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.weapon_positions = defaultdict(list)
         self.has_calculated_path: bool = False
         self.parsed_map: Optional[list[list[int]]] = None
-        self.path: Optional[list] = None
+        self.path: List = []
         self.arena_size: Optional[tuple[int, int]] = None
+        self.bfs_goal: coordinates.Coords = None
+        self.bfs_potential_goals: set[coordinates.Coords] = set()
+        self.bfs_potential_goals_visited: set[coordinates.Coords] = set()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TupTupController) and other.name == self.name:
@@ -38,30 +40,47 @@ class TupTupController:
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir_pos = arena_description.menhir_position
-        self.parsed_map = self.__parse_map(arena_description.name)
+        self.bfs_goal = self.menhir_pos
+        try:
+            self.bfs_potential_goals_visited.add(self.menhir_pos)
+            self.parsed_map = self.__parse_map(arena_description.name)
+        except Exception:
+            pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.__update_char_info(knowledge)
+        try:
+            self.__update_char_info(knowledge)
 
-        if not self.has_calculated_path:
-            self.has_calculated_path = True  # if it can't be find during the first attempt, do not try again
-            start, end = self.position, self.menhir_pos
-            self.__calculate_optimal_path(start, end)
+            if not self.has_calculated_path:
+                start, end = self.position, self.bfs_goal
+                self.__calculate_optimal_path(start, end)
+                if len(self.path) > 0:  # the calculations were successful
+                    self.has_calculated_path = True
+                elif self.parsed_map:
+                    neighbors = self.__get_neighbors(self.parsed_map, self.bfs_goal)
+                    for neighbor in neighbors:
+                        if neighbor not in self.bfs_potential_goals_visited:
+                            self.bfs_potential_goals.add(neighbor)
+                    if self.bfs_potential_goals:
+                        self.bfs_goal = self.bfs_potential_goals.pop()
+                        self.bfs_potential_goals_visited.add(self.bfs_goal)
 
-        if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
-            return characters.Action.ATTACK
+            if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
+                return characters.Action.ATTACK
 
-        if not self.action_queue.empty():
-            return self.action_queue.get()
+            if not self.action_queue.empty():
+                return self.action_queue.get()
 
-        if len(self.path) > 1:
-            instr1 = self.path.pop(0)[1]
-            instr2 = self.path[0][1]
-            self.__new_move(instr1, instr2)
-        else:  # the destination is reached
-            self.__guard_area()
+            if len(self.path) > 1:
+                instr1 = self.path.pop(0)[1]
+                instr2 = self.path[0][1]
+                self.__new_move(instr1, instr2)
+            else:  # the destination is reached
+                self.__guard_area()
 
-        return characters.Action.DO_NOTHING
+            return characters.Action.DO_NOTHING
+        except Exception:
+            return characters.Action.DO_NOTHING
 
     def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
@@ -70,28 +89,6 @@ class TupTupController:
                                                        weapons.Amulet, weapons.Axe]}
         self.weapon = weapons_map.get(char_description.weapon.name, weapons.Knife)
         self.facing = char_description.facing
-
-    def __move(self, knowledge: characters.ChampionKnowledge) -> None:
-        x_distance, y_distance = self.__calc_coords_diff(self.menhir_pos, self.position)
-        if abs(x_distance) < 2 and abs(y_distance) < 2:
-            self.reached_middle = True
-            self.action_queue.put(characters.Action.TURN_RIGHT)
-            return None
-
-        if x_distance == 0:  # changes in vertical direction
-            expected_facing = self.__get_expected_facing(y_distance, True)
-        elif y_distance == 0 or abs(x_distance) <= abs(y_distance):  # changes in horizontal direction
-            expected_facing = self.__get_expected_facing(x_distance, False)
-        else:  # changes in vertical direction
-            expected_facing = self.__get_expected_facing(y_distance, True)
-
-        if self.facing != expected_facing:
-            self.__rotate(expected_facing)
-        elif self.__can_move_forward(knowledge):
-            self.action_queue.put(characters.Action.STEP_FORWARD)
-        else:
-            self.direction = self.facing
-            self.__avoid_obstacle(knowledge)
 
     def __rotate(self, expected_facing: characters.Facing) -> None:
         curr_facing_index = FACING_ORDER.index(self.facing)
@@ -109,44 +106,8 @@ class TupTupController:
         elif diff_expected_curr == 3:
             self.action_queue.put(characters.Action.TURN_LEFT)
 
-    def __get_expected_facing(self, distance: int, is_move_vertical: bool) -> characters.Facing:
-        if is_move_vertical:
-            return characters.Facing.UP if distance < 0 else characters.Facing.DOWN
-        else:
-            return characters.Facing.LEFT if distance < 0 else characters.Facing.RIGHT
-
-    def __can_move_forward(self, knowledge: characters.ChampionKnowledge) -> bool:
-        next_tile_coords = self.position + self.facing.value
-        return next_tile_coords in knowledge.visible_tiles.keys() \
-               and knowledge.visible_tiles[next_tile_coords].type == 'land'
-
-    def __avoid_obstacle(self, knowledge):
-        if self.facing == self.direction:
-            if self.__can_move_forward(knowledge):
-                self.direction = None
-                self.moved = False
-                self.action_queue.put(characters.Action.STEP_FORWARD)
-            else:
-                self.moved = False
-                self.action_queue.put(characters.Action.TURN_RIGHT)
-        else:
-            if self.moved:
-                self.moved = False
-                self.action_queue.put(characters.Action.TURN_LEFT)
-            else:
-                if self.__can_move_forward(knowledge):
-                    self.moved = True
-                    self.action_queue.put(characters.Action.STEP_FORWARD)
-                else:
-                    self.moved = False
-                    self.action_queue.put(characters.Action.TURN_RIGHT)
-
     def __guard_area(self) -> None:
         self.action_queue.put(characters.Action.TURN_RIGHT)
-
-    def __calc_coords_diff(self, end_coords: int, start_coords: int) -> int:
-        coords_dif = coordinates.sub_coords(end_coords, start_coords)
-        return coords_dif
 
     def __is_enemy_in_range(self, position: coordinates.Coords,
                             visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> bool:
@@ -221,37 +182,42 @@ class TupTupController:
                 queue.append(neighbour)
         raise BFSException("The shortest path wasn't found!")
 
-    def __get_path(self, end_coords: coordinates.Coords, start_coords: coordinates.Coords, path: Dict,
-                   backtrack_path=[]) -> List[Tuple[int, coordinates.Coords]]:
+    def __get_path(self, end_coords: coordinates.Coords, start_coords: coordinates.Coords, path: Dict):
         if end_coords == start_coords:
-            return backtrack_path
+            return 0, self.facing, end_coords
         elif end_coords not in path.keys():
             raise PathFindingException
         else:
-            self.__get_path(path[end_coords][1], start_coords, path, backtrack_path)
-        backtrack_path.append(path[end_coords])
-        print("type, ", backtrack_path, type(backtrack_path))
-        return backtrack_path
+            next = path[end_coords][1]
+            prev_steps, prev_facing, prev_coords = self.__get_path(next, start_coords, path)
+            diff = end_coords - next
+            next_facing = characters.Facing(coordinates.Coords(diff.y, diff.x))
+            rotations_number = self.__get_rotations_number(prev_facing, next_facing)
+            self.path.append((prev_steps, next))
+            steps = prev_steps + 1 + rotations_number
+            return steps, next_facing, next
 
-    def __find_nearest_weapon(self, coords: coordinates.Coords) -> coordinates.Coords:
-        profitable_weapons_positions = self.weapon_positions['sword'] + self.weapon_positions['bow']
-        min_difference = abs(self.arena_size[0]) + abs(self.arena_size[1])
-        closest_weapon_position = None
-        for weapon_position in profitable_weapons_positions:
-            dist_to_weapon = coords - weapon_position
-            distance_estimation = abs(dist_to_weapon.x) + abs(dist_to_weapon.y)
-            closest_weapon_position = weapon_position if min(min_difference, distance_estimation) == distance_estimation \
-                else closest_weapon_position
-        return closest_weapon_position
+    def __get_rotations_number(self, current_facing: characters.Facing, next_facing: characters.Facing) -> int:
+        curr_facing_index = FACING_ORDER.index(current_facing)
+        next_facing_index = FACING_ORDER.index(next_facing)
+        diff = next_facing_index - curr_facing_index
+        if diff < 0:
+            diff += len(FACING_ORDER)
 
-    def __calculate_optimal_path(self, start_coords: coordinates.Coords, end_coords: coordinates.Coords):
+        if diff == 1 or diff == 3:
+            return 1
+        elif diff == 2:
+            return 2
+        return 0
+
+    def __calculate_optimal_path(self, start_coords: coordinates.Coords, end_coords: coordinates.Coords) -> bool:
         start_swapped = coordinates.Coords(start_coords.y, start_coords.x)
         end_swapped = coordinates.Coords(end_coords.y, end_coords.x)
         try:
             bfs_res = self.__breadth_first_search(start_swapped, end_swapped)
-            self.path = self.__get_path(end_swapped, start_swapped, bfs_res)
+            self.__get_path(end_swapped, start_swapped, bfs_res)
         except (BFSException, PathFindingException) as e:
-            pass # todo decide what to do when if sth will go wrong with the new method
+            pass
 
     def __new_move(self, start_coords: coordinates.Coords, end_coords: coordinates.Coords):
         try:
