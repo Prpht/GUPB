@@ -1,13 +1,17 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import logging
 from typing import NamedTuple, Optional
 
 import sortedcontainers
 
+from gupb.logger import core as logger_core
 from gupb.model import effects
 from gupb.model import characters
 from gupb.model import weapons
+
+verbose_logger = logging.getLogger('verbose')
 
 
 class TileDescription(NamedTuple):
@@ -57,7 +61,9 @@ class Tile(ABC):
         self.character = champion
         if self.loot:
             champion.weapon, self.loot = self.loot, champion.weapon
-            logging.debug(f"Champion {champion.controller.name} picked up a {champion.weapon.description().name}.")
+            verbose_logger.debug(
+                f"Champion {champion.controller.name} picked up a {champion.weapon.description().name}.")
+            ChampionPickedWeaponReport(champion.controller.name, champion.weapon.description().name).log(logging.DEBUG)
 
     # noinspection PyUnusedLocal
     def leave(self, champion: characters.Champion) -> None:
@@ -117,3 +123,9 @@ class Menhir(Tile):
     @staticmethod
     def terrain_transparent() -> bool:
         return False
+
+
+@dataclass(frozen=True)
+class ChampionPickedWeaponReport(logger_core.LoggingMixin):
+    controller_name: str
+    weapon_name: str

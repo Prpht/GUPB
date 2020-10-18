@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 import os.path
 import random
@@ -6,11 +7,14 @@ from typing import Dict, NamedTuple, Optional
 
 import bresenham
 
+from gupb.logger import core as logger_core
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model import effects
 from gupb.model import tiles
 from gupb.model import weapons
+
+verbose_logger = logging.getLogger('verbose')
 
 TILE_ENCODING = {
     '=': tiles.Sea,
@@ -101,7 +105,8 @@ class Arena:
             self.terrain[champion.position].leave(champion)
             champion.position = new_position
             self.terrain[champion.position].enter(champion)
-            logging.debug(f"Champion {champion.controller.name} entered tile {new_position}.")
+            verbose_logger.debug(f"Champion {champion.controller.name} entered tile {new_position}.")
+            ChampionEnteredTileReport(champion.controller.name, new_position).log(logging.DEBUG)
 
     def stay(self, champion: characters.Champion) -> None:
         self.terrain[champion.position].stay()
@@ -111,12 +116,14 @@ class Arena:
             self.terrain[self.menhir_position] = tiles.Land()
         self.menhir_position = random.sample(self.empty_coords(), 1)[0]
         self.terrain[self.menhir_position] = tiles.Menhir()
-        logging.debug(f"Menhir spawned at {self.menhir_position}.")
+        verbose_logger.debug(f"Menhir spawned at {self.menhir_position}.")
+        MenhirSpawnedReport(self.menhir_position).log(logging.DEBUG)
 
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
         if self.mist_radius:
-            logging.debug(f"Radius of mist-free space decreased to {self.mist_radius}.")
+            verbose_logger.debug(f"Radius of mist-free space decreased to {self.mist_radius}.")
+            MistRadiusReducedReport(self.mist_radius).log(logging.DEBUG)
             for coords in self.terrain:
                 distance = int(((coords.x - self.menhir_position.x) ** 2 +
                                 (coords.y - self.menhir_position.y) ** 2) ** 0.5)
@@ -138,3 +145,19 @@ class Arena:
 def terrain_size(terrain: Terrain) -> tuple[int, int]:
     estimated_x_size, estimated_y_size = max(terrain)
     return estimated_x_size + 1, estimated_y_size + 1
+
+
+@dataclass(frozen=True)
+class ChampionEnteredTileReport(logger_core.LoggingMixin):
+    controller_name: str
+    tile_coords: coordinates.Coords
+
+
+@dataclass(frozen=True)
+class MenhirSpawnedReport(logger_core.LoggingMixin):
+    position: coordinates.Coords
+
+
+@dataclass(frozen=True)
+class MistRadiusReducedReport(logger_core.LoggingMixin):
+    mist_radius: int

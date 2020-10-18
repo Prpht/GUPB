@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 import random
 from typing import Iterator, NamedTuple
@@ -7,8 +8,12 @@ from typing import Iterator, NamedTuple
 import statemachine
 
 from gupb import controller
+from gupb.logger import core as logger_core
 from gupb.model import arenas
 from gupb.model import characters
+from gupb.model import coordinates
+
+verbose_logger = logging.getLogger('verbose')
 
 MIST_TTH: int = 5
 
@@ -57,16 +62,19 @@ class Game(statemachine.StateMachine):
         for controller_to_spawn, coords in zip(to_spawn, champion_positions):
             champion = characters.Champion(coords, self.arena)
             self.arena.terrain[coords].character = champion
-            champion.controller = controller_to_spawn
+            champion.assign_controller(controller_to_spawn)
             champions.append(champion)
-            logging.debug(f"Champion for {controller_to_spawn.name} spawned at {coords} facing {champion.facing}.")
+            verbose_logger.debug(f"{champion.tabard.value} champion for {controller_to_spawn.name}"
+                                 f" spawned at {coords} facing {champion.facing}.")
+            ChampionSpawnedReport(controller_to_spawn.name, coords, champion.facing.value).log(logging.DEBUG)
         return champions
 
     def _environment_action(self) -> None:
         self._clean_dead_champions()
         self.action_queue = self.champions.copy()
         self.episode += 1
-        logging.debug(f"Starting episode {self.episode}.")
+        verbose_logger.debug(f"Starting episode {self.episode}.")
+        EpisodeStartReport(self.episode).log(logging.DEBUG)
         if self.episode % MIST_TTH == 0:
             self.arena.increase_mist()
 
@@ -80,7 +88,8 @@ class Game(statemachine.StateMachine):
                 self.deaths.append(death)
         self.champions = alive
         if len(self.champions) == 1:
-            logging.debug(f"Champion {self.champions[0].controller.name} was the last one standing.")
+            verbose_logger.debug(f"Champion {self.champions[0].controller.name} was the last one standing.")
+            LastManStandingReport(self.champions[0].controller.name).log(logging.DEBUG)
             champion = self.champions.pop()
             death = ChampionDeath(champion, self.episode)
             self.deaths.append(death)
@@ -98,3 +107,20 @@ class Game(statemachine.StateMachine):
         while True:
             yield a
             a, b = b, a + b
+
+
+@dataclass(frozen=True)
+class ChampionSpawnedReport(logger_core.LoggingMixin):
+    controller_name: str
+    coords: coordinates.Coords
+    facing_value: coordinates.Coords
+
+
+@dataclass(frozen=True)
+class EpisodeStartReport(logger_core.LoggingMixin):
+    episode_number: int
+
+
+@dataclass(frozen=True)
+class LastManStandingReport(logger_core.LoggingMixin):
+    controller_name: str
