@@ -13,24 +13,30 @@ MIST_TTH: int = 5
 WEPON_REACH_BENEFIT: int = 0.7
 # top left of map is 0 0
 FALLOFF=10
+INITIAL_ROTATE_DIAMETER = 17
 
-ROTATE_AROUND_POINT_DIRECTIONS = {"clockwise": [
-    [coordinates.Coords(0, -1), coordinates.Coords(-1, 0),
+def r(element, times):
+    return [element] * times
+
+def getRotateAround(diam):
+    return {"clockwise": [
+    [coordinates.Coords(0, -1), *r(coordinates.Coords(-1, 0),diam-2),
      coordinates.Coords(-1, 0)],
-    [coordinates.Coords(0, -1), None,  # never used
-     coordinates.Coords(0, 1)],
-    [coordinates.Coords(1, 0), coordinates.Coords(
-        1, 0), coordinates.Coords(0, 1)],
+        *r([coordinates.Coords(0, -1), *r(coordinates.Coords(0, -1), diam - 2),
+     coordinates.Coords(0, 1)],diam-2),
+    [coordinates.Coords(1, 0), *r(coordinates.Coords(
+        1, 0),diam-2), coordinates.Coords(0, 1)],
     ],
 "counterclockwise": [
-    [coordinates.Coords(1, 0), coordinates.Coords(1, 0),
+    [coordinates.Coords(1, 0), *r(coordinates.Coords(1, 0), diam - 2),
      coordinates.Coords(0, -1)],
-    [coordinates.Coords(0, 1), None,  # never used
-     coordinates.Coords(0, -1)],
-    [coordinates.Coords(0, 1), coordinates.Coords(
-        -1, 0), coordinates.Coords(-1, 0)],
+    *r([coordinates.Coords(0, 1), *r(coordinates.Coords(0, -1), diam - 2),
+        coordinates.Coords(0, -1)], diam - 2),
+    [coordinates.Coords(0, 1), *r(coordinates.Coords(
+        -1, 0), diam - 2), coordinates.Coords(-1, 0)],
 ],
     }
+
 
 
 class IHaveNoIdeaWhatImDoingController:
@@ -44,6 +50,7 @@ class IHaveNoIdeaWhatImDoingController:
         self.position_log = []
         self.mist_distance = 0
         self.menhir_rotation = "counterclockwise"
+        self.rotate_diam = INITIAL_ROTATE_DIAMETER
 
     def getTileGain(self, currentWeapon, newWeapon, dist):
         if(not newWeapon):
@@ -126,6 +133,10 @@ class IHaveNoIdeaWhatImDoingController:
             return coordinates.Coords(0, 1)
 
     def getDiscoverOption(self, knowledge: characters.ChampionKnowledge):
+        if(len(self.decision_log) < 3 or (self.decision_log[0] == "discover" and self.decision_log[1] == "discover")):
+            return []
+        if(self.decision_log[0]=="discover"):
+            return [(1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1]+1) % 2], 'discover')]
         return [(0.1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1])%2],'discover')]
 
     def getNavOption(self, knowledge: characters.ChampionKnowledge):
@@ -141,18 +152,22 @@ class IHaveNoIdeaWhatImDoingController:
 
     def getObeliskCaptureOption(self, knowledge: characters.ChampionKnowledge):
         menhirOffset = (knowledge.position - self.menhir_position)
-        if(not (abs(menhirOffset[0]) <= 1 and abs(menhirOffset[1]) <=1) or self.mist_distance <= 2 or self.heading_map[knowledge.position]["weapon"] != self.weapon):
+        rotateMap = getRotateAround(self.rotate_diam)[self.menhir_rotation]
+        radiusShift = (self.rotate_diam - 1) // 2
+        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
             return []
-        preferedDir = ROTATE_AROUND_POINT_DIRECTIONS[self.menhir_rotation][-menhirOffset[1] + 1][menhirOffset[0] +
-                                                     1]
+        
+        preferedDir = rotateMap[-menhirOffset[1] + radiusShift][menhirOffset[0] + radiusShift]
+        if(menhirOffset[0] == radiusShift and menhirOffset[1] == radiusShift):
+            self.rotate_diam -= 2
         if(preferedDir == self.facing):
             if(self.canStepOn(knowledge.position + preferedDir)):
                 return [(0.7, characters.Action.STEP_FORWARD, "capture")]
             else:
                 self.menhir_rotation = "clockwise" if self.menhir_rotation == "counterclockwise" else "counterclockwise"
-                print(self.menhir_rotation)
+                if(self.rotate_diam > 3):
+                    self.rotate_diam -= 2
                 return [(0.7, characters.Action.TURN_RIGHT, "capture")]
-            
         if(preferedDir == self.rotateFacingLeft(self.facing)):
             return [(0.7, characters.Action.TURN_LEFT, "capture")]
         return [(0.7, characters.Action.TURN_LEFT, "capture")]
@@ -168,7 +183,6 @@ class IHaveNoIdeaWhatImDoingController:
         return []
 
     def getActionTime(self, name, percentageOfFalloff=FALLOFF):
-        print(self.decision_log)
         cTime = (percentageOfFalloff - len(list(filter(lambda x: x == name,
                                                        self.decision_log)))) / percentageOfFalloff
         return max(0,cTime)
@@ -185,13 +199,13 @@ class IHaveNoIdeaWhatImDoingController:
                         break
                     if(coord in self.memory and self.memory[coord][1].character and self.memory[coord][1].character.controller_name != self.name):
                         action = characters.Action.TURN_LEFT if cDir == self.rotateFacingLeft(self.facing) else characters.Action.TURN_RIGHT
-                        prio = reach / 100 * ((3 - abs(spread)) / 3)**2 * abs((self.time - self.memory[coord][0] + spread) / 5) * self.getActionTime("obtain", 3)
+                        prio = reach / 50 * ((3 - abs(spread)) / 3)**2 * abs((self.time - self.memory[coord][0] + spread) / 5) * self.getActionTime("obtain", 4)
                         options.append((prio,action, "obtain"))
         return options
 
     def checkStuckOption(self, knowledge: characters.ChampionKnowledge):
-        if(len(list(filter(lambda x: x != knowledge.position, self.position_log[-6:-1])))==0):
-            if(self.getActionTime('nav') == 0):
+        if(len(list(filter(lambda x: x != knowledge.position, self.position_log[-3:-1])))==0 and self.mist_distance > 4):
+            if(self.getActionTime('nav_forward') == 0 or self.getActionTime('nav') == 0):
                 return [(4 * self.getActionTime('checkStuck'), characters.Action.STEP_FORWARD if self.canStepOn(knowledge.position + self.facing) else characters.Action.TURN_RIGHT, 'checkStuck')]
         return []
                 
@@ -205,7 +219,6 @@ class IHaveNoIdeaWhatImDoingController:
         options = [*self.getNavOption(knowledge), *self.getAttackOption(
             knowledge), *self.getObtainOption(knowledge), *self.getObeliskCaptureOption(knowledge), *self.checkStuckOption(knowledge),*self.getDiscoverOption(knowledge)]
         decision = sorted(options, key=lambda option: -option[0])[0]
-        print(decision)
         self.position_log.append(knowledge.position)
         if(len(decision) > 2):
             self.decision_log.append(decision[2])
