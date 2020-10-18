@@ -12,13 +12,11 @@ CONFIGURATION = {
     'controllers': [
         bb_bot.BBBotController("Bartek"),
         botelka.BotElkaController("Z nami na pewno zdasz"),
-        # claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
-        # krowa123.Krowa1233Controller("Krowka"),
         tup_tup.TupTupController('Bot'),
       
     ],
     'visualise': True,
-    'show_sight': ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
+    'show_sight': None,
     'runs_no': 1,
 }
