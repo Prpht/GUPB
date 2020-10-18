@@ -62,7 +62,7 @@ WEAPONS_DESCRIPTORS = {
     "knife": 1
 }
 
-SIGHT_RANGE = 3000
+SIGHT_RANGE = 2000
 DANGEROUS_DIST = 1500
 LONG_SEQ = 6
 EXPLORATION_PROB = 0.1
@@ -83,6 +83,7 @@ class ClaretWolfController:
         self.facing = None
         self.enviroment_map = None
         self.bot_position = None
+        self.menhir_position = None
         self.queue = []
         self.run_seq_step = 0
         self.position_axis: Axis= None
@@ -104,6 +105,7 @@ class ClaretWolfController:
 
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.menhir_position = arena_description.menhir_position
         self.init_enviroment_map(arena_description.name)
 
 
@@ -155,12 +157,21 @@ class ClaretWolfController:
         if self.can_attack(knowledge):
             self.queue =[]
             self.queue.append(characters.Action.ATTACK)
+            return
 
         # is mist a danger?
-        mist_vector = self.find_vector_to_nearest_mist_tile(knowledge)
-        if self.last_observed_mist_vec is not None:
-            self.queue =[]
-            self.queue.append(self.run_away_from_mist())
+        if g_distance(self.bot_position, self.menhir_position) < 2:
+            self.queue.append(self.recon())
+            return
+        else:
+            self.find_vector_to_nearest_mist_tile(knowledge)
+            if self.last_observed_mist_vec is not None:
+                self.queue =[]
+                next = self.menhir_position
+                if next:
+                    self.enqueue_target(next)
+                    self.last_observed_mist_vec = None
+                    return 
             
         # maybe look for new weapon?
         next = self.determine_next_weapon()
@@ -313,25 +324,38 @@ class ClaretWolfController:
                     return True
         return False
 
-    def run_away_from_mist(self):
-        if self.run_seq_step == 1:
-            self.run_seq_step += 1
-            if self.is_mist_closer_from_left(): #closer from left
-                return self.mapping_on_actions[Move.RIGHT]
-            elif self.is_mist_closer_from_right():
-                return self.mapping_on_actions[Move.LEFT]
-            else: # mist directly in front of bot
-                self.is_bot_in_rotation = True
-                return self.mapping_on_actions[Move.RIGHT]
-        elif self.is_bot_in_rotation: #continue rotation
-            self.run_seq_step += 2
-            self.is_bot_in_rotation = False
-            return self.mapping_on_actions[Move.RIGHT]
-        elif self.run_seq_step > 1 and self.run_seq_step < LONG_SEQ:
-            self.run_seq_step += 1
-            return self.mapping_on_actions[Move.UP]
-        else:
-            return self.mapping_on_actions[random.choice([Move.UP, Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
+    # def run_away_from_mist(self):
+        # print("BOT POSITION")
+        # print(self.bot_position)
+        # ret_val = self.go_to_coords(self.menhir_position)
+        # print("RETURN TO MENHIR")
+        # print(ret_val)
+        # if g_distance(self.bot_position, self.menhir_position) < 2:
+        #     return self.recon()
+        # else:
+        #     self.last_observed_mist_vec = None
+        #     return self.menhir_position
+        # if self.run_seq_step == 1:
+        #     self.run_seq_step += 1
+        #     if self.is_mist_closer_from_left(): #closer from left
+        #         return self.mapping_on_actions[Move.RIGHT]
+        #     elif self.is_mist_closer_from_right():
+        #         return self.mapping_on_actions[Move.LEFT]
+        #     else: # mist directly in front of bot
+        #         self.is_bot_in_rotation = True
+        #         return self.mapping_on_actions[Move.RIGHT]
+        # elif self.is_bot_in_rotation: #continue rotation
+        #     self.run_seq_step += 2
+        #     self.is_bot_in_rotation = False
+        #     return self.mapping_on_actions[Move.RIGHT]
+        # elif self.run_seq_step > 1 and self.run_seq_step < LONG_SEQ:
+        #     self.run_seq_step += 1
+        #     return self.mapping_on_actions[Move.UP]
+        # else:
+        #     return self.mapping_on_actions[random.choice([Move.UP, Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
+
+    def recon(self):
+        return characters.Action.TURN_LEFT
 
     def is_mist_closer_from_left(self):
         (self.position_axis == Axis.VERTICAL and \
