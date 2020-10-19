@@ -30,6 +30,16 @@ class ChampionDescription(NamedTuple):
     facing: Facing
 
 
+class Tabard(Enum):
+    BLUE = 'Blue'
+    BROWN = 'Brown'
+    GREY = 'Grey'
+    RED = 'Red'
+    VIOLET = 'Violet'
+    WHITE = 'White'
+    YELLOW = 'Yellow'
+
+
 class Champion:
     def __init__(self, starting_position: coordinates.Coords, arena: arenas.Arena) -> None:
         self.facing: Facing = Facing.random()
@@ -38,22 +48,34 @@ class Champion:
         self.position: coordinates.Coords = starting_position
         self.arena: arenas.Arena = arena
         self.controller: Optional[controller.Controller] = None
+        self.tabard: Optional[Tabard] = None
+
+    def assign_controller(self, assigned_controller: controller.Controller) -> None:
+        self.controller = assigned_controller
+        self.tabard = self.controller.preferred_tabard
 
     def description(self) -> ChampionDescription:
         return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)
 
     def act(self) -> None:
-        action = self.pick_action()
-        verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
-        ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
-        action(self)
-        self.arena.stay(self)
+        if self.alive:
+            action = self.pick_action()
+            verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
+            ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
+            action(self)
+            self.arena.stay(self)
 
+    # noinspection PyBroadException
     def pick_action(self) -> Action:
         if self.controller:
             visible_tiles = self.arena.visible_tiles(self)
             knowledge = ChampionKnowledge(self.position, visible_tiles)
-            return self.controller.decide(knowledge)
+            try:
+                return self.controller.decide(knowledge)
+            except Exception as e:
+                verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
+                ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)
+                return Action.DO_NOTHING
         else:
             return Action.DO_NOTHING
 
@@ -167,3 +189,9 @@ class ChampionWoundsReport(logger_core.LoggingMixin):
 @dataclass(frozen=True)
 class ChampionDeathReport(logger_core.LoggingMixin):
     controller_name: str
+
+
+@dataclass(frozen=True)
+class ControllerExceptionReport(logger_core.LoggingMixin):
+    controller_name: str
+    exception: str

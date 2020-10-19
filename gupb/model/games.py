@@ -62,9 +62,10 @@ class Game(statemachine.StateMachine):
         for controller_to_spawn, coords in zip(to_spawn, champion_positions):
             champion = characters.Champion(coords, self.arena)
             self.arena.terrain[coords].character = champion
-            champion.controller = controller_to_spawn
+            champion.assign_controller(controller_to_spawn)
             champions.append(champion)
-            verbose_logger.debug(f"Champion for {controller_to_spawn.name} spawned at {coords} -> {champion.facing}.")
+            verbose_logger.debug(f"{champion.tabard.value} champion for {controller_to_spawn.name}"
+                                 f" spawned at {coords} facing {champion.facing}.")
             ChampionSpawnedReport(controller_to_spawn.name, coords, champion.facing.value).log(logging.DEBUG)
         return champions
 

@@ -135,6 +135,7 @@ def configure_logging(log_directory: str) -> None:
     time = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
     verbose_logger = logging.getLogger('verbose')
+    verbose_logger.propagate = False
     verbose_file_path = logging_dir_path / f'gupb__{time}.log'
     verbose_file_handler = logging.FileHandler(verbose_file_path.as_posix())
     verbose_formatter = logging.Formatter(
@@ -145,6 +146,7 @@ def configure_logging(log_directory: str) -> None:
     verbose_logger.setLevel(logging.DEBUG)
 
     json_logger = logging.getLogger('json')
+    json_logger.propagate = False
     json_file_path = logging_dir_path / f'gupb__{time}.json'
     json_file_handler = logging.FileHandler(json_file_path.as_posix())
     json_formatter = logging.Formatter(
