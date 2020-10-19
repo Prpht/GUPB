@@ -198,6 +198,10 @@ class BBBotController:
     def name(self) -> str:
         return f'BBBotController{self.first_name}'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.WHITE
+
 
 POTENTIAL_CONTROLLERS = [
     BBBotController("Bartek"),
