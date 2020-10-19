@@ -168,6 +168,10 @@ class IHaveNoIdeaWhatImDoingController:
     def name(self) -> str:
         return 'IHaveNoIdeaWhatImDoingController'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.RED
+
     def updateFacing(self, knowledge: characters.ChampionKnowledge):
         for dir in dirs:
             if(knowledge.position + dir in knowledge.visible_tiles):

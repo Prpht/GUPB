@@ -35,6 +35,10 @@ class RandomController:
     def name(self) -> str:
         return f'RandomController{self.first_name}'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.WHITE
+
 
 POTENTIAL_CONTROLLERS = [
     RandomController("Alice"),

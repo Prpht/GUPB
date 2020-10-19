@@ -108,6 +108,10 @@ class Krowa1233Controller:
     def name(self) -> str:
         return f'Krowa1233Controller{self.first_name}'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.VIOLET
+
     def __mist_is_coming(
         self,
         champion_position: coordinates.Coords,

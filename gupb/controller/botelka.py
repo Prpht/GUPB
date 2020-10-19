@@ -7,7 +7,7 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
 
 from gupb.model.arenas import ArenaDescription
-from gupb.model.characters import Facing, Action, ChampionKnowledge
+from gupb.model.characters import Facing, Action, ChampionKnowledge, Tabard
 from gupb.model.coordinates import Coords, add_coords, sub_coords
 from gupb.model.tiles import TileDescription
 
@@ -91,6 +91,10 @@ class BotElkaController:
     @property
     def name(self) -> str:
         return f"BotElka<{self.first_name}>"
+
+    @property
+    def preferred_tabard(self) -> Tabard:
+        return Tabard.BLUE
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self.menhir_pos = arena_description.menhir_position

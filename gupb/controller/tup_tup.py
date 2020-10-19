@@ -166,6 +166,10 @@ class TupTupController:
     def name(self) -> str:
         return self.identifier
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.YELLOW
+
 
 POTENTIAL_CONTROLLERS = [
     TupTupController('Bot'),
