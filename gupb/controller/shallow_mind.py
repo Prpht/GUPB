@@ -2,10 +2,15 @@ import random
 
 from typing import Dict
 
+from pathfinding.finder.a_star import AStarFinder
+from pathfinding.core.grid import Grid
+
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
-from gupb.model.arenas import Terrain, terrain_size
+from gupb.model.arenas import Terrain, terrain_size, Arena
 from gupb.model.characters import ChampionDescription
+from gupb.model.tiles import Menhir, Wall, Sea, Land
+from gupb.model.weapons import Knife, Sword, Bow, Axe, Amulet
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -14,26 +19,61 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
+FIELD_WEIGHT = 100
 
-def tile_map(tile):
-    if not tile:
-        return 1
-    return {
+TILES = [Land, Sea, Wall, Menhir]
 
-    }.get(tile, 1)
+TILES_MAP = {tile().description().type: tile for tile in TILES}
+
+WEAPONS = [(Knife, 0), (Sword, FIELD_WEIGHT), (Bow, 1), (Axe, 5), (Amulet, 3)]
+
+WEAPONS_CLASSES = [x for x, _ in WEAPONS]
+
+WEAPONS_MAP = {weapon().description(): weapon for weapon, _ in WEAPONS}
+
+WEAPONS_ENCODING = {weapon().description(): value for weapon, value in WEAPONS}
+
+finder = AStarFinder()
+
+
+def terrain_transparent_monkey_patch(self) -> bool:
+    return TILES_MAP[self.type].terrain_transparent()
+
+
+def transparent_monkey_patch(self) -> bool:
+    return self.terrain_transparent() and not self.character
+
+
+tiles.TileDescription.terrain_transparent = terrain_transparent_monkey_patch
+tiles.TileDescription.transparent = transparent_monkey_patch
+
+
+class ArenaMapped(Arena):
+    def __init__(self, arena):
+        super().__init__(arena.name, arena.terrain)
+        self.terrain: Dict[coordinates.Coords, tiles.TileDescription] = {k: v.description() for k, v in
+                                                                         arena.terrain.items()}
+        self.matrix = []
+
+    def prepare_matrix(self) -> None:
+        x_size, y_size = self.size
+        self.matrix = [[FIELD_WEIGHT for _ in range(y_size)] for _ in range(x_size)]
+
+    def register_effect(self, _, coords: coordinates.Coords) -> None:
+        x, y = coords
+        self.matrix[x][y] = -1
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class ShallowMind:
+class ShallowMindController:
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.menhir_position: coordinates.Coords = None
-        self.terrain: Dict[coordinates.Coords, tiles.TileDescription] = dict()
         self.prev_champion: ChampionDescription = None
+        self.arena: ArenaMapped = None
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, ShallowMind):
+        if isinstance(other, ShallowMindController):
             return self.first_name == other.first_name
         return False
 
@@ -41,27 +81,56 @@ class ShallowMind:
         return hash(self.first_name)
 
     def __get_champion(self, knowledge: characters.ChampionKnowledge) -> ChampionDescription:
-        return self.terrain.get(knowledge.position).character
+        return self.arena.terrain.get(knowledge.position).character
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.menhir_position = arena_description.menhir_position
         arena = arenas.Arena.load(arena_description.name)
-        if arena:
-            self.terrain = {k: v.description() for k, v in arena.terrain.items()}
-        else:
-            self.terrain = dict()
-        pass
+        self.arena = ArenaMapped(arena)
+        self.arena.menhir_position = arena_description.menhir_position
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.terrain = {**self.terrain, **knowledge.visible_tiles}
+        arena = self.arena
+        arena.terrain = {**arena.terrain, **knowledge.visible_tiles}
         champ = self.__get_champion(knowledge)
-        # todo write code
-        fields = sorted(self.terrain.items())
-        x, y = terrain_size(self.terrain)
-        map = {k: v for k, v in sorted(self.terrain.items())}
+        used_weapon = WEAPONS_ENCODING.get(champ.weapon)
+        # It's assumed that the whole map is known
+        self.arena.prepare_matrix()
+        self.arena.matrix[knowledge.position[0]][knowledge.position[1]] = FIELD_WEIGHT / 2
+        for position, tileDescription in arena.terrain.items():
+            x, y = position
+            # print(position)
+            if tileDescription.character:
+                arena.matrix[x][y] = -1
+                weapon = WEAPONS_MAP.get(tileDescription.character.weapon)
+                weapon.cut(self.arena, position, tileDescription.character.facing)
+            elif arena.matrix[x][y] > 0:
+                if tileDescription.loot:
+                    importance = WEAPONS_ENCODING.get(tileDescription.loot)
+                    if importance > used_weapon:
+                        arena.matrix[x][y] = importance
+                    else:
+                        arena.matrix[x][y] = -2
+                else:
+                    if not TILES_MAP.get(tileDescription.type).terrain_passable():
+                        arena.matrix[x][y] = 0
 
+        grid = Grid(matrix=self.arena.matrix)
+        # print(grid.grid_str())
+        start = grid.node(*knowledge.position)
+        end = grid.node(self.arena.menhir_position[0], self.arena.menhir_position[1])
+
+        path, runs = finder.find_path(start, end, grid)
+        # print('operations:', runs, 'path length:', len(path))
+        print(grid.grid_str(path=path, start=start, end=end))
+        print(path)
         self.prev_champion = champ
-        return random.choice(POSSIBLE_ACTIONS)
+        # print(knowledge.position)
+        # print(champ.facing.value)
+        # print(path[0])
+        if path and knowledge.position + champ.facing.value == path[1]:
+            return characters.Action.STEP_FORWARD
+        else:
+            return characters.Action.TURN_LEFT
 
     @property
     def name(self) -> str:
@@ -69,5 +138,5 @@ class ShallowMind:
 
 
 POTENTIAL_CONTROLLERS = [
-    ShallowMind('test'),
+    ShallowMindController('test'),
 ]
