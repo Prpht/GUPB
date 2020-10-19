@@ -94,9 +94,10 @@ class ShallowMindController:
         champ = self.__get_champion(knowledge)
         used_weapon = WEAPONS_ENCODING.get(champ.weapon)
         # It's assumed that the whole map is known
-        print(knowledge.position)
         self.arena.prepare_matrix()
-        self.arena.matrix[knowledge.position[1]][knowledge.position[0]] = FIELD_WEIGHT / 2
+        next_field = knowledge.position + champ.facing.value
+        self.arena.matrix[next_field[1]][next_field[0]] = FIELD_WEIGHT / 2
+
         for position, tileDescription in arena.terrain.items():
             y, x = position
             if tileDescription.character:
@@ -117,10 +118,9 @@ class ShallowMindController:
         grid = Grid(matrix=self.arena.matrix)
         start = grid.node(*knowledge.position)
         end = grid.node(self.arena.menhir_position[0], self.arena.menhir_position[1]+1)
-
         path, runs = finder.find_path(start, end, grid)
         self.prev_champion = champ
-        if len(path) > 1 and knowledge.position + champ.facing.value == path[1]:
+        if len(path) > 1 and next_field == path[1]:
             return characters.Action.STEP_FORWARD
         else:
             return characters.Action.TURN_LEFT
