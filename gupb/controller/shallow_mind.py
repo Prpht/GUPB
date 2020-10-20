@@ -129,6 +129,10 @@ class ShallowMindController:
     def name(self) -> str:
         return f'ShallowMindController{self.first_name}'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.GREY
+
 
 POTENTIAL_CONTROLLERS = [
     ShallowMindController('test'),
