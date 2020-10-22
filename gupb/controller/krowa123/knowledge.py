@@ -7,6 +7,7 @@ from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.characters import ChampionKnowledge, Facing, ChampionDescription
 from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
+from gupb.model.tiles import Menhir
 from gupb.model.weapons import Weapon
 from . import utils
 from .model import SeenTile
@@ -27,6 +28,7 @@ class Knowledge:
         arena = Arena.load(arena_description.name)
         self.terrain = {k: SeenTile(v.description()) for k, v in arena.terrain.items()}
         self.menhir_position = arena_description.menhir_position
+        self.terrain[self.menhir_position] = SeenTile(Menhir().description())
         self.mist_radius = arena.mist_radius
         self.time = 0
 
