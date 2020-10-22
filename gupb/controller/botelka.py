@@ -79,6 +79,7 @@ class BotElkaController:
         self.go_to_menhir = True
         self.weapon_positions = {}
         self.players_in_sight = []
+        self.finder = DijkstraFinder()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -166,8 +167,8 @@ class BotElkaController:
         start = self.grid.node(self.current_coords.x, self.current_coords.y)
         end = self.grid.node(coords.x, coords.y)
 
-        finder = DijkstraFinder()
-        path, _ = finder.find_path(start, end, self.grid)
+        
+        path, _ = self.finder.find_path(start, end, self.grid)
 
         facing = self.current_facing
 
@@ -190,7 +191,7 @@ class BotElkaController:
         assert visible_tile and coords, "Bot attributes always present"
 
         visible_weapons = {
-            coords: visible_tile.loot.name
+            Coords(coords[0], coords[1]): visible_tile.loot.name
             for coords, visible_tile in knowledge.visible_tiles.items()
             if visible_tile.loot
         }
@@ -210,7 +211,11 @@ class BotElkaController:
     def find_better_weapon(self) -> None:
         distances = {}
         for coords, weapon in self.weapon_positions.items():
-            distances[(weapon, coords)] = len(self.find_path(coords)) * WEAPON_INDEX[weapon]
+            distance = len(self.find_path(coords)) * WEAPON_INDEX[weapon]
+            if distance == 0:
+                distances[(weapon, coords)] = float('inf')
+            else:
+                distances[(weapon, coords)] = distance 
         weapon, coord = min(distances.items(), key=operator.itemgetter(1))[0]
         self.moves_queue = self.find_path(coord)
 
