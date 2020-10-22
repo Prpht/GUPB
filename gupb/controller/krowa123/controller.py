@@ -54,10 +54,12 @@ class Krowa1233Controller(Controller):
     def find_dijkstra_to_menhir(
         self,
         weapons_to_take: List[Type[Weapon]],
-        strict: bool = False
+        dist: int = 0,
+        strict: bool = True
     ) -> List[Coords]:
         return self.knowledge.find_dijkstra_path(
             weapons_to_take=weapons_to_take,
+            dist=dist,
             strict=strict
         )
 
@@ -71,15 +73,16 @@ class Krowa1233Controller(Controller):
         self.knowledge.update(knowledge)
         if len(self.action_queue) == 0 and self.last_action is None:
             path = self.find_dijkstra_to_menhir(
-                weapons_to_take=[Bow]
+                weapons_to_take=[Bow],
+                dist=15,
             )
             self._plan_actions(path)
         elif len(self.action_queue) == 0:
-            if self.knowledge.mist_radius > 15:
+            if self.knowledge.mist_radius > 30:
                 self._plan_random_enemies_search()
             else:
                 path = self.find_dijkstra_to_menhir(
-                    weapons_to_take=[], strict=True
+                    weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
                 )
                 self._plan_actions(path)
         if self._check_if_hit(knowledge.visible_tiles):

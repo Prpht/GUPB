@@ -62,13 +62,15 @@ class Knowledge:
     def find_dijkstra_path(
         self,
         weapons_to_take: List[Type[Weapon]],
-        strict: bool = False
+        dist: int = 0,
+        strict: bool = True
     ) -> List[Coords]:
         return determine_path_bot(
             terrain=self.terrain,
             start=self.position,
             weapons_to_take=weapons_to_take,
             menhir_position=self.menhir_position,
+            dist=dist,
             strict=strict
         )
 
