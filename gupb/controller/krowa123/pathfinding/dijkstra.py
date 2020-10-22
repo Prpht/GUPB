@@ -1,11 +1,11 @@
-from queue import PriorityQueue
 import random
-from typing import Dict, List, Type, Tuple, Optional
 from dataclasses import dataclass, field
+from queue import PriorityQueue
+from typing import Dict, List, Type, Tuple
 
-from gupb.controller.krowa123.model import SeenTile
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Weapon
+from ..model import SeenTile
 
 INF = 100000000000000
 

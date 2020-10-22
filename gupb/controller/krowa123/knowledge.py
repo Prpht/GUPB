@@ -2,20 +2,17 @@ from __future__ import annotations
 
 from typing import Dict, Optional, List, Type
 
-from gupb.controller.krowa123 import pathfinding, utils
-from gupb.controller.krowa123.model import SeenTile
-from gupb.controller.krowa123.pathfinding.dijkstra import determine_path_bot
-from gupb.model import weapons, effects
+from gupb.model import effects
 from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.characters import ChampionKnowledge, Facing, ChampionDescription
 from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
+from gupb.model.weapons import Weapon
+from . import utils
+from .model import SeenTile
+from .pathfinding import astar_search, determine_path_bot
 
 __all__ = ["Knowledge"]
-
-from gupb.model.tiles import Tile
-
-from gupb.model.weapons import Weapon
 
 
 class Knowledge:
@@ -23,7 +20,7 @@ class Knowledge:
     menhir_position: Coords
     position: Coords
     health: int
-    weapon_type: Type[weapons.Weapon]
+    weapon_type: Type[Weapon]
     facing: Facing
 
     def __init__(self, arena_description: ArenaDescription):
@@ -60,7 +57,7 @@ class Knowledge:
             self.terrain[coord].update(tile_desc, self.time)
 
     def find_path(self, start: Coords, end: Coords, avoid_loot: bool = True) -> Optional[List[Coords]]:
-        return pathfinding.astar_search(self.terrain, start, end, avoid_loot)
+        return astar_search(self.terrain, start, end, avoid_loot)
 
     def find_dijkstra_path(
         self,
