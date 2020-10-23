@@ -33,7 +33,7 @@ def floyd_warshall(arena: Arena):
 
 if __name__ == '__main__':
     arena = sys.argv[1]
-    file = f"gupb/controller/krowa123/pathfinding/{arena}.p"
+    file = f"gupb/controller/krowa123/pathfinding/data/{arena}.p"
     # fw = floyd_warshall(Arena.load(arena))
     # pickle.dump(fw, open(file, "wb"))
     print(pickle.load(open(file, "rb")))
