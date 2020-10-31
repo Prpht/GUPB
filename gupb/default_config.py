@@ -18,5 +18,5 @@ CONFIGURATION = {
     ],
     'visualise': True,
     'show_sight': b,
-    'runs_no': 1,
+    'runs_no': 2,
 }

@@ -27,7 +27,7 @@ def weapon_ranking(weapon: Weapon) -> int:
     return 0
 
 
-class DistanceMeasure(Enum, int):
+class DistanceMeasure(Enum):
     CLOSE = 0
     FAR = 1
     VERY_FAR = 2
@@ -88,7 +88,7 @@ class Wisdom:
 
     @property
     def will_pick_up_worse_weapon(self) -> bool:
-        coords_in_front = add_coords(self.bot_coords, self.bot_facing)
+        coords_in_front = add_coords(self.bot_coords, self.bot_facing.value)
 
         if not self.knowledge.visible_tiles[coords_in_front].loot:
             return False
@@ -106,6 +106,6 @@ class Wisdom:
         )
 
     @property
-    def distance_to_menhir(self) -> DistanceMeasure:
+    def distance_to_menhir(self) -> int:
         # @TODO
-        return DistanceMeasure.VERY_FAR
+        return DistanceMeasure.VERY_FAR.value
