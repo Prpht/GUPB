@@ -22,6 +22,8 @@ class BotElkaController:
         self.old_action = Action.DO_NOTHING
         self.old_state = (0, 0, 0, 0)
 
+        self.wisdom = None
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
             return self.first_name == other.first_name
@@ -40,10 +42,12 @@ class BotElkaController:
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self.arena = Arena.load(arena_description.name)
+        self.wisdom = Wisdom(self.arena, None, self.name)
         save_q(self.q)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        wisdom = Wisdom(self.arena, knowledge, self.name)
+        self.wisdom.next_knowledge(knowledge)
+        wisdom = self.wisdom
 
         new_state = get_state(wisdom)
 

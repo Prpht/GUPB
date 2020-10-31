@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge, Facing
@@ -37,8 +38,19 @@ class DistanceMeasure(Enum):
 @dataclass
 class Wisdom:
     arena: Arena
-    knowledge: ChampionKnowledge
+    knowledge: Optional[ChampionKnowledge]
     bot_name: str
+    prev_knowledge: Optional[ChampionKnowledge] = None
+
+    def next_knowledge(self, knowledge:ChampionKnowledge):
+        self.prev_knowledge = self.knowledge
+        self.knowledge = knowledge
+
+    @property
+    def coords_did_not_change(self):
+        if not self.prev_knowledge:
+            return False
+        return self.knowledge.position == self.prev_knowledge.position
 
     @property
     def bot_coords(self) -> Coords:
