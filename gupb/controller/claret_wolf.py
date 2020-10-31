@@ -81,6 +81,8 @@ class ClaretWolfController:
         self.weapon = "knife"
         self.weapons_knowledge = {}
         self.enemies_knowledge = {}
+        self.dynamic_obsticles = {}
+        self.arena = None
         self.bot_position = None
         self.facing = None
         self.enviroment_map = None
@@ -93,7 +95,7 @@ class ClaretWolfController:
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
                                                                   Move.RIGHT: characters.Action.TURN_RIGHT,
-                                                                  Move.DO_NOTHING: characters.Action.ATTACK, #ATTACK
+                                                                  Move.DO_NOTHING: characters.Action.ATTACK,
                                                                   }
 
     def __eq__(self, other: object) -> bool:
@@ -122,7 +124,8 @@ class ClaretWolfController:
             arena_object = arenas.Arena.load(map_name)
             size = arena_object.size
             terrain = arena_object.terrain
-            arena = [[self.terrain_mapping(terrain, coordinates.Coords(*(x,y))) for x in range(size[0])] for y in range(size[1])]
+            arena = [[self.terrain_mapping(terrain, coordinates.Coords(*(x,y))) for x in range(size[0])] for y in range(size[1])] 
+            self.arena = arena
             self.enviroment_map = Grid(matrix=arena)
         except:
             pass
@@ -276,11 +279,14 @@ class ClaretWolfController:
         weapons = {k: v.loot.name for k, v in weapons.items()}
         for weapon in weapons.items():
             self.weapons_knowledge[weapon[0]] = weapon[1]
+        self.dynamic_obsticles = self.weapons_knowledge.copy()
         self.weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.weapons_knowledge.items()))
+        self.dynamic_obsticles = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] <= WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.dynamic_obsticles.items()))
+        
 
     def determine_next_weapon(self):
         temp_weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[1] != self.bot_position, self.weapons_knowledge.items()))
-        weapons_scores = {k: WEAPONS_DESCRIPTORS[v]/(1 + g_distance(self.bot_position, k)) for k, v in temp_weapons_knowledge.items()}
+        weapons_scores = {k: 2*WEAPONS_DESCRIPTORS[v]/(1 + g_distance(self.bot_position, k)) for k, v in temp_weapons_knowledge.items()}
         if weapons_scores: 
             max_value = max(weapons_scores.values())
             max_keys = [k for k, v in weapons_scores.items() if v == max_value]
@@ -289,10 +295,20 @@ class ClaretWolfController:
 
 
     def go_to_coords(self, target: coordinates.Coords):
+        def create_grid():
+            temp_arena = self.arena.copy()
+            for w in self.dynamic_obsticles.keys():
+                # print("UPDATING ARENA")
+                # print(w)
+                temp_arena[w[0]][w[1]] = -1
+            return Grid(matrix=temp_arena)
+
+        self.enviroment_map = create_grid()
+        # self.enviroment_map.cleanup() #cleaning not required
+
         start = self.enviroment_map.node(target[0], target[1])
         end = self.enviroment_map.node(self.bot_position[0], self.bot_position[1])
 
-        self.enviroment_map.cleanup()
         finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
         path, _ = finder.find_path(start, end, self.enviroment_map)
         return path
@@ -411,6 +427,7 @@ class ClaretWolfController:
 
 
     def explore_map(self):
+        # TODO: Check if not going in eapons based on  bot state
         return self.mapping_on_actions[random.choice([Move.UP, Move.UP, Move.RIGHT, Move.LEFT, Move.UP])]
 
 
