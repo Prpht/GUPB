@@ -15,6 +15,7 @@ WEAPONS = {
     "amulet": Amulet(),
 }
 
+MAX_HEALTH = 5
 
 def weapon_ranking(weapon: Weapon) -> int:
     if isinstance(weapon, Bow):
@@ -67,6 +68,16 @@ class Wisdom:
     @property
     def bot_health(self) -> int:
         tile = self.knowledge.visible_tiles[self.bot_coords]
+
+        assert tile.character, "Character must be standing on a tile"
+
+        return tile.character.health
+
+    @property
+    def prev_bot_health(self) -> int:
+        if not self.prev_knowledge:
+            return MAX_HEALTH
+        tile = self.prev_knowledge.visible_tiles[self.bot_coords]
 
         assert tile.character, "Character must be standing on a tile"
 
@@ -129,3 +140,7 @@ class Wisdom:
     def distance_to_menhir(self) -> int:
         # @TODO
         return DistanceMeasure.VERY_FAR.value
+
+    @property
+    def lost_health(self):
+        return self.bot_health != self.prev_bot_health
