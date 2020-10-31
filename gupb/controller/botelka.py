@@ -33,32 +33,36 @@ MAP_SYMBOLS_COST = {
 WEAPONS_SYMBOLS = 'BSAMK'
 
 WEAPON_INDEX = {
-    'knife': 1000,
-    'sword': 3,
-    'axe': 3,
-    'bow': 1,
-    'amulet': 3,
+    "knife": 1000,
+    "sword": 3,
+    "axe": 3,
+    "bow": 1,
+    "amulet": 3,
 }
 
 WEAPON_DECODING = {
-    'K': 'knife',
-    'S': 'sword',
-    'A': 'axe',
-    'B': 'bow',
-    'M': 'amulet',
+    'K': "knife",
+    'S': "sword",
+    'A': "axe",
+    'B': "bow",
+    'M': "amulet",
 }
+
 
 def generate_coords_front(list_of_values, add_val, n):
     if n == 0: return list_of_values
-    return generate_coords_front(list_of_values.append((list_of_values[-1] + add_val).value), add_val, n-1)
+    return generate_coords_front(list_of_values.append((list_of_values[-1] + add_val).value), add_val, n - 1)
+
 
 WEAPON_RANGE = {
     'knife': lambda coords, facing: [coords + facing.value],
-    'sword': lambda coords, facing: [facing.value*i + coords  for i in range(1,4)],
-    'axe': lambda coords, facing: [coords + facing.value, coords + facing.value + facing.turn_left().value,  coords + facing.value + facing.turn_right().value],
-    'bow': lambda coords, facing: [facing.value*i + coords  for i in range(1,50)],
-    'amulet': lambda coords, _: [coords + (1,1), coords + (-1,1), coords + (1,-1), coords + (-1,-1)]
+    'sword': lambda coords, facing: [facing.value * i + coords for i in range(1, 4)],
+    'axe': lambda coords, facing: [coords + facing.value, coords + facing.value + facing.turn_left().value,
+                                   coords + facing.value + facing.turn_right().value],
+    'bow': lambda coords, facing: [facing.value * i + coords for i in range(1, 50)],
+    'amulet': lambda coords, _: [coords + (1, 1), coords + (-1, 1), coords + (1, -1), coords + (-1, -1)]
 }
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -122,7 +126,7 @@ class BotElkaController:
         self.update_current_bot_attributes(knowledge)
 
         players_coords_set = set(self.players_in_sight)
-        weapon_coords_range_list =  WEAPON_RANGE[self.current_weapon](self.current_coords, self.current_facing)
+        weapon_coords_range_list = WEAPON_RANGE[self.current_weapon](self.current_coords, self.current_facing)
 
         if players_coords_set.intersection(weapon_coords_range_list):
             self.moves_queue.insert(0, Action.ATTACK)
@@ -167,7 +171,6 @@ class BotElkaController:
         start = self.grid.node(self.current_coords.x, self.current_coords.y)
         end = self.grid.node(coords.x, coords.y)
 
-        
         path, _ = self.finder.find_path(start, end, self.grid)
 
         facing = self.current_facing
@@ -215,7 +218,7 @@ class BotElkaController:
             if distance == 0:
                 distances[(weapon, coords)] = float('inf')
             else:
-                distances[(weapon, coords)] = distance 
+                distances[(weapon, coords)] = distance
         weapon, coord = min(distances.items(), key=operator.itemgetter(1))[0]
         self.moves_queue = self.find_path(coord)
 
@@ -244,5 +247,5 @@ def _move_one_tile(starting_facing: Facing, coord_0: Coords, coord_1: Coords) ->
 
 
 POTENTIAL_CONTROLLERS = [
-    BotElkaController("Z nami na pewno zdasz")
+    # BotElkaController("Z nami na pewno zdasz")
 ]
