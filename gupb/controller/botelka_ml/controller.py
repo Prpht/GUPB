@@ -1,4 +1,4 @@
-from collections import defaultdict
+from pathfinding.core.grid import Grid
 
 from gupb.controller.botelka_ml.brain import get_state, epsilon_greedy_action, init_q, save_q
 from gupb.controller.botelka_ml.models import Wisdom
@@ -9,6 +9,16 @@ from gupb.model.characters import Action, ChampionKnowledge, Tabard
 LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
+MAP_TILES_COST = {
+    'sea': 0,  # Sea - obstacle
+    'wall': 0,  # Wall  - obstacle
+    'bow': 1,  # Bow
+    'sword': 4,  # Sword
+    'axe': 4,  # Axe
+    'amulet': 4,  # Amulet
+    'land': 3,  # Land
+    'knife': 10000,  # Knife - start weapon, we usually want to avoid it
+}
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -42,7 +52,15 @@ class BotElkaController:
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self.arena = Arena.load(arena_description.name)
-        self.wisdom = Wisdom(self.arena, None, self.name)
+        self.arena.menhir_position = arena_description.menhir_position
+
+        matrix = [[0] * self.arena.size[0]]* self.arena.size[1]
+        for coords, tile in self.arena.terrain.items():
+            x, y = coords
+            matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
+        grid = Grid(matrix=matrix)
+
+        self.wisdom = Wisdom(self.arena, None, self.name, grid)
         save_q(self.q)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
@@ -60,8 +78,6 @@ class BotElkaController:
 
         self.old_action = new_action
         self.old_state = new_state
-
-        print(new_action)
 
         return new_action
 

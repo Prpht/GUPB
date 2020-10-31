@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
+
+from pathfinding.core.grid import Grid
+from pathfinding.finder.dijkstra import DijkstraFinder
 
 from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge, Facing
-from gupb.model.coordinates import Coords, add_coords
+from gupb.model.coordinates import Coords, add_coords, sub_coords
 from gupb.model.weapons import Weapon, Axe, Sword, Amulet, Knife, Bow
 
 WEAPONS = {
@@ -41,7 +44,9 @@ class Wisdom:
     arena: Arena
     knowledge: Optional[ChampionKnowledge]
     bot_name: str
+    grid: Grid
     prev_knowledge: Optional[ChampionKnowledge] = None
+    finder = DijkstraFinder()
 
     def next_knowledge(self, knowledge:ChampionKnowledge):
         self.prev_knowledge = self.knowledge
@@ -138,9 +143,56 @@ class Wisdom:
 
     @property
     def distance_to_menhir(self) -> int:
-        # @TODO
+        try:
+            steps_num = self.find_path_len(self.arena.menhir_position)
+        except Exception:
+            return DistanceMeasure.INACCESSIBLE.value
+
+        if steps_num < 30:
+            return DistanceMeasure.CLOSE.value
+        if steps_num < 60:
+            return DistanceMeasure.FAR.value
         return DistanceMeasure.VERY_FAR.value
 
     @property
     def lost_health(self):
         return self.bot_health != self.prev_bot_health
+
+    def find_path_len(self, coords: Coords) -> int:
+        steps = 0
+        self.grid.cleanup()
+
+        start = self.grid.node(self.bot_coords.x, self.bot_coords.y)
+        end = self.grid.node(coords.x, coords.y)
+
+        path, _ = self.finder.find_path(start, end, self.grid)
+
+        facing = self.bot_facing
+
+        for x in range(len(path) - 1):
+            actions, facing = self.move_one_tile(facing, path[x], path[x + 1])
+            steps += actions
+
+        return steps
+
+    def move_one_tile(self, starting_facing: Facing, coord_0: Coords, coord_1: Coords) -> Tuple[int, Facing]:
+        exit_facing = Facing(sub_coords(coord_1, coord_0))
+
+        # Determine what is better, turning left or turning right.
+        # Builds 2 lists and compares length.
+        facing_turning_left = starting_facing
+        left_actions = 0
+        while facing_turning_left != exit_facing:
+            facing_turning_left = facing_turning_left.turn_left()
+            left_actions += 1
+
+        facing_turning_right = starting_facing
+        right_actions = 1
+        while facing_turning_right != exit_facing:
+            facing_turning_right = facing_turning_right.turn_right()
+            right_actions +=1
+
+        actions = right_actions if left_actions > right_actions else left_actions
+        actions += 1
+
+        return actions, exit_facing

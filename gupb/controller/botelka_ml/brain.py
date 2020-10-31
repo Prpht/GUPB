@@ -45,8 +45,6 @@ def save_q(q: Dict):
             ]
         ))
 
-    print("Saved", q)
-
 
 def epsilon_greedy_action(q, state) -> Action:
     if random.random() < EPS:
