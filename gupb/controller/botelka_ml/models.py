@@ -53,6 +53,14 @@ class Wisdom:
         return tile.character.facing
 
     @property
+    def bot_health(self) -> int:
+        tile = self.knowledge.visible_tiles[self.bot_coords]
+
+        assert tile.character, "Character must be standing on a tile"
+
+        return tile.character.health
+
+    @property
     def bot_weapon(self) -> Weapon:
         tile = self.knowledge.visible_tiles[self.bot_coords]
 
