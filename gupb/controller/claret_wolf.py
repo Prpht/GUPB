@@ -150,14 +150,13 @@ class ClaretWolfController:
             else:
                 return self.explore_map()
         except Exception as e:
-            print("EXCEPTION CAUSE = ", e)
+            #print("EXCEPTION CAUSE = ", e)
             return Action.DO_NOTHING
             pass
 
 
     def update_enemies_knowledge(self, knowledge):
         visible_tiles = knowledge.visible_tiles
-        #print("TILES = ", visible_tiles)
         for coord, tile_desc in visible_tiles.items():
             if tile_desc.character is not None and coord != self.bot_position:
                 self.enemies_knowledge[tile_desc.character.controller_name] = (tile_desc, coord)
@@ -330,7 +329,6 @@ class ClaretWolfController:
 
 
     def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
-        #my_position: coordinates.Coords = knowledge.position
         mist_tiles: dict[coordinates.Coords, int] = defaultdict(int) #dict for storing distance to each mist tile from current bot position
         visible_tiles = knowledge.visible_tiles
 
@@ -347,7 +345,6 @@ class ClaretWolfController:
                 self.last_observed_mist_vec = min_dist_vec
                 self.run_seq_step = 1
             elif g_distance_vec(min_dist_vec) < g_distance_vec(self.last_observed_mist_vec):
-                # print("RPY:: MIN_VEC_MIST = ", min_dist_vec)
                 self.last_observed_mist_vec = min_dist_vec
                 if self.run_seq_step == LONG_SEQ:
                     self.run_seq_step = 1
