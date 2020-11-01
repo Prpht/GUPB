@@ -22,10 +22,11 @@ class TupTupController:
         self.bfs_potential_goals: Set[coordinates.Coords] = set()
         self.bfs_potential_goals_visited: Set[coordinates.Coords] = set()
         self.map: Optional[arenas.Terrain] = None
-        self.map_size = None
-        self.mist_radius = 0
-        self.episode = 0
-        self.max_num_of_episodes = 0
+        self.map_size: Optional[Tuple[int, int]] = None
+        self.hiding_spot: coordinates.Coords = None
+        self.mist_radius: int = 0
+        self.episode: int = 0
+        self.max_num_of_episodes: int = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TupTupController) and other.name == self.name:
@@ -49,6 +50,16 @@ class TupTupController:
         self.episode += 1
         try:
             self.__update_char_info(knowledge)
+
+            if self.episode == 1 and self.__needs_to_hide():
+                self.__go_to_hiding_spot()
+
+            if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
+                return characters.Action.ATTACK
+
+            if not self.action_queue.empty():
+                return self.action_queue.get()
+
             if not self.has_calculated_path:
                 start, end = self.position, self.bfs_goal
                 self.__calculate_optimal_path(start, end)
@@ -63,8 +74,6 @@ class TupTupController:
                     if self.bfs_potential_goals:
                         self.bfs_goal = self.bfs_potential_goals.pop()
                         self.bfs_potential_goals_visited.add(self.bfs_goal)
-            if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
-                return characters.Action.ATTACK
 
             if not self.action_queue.empty():
                 return self.action_queue.get()
@@ -88,6 +97,29 @@ class TupTupController:
                                                        weapons.Amulet, weapons.Axe]}
         self.weapon = weapons_map.get(char_description.weapon.name, weapons.Knife)
         self.facing = char_description.facing
+
+    def __needs_to_hide(self) -> bool:
+        quarter = (self.position[0] // (self.map_size[0] / 2), self.position[1] // (self.map_size[1] / 2))
+        if self.menhir_pos[0] // (self.map_size[0] / 2) == quarter[0] and \
+                self.menhir_pos[1] // (self.map_size[1] / 2) == quarter[1]:
+            start_x = self.map_size[0] - 1 if quarter[0] > 0 else 0
+            start_y = self.map_size[1] - 1 if quarter[1] > 0 else 0
+            corner = {(start_x, start_y)}
+            while not self.hiding_spot:
+                for t in corner:
+                    if t in self.map and self.map[t].terrain_passable():
+                        self.hiding_spot = coordinates.Coords(t[0], t[1])
+                        break
+                corner.update([(t[0] + d[0], t[1] + d[1]) for t in corner for d in [(0, 1), (0, -1), (1, 0), (-1, 0)]])
+            return True
+        else:
+            return False
+
+    def __go_to_hiding_spot(self) -> None:
+        start, end = self.position, self.hiding_spot
+        self.__calculate_optimal_path(start, end)
+        self.path.append(end)
+        self.__add_moves(200)
 
     def __rotate(self, expected_facing: characters.Facing, starting_facing: characters.Facing = None) -> None:
         curr_facing_index = FACING_ORDER.index(self.facing if not starting_facing else starting_facing)
@@ -140,7 +172,7 @@ class TupTupController:
         available_cells = []
         for facing in characters.Facing:
             next_coords = coords + facing.value
-            if next_coords in self.map.keys() and self.map[coords].terrain_passable():
+            if next_coords in self.map and self.map[coords].terrain_passable():
                 available_cells.append(next_coords)
         return available_cells
 
