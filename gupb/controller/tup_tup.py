@@ -1,8 +1,7 @@
 from queue import SimpleQueue
-from typing import Dict, Type, Optional, Tuple, List
+from typing import Dict, Type, Optional, Tuple, List, Set
 
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
-import math
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 
@@ -20,14 +19,13 @@ class TupTupController:
         self.has_calculated_path: bool = False
         self.path: List = []
         self.bfs_goal: coordinates.Coords = None
-        self.bfs_potential_goals: set[coordinates.Coords] = set()
-        self.bfs_potential_goals_visited: set[coordinates.Coords] = set()
+        self.bfs_potential_goals: Set[coordinates.Coords] = set()
+        self.bfs_potential_goals_visited: Set[coordinates.Coords] = set()
         self.map: Optional[arenas.Terrain] = None
         self.map_size = None
         self.mist_radius = 0
         self.episode = 0
         self.max_num_of_episodes = 0
-        self.episode_to_start = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TupTupController) and other.name == self.name:
@@ -42,8 +40,7 @@ class TupTupController:
         self.map = arena.terrain
         self.map_size = arena.size
         self.mist_radius = int(self.map_size[0] * 2 ** 0.5) + 1
-        self.max_num_of_episodes = (self.mist_radius - 1) * games.MIST_TTH  # -1 because we can't be exactly in menhir coords
-        print(self.max_num_of_episodes)
+        self.max_num_of_episodes = (self.mist_radius - 1) * games.MIST_TTH
         self.menhir_pos = arena_description.menhir_position
         self.bfs_goal = self.menhir_pos
         self.bfs_potential_goals_visited.add(self.menhir_pos)
@@ -57,7 +54,6 @@ class TupTupController:
                 self.__calculate_optimal_path(start, end)
 
                 if len(self.path) > 0:  # the path was found
-                    self.episode_to_start = self.find_episode_to_start()
                     self.has_calculated_path = True
                 else:
                     neighbors = self.__get_neighbors(self.bfs_goal)
@@ -78,9 +74,8 @@ class TupTupController:
             else:  # the destination is reached
                 self.__guard_area()
 
-                # it turns out that without this line we are doing way too much "DO_NOTHING"
-                if not self.action_queue.empty():
-                    return self.action_queue.get()
+            if not self.action_queue.empty():
+                return self.action_queue.get()
 
             return characters.Action.DO_NOTHING
         except Exception:
@@ -138,8 +133,7 @@ class TupTupController:
                         return True
             else:
                 return False
-        except KeyError:
-            # tile was not visible
+        except KeyError:    # tile was not visible
             return False
 
     def __get_neighbors(self, coords):
@@ -174,22 +168,15 @@ class TupTupController:
     def __backtrack_path(self, end_coords: coordinates.Coords, start_coords: coordinates.Coords, path: Dict,
                          final_path: List):
         if end_coords == start_coords:
-            return 0, self.facing, end_coords
+            return self.facing, end_coords
         elif end_coords not in path.keys():
             raise PathFindingException
         else:
-            next = path[end_coords]
-            prev_steps, prev_facing, prev_coords = self.__backtrack_path(next, start_coords, path, final_path)
-            next_facing = characters.Facing(end_coords - next)
-            rotations_number = self.__get_rotations_number(prev_facing, next_facing)
-            final_path.append([prev_steps, next])
-            steps = prev_steps + 1 + rotations_number
-            return steps, next_facing, next
-
-    def __get_path(self, end_coords: coordinates.Coords, start_coords: coordinates.Coords, path: Dict) -> List:
-        final_path = []
-        self.__backtrack_path(end_coords, start_coords, path, final_path)
-        return final_path
+            next_coord = path[end_coords]
+            prev_facing, prev_coords = self.__backtrack_path(next_coord, start_coords, path, final_path)
+            next_facing = characters.Facing(end_coords - next_coord)
+            final_path.append(next_coord)
+            return next_facing, next_coord
 
     def __get_rotations_number(self, current_facing: characters.Facing, next_facing: characters.Facing) -> int:
         curr_facing_index = FACING_ORDER.index(current_facing)
@@ -206,13 +193,9 @@ class TupTupController:
     def __calculate_optimal_path(self, start_coords: coordinates.Coords, end_coords: coordinates.Coords):
         try:
             bfs_res = self.__breadth_first_search(start_coords, end_coords)
-            self.path = self.__get_path(end_coords, start_coords, bfs_res)
-            print("PATH BEFORE ", self.path)
-            last_val_in_path = self.path[-1][0]
-            for i, _ in enumerate(self.path):
-                self.path[i][0] = last_val_in_path - self.path[i][0]
-            print("PATH AFTER ", self.path)
-
+            final_path = []
+            self.__backtrack_path(end_coords, start_coords, bfs_res, final_path)
+            self.path = final_path
         except (BFSException, PathFindingException) as e:
             pass
 
@@ -221,8 +204,8 @@ class TupTupController:
         for _ in range(number_of_moves):
             if len(self.path) < 2:
                 break
-            start_coords = self.path.pop(0)[1]
-            end_coords = self.path[0][1]
+            start_coords = self.path.pop(0)
+            end_coords = self.path[0]
             starting_facing = self.__move(start_coords, end_coords, starting_facing)
 
     def __move(self, start_coords: coordinates.Coords, end_coords: coordinates.Coords,
@@ -251,30 +234,6 @@ class TupTupController:
         else:
             # one of the numbers SHOULD be 0, otherwise sth is wrong with the BFS result
             raise (Exception("The coordinates are not one step away from each other"))
-
-    def __correlate_coords_with_radius(self):
-        res = []
-        for _, coords in self.path:
-            coords_diff = self.menhir_pos - coords
-            curr_radius = int(math.sqrt(coords_diff.x ** 2 + coords_diff.y ** 2))
-            last_episode = (self.max_num_of_episodes - 1) - curr_radius * games.MIST_TTH
-            res.append(last_episode)
-        return res
-
-    def find_last_index_min_val(self, array):
-        res = len(array) - array[::-1].index(min(array)) - 1
-        return res
-
-    def find_episode_to_start(self):
-        coords_with_radius = self.__correlate_coords_with_radius()
-        farthest_coord_index = self.find_last_index_min_val(coords_with_radius)
-        farthest_radius = coords_with_radius[farthest_coord_index]
-        turning_count = 0
-        for i in range(len(self.path) - 1):
-            if self.path[i][0] - self.path[i + 1][0] > 1:
-                turning_count += 1
-        return farthest_radius - self.path[0][0] - 7 * turning_count
-
 
     @property
     def name(self) -> str:
