@@ -63,19 +63,14 @@ class Krowa1233Controller(Controller):
             strict=strict
         )
 
-    def follow_path(self, path: List[Coords]):
-        self.action_queue = collections.deque()
-        if path:
-            for action in utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path):
-                self.action_queue.append(action)
-
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.knowledge.update(knowledge)
         if len(self.action_queue) == 0 and self.last_action is None:
-            path = self.find_dijkstra_to_menhir(
-                weapons_to_take=[Bow],
-                dist=15,
-            )
+            path = self.knowledge.find_sneaky_path()
+            if path is None:
+                path = self.find_dijkstra_to_menhir(
+                    weapons_to_take=[Bow]
+                )
             self._plan_actions(path)
         elif len(self.action_queue) == 0:
             if self.knowledge.mist_radius > 30:
