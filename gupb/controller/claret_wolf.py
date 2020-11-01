@@ -279,9 +279,9 @@ class ClaretWolfController:
         weapons = {k: v.loot.name for k, v in weapons.items()}
         for weapon in weapons.items():
             self.weapons_knowledge[weapon[0]] = weapon[1]
-        self.dynamic_obsticles = self.weapons_knowledge.copy()
+        self.dynamic_obstacles = self.weapons_knowledge.copy()
         self.weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.weapons_knowledge.items()))
-        self.dynamic_obsticles = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] <= WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.dynamic_obsticles.items()))
+        self.dynamic_obstacles = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] <= WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.dynamic_obstacles.items()))
         
 
     def determine_next_weapon(self):
@@ -297,7 +297,7 @@ class ClaretWolfController:
     def go_to_coords(self, target: coordinates.Coords):
         def create_grid():
             temp_arena = self.arena.copy()
-            for w in self.dynamic_obsticles.keys():
+            for w in self.dynamic_obstacles.keys():
                 # print("UPDATING ARENA")
                 # print(w)
                 temp_arena[w[0]][w[1]] = -1
