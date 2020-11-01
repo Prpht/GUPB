@@ -134,7 +134,6 @@ class ClaretWolfController:
             self.update_weapons_knowledge(knowledge)
             global counter
             if (counter % 5) == 0:
-                print("UPDATEDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDd")
                 self.update_enemies_knowledge(knowledge)
                 counter = 0
             counter += 1
@@ -161,16 +160,10 @@ class ClaretWolfController:
         #print("TILES = ", visible_tiles)
         for coord, tile_desc in visible_tiles.items():
             if tile_desc.character is not None and coord != self.bot_position:
-                print("BOT_NAME = ", tile_desc.character.controller_name, " POS = ", coord)
                 self.enemies_knowledge[tile_desc.character.controller_name] = (tile_desc, coord)
             if tile_desc.character is not None and tile_desc.character.health == 0:
                 del self.enemies_knowledge[tile_desc.character.controller_name]
-                print("REMOVED = ", self.enemies_knowledge)
-        '''champion_tiles = dict(filter(lambda k, v: v.character is not None and k != self.bot_position, visible_tiles.items()))
-        champion_characters = [(champion_tile, coord) for coord, champion_tile in champion_tiles.items()]
-        for (champion_tile, coord) in champion_characters:
-            self.enemies_knowledge[champion_tile.character.controller_name] = (champion_tile, coord)
-        #self.enemies_knowledge = { champion.controller.name(): champion for champion in champion_characters }'''
+
 
     def check_enemies_in_neighbourhood(self):
         neighbourhood_distance = 1000000
@@ -184,7 +177,6 @@ class ClaretWolfController:
 
 
         target_position = self.enemies_knowledge[closest_alive_enemy][1] if closest_alive_enemy is not None else None #coord
-        #print("SEARCH TARGET = ", target_position)
         return target_position
 
 
@@ -216,7 +208,6 @@ class ClaretWolfController:
             
         # maybe look for new weapon?
         next = self.determine_next_weapon()
-        #print("WEAPON = ", next)
         if next:
             self.queue = []
             self.enqueue_target(next)
