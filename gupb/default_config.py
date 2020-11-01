@@ -14,7 +14,7 @@ CONFIGURATION = {
         shallow_mind.ShallowMindController('test'),
         tup_tup.TupTupController('Bot'),
     ],
-    'visualise': True,
+    'visualise': False,
     'show_sight': None,
-    'runs_no': 1,
+    'runs_no': 100,
 }
