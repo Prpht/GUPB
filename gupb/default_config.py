@@ -16,8 +16,8 @@ CONFIGURATION = {
         #bb_bot.BBBotController("Bartek"),
         #botelka.BotElkaController("Z nami na pewno zdasz"),
         CLARET_WOLF,
-        random.RandomController("FIRST"),
-        random.RandomController("SECOND")
+        random.RandomController("FIRST1"),
+        random.RandomController("SECOND2")
         #ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         #krowa123.Krowa1233Controller("Krowka"),
         #tup_tup.TupTupController('Bot'),
