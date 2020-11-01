@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, List
 
 import sortedcontainers
 
@@ -18,7 +18,7 @@ class TileDescription(NamedTuple):
     type: str
     loot: Optional[weapons.WeaponDescription]
     character: Optional[characters.ChampionDescription]
-    effects: list[effects.EffectDescription]
+    effects: List[effects.EffectDescription]
 
 
 class Tile(ABC):

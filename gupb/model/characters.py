@@ -4,7 +4,7 @@ from enum import Enum
 from functools import partial
 import logging
 import random
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Dict
 
 from gupb import controller
 from gupb.logger import core as logger_core
@@ -20,7 +20,7 @@ CHAMPION_STARTING_HP: int = 5
 
 class ChampionKnowledge(NamedTuple):
     position: coordinates.Coords
-    visible_tiles: dict[coordinates.Coords, tiles.TileDescription]
+    visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]
 
 
 class ChampionDescription(NamedTuple):

@@ -141,6 +141,7 @@ class ClaretWolfController:
                 self.update_enemies_knowledge(knowledge)
                 counter = 0
             counter += 1
+            self.set_bot_axis_from_his_facing(knowledge)
             
             if self.has_next_defined():
                 next_move = self.queue.pop(0)
@@ -222,6 +223,7 @@ class ClaretWolfController:
         if next:
             self.queue = []
             self.enqueue_target(next)
+
 
         # maybe explore DEFAULT
 
