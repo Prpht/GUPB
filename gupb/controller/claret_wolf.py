@@ -4,7 +4,7 @@ from enum import Enum
 from collections import defaultdict
 
 import random
-
+import copy
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -279,7 +279,7 @@ class ClaretWolfController:
         weapons = {k: v.loot.name for k, v in weapons.items()}
         for weapon in weapons.items():
             self.weapons_knowledge[weapon[0]] = weapon[1]
-        self.dynamic_obstacles = self.weapons_knowledge.copy()
+        self.dynamic_obstacles = copy.deepcopy(self.weapons_knowledge)
         self.weapons_knowledge = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] > WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.weapons_knowledge.items()))
         self.dynamic_obstacles = dict(filter(lambda elem: WEAPONS_DESCRIPTORS[elem[1]] <= WEAPONS_DESCRIPTORS[self.weapon] and elem[0] != self.bot_position, self.dynamic_obstacles.items()))
         
