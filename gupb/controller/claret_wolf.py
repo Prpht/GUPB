@@ -73,12 +73,14 @@ epsilon = 0.1
 g_distance = lambda my_p, ref_p: ((ref_p[0] - my_p[0]) ** 2 + (ref_p[1] - my_p[1]) ** 2)
 g_distance_vec = lambda vec: ((vec[0]) ** 2 + (vec[1]) ** 2)
 
+counter = 0
 
 class ClaretWolfController:
     def __init__(self):
         self.last_observed_mist_vec: coordinates.Coords = None
         self.weapon = "knife"
         self.weapons_knowledge = {}
+        self.enemies_knowledge = {}
         self.bot_position = None
         self.facing = None
         self.enviroment_map = None
@@ -88,6 +90,8 @@ class ClaretWolfController:
         self.run_seq_step = 0
         self.position_axis: Axis= None
         self.is_bot_in_rotation = False
+        #self.arena_name = None
+        #self.arena = None
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
                                                                   Move.RIGHT: characters.Action.TURN_RIGHT,
@@ -120,7 +124,7 @@ class ClaretWolfController:
             arena_object = arenas.Arena.load(map_name)
             size = arena_object.size
             terrain = arena_object.terrain
-            arena = [[self.terrain_mapping(terrain, coordinates.Coords(*(x,y))) for x in range(size[0])] for y in range(size[1])] 
+            arena = [[self.terrain_mapping(terrain, coordinates.Coords(*(x,y))) for x in range(size[0])] for y in range(size[1])]
             self.enviroment_map = Grid(matrix=arena)
         except:
             pass
@@ -130,7 +134,10 @@ class ClaretWolfController:
         try:
             self.update_bot(knowledge)
             self.update_weapons_knowledge(knowledge)
-            self.set_bot_axis_from_his_facing(knowledge)
+            if counter % 10 == 0:
+                self.update_enemies_knowledge(knowledge)
+                counter = 0
+            counter += 1
             
             if self.has_next_defined():
                 next_move = self.queue.pop(0)
@@ -145,6 +152,31 @@ class ClaretWolfController:
                 return self.explore_map()
         except:
             pass
+
+
+    def update_enemies_knowledge(self, knowledge: characters.ChampionKnowledge):
+        visible_tiles = knowledge.visible_tiles
+        for coord, tile_desc in visible_tiles.items():
+            if tile_desc.character is not None and coord != self.bot_position:
+                self.enemies_knowledge[tile_desc.character.controller_name] = (tile_desc, coord)
+        '''champion_tiles = dict(filter(lambda k, v: v.character is not None and k != self.bot_position, visible_tiles.items()))
+        champion_characters = [(champion_tile, coord) for coord, champion_tile in champion_tiles.items()]
+        for (champion_tile, coord) in champion_characters:
+            self.enemies_knowledge[champion_tile.character.controller_name] = (champion_tile, coord)
+        #self.enemies_knowledge = { champion.controller.name(): champion for champion in champion_characters }'''
+
+    def check_enemies_in_neighbourhood(self):
+        neighbourhood_distance = 1000000
+        closest_alive_enemy = None
+        min_distance_to_enemy = neighbourhood_distance
+        for k, v in self.enemies_knowledge.items():
+            if v[0].health > 0:
+                distance = g_distance(self.bot_position, v[1])
+                closest_alive_enemy = k if distance < min_distance_to_enemy else closest_alive_enemy
+                min_distance_to_enemy = distance if distance < min_distance_to_enemy else min_distance_to_enemy
+
+        target_position = self.enemies_knowledge[closest_alive_enemy][1] if closest_alive_enemy is not None else None #coord
+        return target_position
 
 
     def has_next_defined(self):
@@ -177,8 +209,13 @@ class ClaretWolfController:
         next = self.determine_next_weapon()
         if next:
             self.enqueue_target(next)
+            return
 
         # maybe chase?
+        next = self.check_enemies_in_neighbourhood()
+        if next:
+            self.queue = []
+            self.enqueue_target(next)
 
         # maybe explore DEFAULT
 
