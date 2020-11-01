@@ -16,5 +16,5 @@ CONFIGURATION = {
     ],
     'visualise': True,
     'show_sight': None,
-    'runs_no': 2,
+    'runs_no': 1,
 }
