@@ -47,10 +47,12 @@ class Wisdom:
     grid: Grid
     prev_knowledge: Optional[ChampionKnowledge] = None
     finder = DijkstraFinder()
+    t: int = 0 
 
     def next_knowledge(self, knowledge:ChampionKnowledge):
         self.prev_knowledge = self.knowledge
         self.knowledge = knowledge
+        self.t += 1
 
     @property
     def coords_did_not_change(self):
@@ -157,6 +159,12 @@ class Wisdom:
     @property
     def lost_health(self):
         return self.bot_health != self.prev_bot_health
+
+    @property
+    def reach_menhir_before_mist(self):
+        distance = self.distance_to_menhir
+        return self.arena.mist_radius/5-self.t-30 > distance
+
 
     def find_path_len(self, coords: Coords) -> int:
         steps = 0
