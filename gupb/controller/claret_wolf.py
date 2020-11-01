@@ -5,6 +5,7 @@ from collections import defaultdict
 
 import random
 import copy
+
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -205,7 +206,8 @@ class ClaretWolfController:
                 next = self.menhir_position
                 if next:
                     self.enqueue_target(next)
-                    #self.last_observed_mist_vec = None
+                    if random.uniform(0, 1) < 0.3:
+                        self.last_observed_mist_vec = None
                     return 
             
         # maybe look for new weapon?
