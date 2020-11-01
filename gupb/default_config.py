@@ -1,12 +1,5 @@
-from gupb.controller import bb_bot
-from gupb.controller import botelka
-from gupb.controller import claret_wolf
-from gupb.controller import ihavenoideawhatimdoing
-from gupb.controller import shallow_mind
-from gupb.controller import krowa123
-from gupb.controller import tup_tup
-
-b = botelka.BotElkaController("Z nami na pewno zdasz")
+from gupb.controller import bb_bot, claret_wolf, ihavenoideawhatimdoing, shallow_mind, krowa123, tup_tup
+from gupb.controller.botelka_ml.controller import BotElkaController
 
 CONFIGURATION = {
     'arenas': [
@@ -14,7 +7,7 @@ CONFIGURATION = {
     ],
     'controllers': [
         bb_bot.BBBotController("Bartek"),
-        b,
+        BotElkaController("Z nami na pewno zdasz"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
@@ -22,6 +15,6 @@ CONFIGURATION = {
         tup_tup.TupTupController('Bot'),
     ],
     'visualise': True,
-    'show_sight': b,
+    'show_sight': None,
     'runs_no': 1,
 }
