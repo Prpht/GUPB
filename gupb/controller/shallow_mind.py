@@ -5,6 +5,7 @@ from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionDescription, Facing
+from gupb.model.games import MIST_TTH
 from gupb.model.tiles import Menhir, Wall, Sea, Land
 from gupb.model.weapons import Knife, Sword, Bow, Axe, Amulet
 from queue import SimpleQueue
@@ -23,7 +24,7 @@ WEAPONS_ENCODING = {weapon().description(): value for weapon, value in WEAPONS}
 
 finder = AStarFinder()
 
-FIELD_ATTACKED = FIELD_WEIGHT * FIELD_WEIGHT
+FIELD_ATTACKED = FIELD_WEIGHT * FIELD_WEIGHT * FIELD_WEIGHT
 
 
 def terrain_transparent_monkey_patch(self) -> bool:
@@ -48,6 +49,7 @@ class ArenaMapped(Arena):
         self.matrix = []
         self.champion: ChampionDescription = None
         self.position: coordinates.Coords = None
+        self.episode: int = 0
         self.effect_weight: int = FIELD_ATTACKED
 
     def get_next_field(self) -> coordinates.Coords:
@@ -70,6 +72,10 @@ class ArenaMapped(Arena):
         next_field = self.get_next_field()
         self.matrix[next_field[1]][next_field[0]] = FIELD_WEIGHT / 2
 
+        self.effect_weight: int = FIELD_ATTACKED
+        if self.episode % MIST_TTH == 0:
+            self.increase_mist()
+        self.episode += 1
         for position, tileDescription in knowledge.visible_tiles.items():
             if tileDescription.character and tileDescription.character != self.champion:
                 self.champions[tileDescription.character] = (position, 0)
@@ -104,6 +110,9 @@ class ArenaMapped(Arena):
         grid = Grid(matrix=self.matrix)
         start = grid.node(*self.position)
         for possible_postion in Facing:
+            end_position = self.menhir_position + possible_postion.value
+            if end_position == start:
+                return characters.Action.TURN_LEFT
             end = grid.node(*(self.menhir_position + possible_postion.value))
             path, _ = finder.find_path(start, end, grid)
             if len(path) > 1:
