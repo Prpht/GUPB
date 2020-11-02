@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Type, Optional
 
-from gupb.controller.krowa123 import utils
+from . import utils
 from gupb.model.tiles import Tile, TileDescription
 from gupb.model.weapons import Weapon
 
