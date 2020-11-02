@@ -5,6 +5,7 @@ from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import shallow_mind
 from gupb.controller import krowa123
 from gupb.controller import tup_tup
+from gupb.controller import random
 
 CONFIGURATION = {
     'arenas': [
