@@ -13,7 +13,7 @@ MIST_TTH: int = 5
 WEPON_REACH_BENEFIT: int = 0.7
 # top left of map is 0 0
 FALLOFF=12
-INITIAL_ROTATE_DIAMETER = 13
+INITIAL_ROTATE_DIAMETER = 1+20*2
 
 def r(element, times):
     return [element] * times
@@ -120,7 +120,7 @@ class IHaveNoIdeaWhatImDoingController:
         currentRadius = self.arena.mist_radius - (self.time // MIST_TTH)
         playerMenhirDist = self.heading_map[knowledge.position]["distance"]
         self.mist_distance = currentRadius - playerMenhirDist
-        return currentRadius - playerMenhirDist
+        return max(0,currentRadius - playerMenhirDist)
 
     def rotateFacingLeft(self, facing):
         if(facing[0] == 0 and facing[1] == 1):
@@ -140,15 +140,16 @@ class IHaveNoIdeaWhatImDoingController:
         return [(0.1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1])%2],'discover')]
 
     def getNavOption(self, knowledge: characters.ChampionKnowledge):
+        multiplier = 1 if self.getMistDistance(knowledge) > 8 else 1/2*(8 - self.getMistDistance(knowledge))
         preferedDir = self.mulitplyCoords(
             self.heading_map[knowledge.position]["sourceDir"],-1)
         if(preferedDir == None):
-            return [(0.1, characters.Action.TURN_RIGHT,"nav")]
+            return [(0.1*multiplier, characters.Action.TURN_RIGHT,"nav")]
         if(preferedDir == self.facing):
-            return [(0.5 * self.getActionTime('nav_forward'), characters.Action.STEP_FORWARD, "nav_forward")]
+            return [(0.5*multiplier * self.getActionTime('nav_forward'), characters.Action.STEP_FORWARD, "nav_forward")]
         if(preferedDir == self.rotateFacingLeft(self.facing)):
-            return [(0.6, characters.Action.TURN_LEFT,"nav")]
-        return [(0.6, characters.Action.TURN_RIGHT, "nav")]
+            return [(0.6*multiplier, characters.Action.TURN_LEFT,"nav")]
+        return [(0.6* multiplier, characters.Action.TURN_RIGHT, "nav")]
 
     def getObeliskCaptureOption(self, knowledge: characters.ChampionKnowledge):
         menhirOffset = (knowledge.position - self.menhir_position)
@@ -158,15 +159,15 @@ class IHaveNoIdeaWhatImDoingController:
             return []
         
         preferedDir = rotateMap[-menhirOffset[1] + radiusShift][menhirOffset[0] + radiusShift]
-        if(menhirOffset[0] == radiusShift and menhirOffset[1] == radiusShift):
+        if(self.mist_distance < 15):
             self.rotate_diam -= 2
         if(preferedDir == self.facing):
             if(self.canStepOn(knowledge.position + preferedDir)):
                 return [(0.7, characters.Action.STEP_FORWARD, "capture")]
             else:
                 self.menhir_rotation = "clockwise" if self.menhir_rotation == "counterclockwise" else "counterclockwise"
-                if(self.rotate_diam > 3):
-                    self.rotate_diam -= 2
+                # if(self.rotate_diam > 3 and self.mist_distance < 15):
+                #     self.rotate_diam -= 2
                 return [(0.7, characters.Action.TURN_RIGHT, "capture")]
         if(preferedDir == self.rotateFacingLeft(self.facing)):
             return [(0.7, characters.Action.TURN_LEFT, "capture")]
