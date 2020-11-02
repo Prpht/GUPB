@@ -12,8 +12,8 @@ dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 MIST_TTH: int = 5
 WEPON_REACH_BENEFIT: int = 0.7
 # top left of map is 0 0
-FALLOFF=10
-INITIAL_ROTATE_DIAMETER = 17
+FALLOFF=12
+INITIAL_ROTATE_DIAMETER = 13
 
 def r(element, times):
     return [element] * times
@@ -154,7 +154,7 @@ class IHaveNoIdeaWhatImDoingController:
         menhirOffset = (knowledge.position - self.menhir_position)
         rotateMap = getRotateAround(self.rotate_diam)[self.menhir_rotation]
         radiusShift = (self.rotate_diam - 1) // 2
-        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
+        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance * 2 <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
             return []
         
         preferedDir = rotateMap[-menhirOffset[1] + radiusShift][menhirOffset[0] + radiusShift]
@@ -200,7 +200,7 @@ class IHaveNoIdeaWhatImDoingController:
                     if(coord in self.memory and self.memory[coord][1].character and self.memory[coord][1].character.controller_name != self.name):
                         action = characters.Action.TURN_LEFT if cDir == self.rotateFacingLeft(self.facing) else characters.Action.TURN_RIGHT
                         prio = reach / 50 * ((3 - abs(spread)) / 3)**2 * abs((self.time - self.memory[coord][0] + spread) / 5) * self.getActionTime("obtain", 4)
-                        options.append((prio,action, "obtain"))
+                        options.append((prio/2,action, "obtain"))
         return options
 
     def checkStuckOption(self, knowledge: characters.ChampionKnowledge):
