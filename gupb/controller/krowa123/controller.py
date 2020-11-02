@@ -1,21 +1,16 @@
 import collections
-import math
 import random
-from queue import SimpleQueue
-from typing import Dict, List, Optional, Tuple, Type
+from typing import Dict, List, Optional, Type
 
-from gupb.model import arenas, coordinates, tiles, weapons
-from gupb.model import characters
-from gupb.model.characters import Action
-from gupb.model.coordinates import add_coords, Coords
+from gupb.controller import Controller
+from gupb.model import arenas, tiles
+from gupb.model.characters import Action, ChampionKnowledge, Tabard
+from gupb.model.coordinates import Coords
+from gupb.model.weapons import Bow, Weapon
 from . import utils
 from .knowledge import Knowledge
-from .. import Controller
 
 __all__ = ["Krowa1233Controller"]
-
-from ...model.tiles import Tile
-from ...model.weapons import Bow, Weapon
 
 POSSIBLE_ACTIONS = [
     Action.TURN_LEFT,
@@ -33,7 +28,7 @@ class Krowa1233Controller(Controller):
         self.first_name: str = first_name
         self.knowledge: Optional[Knowledge] = None
         self.last_action: Optional[Action] = None
-        self.last_position: Optional[coordinates.Coords] = None
+        self.last_position: Optional[Coords] = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Krowa1233Controller):
@@ -59,32 +54,30 @@ class Krowa1233Controller(Controller):
     def find_dijkstra_to_menhir(
         self,
         weapons_to_take: List[Type[Weapon]],
-        strict: bool = False
+        dist: int = 0,
+        strict: bool = True
     ) -> List[Coords]:
         return self.knowledge.find_dijkstra_path(
             weapons_to_take=weapons_to_take,
+            dist=dist,
             strict=strict
         )
 
-    def follow_path(self, path: List[Coords]):
-        self.action_queue = collections.deque()
-        if path:
-            for action in utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path):
-                self.action_queue.append(action)
-
-    def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.knowledge.update(knowledge)
         if len(self.action_queue) == 0 and self.last_action is None:
-            path = self.find_dijkstra_to_menhir(
-                weapons_to_take=[Bow]
-            )
+            path = self.knowledge.find_sneaky_path()
+            if path is None:
+                path = self.find_dijkstra_to_menhir(
+                    weapons_to_take=[Bow]
+                )
             self._plan_actions(path)
         elif len(self.action_queue) == 0:
-            if self.knowledge.mist_radius > 15:
+            if self.knowledge.mist_radius > 30:
                 self._plan_random_enemies_search()
             else:
                 path = self.find_dijkstra_to_menhir(
-                    weapons_to_take=[], strict=True
+                    weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
                 )
                 self._plan_actions(path)
         if self._check_if_hit(knowledge.visible_tiles):
@@ -108,7 +101,7 @@ class Krowa1233Controller(Controller):
             self.action_queue.append(Action.TURN_RIGHT)
         self.action_queue.append(Action.STEP_FORWARD)
 
-    def _check_if_hit(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> bool:
+    def _check_if_hit(self, visible_tiles: Dict[Coords, tiles.TileDescription]) -> bool:
         return len(self.knowledge.champions_to_attack()) > 0
 
     @property
@@ -116,5 +109,5 @@ class Krowa1233Controller(Controller):
         return f'Krowa1233Controller{self.first_name}'
 
     @property
-    def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.VIOLET
+    def preferred_tabard(self) -> Tabard:
+        return Tabard.VIOLET

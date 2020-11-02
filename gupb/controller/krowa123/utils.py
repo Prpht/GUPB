@@ -49,7 +49,9 @@ def path_to_actions(position: Coords, facing: Facing, path: List[Coords]) -> Lis
         if coord - position != (0, 0):
             desired_facing = facing_from_value(coord - position)
             actions += turn_actions(facing, desired_facing)
-        actions.append(Action.STEP_FORWARD)
+            actions.append(Action.STEP_FORWARD)
+        else:
+            actions.append(Action.DO_NOTHING)
         position = coord
         facing = desired_facing
     return actions

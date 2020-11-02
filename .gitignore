@@ -4,3 +4,4 @@
 venv/
 .run/
 results/
+*.DS_STORE

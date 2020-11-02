@@ -1,5 +1,11 @@
-from gupb.controller import bb_bot, claret_wolf, ihavenoideawhatimdoing, shallow_mind, krowa123, tup_tup
 from gupb.controller.botelka_ml.controller import BotElkaController
+from gupb.controller import bb_bot
+from gupb.controller import claret_wolf
+from gupb.controller import ihavenoideawhatimdoing
+from gupb.controller import shallow_mind
+from gupb.controller import krowa123
+from gupb.controller import tup_tup
+from gupb.controller import random
 
 CONFIGURATION = {
     'arenas': [

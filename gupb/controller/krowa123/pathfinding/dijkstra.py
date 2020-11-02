@@ -1,11 +1,13 @@
-from queue import PriorityQueue
-import random
-from typing import Dict, List, Type, Tuple, Optional
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-from gupb.controller.krowa123.model import SeenTile
+import random
+from dataclasses import dataclass, field
+from queue import PriorityQueue
+from typing import Dict, List, Type, Tuple
+
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Weapon
+from ..model import SeenTile
 
 INF = 100000000000000
 
@@ -15,8 +17,8 @@ class Vertex:
     coords: Coords = field(compare=False)
     tile_type: SeenTile = field(compare=False)
     dist: int = INF
-    prev: 'Vertex' = field(compare=False, default=None)
-    neighbours: List['Vertex'] = field(compare=False, default_factory=list)
+    prev: Vertex = field(compare=False, default=None)
+    neighbours: List[Vertex] = field(compare=False, default_factory=list)
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -31,7 +33,8 @@ def determine_path_bot(
     start: Coords,
     weapons_to_take: List[Type[Weapon]],
     menhir_position: Coords,
-    strict: bool
+    dist: int = 0,
+    strict: bool = True
 ) -> List[Coords]:
     graph = construct_graph(terrain=terrain, menhir_position=menhir_position)
     graph = dijkstra_search(graph, start, weapons_to_take)
@@ -41,13 +44,12 @@ def determine_path_bot(
     weapons.sort(key=lambda e: e[1].dist)
     target_position = graph[menhir_position]
     target_position = target_position
-    for i in range(50):
-        if strict:
-            break
-        ns = [n for n in target_position.neighbours if n.coords != menhir_position]
-        if len(ns) == 0:
-            break
-        target_position = random.choice(ns)
+    if not strict:
+        for i in range(dist):
+            ns = [n for n in target_position.neighbours if n.coords != menhir_position]
+            if len(ns) == 0:
+                break
+            target_position = random.choice(ns)
     path = []
     if len(weapons) > 0:
         path.extend(
@@ -55,9 +57,11 @@ def determine_path_bot(
         )
         graph = construct_graph(terrain=terrain, menhir_position=menhir_position)
         graph = dijkstra_search(graph, weapons[0][0], weapons_to_take)
-        path.extend(
-            get_path(graph, target_position.coords)
-        )
+
+    pm = get_path(graph, target_position.coords)
+    if start and dist > 0:
+        pm = pm[:-min(dist, len(pm))]
+    path.extend(pm)
     return path
 
 
