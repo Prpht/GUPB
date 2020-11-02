@@ -1,5 +1,5 @@
+from gupb.controller.botelka_ml.controller import BotElkaController
 from gupb.controller import bb_bot
-from gupb.controller import botelka
 from gupb.controller import claret_wolf
 from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import shallow_mind
@@ -9,14 +9,11 @@ from gupb.controller import random
 
 CONFIGURATION = {
     'arenas': [
-        'archipelago',
-        'wasteland',
-        'dungeon',
         'fisher_island',
     ],
     'controllers': [
         bb_bot.BBBotController("Bartek"),
-        botelka.BotElkaController("Z nami na pewno zdasz"),
+        BotElkaController("Z nami na pewno zdasz"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
