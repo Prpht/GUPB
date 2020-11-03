@@ -80,8 +80,3 @@ class BotElkaController:
         self.old_state = new_state
 
         return new_action
-
-
-POTENTIAL_CONTROLLERS = [
-    BotElkaController("Z nami na pewno zdasz")
-]

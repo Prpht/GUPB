@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 import random
-from typing import Iterator, NamedTuple
+from typing import Iterator, NamedTuple, Optional
 
 # noinspection PyPackageRequirements
 import statemachine
@@ -26,10 +26,17 @@ class Game(statemachine.StateMachine):
 
     cycle = actions_done.to(instants_triggered) | instants_triggered.to(actions_done)
 
-    def __init__(self, arena_name: str, to_spawn: list[controller.Controller]) -> None:
+    def __init__(
+            self,
+            arena_name: str,
+            to_spawn: list[controller.Controller],
+            menhir_position: Optional[coordinates.Coords] = None,
+            initial_champion_positions: Optional[list[coordinates.Coords]] = None,
+    ) -> None:
         self.arena: arenas.Arena = arenas.Arena.load(arena_name)
-        self.arena.spawn_menhir()
+        self.arena.spawn_menhir(menhir_position)
         self._prepare_controllers(to_spawn)
+        self.initial_champion_positions: Optional[list[coordinates.Coords]] = initial_champion_positions
         self.champions: list[characters.Champion] = self._spawn_champions(to_spawn)
         self.action_queue: list[characters.Champion] = []
         self.episode: int = 0
@@ -52,14 +59,19 @@ class Game(statemachine.StateMachine):
         return {death.champion.controller.name: score for death, score in zip(self.deaths, self._fibonacci())}
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
-        random.shuffle(to_spawn)
         for controller_to_spawn in to_spawn:
             controller_to_spawn.reset(self.arena.description())
 
-    def _spawn_champions(self, to_spawn: list[controller.Controller]) -> list[characters.Champion]:
+    def _spawn_champions(
+            self,
+            to_spawn: list[controller.Controller],
+    ) -> list[characters.Champion]:
         champions = []
-        champion_positions = random.sample(self.arena.empty_coords(), len(to_spawn))
-        for controller_to_spawn, coords in zip(to_spawn, champion_positions):
+        if self.initial_champion_positions is None:
+            self.initial_champion_positions = random.sample(self.arena.empty_coords(), len(to_spawn))
+        if len(to_spawn) != len(self.initial_champion_positions):
+            raise RuntimeError("Unable to spawn champions: not enough positions!")  # TODO: remove if works
+        for controller_to_spawn, coords in zip(to_spawn, self.initial_champion_positions):
             champion = characters.Champion(coords, self.arena)
             self.arena.terrain[coords].character = champion
             champion.assign_controller(controller_to_spawn)
