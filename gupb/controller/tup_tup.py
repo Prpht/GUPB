@@ -37,6 +37,14 @@ class TupTupController:
         return hash(self.identifier)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.action_queue = SimpleQueue()
+        self.path = []
+        self.bfs_potential_goals = set()
+        self.bfs_potential_goals_visited = set()
+        self.has_calculated_path = False
+        self.hiding_spot = None
+        self.episode = 0
+
         arena = arenas.Arena.load(arena_description.name)
         self.map = arena.terrain
         self.map_size = arena.size
