@@ -1,14 +1,11 @@
 import random
 
 import numpy as np
-import tensorflow as tf
-from tensorflow.python.client.session import Session
-from tensorflow.python.keras.backend import placeholder
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.ops.variables import global_variables_initializer
-from tensorflow.python.training.gradient_descent import GradientDescentOptimizer
 
 from gupb.model.characters import Action
+import tensorflow.compat.v1 as tf
+
+tf.disable_v2_behavior()
 
 
 class DeepLearning:
@@ -35,26 +32,26 @@ class DeepLearning:
         self.initializer = None
         # ---
 
-        self.session = Session()
+        self.session = tf.Session()
         self.define_model()
         self.session.run(self.initializer)
 
     def define_model(self):
         # Input is an array of single item (state). Input is 2-dimensional
-        self.model_input = placeholder(dtype=tf.float32, shape=[None, self.input_count])
+        self.model_input = tf.placeholder(dtype=tf.float32, shape=[None, self.input_count])
 
         # 8 hidden neurons per layer
         # TODO: Experiment with different values
         layer_size = 8
 
         # Two hidden layers of 8 neurons with sigmoid activation initialized to zero for stability
-        fc1 = Dense(
+        fc1 = tf.layers.dense(
             self.model_input,
             layer_size,
             activation=tf.sigmoid,
             kernel_initializer=tf.constant_initializer(np.zeros((self.input_count, layer_size)))
         )
-        fc2 = Dense(
+        fc2 = tf.layers.dense(
             fc1,
             layer_size,
             activation=tf.sigmoid,
@@ -62,25 +59,26 @@ class DeepLearning:
         )
 
         # Output has 5 values
-        self.model_output = Dense(fc2, self.output_count)
+        self.model_output = tf.layers.dense(fc2, self.output_count)
 
         # This is for feeding training output (a.k.a ideal target values)
-        self.target_output = placeholder(shape=[None, self.output_count], dtype=tf.float32)
+        self.target_output = tf.placeholder(shape=[None, self.output_count], dtype=tf.float32)
         # Loss is mean squared difference between current output and ideal target values
         loss = tf.losses.mean_squared_error(self.target_output, self.model_output)
         # Optimizer adjusts weights to minimize loss, with the speed of learning_rate
-        self.optimizer = GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(loss)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(loss)
         # Initializer to set weights to initial values
-        self.initializer = global_variables_initializer()
+        self.initializer = tf.global_variables_initializer()
 
     # Ask model to estimate Q value for specific state (inference)
     def get_q(self, state):
         # Model input: Single state represented by array of single item (state)
         # Model output: Array of Q values for single state
-        return self.session.run(self.model_output, feed_dict={self.model_input: [[state]]})[0]
+        return self.session.run(self.model_output, feed_dict={self.model_input: [[state]]})[0]  # TODO: [[state]]
 
     def get_next_action(self, state):
         if random.random() > self.exploration_rate:  # Explore (gamble) or exploit (greedy)
+            print("WILL USE GREEDY")
             return self.greedy_action(state)
         else:
             return self.random_action()
@@ -94,7 +92,9 @@ class DeepLearning:
         actions = [
             Action.DO_NOTHING, Action.TURN_LEFT, Action.TURN_RIGHT, Action.STEP_FORWARD, Action.ATTACK
         ]
-        return random.choice(actions)
+        random_action = random.choice(actions)
+        print(random_action)
+        return random_action
 
     def train(self, old_state, action, reward, new_state):
         # Ask the model for the Q values of the old state (inference)
@@ -107,7 +107,7 @@ class DeepLearning:
         old_state_q_values[action] = reward + self.discount * np.amax(new_state_q_values)
 
         # Setup training data
-        training_input = [[old_state]]
+        training_input = [[old_state]]  # TODO: [[old_state]]
 
         target_output = [old_state_q_values]
         training_data = {self.model_input: training_input, self.target_output: target_output}

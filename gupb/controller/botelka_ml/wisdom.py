@@ -90,6 +90,7 @@ class Wisdom:
             result[2 * i] = x
             result[2 * i + 1] = y
 
+        # TODO: Add number of visible tiles to state
         return result
 
     @property

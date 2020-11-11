@@ -1,9 +1,9 @@
 from pathfinding.core.grid import Grid
 
-from gupb.controller.botelka_ml.brain import get_state, epsilon_greedy_action, init_q, save_q
+from gupb.controller.botelka_ml.brain import init_q, save_q
 from gupb.controller.botelka_ml.model import get_model
-from gupb.controller.botelka_ml.wisdom import Wisdom
 from gupb.controller.botelka_ml.rewards import calculate_reward
+from gupb.controller.botelka_ml.wisdom import Wisdom
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
