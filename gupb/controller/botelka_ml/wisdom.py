@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
@@ -19,6 +19,7 @@ WEAPONS = {
 }
 
 MAX_HEALTH = 5
+
 
 def weapon_ranking(weapon: Weapon) -> int:
     if isinstance(weapon, Bow):
@@ -47,12 +48,49 @@ class Wisdom:
     grid: Grid
     prev_knowledge: Optional[ChampionKnowledge] = None
     finder = DijkstraFinder()
-    t: int = 0 
+    t: int = 0
 
-    def next_knowledge(self, knowledge:ChampionKnowledge):
+    def next_knowledge(self, knowledge: ChampionKnowledge):
         self.prev_knowledge = self.knowledge
         self.knowledge = knowledge
         self.t += 1
+
+    @property
+    def relative_enemies_positions(self) -> List[float]:
+        """
+        Returns relative position to the enemies.
+         eg.:
+            E(0,2)
+
+            B(0,0)    E(4,0)
+
+            E(0,-2)
+
+         B - bot/botelka
+         E - enemy
+        """
+
+        enemies_coords = [
+            coords
+            for coords, tile in self.knowledge.visible_tiles.items()
+            if tile.character and coords != self.bot_coords
+        ]
+
+        relative_enemies_coords = [
+            sub_coords(enemy_coord, self.bot_coords)
+            for enemy_coord in enemies_coords
+        ]
+
+        # Change to format accepted by neural net
+        result = [0] * 10  # 10 because of neural net size
+
+        for i in range(len(relative_enemies_coords)):
+            x, y = relative_enemies_coords[i]
+
+            result[2 * i] = x
+            result[2 * i + 1] = y
+
+        return result
 
     @property
     def coords_did_not_change(self):
@@ -163,8 +201,7 @@ class Wisdom:
     @property
     def reach_menhir_before_mist(self):
         distance = self.distance_to_menhir
-        return self.arena.mist_radius/5-self.t-30 > distance
-
+        return self.arena.mist_radius / 5 - self.t - 30 > distance
 
     def find_path_len(self, coords: Coords) -> int:
         steps = 0
@@ -198,7 +235,7 @@ class Wisdom:
         right_actions = 1
         while facing_turning_right != exit_facing:
             facing_turning_right = facing_turning_right.turn_right()
-            right_actions +=1
+            right_actions += 1
 
         actions = right_actions if left_actions > right_actions else left_actions
         actions += 1

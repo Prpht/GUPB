@@ -32,10 +32,14 @@ WEAPON_ENCODING = {
 
 Terrain = Dict[coordinates.Coords, tiles.Tile]
 
+MIST_ADDITIONAL_RANGE = 0  # @TODO REMOVE 50, ONLY FOR BOTELKA TRAINING
 
-class ArenaDescription(NamedTuple):
+
+@dataclass
+class ArenaDescription:
     name: str
     menhir_position: coordinates.Coords
+    deaths = []
 
 
 class Arena:
@@ -45,7 +49,7 @@ class Arena:
         self.tiles_with_instant_effects: set[tiles.Tile] = set()
         self.size: tuple[int, int] = terrain_size(self.terrain)
         self.menhir_position: Optional[coordinates.Coords] = None
-        self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
+        self.mist_radius = int(self.size[0] * 2 ** 0.5) + MIST_ADDITIONAL_RANGE
 
     @staticmethod
     def load(name: str) -> Arena:

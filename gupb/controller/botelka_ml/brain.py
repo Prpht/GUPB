@@ -3,7 +3,7 @@ import random
 from collections import defaultdict
 from typing import Tuple, Dict
 
-from gupb.controller.botelka_ml.models import Wisdom
+from gupb.controller.botelka_ml.wisdom import Wisdom
 from gupb.model.characters import Action
 from pathlib import Path
 

@@ -1,7 +1,8 @@
 from pathfinding.core.grid import Grid
 
 from gupb.controller.botelka_ml.brain import get_state, epsilon_greedy_action, init_q, save_q
-from gupb.controller.botelka_ml.models import Wisdom
+from gupb.controller.botelka_ml.model import get_model
+from gupb.controller.botelka_ml.wisdom import Wisdom
 from gupb.controller.botelka_ml.rewards import calculate_reward
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
@@ -20,6 +21,7 @@ MAP_TILES_COST = {
     'knife': 10000,  # Knife - start weapon, we usually want to avoid it
 }
 
+
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class BotElkaController:
@@ -30,9 +32,13 @@ class BotElkaController:
         self.arena = None
 
         self.old_action = Action.DO_NOTHING
-        self.old_state = (0, 0, 0, 0)
+        self.old_state = [0] * 10
 
         self.wisdom = None
+
+        self.episode = 0
+
+        self.model = get_model()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -50,11 +56,18 @@ class BotElkaController:
     def preferred_tabard(self) -> Tabard:
         return Tabard.BLUE
 
+    def die(self):
+        self.model.update(self.old_state, self.old_state, self.old_action, -100)
+
+    def win(self):
+        # TODO: self.old_state == self.old_state (???)
+        self.model.update(self.old_state, self.old_state, self.old_action, 100)
+
     def reset(self, arena_description: ArenaDescription) -> None:
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
 
-        matrix = [[0] * self.arena.size[0]]* self.arena.size[1]
+        matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
         for coords, tile in self.arena.terrain.items():
             x, y = coords
             matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
@@ -64,17 +77,17 @@ class BotElkaController:
         save_q(self.q)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        self.episode += 1
+
         self.wisdom.next_knowledge(knowledge)
         wisdom = self.wisdom
 
-        new_state = get_state(wisdom)
+        new_state = wisdom.relative_enemies_positions
+        reward = calculate_reward(wisdom)
 
-        new_action = epsilon_greedy_action(self.q, new_state)
+        self.model.update(self.old_state, new_state, self.old_action, reward)  # Let the agent update internals
 
-        reward = calculate_reward(wisdom, self.old_action)
-
-        learned_value = (reward + DISCOUNT_FACTOR * self.q[new_state, new_action])
-        self.q[self.old_state, self.old_action] = (1 - LEARNING_RATE) * self.q[self.old_state, self.old_action] + LEARNING_RATE * learned_value
+        new_action = self.model.get_next_action(new_state)
 
         self.old_action = new_action
         self.old_state = new_state

@@ -28,12 +28,12 @@ class Game(statemachine.StateMachine):
 
     def __init__(self, arena_name: str, to_spawn: list[controller.Controller]) -> None:
         self.arena: arenas.Arena = arenas.Arena.load(arena_name)
+        self.deaths: list[ChampionDeath] = []
         self.arena.spawn_menhir()
         self._prepare_controllers(to_spawn)
         self.champions: list[characters.Champion] = self._spawn_champions(to_spawn)
         self.action_queue: list[characters.Champion] = []
         self.episode: int = 0
-        self.deaths: list[ChampionDeath] = []
         self.finished = False
         super(statemachine.StateMachine, self).__init__()
 
@@ -53,8 +53,11 @@ class Game(statemachine.StateMachine):
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
         random.shuffle(to_spawn)
+
         for controller_to_spawn in to_spawn:
-            controller_to_spawn.reset(self.arena.description())
+            arena_description = self.arena.description()
+            setattr(arena_description, "deaths", self.deaths)
+            controller_to_spawn.reset(arena_description)
 
     def _spawn_champions(self, to_spawn: list[controller.Controller]) -> list[characters.Champion]:
         champions = []
@@ -93,6 +96,11 @@ class Game(statemachine.StateMachine):
             champion = self.champions.pop()
             death = ChampionDeath(champion, self.episode)
             self.deaths.append(death)
+
+            win_callable = getattr(champion.controller, "win", None)
+            if win_callable:
+                win_callable()
+
         if not self.champions:
             self.finished = True
 
