@@ -94,6 +94,13 @@ class Wisdom:
         return result
 
     @property
+    def relative_menhir_position(self) -> List[float]:
+        menhir_coords = self.arena.menhir_position
+        relative_position = sub_coords(menhir_coords, self.bot_coords)
+
+        return [relative_position[0], relative_position[1]]
+
+    @property
     def coords_did_not_change(self):
         if not self.prev_knowledge:
             return False
@@ -102,12 +109,16 @@ class Wisdom:
     @property
     def bot_coords(self) -> Coords:
         return self.knowledge.position
+    
+    @property
+    def prev_bot_coords(self) -> Coords:
+        return self.prev_knowledge.position
 
     @property
     def bot_facing(self) -> Facing:
         tile = self.knowledge.visible_tiles[self.bot_coords]
 
-        assert tile.character, "Character must be standing on a tile"
+        assert tile.character, "Character must be standing on a tile bot_facing"
 
         return tile.character.facing
 
@@ -115,7 +126,7 @@ class Wisdom:
     def bot_health(self) -> int:
         tile = self.knowledge.visible_tiles[self.bot_coords]
 
-        assert tile.character, "Character must be standing on a tile"
+        assert tile.character, "Character must be standing on a tile bot_health"
 
         return tile.character.health
 
@@ -123,9 +134,9 @@ class Wisdom:
     def prev_bot_health(self) -> int:
         if not self.prev_knowledge:
             return MAX_HEALTH
-        tile = self.prev_knowledge.visible_tiles[self.bot_coords]
+        tile = self.prev_knowledge.visible_tiles[self.prev_bot_coords]
 
-        assert tile.character, "Character must be standing on a tile"
+        assert tile.character, "Character must be standing on a tile prev_bot_health"
 
         return tile.character.health
 
@@ -133,7 +144,7 @@ class Wisdom:
     def bot_weapon(self) -> Weapon:
         tile = self.knowledge.visible_tiles[self.bot_coords]
 
-        assert tile.character, "Character must be standing on a tile"
+        assert tile.character, "Character must be standing on a tile bot_weapon"
 
         weapon_name = tile.character.weapon.name
 
@@ -187,13 +198,15 @@ class Wisdom:
         try:
             steps_num = self.find_path_len(self.arena.menhir_position)
         except Exception:
-            return DistanceMeasure.INACCESSIBLE.value
+            # return DistanceMeasure.INACCESSIBLE.value
+            return 1000000
 
-        if steps_num < 30:
-            return DistanceMeasure.CLOSE.value
-        if steps_num < 60:
-            return DistanceMeasure.FAR.value
-        return DistanceMeasure.VERY_FAR.value
+        return steps_num
+        # if steps_num < 30:
+        #     return DistanceMeasure.CLOSE.value
+        # if steps_num < 60:
+        #     return DistanceMeasure.FAR.value
+        # return DistanceMeasure.VERY_FAR.value
 
     @property
     def lost_health(self):

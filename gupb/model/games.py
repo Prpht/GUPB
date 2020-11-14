@@ -53,11 +53,8 @@ class Game(statemachine.StateMachine):
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
         random.shuffle(to_spawn)
-
         for controller_to_spawn in to_spawn:
-            arena_description = self.arena.description()
-            setattr(arena_description, "deaths", self.deaths)
-            controller_to_spawn.reset(arena_description)
+            controller_to_spawn.reset(self.arena.description())
 
     def _spawn_champions(self, to_spawn: list[controller.Controller]) -> list[characters.Champion]:
         champions = []

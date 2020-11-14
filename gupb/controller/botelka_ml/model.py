@@ -19,7 +19,7 @@ class DeepLearning:
         self.exploration_delta = 1.0 / iterations  # Shift from exploration to exploration
 
         # 10 neurons for max 5 players
-        self.input_count = 10
+        self.input_count = 16
 
         # 5 actions possible (5 neurons)
         self.output_count = 5
@@ -69,31 +69,38 @@ class DeepLearning:
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(loss)
         # Initializer to set weights to initial values
         self.initializer = tf.global_variables_initializer()
+        self.saver = tf.train.Saver()
+
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!
+        self.load()
+        self.exploration_rate = 0
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # Ask model to estimate Q value for specific state (inference)
     def get_q(self, state):
         # Model input: Single state represented by array of single item (state)
         # Model output: Array of Q values for single state
-        return self.session.run(self.model_output, feed_dict={self.model_input: [[state]]})[0]  # TODO: [[state]]
+        return self.session.run(self.model_output, feed_dict={self.model_input: [state]})[0]  # TODO: [[state]]
 
     def get_next_action(self, state):
         if random.random() > self.exploration_rate:  # Explore (gamble) or exploit (greedy)
-            print("WILL USE GREEDY")
             return self.greedy_action(state)
         else:
             return self.random_action()
 
     # Which action (FORWARD or BACKWARD) has bigger Q-value, estimated by our model (inference).
     def greedy_action(self, state):
+        MAPPING = {
+             0: Action.DO_NOTHING, 1: Action.TURN_LEFT, 2: Action.TURN_RIGHT, 3: Action.STEP_FORWARD, 4: Action.ATTACK
+        } 
         # argmax picks the higher Q-value and returns the index (FORWARD=0, BACKWARD=1)
-        return np.argmax(self.get_q(state))
+        return MAPPING[np.argmax(self.get_q(state))]
 
     def random_action(self):
         actions = [
             Action.DO_NOTHING, Action.TURN_LEFT, Action.TURN_RIGHT, Action.STEP_FORWARD, Action.ATTACK
         ]
         random_action = random.choice(actions)
-        print(random_action)
         return random_action
 
     def train(self, old_state, action, reward, new_state):
@@ -103,11 +110,14 @@ class DeepLearning:
         # Ask the model for the Q values of the new state (inference)
         new_state_q_values = self.get_q(new_state)
 
+        MAPPING = {
+             Action.DO_NOTHING: 0, Action.TURN_LEFT: 1, Action.TURN_RIGHT: 2, Action.STEP_FORWARD: 3, Action.ATTACK: 4
+        } 
         # Real Q value for the action we took. This is what we will train towards.
-        old_state_q_values[action] = reward + self.discount * np.amax(new_state_q_values)
+        old_state_q_values[MAPPING[action]] = reward + self.discount * np.amax(new_state_q_values)
 
         # Setup training data
-        training_input = [[old_state]]  # TODO: [[old_state]]
+        training_input = [old_state]  # TODO: [[old_state]]
 
         target_output = [old_state_q_values]
         training_data = {self.model_input: training_input, self.target_output: target_output}
@@ -123,6 +133,11 @@ class DeepLearning:
         if self.exploration_rate > 0:
             self.exploration_rate -= self.exploration_delta
 
+    def save(self):
+        self.saver.save(self.session, "./tmp/model.ckpt")
+
+    def load(self):
+        self.saver.restore(self.session, "./tmp/model.ckpt")
 
 model = None
 

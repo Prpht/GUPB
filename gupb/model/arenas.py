@@ -35,11 +35,10 @@ Terrain = Dict[coordinates.Coords, tiles.Tile]
 MIST_ADDITIONAL_RANGE = 0  # @TODO REMOVE 50, ONLY FOR BOTELKA TRAINING
 
 
-@dataclass
-class ArenaDescription:
+
+class ArenaDescription(NamedTuple):
     name: str
     menhir_position: coordinates.Coords
-    deaths = []
 
 
 class Arena:

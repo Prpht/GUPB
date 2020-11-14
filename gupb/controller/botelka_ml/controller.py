@@ -32,11 +32,12 @@ class BotElkaController:
         self.arena = None
 
         self.old_action = Action.DO_NOTHING
-        self.old_state = [0] * 10
+        self.old_state = [0]*16
 
         self.wisdom = None
 
         self.episode = 0
+        self.game_no = 0
 
         self.model = get_model()
 
@@ -57,13 +58,20 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state, self.old_state, self.old_action, -100)
+        self.model.update(self.old_state, self.old_state, self.old_action, -10)
+        if self.game_no > 298:
+            self.model.save()
+            print("saved")
 
     def win(self):
         # TODO: self.old_state == self.old_state (???)
         self.model.update(self.old_state, self.old_state, self.old_action, 100)
+        # if self.game_no > 298:
+        self.model.save()
+        print("saved (win)")
 
     def reset(self, arena_description: ArenaDescription) -> None:
+        self.game_no += 1
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
 
@@ -82,7 +90,10 @@ class BotElkaController:
         self.wisdom.next_knowledge(knowledge)
         wisdom = self.wisdom
 
-        new_state = wisdom.relative_enemies_positions
+        bot_facing =  wisdom.bot_facing.value
+
+        new_state = wisdom.relative_enemies_positions + [wisdom.mist_visible, bot_facing[0], bot_facing[1], 
+        wisdom.reach_menhir_before_mist] + wisdom.relative_menhir_position
         reward = calculate_reward(wisdom)
 
         self.model.update(self.old_state, new_state, self.old_action, reward)  # Let the agent update internals
