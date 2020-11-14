@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import math
 import os
 import pickle
+from collections import defaultdict
 from typing import Dict, Optional, List, Type, Tuple
 
-from gupb.model import effects
+from gupb.model import effects, weapons
 from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.characters import ChampionKnowledge, Facing, ChampionDescription
 from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
 from gupb.model.tiles import Menhir
-from gupb.model.weapons import Weapon
+from gupb.model.weapons import Weapon, WeaponDescription
 from . import utils
 from .model import SeenTile
 from .pathfinding import astar_search, determine_path_bot
@@ -112,15 +114,15 @@ class Knowledge:
         self.floyd_results = load_floyd_results(arena_name=arena_description.name)
         self.sneaky_points = SNEAKY_POINTS.get(arena_description.name)
 
-    # noinspection PyDefaultArgument
-    def loot(self, filter: Optional[List[str]] = None, filter_out: Optional[List[str]] = None) -> Dict[Coords, utils.W]:
-        return {coord: seen_tile.loot for coord, seen_tile in self.terrain.items()
+    def loot(self, filter: Optional[List[utils.W]] = None,
+             filter_out: Optional[List[utils.W]] = None) -> Dict[Coords, utils.W]:
+        return {coord: seen_tile.loot_type() for coord, seen_tile in self.terrain.items()
                 if seen_tile.loot
                 and (not filter or seen_tile.loot.name in filter)
                 and (not filter_out or seen_tile.loot.name not in filter_out)}
 
-    def check_loot(self, coord: Coords, is_type: Optional[Type[utils.W]]):
-        return self.terrain[coord].loot and (not is_type or self.terrain[coord].loot_type() == is_type)
+    def check_loot(self, coord: Coords, is_type: Optional[Type[utils.W]] = None):
+        return self.terrain[coord].loot_type() and (not is_type or self.terrain[coord].loot_type() == is_type)
 
     def tile(self, coord: Coords):
         return self.terrain[coord]
@@ -144,6 +146,7 @@ class Knowledge:
     def find_dijkstra_path(
         self,
         weapons_to_take: List[Type[Weapon]],
+        target: Coords,
         dist: int = 0,
         strict: bool = True
     ) -> List[Coords]:
@@ -151,10 +154,43 @@ class Knowledge:
             terrain=self.terrain,
             start=self.position,
             weapons_to_take=weapons_to_take,
-            menhir_position=self.menhir_position,
+            target=target,
             dist=dist,
             strict=strict
         )
+
+    def tile_on_left(self) -> SeenTile:
+        return self.terrain[self.position + self.facing.turn_left().value]
+
+    def tile_on_right(self) -> SeenTile:
+        return self.terrain[self.position + self.facing.turn_right().value]
+
+    def sneaky_point_distances(self) -> Dict[Coords, (int, int)]:
+        sneaky_point_dist = {}
+        if self.sneaky_points:
+            distances = self.floyd_results[0]
+            for c in self.sneaky_points:
+                dist = (distances[self.position][c], distances[c][self.menhir_position])
+                if dist[0] != math.inf and dist[0] != math.inf:
+                    sneaky_point_dist[c] = dist
+
+        return sneaky_point_dist
+
+    def weapon_distances(self) -> Dict[Type[utils.W], List[(int, int, Coords)]]:
+        weapon_dist = defaultdict(list)
+        if self.floyd_results:
+            loot = self.loot(filter_out=[weapons.Knife])
+            distances = self.floyd_results[0]
+
+            for c, w in loot.items():
+                dist = distances[self.position][c]
+                if dist != math.inf:
+                    weapon_dist[w].append((dist, distances[c][self.menhir_position], c))
+
+            for w in weapon_dist:
+                weapon_dist[w].sort(key=lambda x: x[0])
+
+        return weapon_dist
 
     def find_sneaky_path(self) -> Optional[List[Coords]]:
         if self.floyd_results is None or self.sneaky_points is None:
@@ -165,7 +201,7 @@ class Knowledge:
                 menhir_position=self.menhir_position,
                 distances=self.floyd_results[0]
             )
-            return self.__build_sneaky_path(priority_points=priority_points)
+            return self._build_sneaky_path(priority_points=priority_points)
         except Exception:
             return None
 
@@ -183,7 +219,7 @@ class Knowledge:
                 if distance == self.mist_radius:
                     self.terrain[coords].tile.effects.append(effects.Mist().description())
 
-    def __build_sneaky_path(self, priority_points: List[Coords]) -> List[Coords]:
+    def _build_sneaky_path(self, priority_points: List[Coords]) -> List[Coords]:
         result = [self.position]
         for i, point in enumerate(priority_points):
             pos = result[-1]
