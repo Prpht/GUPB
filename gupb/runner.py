@@ -29,6 +29,7 @@ class Runner:
         self.runs_no: int = config['runs_no']
         self.start_balancing: bool = config['start_balancing']
         self.scores: dict[str, int] = collections.defaultdict(int)
+        self._last_arena: Optional[str] = None
         self._last_menhir_position: Optional[coordinates.Coords] = None
         self._last_initial_positions: Optional[list[coordinates.Coords]] = None
 
@@ -47,7 +48,8 @@ class Runner:
             game = games.Game(arena, self.controllers)
         else:
             self.controllers = self.controllers[1:] + [self.controllers[0]]
-            game = games.Game(arena, self.controllers, self._last_menhir_position, self._last_initial_positions)
+            game = games.Game(self._last_arena, self.controllers, self._last_menhir_position, self._last_initial_positions)
+        self._last_arena = game.arena.name
         self._last_menhir_position = game.arena.menhir_position
         self._last_initial_positions = game.initial_champion_positions
         show_sight = next((c for c in game.champions if c.controller == self.show_sight), None)
