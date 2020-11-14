@@ -111,10 +111,11 @@ class Arena:
     def stay(self, champion: characters.Champion) -> None:
         self.terrain[champion.position].stay()
 
-    def spawn_menhir(self) -> None:
+    def spawn_menhir(self, new_position: Optional[coordinates.Coords] = None) -> None:
         if self.menhir_position:
             self.terrain[self.menhir_position] = tiles.Land()
-        self.menhir_position = random.sample(self.empty_coords(), 1)[0]
+        new_position = random.sample(self.empty_coords(), 1)[0] if new_position is None else new_position
+        self.menhir_position = new_position
         self.terrain[self.menhir_position] = tiles.Menhir()
         verbose_logger.debug(f"Menhir spawned at {self.menhir_position}.")
         MenhirSpawnedReport(self.menhir_position).log(logging.DEBUG)

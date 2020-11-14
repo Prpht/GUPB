@@ -1,5 +1,5 @@
 from gupb.controller import bb_bot
-from gupb.controller import botelka
+from gupb.controller.botelka_ml import controller as botelka
 from gupb.controller import claret_wolf
 from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import shallow_mind
@@ -8,9 +8,6 @@ from gupb.controller import tup_tup
 
 CONFIGURATION = {
     'arenas': [
-        'archipelago',
-        'wasteland',
-        'dungeon',
         'fisher_island',
     ],
     'controllers': [
@@ -22,7 +19,8 @@ CONFIGURATION = {
         shallow_mind.ShallowMindController('test'),
         tup_tup.TupTupController('Bot'),
     ],
-    'visualise': False,
+    'start_balancing': True,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 100,
+    'runs_no': 1,
 }

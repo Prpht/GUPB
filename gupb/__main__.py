@@ -123,6 +123,12 @@ def configuration_inquiry(initial_config: dict[str, Any]) -> dict[str, Any]:
             'filter': int,
             'default': str(initial_config['runs_no']),
         },
+        {
+            'type': 'confirm',
+            'name': 'start_balancing',
+            'message': 'Repeat positions until every controller tried each at least once?',
+            'default': initial_config['start_balancing'],
+        },
     ]
     answers = questionary.prompt(questions)
     return answers
