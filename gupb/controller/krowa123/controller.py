@@ -112,7 +112,7 @@ class Krowa1233Controller(Controller):
         weapon_distances = self.knowledge.weapon_distances()
 
         def valid(w):
-            return w if (w and w[1][0] + w[1][1] <= self.knowledge.mist_radius * 3) else None
+            return w if (w and w[1][0] / 2 + w[1][1] < self.knowledge.mist_radius - 1) else None
 
         bow = next(map(lambda d: (Bow, d), weapon_distances[Bow]), None)
         sword = next(map(lambda d: (Sword, d), weapon_distances[Sword]), None)
@@ -130,13 +130,13 @@ class Krowa1233Controller(Controller):
 
     def go_to_sneaky_point(self):
         def valid(sp):
-            return sp if (sp[1][0] + sp[1][1] < self.knowledge.mist_radius) else None
+            return sp if (sp[1][0] / 2 + sp[1][1] < self.knowledge.mist_radius - 5) else None
 
         sneaky_points = sorted(filter(valid, self.knowledge.sneaky_point_distances().items()), key=lambda x: x[1][0])
 
         for sneaky_point in sneaky_points:
             if not self.knowledge.check_loot(sneaky_point[0]) or self.knowledge.check_loot(sneaky_point[0], self.knowledge.weapon_type):
-                if sneaky_point[1][0] == self.knowledge.position and sneaky_point[1][1] < (self.knowledge.mist_radius - 5):
+                if sneaky_point[1][0] == self.knowledge.position:
                     return
                 else:
                     path = self.find_dijkstra([], sneaky_point[0])
@@ -176,7 +176,7 @@ class Krowa1233Controller(Controller):
                     self._plan_actions(path)
                 else:
                     path = self.find_dijkstra_to_menhir(
-                        weapons_to_take=[], dist=min(4, int(self.knowledge.mist_radius - 1))
+                        weapons_to_take=[], dist=max(1, min(4, int(self.knowledge.mist_radius - 1)))
                     )
                     self._plan_actions(path)
         if self._check_if_hit(knowledge.visible_tiles):
