@@ -145,68 +145,62 @@ class Krowa1233Controller(Controller):
                         self._plan_actions(path)
                         return
 
-        # print("SAFE SPOT IMPOSSILBE")
         self.goals[Goals.SAFE_SPOT] = [GoalState.IMPOSSIBLE]
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        try:
-            self.knowledge.update(knowledge)
-            if self.goals[Goals.WEAPON][0] == GoalState.FINISHED:
-                if self.goals[Goals.WEAPON][2] != self.knowledge.weapon_type and self.knowledge.weapon_type != self.last_weapon:
-                    path = [self.last_position, self.knowledge.position]
-                    self.action_queue.extendleft(utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path))
-            if self.goals[Goals.WEAPON][0] == GoalState.IN_PROGRESS:
-                if self.goals[Goals.WEAPON][1] == self.knowledge.position:
-                    self.goals[Goals.WEAPON][0] = GoalState.end(self.goals[Goals.WEAPON][2] == self.knowledge.weapon_type)
-                elif not self.knowledge.check_loot(*self.goals[Goals.WEAPON][1:]):
-                    self.goals[Goals.WEAPON][0] = GoalState.FAILED
-                    self.get_weapon()
-            if self.goals[Goals.WEAPON][0] == GoalState.NOT_STARTED:
+        self.knowledge.update(knowledge)
+        if self.goals[Goals.WEAPON][0] == GoalState.FINISHED:
+            if self.goals[Goals.WEAPON][2] != self.knowledge.weapon_type and self.knowledge.weapon_type != self.last_weapon:
+                path = [self.last_position, self.knowledge.position]
+                self.action_queue.extendleft(utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path))
+        if self.goals[Goals.WEAPON][0] == GoalState.IN_PROGRESS:
+            if self.goals[Goals.WEAPON][1] == self.knowledge.position:
+                self.goals[Goals.WEAPON][0] = GoalState.end(self.goals[Goals.WEAPON][2] == self.knowledge.weapon_type)
+            elif not self.knowledge.check_loot(*self.goals[Goals.WEAPON][1:]):
+                self.goals[Goals.WEAPON][0] = GoalState.FAILED
                 self.get_weapon()
+        if self.goals[Goals.WEAPON][0] == GoalState.NOT_STARTED:
+            self.get_weapon()
 
-            if len(self.action_queue) == 0:
-                if self.goals[Goals.SAFE_SPOT][0] == GoalState.IN_PROGRESS:
-                    if self.goals[Goals.SAFE_SPOT][1] == self.knowledge.position:
-                        self.goals[Goals.SAFE_SPOT][0] = GoalState.FINISHED
-                elif self.goals[Goals.SAFE_SPOT][0] != GoalState.IMPOSSIBLE:
-                    self.go_to_sneaky_point()
-                if self.goals[Goals.SAFE_SPOT][0] == GoalState.IMPOSSIBLE:
-                    if self.knowledge.mist_radius > 10:
-                        path = self.find_dijkstra_to_menhir(
-                            weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
-                        )
-                        self._plan_actions(path)
-                    else:
-                        path = self.find_dijkstra_to_menhir(
-                            weapons_to_take=[], dist=min(4, int(self.knowledge.mist_radius - 1))
-                        )
-                        self._plan_actions(path)
-            if self._check_if_hit(knowledge.visible_tiles):
-                action = Action.ATTACK
-            elif self._check_if_under_attack():
-                action = Action.DO_NOTHING
-            elif len(self.action_queue) > 0:
-                self.goals[Goals.CAMP] = [GoalState.FINISHED, None]
-                action = self.action_queue.popleft()
-            else:
-                last_turn = self.goals[Goals.CAMP][1]
-                turn_left = self.knowledge.tile_on_left().terrain_transparent()
-                turn_right = self.knowledge.tile_on_right().terrain_transparent()
-
-                if last_turn == Action.TURN_LEFT:
-                    action = Action.TURN_LEFT if turn_left else Action.TURN_RIGHT
+        if len(self.action_queue) == 0:
+            if self.goals[Goals.SAFE_SPOT][0] == GoalState.IN_PROGRESS:
+                if self.goals[Goals.SAFE_SPOT][1] == self.knowledge.position:
+                    self.goals[Goals.SAFE_SPOT][0] = GoalState.FINISHED
+            elif self.goals[Goals.SAFE_SPOT][0] != GoalState.IMPOSSIBLE:
+                self.go_to_sneaky_point()
+            if self.goals[Goals.SAFE_SPOT][0] == GoalState.IMPOSSIBLE:
+                if self.knowledge.mist_radius > 10:
+                    path = self.find_dijkstra_to_menhir(
+                        weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
+                    )
+                    self._plan_actions(path)
                 else:
-                    action = Action.TURN_RIGHT if turn_right else Action.TURN_LEFT
-                self.goals[Goals.CAMP] = [GoalState.IN_PROGRESS, action]
+                    path = self.find_dijkstra_to_menhir(
+                        weapons_to_take=[], dist=min(4, int(self.knowledge.mist_radius - 1))
+                    )
+                    self._plan_actions(path)
+        if self._check_if_hit(knowledge.visible_tiles):
+            action = Action.ATTACK
+        elif self._check_if_under_attack():
+            action = Action.DO_NOTHING
+        elif len(self.action_queue) > 0:
+            self.goals[Goals.CAMP] = [GoalState.FINISHED, None]
+            action = self.action_queue.popleft()
+        else:
+            last_turn = self.goals[Goals.CAMP][1]
+            turn_left = self.knowledge.tile_on_left().terrain_transparent()
+            turn_right = self.knowledge.tile_on_right().terrain_transparent()
 
-            self.last_action = action
-            self.last_position = knowledge.position
-            self.last_weapon = self.knowledge.weapon_type
-            return action
-        except Exception as e:
-            traceback.print_exc()
-            return Action.DO_NOTHING
+            if last_turn == Action.TURN_LEFT:
+                action = Action.TURN_LEFT if turn_left else Action.TURN_RIGHT
+            else:
+                action = Action.TURN_RIGHT if turn_right else Action.TURN_LEFT
+            self.goals[Goals.CAMP] = [GoalState.IN_PROGRESS, action]
 
+        self.last_action = action
+        self.last_position = knowledge.position
+        self.last_weapon = self.knowledge.weapon_type
+        return action
 
     def _plan_actions(self, path: List[Coords]) -> None:
         self.action_queue = collections.deque()
