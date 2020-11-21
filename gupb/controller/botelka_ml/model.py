@@ -8,6 +8,15 @@ import tensorflow.compat.v1 as tf
 
 tf.disable_v2_behavior()
 
+MAPPING = {
+            0: [Action.DO_NOTHING],
+            1: [Action.TURN_LEFT, Action.STEP_FORWARD],  # MOVE LEFT
+            2: [Action.TURN_RIGHT, Action.STEP_FORWARD],  # MOVE RIGHT
+            3: [Action.STEP_FORWARD],  # MOVE FORWARD
+            4: [Action.ATTACK],  # ATTACK
+            5: [Action.TURN_LEFT, Action.TURN_LEFT, Action.TURN_LEFT, Action.TURN_LEFT]  # rotate
+        }
+
 
 class DeepLearning:
     def __init__(self):
@@ -22,8 +31,8 @@ class DeepLearning:
         # N neurons
         self.input_count = State.get_length()
 
-        # 5 actions possible (5 neurons)
-        self.output_count = 5
+        # 6 actions possible (6 neurons)
+        self.output_count = 6
 
         # Will ne initialized in define_model
         self.model_input = None
@@ -92,31 +101,24 @@ class DeepLearning:
 
     # Which action (FORWARD or BACKWARD) has bigger Q-value, estimated by our model (inference).
     def greedy_action(self, state):
-        MAPPING = {
-            0: Action.DO_NOTHING, 1: Action.TURN_LEFT, 2: Action.TURN_RIGHT, 3: Action.STEP_FORWARD, 4: Action.ATTACK
-        }
         # argmax picks the higher Q-value and returns the index (FORWARD=0, BACKWARD=1)
-        return MAPPING[np.argmax(self.get_q(state))]
+        action_no = np.argmax(self.get_q(state))
+        return MAPPING[action_no], action_no
 
     def random_action(self):
-        actions = [
-            Action.DO_NOTHING, Action.TURN_LEFT, Action.TURN_RIGHT, Action.STEP_FORWARD, Action.ATTACK
-        ]
-        random_action = random.choice(actions)
-        return random_action
 
-    def train(self, old_state, action, reward, new_state):
+        random_action_no = random.choice(range(len(MAPPING)))
+        return MAPPING[random_action_no], random_action_no
+
+    def train(self, old_state, action_no, reward, new_state):
         # Ask the model for the Q values of the old state (inference)
         old_state_q_values = self.get_q(old_state)
 
         # Ask the model for the Q values of the new state (inference)
         new_state_q_values = self.get_q(new_state)
 
-        MAPPING = {
-            Action.DO_NOTHING: 0, Action.TURN_LEFT: 1, Action.TURN_RIGHT: 2, Action.STEP_FORWARD: 3, Action.ATTACK: 4
-        }
         # Real Q value for the action we took. This is what we will train towards.
-        old_state_q_values[MAPPING[action]] = reward + self.discount * np.amax(new_state_q_values)
+        old_state_q_values[action_no] = reward + self.discount * np.amax(new_state_q_values)
 
         # Setup training data
         training_input = [old_state]  # TODO: [[old_state]]
@@ -127,9 +129,9 @@ class DeepLearning:
         # Train
         self.session.run(self.optimizer, feed_dict=training_data)
 
-    def update(self, old_state, new_state, action, reward):
+    def update(self, old_state, new_state, action_no, reward):
         # Train our model with new data
-        self.train(old_state, action, reward, new_state)
+        self.train(old_state, action_no, reward, new_state)
 
         # Finally shift our exploration_rate toward zero (less gambling)
         if self.exploration_rate > 0:

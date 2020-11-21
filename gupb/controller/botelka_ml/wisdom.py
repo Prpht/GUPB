@@ -68,16 +68,18 @@ class State:
     facing: int
     weapon: int
     distance_to_menhir: int
+    menhir_x: int
+    menhir_y: int
     tick: int
 
     @staticmethod
     def get_length():
-        return 9
+        return 11
 
     def as_tuple(self):
         return (
-            self.x, self.y, self.health, self.visible_enemies, self.can_attack_enemy,
-            self.facing, self.weapon, self.distance_to_menhir, self.tick
+            self.x, self.y, self.health, self.visible_enemies, self.can_attack_enemy, self.facing,
+            self.weapon, self.distance_to_menhir, self.menhir_x, self.menhir_y, self.tick
         )
 
 
@@ -109,8 +111,8 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
 
     weapon = WEAPON_TO_INT[bot_weapon]
 
-    x, y = sub_coords(bot_coords, arena.menhir_position)
-    menhir_distance = np.sqrt(x ** 2 + y ** 2)
+    m_x, m_y = sub_coords(bot_coords, arena.menhir_position)
+    menhir_distance = np.sqrt(m_x ** 2 + m_y ** 2)
 
     return State(
         hash(arena.name),
@@ -122,6 +124,8 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
         facing,
         weapon,
         menhir_distance,
+        m_x,
+        m_y,
         tick
     )
 

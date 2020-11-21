@@ -26,12 +26,13 @@ class BotElkaController:
         self.first_name: str = first_name
         self.arena = None
 
-        self.old_action = Action.DO_NOTHING
-        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 0)
+        self.old_action_no = 0
+        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
 
         self.model = get_model()
 
         self.tick = 0
+        self.moves_queue = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -50,11 +51,11 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action, -10)
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, -10)
         self.model.save()
 
     def win(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action, 100)
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 100)
         self.model.save()
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -72,20 +73,24 @@ class BotElkaController:
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.tick += 1
 
+        if self.moves_queue:
+            return self.moves_queue.pop()
+
         new_state = get_state(knowledge, self.arena, self.tick)
 
-        reward = calculate_reward(self.old_state, new_state, self.old_action)
+        reward = calculate_reward(self.old_state, new_state, self.old_action_no)
 
         # print(reward)
 
-        self.model.update(self.old_state.as_tuple(), new_state.as_tuple(), self.old_action, reward)
+        self.model.update(self.old_state.as_tuple(), new_state.as_tuple(), self.old_action_no, reward)
 
-        new_action = self.model.get_next_action(new_state)
+        new_actions, action_no = self.model.get_next_action(new_state.as_tuple())
+        self.moves_queue.extend(new_actions)
 
-        self.old_action = new_action
+        self.old_action_no = action_no
         self.old_state = new_state
 
-        return new_action
+        return self.moves_queue.pop()
 
 
 POTENTIAL_CONTROLLERS = [
