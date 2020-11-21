@@ -1,7 +1,9 @@
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Tuple, List
 
+import numpy as np
 from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
 
@@ -16,6 +18,21 @@ WEAPONS = {
     "sword": Sword(),
     "knife": Knife(),
     "amulet": Amulet(),
+}
+
+WEAPON_TO_INT = {
+    "bow": 0,
+    "axe": 1,
+    "sword": 2,
+    "knife": 3,
+    "amulet": 4,
+}
+
+FACING_TO_INT = {
+    Facing.UP: 0,
+    Facing.RIGHT: 1,
+    Facing.LEFT: 2,
+    Facing.DOWN: 3
 }
 
 MAX_HEALTH = 5
@@ -41,6 +58,75 @@ class DistanceMeasure(Enum):
 
 
 @dataclass
+class State:
+    map_name: int
+    x: int
+    y: int
+    health: int
+    visible_enemies: int
+    can_attack_enemy: bool
+    facing: int
+    weapon: int
+    distance_to_menhir: int
+    tick: int
+
+    @staticmethod
+    def get_length():
+        return 9
+
+    def as_tuple(self):
+        return (
+            self.x, self.y, self.health, self.visible_enemies, self.can_attack_enemy,
+            self.facing, self.weapon, self.distance_to_menhir, self.tick
+        )
+
+
+def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
+    bot_coords = knowledge.position
+    bot_tile = knowledge.visible_tiles.get(bot_coords)
+    bot_character = bot_tile.character if bot_tile else None
+    bot_weapon = bot_character.weapon.name if bot_character else "knife"
+    bot_facing = bot_character.facing if bot_character else Facing.UP
+
+    # ---
+
+    health = bot_character.health if bot_character else 5
+
+    visible_enemies = len([
+        coords
+        for coords, tile in knowledge.visible_tiles.items()
+        if tile.character and coords != bot_coords
+    ])
+
+    can_attack_enemy = any(
+        coord
+        for coord in
+        WEAPONS[bot_weapon].cut_positions(arena.terrain, bot_coords, bot_facing)
+        if knowledge.visible_tiles[coord].character
+    )
+
+    facing = FACING_TO_INT[bot_facing]
+
+    weapon = WEAPON_TO_INT[bot_weapon]
+
+    x, y = sub_coords(bot_coords, arena.menhir_position)
+    menhir_distance = np.sqrt(x ** 2 + y ** 2)
+
+    return State(
+        hash(arena.name),
+        bot_coords[0],
+        bot_coords[1],
+        health,
+        visible_enemies,
+        can_attack_enemy,
+        facing,
+        weapon,
+        menhir_distance,
+        tick
+    )
+
+
+@dataclass
 class Wisdom:
     arena: Arena
     knowledge: Optional[ChampionKnowledge]
@@ -54,6 +140,9 @@ class Wisdom:
         self.prev_knowledge = self.knowledge
         self.knowledge = knowledge
         self.t += 1
+
+    def get_state(self):
+        pass
 
     @property
     def relative_enemies_positions(self) -> List[float]:
@@ -101,6 +190,14 @@ class Wisdom:
         return [relative_position[0], relative_position[1]]
 
     @property
+    def menhir_distance(self) -> int:
+        menhir_coords = self.arena.menhir_position
+        m_x, m_y = sub_coords(menhir_coords, self.bot_coords)
+        x, y = self.bot_coords
+
+        return int(math.sqrt((x - m_x) ** 2 + (y - m_y) ** 2))
+
+    @property
     def coords_did_not_change(self):
         if not self.prev_knowledge:
             return False
@@ -109,10 +206,18 @@ class Wisdom:
     @property
     def bot_coords(self) -> Coords:
         return self.knowledge.position
-    
+
     @property
     def prev_bot_coords(self) -> Coords:
         return self.prev_knowledge.position
+
+    @property
+    def prev_bot_facing(self) -> Facing:
+        tile = self.prev_knowledge.visible_tiles[self.bot_coords]
+
+        assert tile.character, "Character must be standing on a tile bot_facing"
+
+        return tile.character.facing
 
     @property
     def bot_facing(self) -> Facing:

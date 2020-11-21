@@ -1,9 +1,6 @@
-from pathfinding.core.grid import Grid
-
-from gupb.controller.botelka_ml.brain import init_q, save_q
 from gupb.controller.botelka_ml.model import get_model
 from gupb.controller.botelka_ml.rewards import calculate_reward
-from gupb.controller.botelka_ml.wisdom import Wisdom
+from gupb.controller.botelka_ml.wisdom import State, get_state
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
@@ -26,20 +23,15 @@ MAP_TILES_COST = {
 # noinspection PyMethodMayBeStatic
 class BotElkaController:
     def __init__(self, first_name: str):
-        self.q = init_q()
-
         self.first_name: str = first_name
         self.arena = None
 
         self.old_action = Action.DO_NOTHING
-        self.old_state = [0]*16
-
-        self.wisdom = None
-
-        self.episode = 0
-        self.game_no = 0
+        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 0)
 
         self.model = get_model()
+
+        self.tick = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -58,45 +50,35 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state, self.old_state, self.old_action, -10)
-        if self.game_no > 298:
-            self.model.save()
-            print("saved")
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action, -10)
+        self.model.save()
 
     def win(self):
-        # TODO: self.old_state == self.old_state (???)
-        self.model.update(self.old_state, self.old_state, self.old_action, 100)
-        # if self.game_no > 298:
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action, 100)
         self.model.save()
-        print("saved (win)")
 
     def reset(self, arena_description: ArenaDescription) -> None:
-        self.game_no += 1
+        self.tick = 0
+
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
 
-        matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
-        for coords, tile in self.arena.terrain.items():
-            x, y = coords
-            matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
-        grid = Grid(matrix=matrix)
-
-        self.wisdom = Wisdom(self.arena, None, self.name, grid)
-        save_q(self.q)
+        # matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
+        # for coords, tile in self.arena.terrain.items():
+        #     x, y = coords
+        #     matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
+        # grid = Grid(matrix=matrix)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self.episode += 1
+        self.tick += 1
 
-        self.wisdom.next_knowledge(knowledge)
-        wisdom = self.wisdom
+        new_state = get_state(knowledge, self.arena, self.tick)
 
-        bot_facing =  wisdom.bot_facing.value
+        reward = calculate_reward(self.old_state, new_state, self.old_action)
 
-        new_state = wisdom.relative_enemies_positions + [wisdom.mist_visible, bot_facing[0], bot_facing[1], 
-        wisdom.reach_menhir_before_mist] + wisdom.relative_menhir_position
-        reward = calculate_reward(wisdom)
+        # print(reward)
 
-        self.model.update(self.old_state, new_state, self.old_action, reward)  # Let the agent update internals
+        self.model.update(self.old_state.as_tuple(), new_state.as_tuple(), self.old_action, reward)
 
         new_action = self.model.get_next_action(new_state)
 

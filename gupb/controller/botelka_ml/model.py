@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 
+from gupb.controller.botelka_ml.wisdom import State
 from gupb.model.characters import Action
 import tensorflow.compat.v1 as tf
 
@@ -18,8 +19,8 @@ class DeepLearning:
         self.exploration_rate = 1.0  # Initial exploration rate
         self.exploration_delta = 1.0 / iterations  # Shift from exploration to exploration
 
-        # 10 neurons for max 5 players
-        self.input_count = 16
+        # N neurons
+        self.input_count = State.get_length()
 
         # 5 actions possible (5 neurons)
         self.output_count = 5
@@ -30,6 +31,7 @@ class DeepLearning:
         self.target_output = None
         self.optimizer = None
         self.initializer = None
+        self.saver = None
         # ---
 
         self.session = tf.Session()
@@ -91,8 +93,8 @@ class DeepLearning:
     # Which action (FORWARD or BACKWARD) has bigger Q-value, estimated by our model (inference).
     def greedy_action(self, state):
         MAPPING = {
-             0: Action.DO_NOTHING, 1: Action.TURN_LEFT, 2: Action.TURN_RIGHT, 3: Action.STEP_FORWARD, 4: Action.ATTACK
-        } 
+            0: Action.DO_NOTHING, 1: Action.TURN_LEFT, 2: Action.TURN_RIGHT, 3: Action.STEP_FORWARD, 4: Action.ATTACK
+        }
         # argmax picks the higher Q-value and returns the index (FORWARD=0, BACKWARD=1)
         return MAPPING[np.argmax(self.get_q(state))]
 
@@ -111,8 +113,8 @@ class DeepLearning:
         new_state_q_values = self.get_q(new_state)
 
         MAPPING = {
-             Action.DO_NOTHING: 0, Action.TURN_LEFT: 1, Action.TURN_RIGHT: 2, Action.STEP_FORWARD: 3, Action.ATTACK: 4
-        } 
+            Action.DO_NOTHING: 0, Action.TURN_LEFT: 1, Action.TURN_RIGHT: 2, Action.STEP_FORWARD: 3, Action.ATTACK: 4
+        }
         # Real Q value for the action we took. This is what we will train towards.
         old_state_q_values[MAPPING[action]] = reward + self.discount * np.amax(new_state_q_values)
 
@@ -138,6 +140,7 @@ class DeepLearning:
 
     def load(self):
         self.saver.restore(self.session, "./tmp/model.ckpt")
+
 
 model = None
 

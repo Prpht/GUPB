@@ -1,31 +1,36 @@
-from gupb.controller.botelka_ml.wisdom import Wisdom, MAX_HEALTH
+from gupb.controller.botelka_ml.wisdom import State
+from gupb.model.characters import Action
 
 
-def calculate_reward(wisdom: Wisdom) -> int:
-    """
-    Calculates reward for given action, tries to tell if action makes sens.
-    """
+def calculate_reward(old_state: State, new_state: State, old_action: Action) -> int:
+    points = 0
 
-    if wisdom.lost_health:
-        return -10 * (MAX_HEALTH - wisdom.bot_health)
+    if old_state.health != new_state.health:
+        # Lost health
+        points -= 100
 
-    return 1
-    # points -= 30 if wisdom.reach_menhir_before_mist else 0
-    #
-    # if prev_action is Action.ATTACK:
-    #     points -= 100 if not wisdom.can_attack_player else 0
-    #
-    # if prev_action is Action.TURN_LEFT:
-    #     points -= 20 if wisdom.mist_visible else 0
-    #
-    # if prev_action is Action.TURN_RIGHT:
-    #     points -= 20 if wisdom.mist_visible else 0
-    #
-    # if prev_action is Action.STEP_FORWARD:
-    #     points += 10
-    #     points += 50 if wisdom.enemies_visible else 0
-    #     points += 50 if wisdom.better_weapon_visible else 0
-    #     points -= 70 if wisdom.will_pick_up_worse_weapon else 0
-    #     points -= 500 if wisdom.coords_did_not_change else 0
+    if old_state.can_attack_enemy and old_action == Action.ATTACK:
+        # Could attack enemy, and attacked enemy
+        points += 120
 
-    # return points
+    if old_state.can_attack_enemy and old_action != Action.ATTACK:
+        # Could attack enemy, but didn't attack
+        points -= 10
+
+    if old_action == Action.ATTACK and not old_state.can_attack_enemy:
+        # Could not attack enemy but attacked anyway, pointless move
+        points -= 100
+
+    if old_state.visible_enemies > 0:
+        # Sees enemies, the more the better
+        points += old_state.visible_enemies * 10
+
+    if old_state.visible_enemies == 0:
+        # No visible enemies
+        points -= 25
+
+    if old_state.tick > 120 and old_state.distance_to_menhir > 10:
+        # Mist approaching
+        points -= 50
+
+    return points

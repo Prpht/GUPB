@@ -13,7 +13,9 @@ CONFIGURATION = {
     'arenas': [
         'simple',
     ],
-    'controllers': [b, 
+    'controllers': [
+        b,
+        tup_tup.TupTupController("TupTup"),
         bb_bot.BBBotController("Bartek"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
@@ -21,5 +23,5 @@ CONFIGURATION = {
     ],
     'visualise': False,
     'show_sight': b,
-    'runs_no': 300,
+    'runs_no': 10,
 }
