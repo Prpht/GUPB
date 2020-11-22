@@ -23,7 +23,7 @@ class QAction(Enum):
 # mapa: (stan, akcja) -> nagroda
 q_values = defaultdict(int)
 epsilon = 0.2
-learning_rate = 0.1
+learning_rate = 0.3
 gamma = 0.99
 
 mist_threshold = 2000
@@ -53,7 +53,6 @@ def learn_actions(state):
 
 def update_q_values(old_state, action, reward, new_state):
     q_values[(old_state, action)] = q_values[(old_state, action)] + learning_rate * (reward + gamma * q_values[(new_state, get_max_reward_action(new_state))] - q_values[(old_state, action)])
-    print(q_values)
 
 def calculate_state(mist_vec):
 
@@ -65,3 +64,6 @@ def calculate_state(mist_vec):
         return MistDistance.CLOSE_MIST
     else:
         return MistDistance.FAR_MIST
+
+def get_table():
+    return q_values
