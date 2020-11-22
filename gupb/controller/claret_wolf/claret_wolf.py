@@ -16,7 +16,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
-from .q_learning import calculate_state, choose_action, learn_actions, QAction, update_q_values
+from .q_learning import calculate_state, choose_action, learn_actions, QAction, update_q_values, get_table
 
 class Move(Enum):
     UP = coordinates.Coords(0, -1)
@@ -115,6 +115,7 @@ class ClaretWolfController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir_position = arena_description.menhir_position
         self.init_enviroment_map(arena_description.name)
+        # print(get_table())
 
 
     def terrain_mapping(self, terrain, coords: coordinates.Coords)->int:
@@ -156,10 +157,10 @@ class ClaretWolfController:
                 next_move = self.queue.pop(0)
                 return next_move
             else:
-                print("PERFORMING DEAFULT MOVE")
+                # print("PERFORMING DEAFULT MOVE")
                 return self.explore_map()
         except Exception as e:
-            print("EXCEPTION CAUSE = ", e)
+            # print("EXCEPTION CAUSE = ", e)
             return Action.DO_NOTHING
             pass
 
@@ -205,13 +206,13 @@ class ClaretWolfController:
         state = calculate_state(self.last_observed_mist_vec)
         (state, action) = learn_actions(state)
 
-        print(state)
-        print(action)
+        # print(state)
+        # print(action)
 
         #Update
         if self.last_round_health is not None and self.q_learning_state is not None:
 
-            print("Updating q values")
+            # print("Updating q values")
 
             (old_state, old_action) = self.q_learning_state
             reward = 0
@@ -221,7 +222,7 @@ class ClaretWolfController:
                 reward += -50
             # print(reward)
             if old_action == QAction.RUN_AWAY:
-                reward+=-5
+                reward+=-1
             update_q_values(old_state, old_action, reward, state)
 
         self.q_learning_state = (state, action)
