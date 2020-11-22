@@ -16,6 +16,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
+from .q_learning import calculate_state, choose_action, learn_actions, QAction, update_q_values
 
 class Move(Enum):
     UP = coordinates.Coords(0, -1)
@@ -92,7 +93,9 @@ class ClaretWolfController:
         self.queue = []
         self.run_seq_step = 0
         self.position_axis: Axis= None
+        self.round_health = None
         self.is_bot_in_rotation = False
+        self.q_learning_state = None
         self.mapping_on_actions: dict[Move, characters.Action] = {Move.UP: characters.Action.STEP_FORWARD,
                                                                   Move.LEFT: characters.Action.TURN_LEFT,
                                                                   Move.RIGHT: characters.Action.TURN_RIGHT,
@@ -153,9 +156,10 @@ class ClaretWolfController:
                 next_move = self.queue.pop(0)
                 return next_move
             else:
+                print("PERFORMING DEAFULT MOVE")
                 return self.explore_map()
         except Exception as e:
-            #print("EXCEPTION CAUSE = ", e)
+            print("EXCEPTION CAUSE = ", e)
             return Action.DO_NOTHING
             pass
 
@@ -196,21 +200,42 @@ class ClaretWolfController:
             self.queue.append(characters.Action.ATTACK)
             return
 
-        # is mist a danger?
-        if g_distance(self.bot_position, self.menhir_position) < 2:
-            self.queue.append(self.recon())
-            return
-        else:
-            self.find_vector_to_nearest_mist_tile(knowledge)
-            if self.last_observed_mist_vec is not None:
-                self.queue = []
-                next = self.menhir_position
-                if next:
-                    self.enqueue_target(next)
-                    if random.uniform(0, 1) < 0.3:
-                        self.last_observed_mist_vec = None
-                    return 
-            
+        #Choose action based on Q learning
+        self.find_vector_to_nearest_mist_tile(knowledge)
+        state = calculate_state(self.last_observed_mist_vec)
+        (state, action) = learn_actions(state)
+
+        print(state)
+        print(action)
+
+        #Update
+        if self.last_round_health is not None and self.q_learning_state is not None:
+
+            print("Updating q values")
+
+            (old_state, old_action) = self.q_learning_state
+            reward = 0
+            if self.last_round_health == self.round_health:
+                reward += 0.5
+            else:
+                reward += -50
+            # print(reward)
+            if old_action == QAction.RUN_AWAY:
+                reward+=-5
+            update_q_values(old_state, old_action, reward, state)
+
+        self.q_learning_state = (state, action)
+
+        # Perform chosen action
+        if action == QAction.RUN_AWAY:
+            self.queue = []
+            next = self.menhir_position
+            if next:
+                self.enqueue_target(next)
+                return 
+        # elif action == QAction.IGNORE:
+        #     return
+
         # maybe look for new weapon?
         next = self.determine_next_weapon()
         if next:
@@ -223,7 +248,6 @@ class ClaretWolfController:
         if next:
             self.queue = []
             self.enqueue_target(next)
-
 
         # maybe explore DEFAULT
 
@@ -274,9 +298,11 @@ class ClaretWolfController:
 
     def update_bot(self, knowledge: characters.ChampionKnowledge):
         self.bot_position = knowledge.position
-        self.weapon       = knowledge.visible_tiles[self.bot_position].character.weapon.name
-        self.facing       = knowledge.visible_tiles[self.bot_position].character.facing
-
+        character         = knowledge.visible_tiles[self.bot_position].character
+        self.weapon       = character.weapon.name
+        self.facing       = character.facing
+        self.last_round_health = self.round_health
+        self.round_health = character.health
 
     def update_weapons_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
         weapons = dict(filter(lambda elem: elem[1].loot, knowledge.visible_tiles.items()))
