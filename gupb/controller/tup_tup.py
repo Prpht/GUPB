@@ -2,6 +2,7 @@ from enum import Enum
 from queue import SimpleQueue
 import random
 from typing import Dict, Type, Optional, Tuple, List, Set
+from itertools import product
 
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
 
@@ -59,7 +60,10 @@ class TupTupController:
         self.arenas_knowledge: Dict = {}
         self.arena_name: Optional[str] = None
         self.arena_data: Optional[Dict] = None
-        self.__initialize_arenas_knowledge()
+        self.arenas_knowledge: Dict = {arena: {'Q': {perm: 0.0 for perm in product(States, Actions)},
+                                               'state': None, 'action': None, 'reward': None, 'reward_sum': 0,
+                                               'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
+                                               'discount_factor': GAMMA} for arena in ARENA_NAMES}
         self.game_no: int = 0
         self.action: Optional[Actions] = None
         self.state: Optional[States] = None
@@ -72,22 +76,6 @@ class TupTupController:
 
     def __hash__(self) -> int:
         return hash(self.identifier)
-
-    def __initialize_arenas_knowledge(self):
-        for arena in ARENA_NAMES:
-            self.arenas_knowledge[arena] = {'Q': {},
-                                            'state': None,
-                                            'action': None,
-                                            'reward': None,
-                                            'reward_sum': 0,
-                                            'attempt_no': 0,
-                                            'alpha': ALPHA,
-                                            'epsilon': EPSILON,
-                                            'discount_factor': GAMMA}
-            self.arenas_knowledge[arena]['Q'] = {}
-            for state in States:
-                for action in Actions:
-                    self.arenas_knowledge[arena]['Q'][(state, action)] = 0.0
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         if self.arena_data and self.arena_data['attempt_no'] >= 1:
