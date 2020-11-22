@@ -2,14 +2,14 @@ from enum import Enum
 from queue import SimpleQueue
 import random
 from typing import Dict, Type, Optional, Tuple, List, Set
-import numpy as np
 
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
+ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
 ALPHA = 0.2
-EPSILON = 0.9
+EPSILON = 0.4
 GAMMA = 1
 
 DEFAULT_VAL = 0
@@ -56,17 +56,14 @@ class TupTupController:
         self.episode: int = 0
         self.max_num_of_episodes: int = 0
 
-        self.Q: Dict = {}
-        self.alpha: float = ALPHA
-        self.epsilon: float = EPSILON
-        self.discount_factor: float = GAMMA
-        self.attempt_no: int = 0
+        self.arenas_knowledge: Dict = {}
+        self.arena_name: Optional[str] = None
+        self.arena_data: Optional[Dict] = None
+        self.__initialize_arenas_knowledge()
+        self.game_no: int = 0
         self.action: Optional[Actions] = None
         self.state: Optional[States] = None
-        self.reward_sum: float = 0.0
         self.initial_position: coordinates.Coords = None
-        self.last_episode_when_lived: int = 0
-        self.reward: int = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TupTupController) and other.name == self.name:
@@ -76,10 +73,28 @@ class TupTupController:
     def __hash__(self) -> int:
         return hash(self.identifier)
 
+    def __initialize_arenas_knowledge(self):
+        for arena in ARENA_NAMES:
+            self.arenas_knowledge[arena] = {'Q': {},
+                                            'state': None,
+                                            'action': None,
+                                            'reward': None,
+                                            'reward_sum': 0,
+                                            'attempt_no': 0,
+                                            'alpha': ALPHA,
+                                            'epsilon': EPSILON,
+                                            'discount_factor': GAMMA}
+            self.arenas_knowledge[arena]['Q'] = {}
+            for state in States:
+                for action in Actions:
+                    self.arenas_knowledge[arena]['Q'][(state, action)] = 0.0
+
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.attempt_no += 1
-        if self.attempt_no > 1:
-            self.reward = self.__get_reward()
+        if self.arena_data and self.arena_data['attempt_no'] >= 1:
+            self.arena_data['action'] = self.action
+            self.arena_data['state'] = self.state
+            self.arena_data['reward'] = self.__get_reward()
+            self.arena_data['reward_sum'] += self.arena_data['reward']
 
         self.action_queue = SimpleQueue()
         self.path = []
@@ -88,9 +103,12 @@ class TupTupController:
         self.has_calculated_path = False
         self.hiding_spot = None
         self.episode = 0
-        self.last_episode_when_lived: int = 0
+        self.game_no += 1
 
         arena = arenas.Arena.load(arena_description.name)
+        self.arena_name = arena.name
+        self.arena_data = self.arenas_knowledge[self.arena_name]
+        self.arena_data['attempt_no'] += 1
         self.map = arena.terrain
         self.map_size = arena.size
         self.mist_radius = int(self.map_size[0] * 2 ** 0.5) + 1
@@ -99,37 +117,29 @@ class TupTupController:
         self.bfs_goal = self.menhir_pos
         self.bfs_potential_goals_visited.add(self.menhir_pos)
 
-        if self.attempt_no > 200:
-            self.epsilon = MIN_EXPLORATION_RATE + (MAX_EXPLORATION_RATE - MIN_EXPLORATION_RATE) * np.exp(
-                -EXPLORATION_DECAY_RATE * self.attempt_no)
+        self.arena_data['epsilon'] *= 0.99
+        self.arena_data['alpha'] *= 0.99
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.episode += 1
-        if knowledge:
-            self.last_episode_when_lived += 1
         try:
-            # if self.episode == 1:
-                # print("\nGAME #", self.attempt_no)
             self.__update_char_info(knowledge)
             if self.episode == 1:
                 self.initial_position = self.position
 
-            if self.attempt_no == 1 and self.episode == 1:  # if that is the very first game choose the action randomly
+            if self.arena_data['attempt_no'] == 1 and self.episode == 1:  # if it is the first game on this map
                 first_action = random.choice(list(Actions))
                 self.action = first_action
                 self.state = self.__discretize()
-            elif self.attempt_no > 1 and self.episode == 1:  # learn when a new game begins but after the first game
-                reward = self.reward
-                action = self.action
-                state = self.state
+            elif self.arena_data['attempt_no'] > 1 and self.episode == 1:  # learn when a new game begins but after the first game
+                reward = self.arena_data['reward']
+                action = self.arena_data['action']
+                state = self.arena_data['state']
                 new_action = self.__pick_action(state)
                 new_state = self.__discretize()
                 self.__learn(action, state, reward, new_action, new_state)
-                # print("PREV ACTION ", action, " PRE STATE ", state, "\nNEW ACTION ", new_action, " NEW STATE ",
-                #       new_state)
                 self.action = new_action
                 self.state = new_state
-                self.reward_sum += reward
 
             if self.episode == 1 and self.__needs_to_hide():
                 self.__go_to_hiding_spot()
@@ -201,13 +211,6 @@ class TupTupController:
                     self.hiding_spot = coordinates.Coords(t[0], t[1])
                     break
             corner.update([(t[0] + d[0], t[1] + d[1]) for t in corner for d in [(0, 1), (0, -1), (1, 0), (-1, 0)]])
-
-        # menhir_quarter = (self.menhir_pos[0] // (self.map_size[0] / 2), self.menhir_pos[1] // (self.map_size[1] / 2))
-        # hiding_quarter = (self.hiding_spot[0] // (self.map_size[0] / 2), self.hiding_spot[1] // (self.map_size[1] / 2))
-        # print("STATE", self.state, " starting quarter ", quarter, " menhir quarter ",
-        #       menhir_quarter)
-        # print("hiding direction ", self.action,
-        #       " hiding spot quarter ", hiding_quarter)
         return True
 
     def __go_to_hiding_spot(self) -> None:
@@ -381,47 +384,59 @@ class TupTupController:
             return States.NEIGHBOR_QUARTERS
 
     def was_killed_by_mist(self) -> bool:
-        mist_free_radius_when_died = self.mist_radius - self.last_episode_when_lived // games.MIST_TTH
+        mist_free_radius_when_died = self.mist_radius - self.episode // games.MIST_TTH
         radius_distance_to_menhir = int(((self.position[0] - self.menhir_pos[0]) ** 2 +
                                          (self.position[1] - self.menhir_pos[1]) ** 2) ** 0.5)
         return mist_free_radius_when_died <= radius_distance_to_menhir
 
     def __get_reward(self) -> int:
         killed_by_mist = self.was_killed_by_mist()
-        reward = 0
         if killed_by_mist:
-            reward -= 1  # todo what if was killed by mist but also was the last one standing
-
-        if not self.hiding_spot and self.initial_position == self.position:  # camping in the initial position
-            reward -= 4
-        elif not self.has_calculated_path:  # going to the hiding place
-            reward -= 3
-        elif len(self.path) > 0 and self.path[0] == self.hiding_spot:  # camping in the hiding place
-            reward -= 2
-        elif len(self.path) > MENHIR_NEIGHBOURHOOD_DISTANCE and self.path[0] != self.hiding_spot:  # going to the menhir position
-            reward -= 1
-        elif len(self.path) < MENHIR_NEIGHBOURHOOD_DISTANCE:  # camping near the menhir position
-            reward += 3
-        # print("Was killed by mist? ", killed_by_mist, " \treward ", reward)
-        return reward
+            if not self.hiding_spot and self.initial_position == self.position:  # camping in the initial position
+                return 0
+            elif not self.has_calculated_path:  # going to the hiding place
+                return -3
+            elif len(self.path) > 0 and self.path[0] == self.hiding_spot:  # camping in the hiding place
+                return -2
+            elif len(self.path) > MENHIR_NEIGHBOURHOOD_DISTANCE and self.path[0] != self.hiding_spot:  # going to the menhir position
+                return -3
+            elif len(self.path) < MENHIR_NEIGHBOURHOOD_DISTANCE:
+                return 3
+        else:
+            if not self.hiding_spot and self.initial_position == self.position:
+                return -2
+            elif not self.has_calculated_path:
+                return -2
+            elif len(self.path) > 0 and self.path[0] == self.hiding_spot:
+                return -2
+            elif len(self.path) > MENHIR_NEIGHBOURHOOD_DISTANCE and self.path[0] != self.hiding_spot:
+                return -1
+            elif len(self.path) < MENHIR_NEIGHBOURHOOD_DISTANCE:
+                return 2
+        return 0
 
     def __pick_action(self, state: States) -> Actions:
-        if np.random.uniform() < self.epsilon:
+        if random.uniform(0, 1) < self.arena_data['epsilon']:
             return random.choice(list(Actions))
         else:
-            index = np.argmax([self.Q.get((state, Actions.HIDE_IN_THE_STARTING_QUARTER), DEFAULT_VAL),
-                               self.Q.get((state, Actions.HIDE_IN_THE_OPPOSITE_QUARTER), DEFAULT_VAL),
-                               self.Q.get((state, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL), DEFAULT_VAL),
-                               self.Q.get((state, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL), DEFAULT_VAL)])
-            return Actions(index)
+            knowledge = [self.arena_data['Q'].get((state, Actions.HIDE_IN_THE_STARTING_QUARTER), DEFAULT_VAL),
+                         self.arena_data['Q'].get((state, Actions.HIDE_IN_THE_OPPOSITE_QUARTER), DEFAULT_VAL),
+                         self.arena_data['Q'].get((state, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL),
+                                                  DEFAULT_VAL),
+                         self.arena_data['Q'].get((state, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL), DEFAULT_VAL)]
+            max_value = max(knowledge)
+            max_value_index = knowledge.index(max_value)
+            return Actions(max_value_index)
 
     def __learn(self, action: Actions, state: States, reward: int, new_action: Actions, new_state: States):
-        old_value = self.Q.get((state, action), DEFAULT_VAL)
-        future_value = self.Q.get((new_state, new_action), DEFAULT_VAL)
-        if (state, action) not in self.Q.keys():
-            self.Q[(state, action)] = 0.0
-        self.Q[(state, action)] += self.alpha * (reward + self.discount_factor * future_value - old_value)
-        # print("KNOWLEDGE \n", self.Q)
+        old_value = self.arena_data['Q'].get((state, action), DEFAULT_VAL)
+        future_value = self.arena_data['Q'].get((new_state, new_action), DEFAULT_VAL)
+        if (state, action) not in self.arena_data['Q'].keys():
+            self.arena_data['Q'][(state, action)] = 0.0
+        self.arena_data['Q'][(state, action)] += self.arena_data['alpha'] * (
+                    reward + self.arena_data['discount_factor'] * future_value - old_value)
+        # if self.game_no % 50 == 0: # to show learning progress
+        #     print(self.arenas_knowledge)
 
 
 class BFSException(Exception):
