@@ -83,8 +83,8 @@ class DeepLearning:
         self.saver = tf.train.Saver()
 
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!
-        self.load()
-        self.exploration_rate = 0
+        # self.load()
+        # self.exploration_rate = 0
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # Ask model to estimate Q value for specific state (inference)
