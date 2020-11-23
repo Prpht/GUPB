@@ -51,11 +51,11 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, -10)
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
         self.model.save()
 
     def win(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 100)
+        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
         self.model.save()
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -63,6 +63,9 @@ class BotElkaController:
 
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
+
+        self.old_action_no = 0
+        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
 
         # matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
         # for coords, tile in self.arena.terrain.items():

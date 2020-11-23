@@ -102,11 +102,11 @@ class DeepLearning:
     # Which action (FORWARD or BACKWARD) has bigger Q-value, estimated by our model (inference).
     def greedy_action(self, state):
         # argmax picks the higher Q-value and returns the index (FORWARD=0, BACKWARD=1)
+        # print(state, ' >>>>>> ', self.get_q(state), ' >>>>>> ', np.argmax(self.get_q(state)))
         action_no = np.argmax(self.get_q(state))
         return MAPPING[action_no], action_no
 
     def random_action(self):
-
         random_action_no = random.choice(range(len(MAPPING)))
         return MAPPING[random_action_no], random_action_no
 
@@ -138,10 +138,10 @@ class DeepLearning:
             self.exploration_rate -= self.exploration_delta
 
     def save(self):
-        self.saver.save(self.session, "./tmp/model.ckpt")
+        self.saver.save(self.session, "./gupb/controller/botelka_ml/tmp/model.ckpt")
 
     def load(self):
-        self.saver.restore(self.session, "./tmp/model.ckpt")
+        self.saver.restore(self.session, "./gupb/controller/botelka_ml/tmp/model.ckpt")
 
 
 model = None

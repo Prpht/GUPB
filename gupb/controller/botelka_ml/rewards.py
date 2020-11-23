@@ -4,7 +4,7 @@ from gupb.model.characters import Action
 
 
 def calculate_reward(old_state: State, new_state: State, old_action_no: int) -> int:
-    points = 1
+    points = old_state.tick
 
     actions_list = MAPPING[old_action_no]
 
@@ -19,9 +19,5 @@ def calculate_reward(old_state: State, new_state: State, old_action_no: int) -> 
     if old_state.visible_enemies > 0:
         # Sees enemies, the more the better
         points += old_state.visible_enemies
-
-    if old_state.tick > 120 and old_state.distance_to_menhir > 10:
-        # Mist approaching
-        points -= 2
 
     return points
