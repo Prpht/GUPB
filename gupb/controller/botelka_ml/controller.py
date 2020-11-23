@@ -74,7 +74,8 @@ class BotElkaController:
         # grid = Grid(matrix=matrix)
 
     def go_to_menhir(self):
-        pass
+        
+        return []
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.tick += 1

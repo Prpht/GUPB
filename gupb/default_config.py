@@ -7,21 +7,23 @@ from gupb.controller import krowa123
 from gupb.controller import tup_tup
 from gupb.controller import random
 
-b = BotElkaController("Z nami na pewno zdasz")
-
 CONFIGURATION = {
     'arenas': [
-        'simple',
+        'archipelago',
+        'wasteland',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
-        b,
-        tup_tup.TupTupController("TupTup"),
         bb_bot.BBBotController("Bartek"),
+        BotElkaController("Z nami na pewno zdasz"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
+        shallow_mind.ShallowMindController('test'),
+        tup_tup.TupTupController('Bot'),
     ],
     'visualise': False,
-    'show_sight': b,
-    'runs_no': 10,
+    'show_sight': None,
+    'runs_no': 100,
 }
