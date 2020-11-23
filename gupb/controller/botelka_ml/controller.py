@@ -73,8 +73,14 @@ class BotElkaController:
         #     matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
         # grid = Grid(matrix=matrix)
 
+    def go_to_menhir(self):
+        pass
+
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.tick += 1
+
+        if self.tick == 1:
+            self.moves_queue = self.go_to_menhir()
 
         if self.moves_queue:
             return self.moves_queue.pop()
