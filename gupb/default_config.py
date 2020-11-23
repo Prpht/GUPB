@@ -1,6 +1,6 @@
 from gupb.controller import bb_bot
 from gupb.controller.botelka_ml import controller as botelka
-from gupb.controller import claret_wolf
+from gupb.controller.claret_wolf import claret_wolf
 from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import shallow_mind
 from gupb.controller import krowa123
