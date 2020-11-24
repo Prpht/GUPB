@@ -114,6 +114,10 @@ class Champion:
         verbose_logger.debug(f"Champion {self.controller.name} died.")
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 
+        die_callable = getattr(self.controller, "die", None)
+        if die_callable:
+            die_callable()
+
     @property
     def alive(self) -> bool:
         return self.health > 0

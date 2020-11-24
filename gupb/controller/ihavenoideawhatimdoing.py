@@ -1,3 +1,6 @@
+
+from gupb.model.characters import Action
+
 from queue import SimpleQueue
 
 from gupb.model import arenas
@@ -5,8 +8,16 @@ from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model import weapons
 from gupb.model import tiles
+import numpy as np
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
+
+from keras.models import Sequential
+from keras.layers import Dense, Activation, Flatten
+from keras.optimizers import Adam
+
+from rl.agents import SARSAAgent
+from rl.policy import BoltzmannQPolicy
 
 dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 MIST_TTH: int = 5
@@ -14,6 +25,8 @@ WEPON_REACH_BENEFIT: int = 0.7
 # top left of map is 0 0
 FALLOFF=12
 INITIAL_ROTATE_DIAMETER = 1+20*2
+
+LOCAL_SIZE = 7
 
 def r(element, times):
     return [element] * times
@@ -41,6 +54,7 @@ def getRotateAround(diam):
 
 class IHaveNoIdeaWhatImDoingController:
     def __init__(self):
+        self.knowledge = None
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.memory: dict[coordinates.Coords, tiles.TileDescription] = dict()
         self.time = 0
@@ -51,6 +65,7 @@ class IHaveNoIdeaWhatImDoingController:
         self.mist_distance = 0
         self.menhir_rotation = "counterclockwise"
         self.rotate_diam = INITIAL_ROTATE_DIAMETER
+        
 
     def getTileGain(self, currentWeapon, newWeapon, dist):
         if(not newWeapon):
@@ -72,7 +87,26 @@ class IHaveNoIdeaWhatImDoingController:
             "knife": weapons.Knife(),
             "bow": weapons.Bow()
         }[weapon.name]
-
+    def getWeaponFromDesc(self, weapon: weapons.WeaponDescription):
+            if not weapon:
+                return 0
+            return {
+                "amulet": 1,
+                "axe": 2,
+                "knife": 3,
+                "sword":4,
+                "bow": 5
+            }[weapon.name]
+    def getWeaponFromWeapon(self, weapon: weapons.Weapon):
+        if not weapon:
+            return 0
+        return {
+            "Amulet": 1,
+            "Axe": 2,
+            "Knife": 3,
+            "Sword":4,
+            "Bow": 5
+        }[type(weapon).__name__]
     def computeHeadingMap(self):
         queue = []
         del self.heading_map
@@ -109,6 +143,24 @@ class IHaveNoIdeaWhatImDoingController:
         self.menhir_position = arena_description.menhir_position
         # we're just using the static method to avoid repeating parsing files
         self.arena = arenas.Arena.load(arena_description.name)
+        model = Sequential()
+        model.add(Flatten(input_shape=(1,) + (7,7,5)))
+        model.add(Dense(16))
+        model.add(Activation('relu'))
+        model.add(Dense(16))
+        model.add(Activation('relu'))
+        model.add(Dense(16))
+        model.add(Activation('relu'))
+        model.add(Dense(len(list(Action))))
+        model.add(Activation('linear'))
+
+        policy = BoltzmannQPolicy()
+        sarsa = SARSAAgent(model=model, nb_actions=len(list(Action)), nb_steps_warmup=10, policy=policy)
+        sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
+        sarsa.load_weights('ihavenoideawhatimdoing/sarsa_{}_weights.h5f'.format("ihavenoideawhatimdoing"))
+        sarsa.observations = []
+        sarsa.actions = []
+        self.sarsa = sarsa
         pass
 
     def mulitplyCoords(self, coords, val):
@@ -138,6 +190,23 @@ class IHaveNoIdeaWhatImDoingController:
         if(self.decision_log[0]=="discover"):
             return [(1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1]+1) % 2], 'discover')]
         return [(0.1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1])%2],'discover')]
+
+    def getLocalActionOption(self, knowledge: characters.ChampionKnowledge):
+        new_space = np.zeros((LOCAL_SIZE,LOCAL_SIZE,5), dtype=np.uint8)
+        for coords,tile in self.arena.terrain.items():
+            if knowledge:
+                dist = (knowledge.position - coords)
+                x = abs(dist[0])+LOCAL_SIZE//2
+                y = abs(dist[1])+LOCAL_SIZE//2
+                if(x < LOCAL_SIZE//2 and y < LOCAL_SIZE//2):
+                    new_space[x,y,0] = 1 if tile.terrain_passable() else 0
+                    new_space[x,y,1] = 1 if tile.terrain_transparent() else 0
+                    if coords in knowledge.visible_tiles:
+                        new_space[x,y,2] = 1 if knowledge.visible_tiles[coords].character else 0
+        prediction = self.sarsa.forward(new_space)
+        if(list(Action)[prediction] == Action.DO_NOTHING):
+            return []
+        return [(0.2, list(Action)[prediction],'local')]
 
     def getNavOption(self, knowledge: characters.ChampionKnowledge):
         multiplier = 1 if self.getMistDistance(knowledge) > 8 else 1/2*(8 - self.getMistDistance(knowledge))
@@ -211,6 +280,7 @@ class IHaveNoIdeaWhatImDoingController:
         return []
                 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.knowledge = knowledge
         decision = None
         self.updateTiles(knowledge)
         self.updateFacing(knowledge)
@@ -218,7 +288,7 @@ class IHaveNoIdeaWhatImDoingController:
             self.computeHeadingMap()
         self.getMistDistance(knowledge)
         options = [*self.getNavOption(knowledge), *self.getAttackOption(
-            knowledge), *self.getObtainOption(knowledge), *self.getObeliskCaptureOption(knowledge), *self.checkStuckOption(knowledge),*self.getDiscoverOption(knowledge)]
+            knowledge), *self.getObtainOption(knowledge), *self.getObeliskCaptureOption(knowledge), *self.checkStuckOption(knowledge),*self.getDiscoverOption(knowledge),*self.getLocalActionOption(knowledge)]
         decision = sorted(options, key=lambda option: -option[0])[0]
         self.position_log.append(knowledge.position)
         if(len(decision) > 2):
