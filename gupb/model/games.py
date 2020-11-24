@@ -105,6 +105,11 @@ class Game(statemachine.StateMachine):
             champion = self.champions.pop()
             death = ChampionDeath(champion, self.episode)
             self.deaths.append(death)
+
+            win_callable = getattr(champion.controller, "win", None)
+            if win_callable:
+                win_callable()
+
         if not self.champions:
             self.finished = True
 

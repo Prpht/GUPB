@@ -1,30 +1,23 @@
-from gupb.controller.botelka_ml.models import Wisdom, MAX_HEALTH
+from gupb.controller.botelka_ml.wisdom import State
+from gupb.controller.botelka_ml.model import MAPPING
 from gupb.model.characters import Action
 
 
-def calculate_reward(wisdom: Wisdom, prev_action: Action) -> int:
-    """
-    Calculates reward for given action, tries to tell if action makes sens.
-    """
-    points = 0
+def calculate_reward(old_state: State, new_state: State, old_action_no: int) -> int:
+    points = old_state.tick
 
-    points -= 100*(MAX_HEALTH-wisdom.bot_health) if wisdom.lost_health else 0
-    points -= 30 if wisdom.reach_menhir_before_mist else 0
+    actions_list = MAPPING[old_action_no]
 
-    if prev_action is Action.ATTACK:
-        points -= 100 if not wisdom.can_attack_player else 0
+    if old_state.health != new_state.health:
+        # Lost health
+        points -= 1
 
-    if prev_action is Action.TURN_LEFT:
-        points -= 20 if wisdom.mist_visible else 0
+    if old_state.can_attack_enemy and Action.ATTACK in actions_list:
+        # Could attack enemy, and attacked enemy
+        points += 20
 
-    if prev_action is Action.TURN_RIGHT:
-        points -= 20 if wisdom.mist_visible else 0
-
-    if prev_action is Action.STEP_FORWARD:
-        points += 10
-        points += 50 if wisdom.enemies_visible else 0
-        points += 50 if wisdom.better_weapon_visible else 0
-        points -= 70 if wisdom.will_pick_up_worse_weapon else 0
-        points -= 500 if wisdom.coords_did_not_change else 0
+    if old_state.visible_enemies > 0:
+        # Sees enemies, the more the better
+        points += old_state.visible_enemies
 
     return points
