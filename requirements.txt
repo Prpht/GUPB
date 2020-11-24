@@ -7,3 +7,5 @@ python-statemachine==0.8.0
 questionary==1.5.2
 sortedcontainers==2.2.2
 tqdm==4.49.0
+keras-rl==0.4.2
+keras==2.4.3
