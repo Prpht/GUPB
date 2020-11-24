@@ -6,6 +6,7 @@ from queue import PriorityQueue
 from typing import Dict, List, Type, Tuple
 
 from gupb.model.coordinates import Coords
+from gupb.model.tiles import Menhir
 from gupb.model.weapons import Weapon
 from ..model import SeenTile
 
@@ -32,21 +33,20 @@ def determine_path_bot(
     terrain: Dict[Coords, SeenTile],
     start: Coords,
     weapons_to_take: List[Type[Weapon]],
-    menhir_position: Coords,
+    target: Coords,
     dist: int = 0,
     strict: bool = True
 ) -> List[Coords]:
-    graph = construct_graph(terrain=terrain, menhir_position=menhir_position)
+    graph = construct_graph(terrain=terrain)
     graph = dijkstra_search(graph, start, weapons_to_take)
     weapons = [
         (k, v) for k, v in graph.items() if v.tile_type.loot_type() in weapons_to_take
     ]
     weapons.sort(key=lambda e: e[1].dist)
-    target_position = graph[menhir_position]
-    target_position = target_position
+    target_position = graph[target]
     if not strict:
         for i in range(dist):
-            ns = [n for n in target_position.neighbours if n.coords != menhir_position]
+            ns = [n for n in target_position.neighbours if n.coords != target]
             if len(ns) == 0:
                 break
             target_position = random.choice(ns)
@@ -55,7 +55,7 @@ def determine_path_bot(
         path.extend(
             get_path(graph, weapons[0][0])
         )
-        graph = construct_graph(terrain=terrain, menhir_position=menhir_position)
+        graph = construct_graph(terrain=terrain)
         graph = dijkstra_search(graph, weapons[0][0], weapons_to_take)
 
     pm = get_path(graph, target_position.coords)
@@ -91,12 +91,11 @@ def dijkstra_search(
 
 def construct_graph(
     terrain: Dict[Coords, SeenTile],
-    menhir_position: Coords
 ) -> Dict[Coords, Vertex]:
     vertices = {
         c: Vertex(coords=c, tile_type=v)
         for c, v in terrain.items()
-        if v.terrain_passable() or c == menhir_position
+        if v.terrain_passable() or v.type() == Menhir
     }
     for (x, y), vertex in vertices.items():
         to_check = [
@@ -118,7 +117,7 @@ def weight(u: Vertex, v: Vertex, weapons_to_take: List[Type[Weapon]]) -> int:
     elif v.tile_type.passable:
         return 1
     else:
-        return 1000
+        return 20
 
 
 def get_path(
