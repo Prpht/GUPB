@@ -60,16 +60,14 @@ class DistanceMeasure(Enum):
 @dataclass
 class State:
     map_name: int
-    x: int
-    y: int
+    bot_coords: Coords
     health: int
     visible_enemies: int
     can_attack_enemy: bool
     facing: int
     weapon: int
     distance_to_menhir: int
-    menhir_x: int
-    menhir_y: int
+    menhir_coords: Coords
     tick: int
 
     @staticmethod
@@ -78,8 +76,8 @@ class State:
 
     def as_tuple(self):
         return (
-            self.x, self.y, self.health, self.visible_enemies, self.can_attack_enemy, self.facing,
-            self.weapon, self.distance_to_menhir, self.menhir_x, self.menhir_y, self.tick
+            self.bot_coords.x, self.bot_coords.y, self.health, self.visible_enemies, self.can_attack_enemy, self.facing,
+            self.weapon, self.distance_to_menhir, self.menhir_coords.x, self.menhir_coords.y, self.tick
         )
 
 
@@ -111,21 +109,19 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
 
     weapon = WEAPON_TO_INT[bot_weapon]
 
-    m_x, m_y = sub_coords(bot_coords, arena.menhir_position)
-    menhir_distance = np.sqrt(m_x ** 2 + m_y ** 2)
+    menhir_coords = sub_coords(bot_coords, arena.menhir_position)
+    menhir_distance = np.sqrt(menhir_coords.x ** 2 + menhir_coords.y ** 2)
 
     return State(
         hash(arena.name),
-        bot_coords[0],
-        bot_coords[1],
+        bot_coords,
         health,
         visible_enemies,
         can_attack_enemy,
         facing,
         weapon,
         menhir_distance,
-        m_x,
-        m_y,
+        menhir_coords,
         tick
     )
 
