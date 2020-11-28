@@ -11,9 +11,9 @@ botelka = botelka_ml.BotElkaController("Z nami na pewno zdasz")
 CONFIGURATION = {
     'arenas': [
         'archipelago',
-        # 'wasteland',
-        # 'dungeon',
-        # 'fisher_island',
+        'wasteland',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
         botelka,
@@ -25,6 +25,6 @@ CONFIGURATION = {
     ],
     'start_balancing': False,
     'visualise': True,
-    'show_sight': botelka,
+    'show_sight': None,
     'runs_no': 1,
 }

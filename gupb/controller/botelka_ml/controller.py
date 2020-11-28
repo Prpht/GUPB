@@ -1,29 +1,26 @@
-from gupb.controller.botelka_ml.actions import go_to_menhir
-from gupb.controller.botelka_ml.model import get_model
-from gupb.controller.botelka_ml.rewards import calculate_reward
-from gupb.controller.botelka_ml.wisdom import State, get_state
-from gupb.model.arenas import ArenaDescription, Arena
-from gupb.model.characters import Action, ChampionKnowledge, Tabard
 from pathfinding.core.grid import Grid
-from pathfinding.finder.dijkstra import DijkstraFinder
-from gupb.model.characters import ChampionKnowledge, Facing, Action
-from gupb.model.coordinates import Coords, add_coords, sub_coords
-from typing import Optional, Tuple, List
 
+from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all
+from gupb.controller.botelka_ml.utils import debug_print
+from gupb.controller.botelka_ml.wisdom import get_state
+from gupb.model.arenas import ArenaDescription, Arena
+from gupb.model.characters import Tabard, ChampionKnowledge, Action
+from gupb.model.coordinates import Coords
 from gupb.model.tiles import Tile
 
 LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
 MAP_TILES_COST = {
-    'sea': 0,  # Sea - obstacle
-    'wall': 0,  # Wall  - obstacle
-    'bow': 1,  # Bow
-    'sword': 4,  # Sword
-    'axe': 4,  # Axe
-    'amulet': 4,  # Amulet
-    'land': 3,  # Land
-    'knife': 10000,  # Knife - start weapon, we usually want to avoid it
+    "sea": 0,  # Sea - obstacle
+    "wall": 0,  # Wall  - obstacle
+    "menhir": 0,  # Obstacle
+    "bow": 1,  # Bow
+    "sword": 4,  # Sword
+    "axe": 4,  # Axe
+    "amulet": 4,  # Amulet
+    "land": 3,  # Land
+    "knife": 10000,  # Knife - start weapon, we usually want to avoid it
 }
 
 
@@ -43,6 +40,8 @@ class BotElkaController:
         self.moves_queue = []
 
         self.grid = None
+
+        self.menhir_reached = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -74,14 +73,12 @@ class BotElkaController:
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
 
-        print(arena_description.menhir_position)
-
         self.prepare_grid()
 
         self.tick = 0
-
-        self.old_action_no = 0
         # self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
+
+        self.menhir_reached = False
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         # self.tick += 1
@@ -104,57 +101,58 @@ class BotElkaController:
         # self.old_action_no = action_no
         # self.old_state = new_state
 
-        return go_to_menhir(self.grid, new_state)
+        try:
+            go_to_menhir_action = go_to_menhir(self.grid, new_state)
+            if go_to_menhir_action == Action.DO_NOTHING:
+                self.menhir_reached = True
+
+            if not self.menhir_reached:
+                debug_print("Going to menhir")
+                return go_to_menhir_action
+
+            if self.menhir_reached:
+                debug_print("Menhir reached")
+                kill = kill_them_all(self.grid, new_state)
+
+                # Nobody to kill, like look around
+                if kill == Action.DO_NOTHING:
+                    debug_print("Nobody to kill, going to menhir")
+                    return Action.TURN_RIGHT
+
+                debug_print(kill)
+                return kill
+        except Exception as e:
+            # Just to know if anything broke, should be removed
+            debug_print(e)
+        return Action.TURN_RIGHT
 
     def prepare_grid(self):
         matrix = [
             [
-                MAP_TILES_COST[self.arena.terrain[Coords(x, y)].description().type]
+                get_tile_cost(self.arena.terrain[Coords(x, y)])
                 for x in range(self.arena.size[0])
             ]
             for y in range(self.arena.size[1])
         ]
-        for row in matrix:
-            print(row)
+        matrix[self.arena.menhir_position.y][self.arena.menhir_position.x] = 0
+
         self.grid = Grid(matrix=matrix)
-    # def find_path(self, coords: Coords, knowledge: ChampionKnowledge) -> List[Action]:
-    #     steps = []
-    #     self.grid.cleanup()
-    #
-    #     start = self.grid.node(knowledge.position.x, knowledge.position.y)
-    #     end = self.grid.node(coords.x, coords.y)
-    #     # print(knowledge.position.x, knowledge.position.y, coords.x, coords.y)
-    #     path, _ = self.finder.find_path(start, end, self.grid)
-    #
-    #     facing = knowledge.visible_tiles[(knowledge.position.x, knowledge.position.y)].character.facing
-    #
-    #     for x in range(len(path) - 1):
-    #         actions, facing = self.move_one_tile(facing, path[x], path[x + 1])
-    #         steps += actions
-    #
-    #     return steps
-    #
-    # def move_one_tile(self, starting_facing: Facing, coord_0: Coords, coord_1: Coords) -> Tuple[List[Action], Facing]:
-    #     exit_facing = Facing(sub_coords(coord_1, coord_0))
-    #
-    #     # Determine what is better, turning left or turning right.
-    #     # Builds 2 lists and compares length.
-    #     facing_turning_left = starting_facing
-    #     left_actions = []
-    #     while facing_turning_left != exit_facing:
-    #         facing_turning_left = facing_turning_left.turn_left()
-    #         left_actions += [Action.TURN_LEFT]
-    #
-    #     facing_turning_right = starting_facing
-    #     right_actions = []
-    #     while facing_turning_right != exit_facing:
-    #         facing_turning_right = facing_turning_right.turn_right()
-    #         right_actions += [Action.TURN_RIGHT]
-    #
-    #     actions = right_actions if len(left_actions) > len(right_actions) else left_actions
-    #     actions += [Action.STEP_FORWARD]
-    #
-    #     return actions, exit_facing
+
+
+def get_tile_cost(tile: Tile) -> int:
+    description = tile.description()
+
+    # Sea od Land
+    tile_type = description.type
+
+    if not tile.passable:
+        tile_type = "wall"
+
+    # Weapons
+    if description.loot:
+        tile_type = description.loot.name
+
+    return MAP_TILES_COST[tile_type]
 
 
 POTENTIAL_CONTROLLERS = [

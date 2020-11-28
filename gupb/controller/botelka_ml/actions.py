@@ -2,13 +2,67 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
+from gupb.controller.botelka_ml.utils import debug_print
 from gupb.controller.botelka_ml.wisdom import State
 from gupb.model.characters import Action, Facing
-from gupb.model.coordinates import sub_coords, Coords
+from gupb.model.coordinates import sub_coords, Coords, add_coords
+import numpy as np
 
 
 def go_to_menhir(grid: Grid, state: State) -> Action:
-    return _go_to_coords(grid, state.bot_coords, state.facing, state.menhir_coords)
+    """
+    Returns one step towards Menhir.
+    """
+    # We can not go to menhir directly because menhir itself is an obstacle.
+    menhir_surroundings = [
+        add_coords(state.menhir_coords, Facing.UP.value),
+        add_coords(state.menhir_coords, Facing.RIGHT.value),
+        add_coords(state.menhir_coords, Facing.DOWN.value),
+        add_coords(state.menhir_coords, Facing.LEFT.value),
+    ]
+
+    for menhir_surrounding in menhir_surroundings:
+        if menhir_surrounding == state.bot_coords:
+            return Action.DO_NOTHING
+
+        action = _go_to_coords(grid, state.bot_coords, state.facing, menhir_surrounding)
+
+        if action != Action.DO_NOTHING:
+            return action
+
+    return Action.DO_NOTHING
+
+
+def kill_them_all(grid: Grid, state: State) -> Action:
+    def coords_dist(coords_0, coords_1):
+        det = sub_coords(coords_0, coords_1)
+        return np.sqrt(det.x ** 2 + det.y ** 2)
+
+    attackable_players = [
+        (coord, coords_dist(state.bot_coords, coord))
+        for coord in state.weapon.cut_positions(state.arena.terrain, state.bot_coords, state.facing)
+        if coord in state.visible_enemies
+    ]
+
+    if attackable_players:
+        debug_print("Attacking player")
+        return Action.ATTACK
+
+    visible_enemies = [
+        (coord, coords_dist(state.bot_coords, coord))
+        for coord in state.visible_enemies
+    ]
+
+    if not visible_enemies:
+        debug_print("No enemy visible")
+        return Action.DO_NOTHING
+
+    # Closest enemy sorted by distance
+    closest_enemy_coords, closest_enemy_dist = sorted(visible_enemies, key=lambda x: x[1])[0]
+
+    debug_print("Found target to kill", closest_enemy_coords, closest_enemy_dist)
+    debug_print(state.visible_enemies, state.bot_coords, state.facing, closest_enemy_coords)
+    return _go_to_coords(grid, state.bot_coords, state.facing, closest_enemy_coords)
 
 
 def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destination_coords: Coords) -> Action:
@@ -20,7 +74,7 @@ def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destinatio
 
     path, _ = finder.find_path(start, end, grid)
 
-    if not path:
+    if not path or len(path) == 2:
         return Action.DO_NOTHING
 
     current_cords, next_coords = path[0], path[1]
@@ -30,17 +84,15 @@ def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destinatio
 
 
 def _choose_rotation(current_facing: Facing, desired_facing: Facing) -> Action:
-    current_facing_cpy = current_facing
-    left_rotations, right_rotations = 0, 0
+    facing_left, facing_right = current_facing, current_facing
 
-    while current_facing != desired_facing:
-        current_facing = current_facing.turn_left()
-        left_rotations += 1
+    while True:
+        facing_left = facing_left.turn_left()
+        facing_right = facing_right.turn_right()
 
-    current_facing = current_facing_cpy
-    while current_facing != desired_facing:
-        current_facing = current_facing.turn_right()
-        right_rotations += 1
+        # First one that reaches 'desired_facing' is the most optimal
+        if facing_left == desired_facing:
+            return Action.TURN_LEFT
 
-    # Any other case
-    return Action.TURN_LEFT if left_rotations < right_rotations else Action.TURN_RIGHT
+        if facing_right == desired_facing:
+            return Action.TURN_RIGHT
