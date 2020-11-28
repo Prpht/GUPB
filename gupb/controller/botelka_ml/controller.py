@@ -10,6 +10,8 @@ from gupb.model.characters import ChampionKnowledge, Facing, Action
 from gupb.model.coordinates import Coords, add_coords, sub_coords
 from typing import Optional, Tuple, List
 
+from gupb.model.tiles import Tile
+
 LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
@@ -69,12 +71,14 @@ class BotElkaController:
         pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
+        self.arena = Arena.load(arena_description.name)
+        self.arena.menhir_position = arena_description.menhir_position
+
+        print(arena_description.menhir_position)
+
         self.prepare_grid()
 
         self.tick = 0
-
-        self.arena = Arena.load(arena_description.name)
-        self.arena.menhir_position = arena_description.menhir_position
 
         self.old_action_no = 0
         # self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
@@ -99,18 +103,20 @@ class BotElkaController:
         #
         # self.old_action_no = action_no
         # self.old_state = new_state
-        if not self.moves_queue:
-            self.moves_queue += go_to_menhir(self.grid, new_state)
 
-        return self.moves_queue.pop() if self.moves_queue else Action.ATTACK
+        return go_to_menhir(self.grid, new_state)
 
     def prepare_grid(self):
-        matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
-        for coords, tile in self.arena.terrain.items():
-            x, y = coords
-            matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
+        matrix = [
+            [
+                MAP_TILES_COST[self.arena.terrain[Coords(x, y)].description().type]
+                for x in range(self.arena.size[0])
+            ]
+            for y in range(self.arena.size[1])
+        ]
+        for row in matrix:
+            print(row)
         self.grid = Grid(matrix=matrix)
-
     # def find_path(self, coords: Coords, knowledge: ChampionKnowledge) -> List[Action]:
     #     steps = []
     #     self.grid.cleanup()
