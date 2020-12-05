@@ -1,9 +1,8 @@
 from pathfinding.core.grid import Grid
 
-from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon
-from gupb.controller.botelka_ml.model import get_model
-from gupb.controller.botelka_ml.rewards import calculate_reward
-from gupb.controller.botelka_ml.wisdom import get_state, State
+from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon, flee
+from gupb.controller.botelka_ml.utils import debug_print
+from gupb.controller.botelka_ml.state import State, get_state
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Tabard, ChampionKnowledge, Action, Facing
 from gupb.model.coordinates import Coords
@@ -36,11 +35,11 @@ class BotElkaController:
         self.old_action_no = 0
         self.old_state = None
 
-        self.model = get_model()
+        # self.model = get_model()
 
         self.tick = 0
         self.moves_queue = []
-        self.weapons_info = []
+        self.weapons_info = {}
 
         self.grid = None
 
@@ -63,13 +62,13 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
-        self.model.save()
+        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
+        # self.model.save()
         pass
 
     def win(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
-        self.model.save()
+        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
+        # self.model.save()
         pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -80,56 +79,70 @@ class BotElkaController:
 
         self.tick = 0
         self.old_state = State(self.arena, Coords(0, 0), 5, [], False, Facing.UP, Knife(), 1000,
-                               self.arena.menhir_position, 0, {})
-        map_weapons = {Coords(*coords): tile.loot.description()
-                       for coords, tile in self.arena.terrain.items() if tile.loot}
+                               self.arena.menhir_position, 0, {}, False)
 
-        self.weapons_info = map_weapons
+        self.weapons_info = {
+            Coords(*coords): tile.loot.description()
+            for coords, tile in self.arena.terrain.items() if tile.loot
+        }
 
         self.menhir_reached = False
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self.tick += 1
-
-        new_state = get_state(knowledge, self.arena, self.tick, self.weapons_info)
+        old_state, new_state = self.old_state, get_state(knowledge, self.arena, self.tick, self.weapons_info)
         self.weapons_info = new_state.weapons_info
 
-        reward = calculate_reward(self.old_state, new_state, self.old_action_no)
-        self.model.update(self.old_state.as_tuple(), new_state.as_tuple(), self.old_action_no, reward)
-        action_no = self.model.get_next_action(new_state.as_tuple())
-        # self.moves_queue.extend(new_actions)
-        #
-        self.old_action_no = action_no
         self.old_state = new_state
 
-        return {0: go_to_menhir(self.grid, new_state),
-                1: kill_them_all(self.grid, new_state),
-                2: find_better_weapon(self.grid, new_state)}[action_no]
-        #
-        # try:
-        #     go_to_menhir_action = go_to_menhir(self.grid, new_state)
-        #     if go_to_menhir_action == Action.DO_NOTHING:
-        #         self.menhir_reached = True
-        #
-        #     if not self.menhir_reached:
-        #         debug_print("Going to menhir")
-        #         return go_to_menhir_action
-        #
-        #     if self.menhir_reached:
-        #         debug_print("Menhir reached")
-        #         kill = kill_them_all(self.grid, new_state)
-        #
-        #         # Nobody to kill, like look around
-        #         if kill == Action.DO_NOTHING:
-        #             debug_print("Nobody to kill, going to menhir")
-        #             return Action.TURN_RIGHT
-        #
-        #         debug_print(kill);
-        #         return kill
-        # except Exception as e:
-        #     # Just to know if anything broke, should be removed
-        #     debug_print(e)
-        # return Action.TURN_RIGHT
+        if kill_them_all(self.grid, new_state) == Action.ATTACK:
+            debug_print("DIE!!!")
+            return Action.ATTACK
+
+        if old_state.health > new_state.health:
+            debug_print("Ouch! Running away")
+            return flee(self.grid, new_state)
+
+        if new_state.weapon.description().name == "knife":
+            new_weapon = find_better_weapon(self.grid, new_state)
+
+            if new_weapon == Action.DO_NOTHING:
+                debug_print("Could not find a better weapon, going to the menhir")
+                return go_to_menhir(self.grid, new_state)
+
+            debug_print("Going for a better weapon")
+            return new_weapon
+
+        if not self.menhir_reached:
+            go_to_menhir_action = go_to_menhir(self.grid, new_state)
+            if go_to_menhir_action == Action.DO_NOTHING:
+                debug_print("Menhir reached")
+                self.menhir_reached = True
+            else:
+                debug_print("Going to menhir")
+                return go_to_menhir_action
+
+        if self.menhir_reached:
+            kill = kill_them_all(self.grid, new_state)
+
+            # Nobody to kill, like look around
+            if kill == Action.DO_NOTHING:
+                if new_state.mist_visible:
+                    go_to_menhir_action = go_to_menhir(self.grid, new_state)
+
+                    if go_to_menhir_action == Action.DO_NOTHING:
+                        debug_print("I see mist! But I am already near menhir")
+                        return Action.TURN_RIGHT
+                    else:
+                        debug_print("I see mist! Running away")
+                        return go_to_menhir_action
+
+                debug_print("Nobody to kill, no mist, looking around")
+                return Action.TURN_RIGHT
+
+            debug_print("On a mission to kill")
+            return kill
+
+        return Action.STEP_FORWARD
 
     def prepare_grid(self):
         matrix = [

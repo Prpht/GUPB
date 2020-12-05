@@ -1,12 +1,12 @@
+import numpy as np
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
+from gupb.controller.botelka_ml.state import State, weapon_ranking_by_desc
 from gupb.controller.botelka_ml.utils import debug_print
-from gupb.controller.botelka_ml.wisdom import State, weapon_ranking_by_desc
 from gupb.model.characters import Action, Facing
 from gupb.model.coordinates import sub_coords, Coords, add_coords
-import numpy as np
 
 
 def go_to_menhir(grid: Grid, state: State) -> Action:
@@ -45,7 +45,6 @@ def kill_them_all(grid: Grid, state: State) -> Action:
     ]
 
     if attackable_players:
-        debug_print("Attacking player")
         return Action.ATTACK
 
     visible_enemies = [
@@ -54,35 +53,53 @@ def kill_them_all(grid: Grid, state: State) -> Action:
     ]
 
     if not visible_enemies:
-        debug_print("No enemy visible")
         return Action.DO_NOTHING
 
     # Closest enemy sorted by distance
     closest_enemy_coords, closest_enemy_dist = sorted(visible_enemies, key=lambda x: x[1])[0]
 
-    debug_print("Found target to kill", closest_enemy_coords, closest_enemy_dist)
-    debug_print(state.visible_enemies, state.bot_coords, state.facing, closest_enemy_coords)
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_enemy_coords)
 
 
 def find_better_weapon(grid: Grid, state: State) -> Action:
     weapons = state.weapons_info
 
-    weapons_in_radius = [(coords, weapon) for (coords, weapon) in weapons.items()
-                         if abs(coords[0]-state.bot_coords[0]) < 15 and abs(coords[1]-state.bot_coords[1]) < 15]
+    weapons_in_radius = [
+        (coords, weapon)
+        for (coords, weapon) in weapons.items()
+        if abs(coords[0] - state.bot_coords[0]) < 15 and abs(coords[1] - state.bot_coords[1]) < 15
+    ]
 
-    def sortingWeapons(coords_weapon_tuple):
+    def sorting_weapons(coords_weapon_tuple):
         return weapon_ranking_by_desc(coords_weapon_tuple[1])
 
-    weapons_in_radius.sort(key=sortingWeapons, reverse=True)
+    weapons_in_radius.sort(key=sorting_weapons, reverse=True)
+
+    if not weapons_in_radius:
+        debug_print("No weapon visible")
+        return Action.DO_NOTHING
 
     closest_weapon_position = weapons_in_radius[0][0]
     for (coords, _) in weapons_in_radius:
-        if _find_path_len(grid, state.bot_coords, coords) != -1 and _find_path_len(grid, state.bot_coords, coords) < 40:
+        path_len = _find_path_len(grid, state.bot_coords, coords)
+        if path_len != -1 and path_len < 40:
             closest_weapon_position = coords
             break
 
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_weapon_position)
+
+
+def flee(grid: Grid, state: State) -> Action:
+    enemies_in_one_line = [
+        enemy_coord
+        for enemy_coord in state.visible_enemies
+        if enemy_coord.x == state.bot_coords.x or enemy_coord.y == state.bot_coords.y
+    ]
+
+    if len(enemies_in_one_line):
+        return Action.TURN_RIGHT
+
+    return Action.STEP_FORWARD
 
 
 def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destination_coords: Coords) -> Action:

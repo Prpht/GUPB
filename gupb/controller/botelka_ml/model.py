@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-from gupb.controller.botelka_ml.wisdom import State
+from gupb.controller.botelka_ml.state import State
 from gupb.model.characters import Action
 import tensorflow.compat.v1 as tf
 

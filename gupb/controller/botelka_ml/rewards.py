@@ -1,6 +1,4 @@
-from gupb.controller.botelka_ml.wisdom import State
-from gupb.controller.botelka_ml.model import MAPPING
-from gupb.model.characters import Action
+from gupb.controller.botelka_ml.state import State
 
 
 def calculate_reward(old_state: State, new_state: State, old_action_no: int) -> int:
