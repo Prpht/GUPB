@@ -116,7 +116,7 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int,
         coord
         for coord in
         WEAPONS[bot_weapon].cut_positions(arena.terrain, bot_coords, bot_facing)
-        if knowledge.visible_tiles[coord].character
+        if coord in knowledge.visible_tiles and knowledge.visible_tiles[coord].character
     )
 
     menhir_det = sub_coords(bot_coords, arena.menhir_position)
@@ -131,7 +131,7 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int,
     old_weapons = {
         coords: weapon
         for (coords, weapon) in weapons_prior_info.items()
-        if coords not in visible_weapons.keys() or visible_weapons[coords] == weapon
+        if coords not in visible_weapons.keys() or visible_weapons.get(coords) == weapon
     }
 
     weapons = {**old_weapons, **visible_weapons}

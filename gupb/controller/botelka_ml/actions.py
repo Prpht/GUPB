@@ -69,7 +69,7 @@ def find_better_weapon(grid: Grid, state: State) -> Action:
     weapons = state.weapons_info
 
     weapons_in_radius = [(coords, weapon) for (coords, weapon) in weapons.items()
-                         if abs(coords[0]-state.bot_coords[0]) < 15 or abs(coords[1]-state.bot_coords[1]) < 15]
+                         if abs(coords[0]-state.bot_coords[0]) < 15 and abs(coords[1]-state.bot_coords[1]) < 15]
 
     def sortingWeapons(coords_weapon_tuple):
         return weapon_ranking_by_desc(coords_weapon_tuple[1])
@@ -86,6 +86,9 @@ def find_better_weapon(grid: Grid, state: State) -> Action:
 
 
 def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destination_coords: Coords) -> Action:
+    if bot_coords == destination_coords:
+        return Action.DO_NOTHING
+
     finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
     grid.cleanup()
 
@@ -94,13 +97,14 @@ def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destinatio
 
     path, _ = finder.find_path(start, end, grid)
 
-    if not path or len(path) == 2:
+    if not path:
         return Action.DO_NOTHING
 
     current_cords, next_coords = path[0], path[1]
     desired_facing = Facing(sub_coords(next_coords, current_cords))
 
     return Action.STEP_FORWARD if bot_facing == desired_facing else _choose_rotation(bot_facing, desired_facing)
+
 
 def _find_path_len(grid: Grid, bot_coords: Coords, destination_coords: Coords) -> int:
     finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
@@ -111,7 +115,7 @@ def _find_path_len(grid: Grid, bot_coords: Coords, destination_coords: Coords) -
 
     path, _ = finder.find_path(start, end, grid)
 
-    if not path or len(path) == 2:
+    if not path:
         return -1
 
     return len(path)
