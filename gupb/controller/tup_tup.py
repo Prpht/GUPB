@@ -188,12 +188,18 @@ class TupTupController:
             start_y = self.map_size[1] - 1 if quarter[1] == 1.0 else 0
 
         corner = {(start_x, start_y)}
-        while not self.hiding_spot:
+        directions = [(1 if start_x == 0 else -1, 0), (0, 1 if start_y == 0 else -1)]
+        hiding_spots = set()
+        while not hiding_spots:
             for t in corner:
                 if t in self.map and self.map[t].terrain_passable():
                     self.hiding_spot = coordinates.Coords(t[0], t[1])
-                    break
-            corner.update([(t[0] + d[0], t[1] + d[1]) for t in corner for d in [(0, 1), (0, -1), (1, 0), (-1, 0)]])
+                    hiding_spots.add(coordinates.Coords(t[0], t[1]))
+            corner = {(t[0] + d[0], t[1] + d[1]) for t in corner for d in directions}
+
+        for coords in hiding_spots:
+            if self.map[coords].loot:
+                self.hiding_spot = coords
         return True
 
     def __go_to_hiding_spot(self) -> None:
