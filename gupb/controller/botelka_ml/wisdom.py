@@ -85,12 +85,13 @@ class State:
 
     @staticmethod
     def get_length():
-        return 10
+        return 11
 
     def as_tuple(self):
         return (
-            self.bot_coords.x, self.bot_coords.y, self.health, len(self.visible_enemies), self.can_attack_enemy,
-            FACING_TO_INT[self.facing], self.distance_to_menhir, self.menhir_coords.x, self.menhir_coords.y, self.tick
+            hash(self.arena.name), self.bot_coords.x, self.bot_coords.y, self.health, len(self.visible_enemies),
+            self.can_attack_enemy, FACING_TO_INT[self.facing], self.distance_to_menhir, self.menhir_coords.x,
+            self.menhir_coords.y, self.tick
         )
 
 
