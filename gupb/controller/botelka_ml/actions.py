@@ -3,7 +3,7 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
 from gupb.controller.botelka_ml.utils import debug_print
-from gupb.controller.botelka_ml.wisdom import State
+from gupb.controller.botelka_ml.wisdom import State, weapon_ranking_by_desc
 from gupb.model.characters import Action, Facing
 from gupb.model.coordinates import sub_coords, Coords, add_coords
 import numpy as np
@@ -65,6 +65,26 @@ def kill_them_all(grid: Grid, state: State) -> Action:
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_enemy_coords)
 
 
+def find_better_weapon(grid: Grid, state: State) -> Action:
+    weapons = state.weapons_info
+
+    weapons_in_radius = [(coords, weapon) for (coords, weapon) in weapons.items()
+                         if abs(coords[0]-state.bot_coords[0]) < 15 or abs(coords[1]-state.bot_coords[1]) < 15]
+
+    def sortingWeapons(coords_weapon_tuple):
+        return weapon_ranking_by_desc(coords_weapon_tuple[1])
+
+    weapons_in_radius.sort(key=sortingWeapons, reverse=True)
+
+    closest_weapon_position = weapons_in_radius[0][0]
+    for (coords, _) in weapons_in_radius:
+        if _find_path_len(grid, state.bot_coords, coords) != -1 and _find_path_len(grid, state.bot_coords, coords) < 40:
+            closest_weapon_position = coords
+            break
+
+    return _go_to_coords(grid, state.bot_coords, state.facing, closest_weapon_position)
+
+
 def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destination_coords: Coords) -> Action:
     finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
     grid.cleanup()
@@ -81,6 +101,20 @@ def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destinatio
     desired_facing = Facing(sub_coords(next_coords, current_cords))
 
     return Action.STEP_FORWARD if bot_facing == desired_facing else _choose_rotation(bot_facing, desired_facing)
+
+def _find_path_len(grid: Grid, bot_coords: Coords, destination_coords: Coords) -> int:
+    finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+    grid.cleanup()
+
+    start = grid.node(bot_coords.x, bot_coords.y)
+    end = grid.node(destination_coords.x, destination_coords.y)
+
+    path, _ = finder.find_path(start, end, grid)
+
+    if not path or len(path) == 2:
+        return -1
+
+    return len(path)
 
 
 def _choose_rotation(current_facing: Facing, desired_facing: Facing) -> Action:

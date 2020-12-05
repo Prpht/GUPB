@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 
 import numpy as np
 from pathfinding.core.grid import Grid
@@ -10,7 +10,7 @@ from pathfinding.finder.dijkstra import DijkstraFinder
 from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge, Facing
 from gupb.model.coordinates import Coords, add_coords, sub_coords
-from gupb.model.weapons import Weapon, Axe, Sword, Amulet, Knife, Bow
+from gupb.model.weapons import Weapon, Axe, Sword, Amulet, Knife, Bow, WeaponDescription
 
 WEAPONS = {
     "bow": Bow(),
@@ -50,6 +50,18 @@ def weapon_ranking(weapon: Weapon) -> int:
     return 0
 
 
+def weapon_ranking_by_desc(weapon: WeaponDescription) -> int:
+    if weapon.name == 'bow':
+        return 10
+    if weapon.name == 'amulet':
+        return 8
+    if weapon.name == 'axe':
+        return 6
+    if weapon.name == 'sword':
+        return 6
+    return 0
+
+
 class DistanceMeasure(Enum):
     CLOSE = 0
     FAR = 1
@@ -69,6 +81,7 @@ class State:
     distance_to_menhir: int
     menhir_coords: Coords
     tick: int
+    weapons_info: Dict[Coords, WeaponDescription]
 
     @staticmethod
     def get_length():
@@ -81,7 +94,8 @@ class State:
         )
 
 
-def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
+def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int,
+              weapons_prior_info: Dict[Coords, WeaponDescription]) -> State:
     bot_coords = knowledge.position
     bot_tile = knowledge.visible_tiles.get(bot_coords)
     bot_character = bot_tile.character if bot_tile else None
@@ -108,6 +122,22 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
     menhir_det = sub_coords(bot_coords, arena.menhir_position)
     menhir_distance = np.sqrt(menhir_det.x ** 2 + menhir_det.y ** 2)
 
+    visible_weapons = {
+        Coords(*coords): tile.loot
+        for coords, tile in knowledge.visible_tiles.items()
+        if tile.loot and coords != bot_coords
+    }
+
+    old_weapons = {
+        coords: weapon
+        for (coords, weapon) in weapons_prior_info.items()
+        if coords not in visible_weapons.keys() or visible_weapons[coords] == weapon
+    }
+
+    weapons = {**old_weapons, **visible_weapons}
+    if bot_coords in weapons:
+        del weapons[bot_coords]
+
     return State(
         arena,
         bot_coords,
@@ -118,7 +148,8 @@ def get_state(knowledge: ChampionKnowledge, arena: Arena, tick: int) -> State:
         WEAPONS[bot_weapon],
         menhir_distance,
         arena.menhir_position,
-        tick
+        tick,
+        weapons
     )
 
 

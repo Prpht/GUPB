@@ -1,6 +1,6 @@
 from pathfinding.core.grid import Grid
 
-from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all
+from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon
 from gupb.controller.botelka_ml.utils import debug_print
 from gupb.controller.botelka_ml.wisdom import get_state
 from gupb.model.arenas import ArenaDescription, Arena
@@ -38,6 +38,7 @@ class BotElkaController:
 
         self.tick = 0
         self.moves_queue = []
+        self.weapons_info = []
 
         self.grid = None
 
@@ -77,6 +78,10 @@ class BotElkaController:
 
         self.tick = 0
         # self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
+        map_weapons = {Coords(*coords): tile.loot.description()
+        for coords, tile in self.arena.terrain.items() if tile.loot}
+
+        self.weapons_info = map_weapons
 
         self.menhir_reached = False
 
@@ -89,7 +94,9 @@ class BotElkaController:
         # if self.moves_queue:
         #     return self.moves_queue.pop()
 
-        new_state = get_state(knowledge, self.arena, self.tick)
+        new_state = get_state(knowledge, self.arena, self.tick, self.weapons_info)
+
+        self.weapons_info = new_state.weapons_info
 
         # reward = calculate_reward(self.old_state, new_state, self.old_action_no)
         #
@@ -119,7 +126,7 @@ class BotElkaController:
                     debug_print("Nobody to kill, going to menhir")
                     return Action.TURN_RIGHT
 
-                debug_print(kill)
+                debug_print(kill);
                 return kill
         except Exception as e:
             # Just to know if anything broke, should be removed
