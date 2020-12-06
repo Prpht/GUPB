@@ -68,7 +68,7 @@ def astar_search(terrain: Dict[Coords, SeenTile], start: Coords, end: Coords, av
             # Get value from terrain
             tile = terrain.get(next)
             # Check if the node is a wall
-            if not tile.terrain_passable() or tile.mist() or (avoid_loot and tile.loot):
+            if not tile.terrain_passable() or tile.mist():
                 continue
             # Create a neighbor node
             neighbor = Node(next, current_node)
@@ -78,7 +78,8 @@ def astar_search(terrain: Dict[Coords, SeenTile], start: Coords, end: Coords, av
             # Generate heuristics (Manhattan distance)
             dist_start = neighbor.position - start_node.position
             dist_goal = neighbor.position - goal_node.position
-            neighbor.g = abs(dist_start.x) + abs(dist_start.y)
+            loot_penalty = 30 if (avoid_loot and tile.loot) else 0
+            neighbor.g = abs(dist_start.x) + abs(dist_start.y) + loot_penalty
             neighbor.h = abs(dist_goal.x) + abs(dist_goal.y)
             neighbor.f = neighbor.g + neighbor.h
             # Check if neighbor is in open list and if it has a lower f value
