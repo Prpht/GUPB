@@ -4,9 +4,10 @@ from pathfinding.core.grid import Grid
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena
-from gupb.model.characters import ChampionDescription, Facing
+from gupb.model.characters import ChampionDescription, Facing, Action
+from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
-from gupb.model.tiles import Menhir, Wall, Sea, Land
+from gupb.model.tiles import Menhir, Wall, Sea, Land, TileDescription
 from gupb.model.weapons import Knife, Sword, Bow, Axe, Amulet
 from queue import SimpleQueue
 
@@ -37,14 +38,14 @@ def points_dist(cord1, cord2):
 class ArenaMapped(Arena):
     def __init__(self, arena):
         super().__init__(arena.name, arena.terrain)
-        self.tiles_memory: Dict[coordinates.Coords, tiles.TileDescription] = {}
-        self.current_terrain: Dict[coordinates.Coords, tiles.TileDescription] = {k: v.description() for k, v in
-                                                                                 arena.terrain.items()}
+        self.tiles_memory: Dict[Coords, TileDescription] = {}
+        self.current_terrain: Dict[Coords, TileDescription] = {k: v.description() for k, v in
+                                                               arena.terrain.items()}
         self.champions: Dict[
-            ChampionDescription, Tuple[coordinates.Coords, int]] = {}  # second value is the age when champ was seen
+            ChampionDescription, Tuple[Coords, int]] = {}  # second value is the age when champ was seen
         self.matrix = []
         self.champion: ChampionDescription = None
-        self.position: coordinates.Coords = None
+        self.position: Coords = None
         self.episode: int = 0
         self.effect_weight: int = FIELD_ATTACKED
         self.can_hit: bool = False
@@ -55,11 +56,11 @@ class ArenaMapped(Arena):
             if not tile.terrain_passable():
                 self.terrain_matrix[x][y] = 0
 
-    def register_effect(self, _, coords: coordinates.Coords) -> None:
+    def register_effect(self, _, coords: Coords) -> None:
         y, x = coords
         self.matrix[x][y] = self.effect_weight
 
-    def get_next_field(self) -> coordinates.Coords:
+    def get_next_field(self) -> Coords:
         return self.position + self.champion.facing.value
 
     def get_left_field(self):
@@ -71,12 +72,11 @@ class ArenaMapped(Arena):
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
         if self.mist_radius:
-            self.effect_weight = -1
             for coords in self.terrain:
                 distance = points_dist(coords, self.menhir_position)
                 if distance == self.mist_radius:
-                    self.register_effect(None, coords)
-            self.effect_weight = FIELD_ATTACKED
+                    y, x = coords
+                    self.terrain_matrix[x][y] = -1
 
     def prepare_matrix(self, knowledge: characters.ChampionKnowledge) -> None:
         self.champions = {champ: (tere[0], tere[1] + 1) for champ, tere in self.champions.items()}
@@ -128,7 +128,7 @@ class ArenaMapped(Arena):
             self.effect_weight = max(aged_value / 2, FIELD_WEIGHT)
             weapon.cut(self, position, character.facing.turn_left())
 
-        def check_if_hit(_, coords: coordinates.Coords) -> None:
+        def check_if_hit(_, coords: Coords) -> None:
             if coords in seen_champs:
                 self.can_hit = True
 
@@ -141,8 +141,8 @@ class ArenaMapped(Arena):
     def calc_mist_dist(self):
         return self.mist_radius - points_dist(self.position, self.menhir_position)
 
-    def find_move_to(self, end_position: coordinates.Coords) -> Tuple[characters.Action, int]:
-        action = characters.Action.DO_NOTHING
+    def find_move_to(self, end_position: Coords) -> Tuple[Action, int]:
+        action = Action.DO_NOTHING
         length = 0
         if end_position == self.position:
             return action, length
@@ -155,16 +155,16 @@ class ArenaMapped(Arena):
             return action, -1
         else:
             if self.get_next_field() == path[1]:
-                action = characters.Action.STEP_FORWARD
+                action = Action.STEP_FORWARD
                 length += 1
             elif self.get_right_field() == path[1]:
-                action = characters.Action.TURN_RIGHT
+                action = Action.TURN_RIGHT
                 length += 2
             elif self.get_left_field() == path[1]:
-                action = characters.Action.TURN_LEFT
+                action = Action.TURN_LEFT
                 length += 2
             else:
-                action = characters.Action.TURN_LEFT
+                action = Action.TURN_LEFT
                 length += 3
             if len(path) > 2:
                 for idx, field in enumerate(path[2:]):
@@ -175,42 +175,42 @@ class ArenaMapped(Arena):
                         length += 1
             return action, length
 
-    def find_best_move(self, coords: List[coordinates.Coords]) -> Tuple[characters.Action, int]:
+    def find_best_move(self, coords: List[Coords]) -> Tuple[Action, int]:
         potencial_actions = [self.find_move_to(postion) for postion in
                              coords]
         filterd_actions = [(action, length) for action, length in potencial_actions if length != -1]
         if len(filterd_actions) == 0:
-            return characters.Action.DO_NOTHING, -1
+            return Action.DO_NOTHING, -1
         return min(filterd_actions, key=lambda x: x[1])
 
-    def find_move_to_menhir(self) -> Tuple[characters.Action, int]:
+    def find_move_to_menhir(self) -> Tuple[Action, int]:
         menhir_positions = [self.menhir_position + possible_postion.value for possible_postion in Facing]
         return self.find_best_move(menhir_positions)
 
-    def find_move_to_nearest_bow(self) -> Tuple[characters.Action, int]:
+    def find_move_to_nearest_bow(self) -> Tuple[Action, int]:
         bows_positions = [position for position, tileDescription in self.current_terrain.items() if
                           tileDescription.loot == BOW and position != self.position]
         return self.find_best_move(bows_positions)
 
-    def get_field_value(self, coords: coordinates.Coords):
+    def get_field_value(self, coords: Coords):
         y, x = coords
         return self.matrix[x][y]
 
-    def check_if_passable_safely(self, coords: coordinates.Coords) -> bool:
+    def check_if_passable_safely(self, coords: Coords) -> bool:
         value = self.get_field_value(coords)
         return value != FIELD_ATTACKED and value > 0
 
-    def find_escape_action(self) -> characters.Action:
+    def find_escape_action(self) -> Action:
         if self.check_if_passable_safely(self.get_left_field()):
-            return characters.Action.TURN_LEFT
+            return Action.TURN_LEFT
         elif self.check_if_passable_safely(self.get_right_field()):
-            return characters.Action.TURN_RIGHT
+            return Action.TURN_RIGHT
         elif self.check_if_passable_safely(self.get_next_field()):
-            return characters.Action.STEP_FORWARD
-        return characters.Action.DO_NOTHING
+            return Action.STEP_FORWARD
+        return Action.DO_NOTHING
 
-    def find_scan_action(self) -> characters.Action:
-        return characters.Action.TURN_LEFT
+    def find_scan_action(self) -> Action:
+        return Action.TURN_LEFT
 
 
 class ShallowMindController:
@@ -218,7 +218,7 @@ class ShallowMindController:
         self.first_name: str = first_name
         self.prev_champion: ChampionDescription = None
         self.arena: ArenaMapped = None
-        self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
+        self.action_queue: SimpleQueue[Action] = SimpleQueue()
         self.bow_taken = False
 
     def __eq__(self, other: object) -> bool:
@@ -235,27 +235,28 @@ class ShallowMindController:
         self.arena.menhir_position = arena_description.menhir_position
         self.bow_taken = False
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
         self.prev_champion = self.arena.champion
         self.arena.prepare_matrix(knowledge)
         if not self.action_queue.empty():
             return self.action_queue.get()
         champ = self.arena.champion
         if self.arena.can_hit:
-            return characters.Action.ATTACK
-        if champ.weapon != BOW:
-            action, _ = self.arena.find_move_to_nearest_bow()
-            if action != characters.Action.DO_NOTHING:
-                return action
+            return Action.ATTACK
+        if self.arena.calc_mist_dist() > 5:
+            if champ.weapon != BOW:
+                action, _ = self.arena.find_move_to_nearest_bow()
+                if action != Action.DO_NOTHING:
+                    return action
         # todo this need to be redone
         if self.prev_champion:
             if champ.health != self.prev_champion.health:
                 action = self.arena.find_escape_action()
-                if action != characters.Action.DO_NOTHING:
-                    self.action_queue.put(characters.Action.STEP_FORWARD)
+                if action != Action.DO_NOTHING:
+                    self.action_queue.put(Action.STEP_FORWARD)
                     return action
         action, length = self.arena.find_move_to_menhir()
-        if action == characters.Action.DO_NOTHING:
+        if action == Action.DO_NOTHING:
             return self.arena.find_scan_action()
         return action
 
