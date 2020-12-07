@@ -1,6 +1,19 @@
 import math
 
 from gupb.model import coordinates
+from gupb.model.arenas import Arena
+from gupb.model.characters import Facing
+
+facing_to_i = {
+    Facing.UP: 0,
+    Facing.RIGHT: 1,
+    Facing.DOWN: 2,
+    Facing.LEFT: 3
+}
+
+def passable(arena: Arena, coord: coordinates.Coords):
+    return coord in arena.terrain and arena.terrain[coord].terrain_passable()
+
 
 
 def get_tile_type(tiles, coord):

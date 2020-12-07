@@ -1,5 +1,8 @@
 from gupb.controller.bb_bot.commands import IdentifyFacingCommand
 from gupb.controller.bb_bot.helpers import should_attack
+from gupb.controller.bb_bot.learning_controller import LearningController
+from gupb.controller.bb_bot.model import Model
+
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -22,6 +25,7 @@ class BBBotController:
         self.facing = characters.Facing.UP  # temporary facing
         self.currentCommand = IdentifyFacingCommand(self)
         self.iteration = 0
+        self.learning = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BBBotController):
@@ -34,11 +38,23 @@ class BBBotController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.__init__(self.first_name)
         self.menhirPos = arena_description.menhir_position
-
-        pass
+        self.arena = arenas.Arena.load(arena_description.name)
+        # W, H = self.arena.size
+        # self.learning_model = Model.new_model('sarsa', W, H)
+        self.learning_model = Model.from_config('sarsa')
+        self.learning_controller = LearningController(self.learning_model, self)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.iteration += 1
+
+        if self.learning:
+            if self.iteration > 1:
+                state, action = self.learning_controller.episode(1, knowledge)
+            else:
+                state, action = self.learning_controller.initial_ep(knowledge)
+
+            return POSSIBLE_ACTIONS[action]
+
         self.currentPos = knowledge.position
         self.scanedArena.update(knowledge.visible_tiles)
         if should_attack(knowledge):
@@ -49,6 +65,11 @@ class BBBotController:
         elif (action == characters.Action.TURN_RIGHT):
             self.facing = self.facing.turn_right()
         return action
+
+    def die(self):
+        self.learning_model.config["rewards"].append(self.learning_controller.rewards)
+        self.learning_model.config["epoch"] += 1
+        self.learning_model.snapshot()
 
     @property
     def name(self) -> str:
