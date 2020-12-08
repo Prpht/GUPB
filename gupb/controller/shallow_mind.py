@@ -47,6 +47,7 @@ class ArenaMapped(Arena):
         self.menhir_position = arena_description.menhir_position
         self.terrain[arena_description.menhir_position] = Menhir()
         self.tiles_memory: Dict[Coords, TileDescription] = {}
+        self.tiles_age: Dict[Coords, int] = {}
         self.current_terrain: Dict[Coords, TileDescription] = {k: v.description() for k, v in
                                                                arena.terrain.items()}
         self.champions: Dict[
@@ -87,6 +88,8 @@ class ArenaMapped(Arena):
                     self.terrain_matrix[x][y] = -1
 
     def prepare_matrix(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.tiles_age = {**{k: v + 1 for k, v in self.tiles_age.items()},
+                          **{k: 0 for k in knowledge.visible_tiles.keys()}}
         self.champions = {champ: (tere[0], tere[1] + 1) for champ, tere in self.champions.items()}
         self.tiles_memory = {**self.tiles_memory, **knowledge.visible_tiles}
         self.champion = knowledge.visible_tiles.get(knowledge.position).character
@@ -247,6 +250,23 @@ class ArenaMapped(Arena):
                 self.terrain[coord].terrain_transparent() and not self.is_field_safe(coords, coord - coords)]
 
     def find_scan_action(self) -> Action:
+        suraunding = self.check_position_surrounding(self.position)
+        direct_surdoding = [cord.value + self.position for cord in Facing]
+        suraunding = [(self.tiles_age[cords], cords) for cords in suraunding if cords in direct_surdoding]
+        suraunding.sort(reverse=True)
+        suraunding = [x[1] for x in suraunding]
+        if len(suraunding) == 1:
+            if self.position + self.champion.facing.value not in suraunding:
+                return Action.TURN_LEFT
+            return Action.DO_NOTHING
+        if self.get_right_field() == suraunding[0]:
+            return Action.TURN_RIGHT
+        if self.get_left_field() == suraunding[0]:
+            return Action.TURN_LEFT
+        if self.get_right_field() == suraunding[1]:
+            return Action.TURN_RIGHT
+        if self.get_left_field() == suraunding[1]:
+            return Action.TURN_LEFT
         return Action.TURN_LEFT
 
 
