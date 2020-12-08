@@ -1,5 +1,5 @@
-from gupb.controller.botelka_ml.controller import BotElkaController
 from gupb.controller import bb_bot
+from gupb.controller import botelka_ml
 from gupb.controller import claret_wolf
 from gupb.controller import ihavenoideawhatimdoing
 from gupb.controller import shallow_mind
@@ -14,17 +14,16 @@ CONFIGURATION = {
         'fisher_island',
     ],
     'controllers': [
-        bb_bot.BBBotController("Bartek"),
-        BotElkaController("Z nami na pewno zdasz"),
+        botelka_ml.BotElkaController("Z nami na pewno zdasz"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
         shallow_mind.ShallowMindController('test'),
         tup_tup.TupTupController('Bot'),
     ],
-    'start_balancing': True,
-    'visualise': True,
+    'start_balancing': False,
+    'visualise': False,
     'show_sight': None,
-    'runs_no': 1,
+    'runs_no': 280,
     'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }

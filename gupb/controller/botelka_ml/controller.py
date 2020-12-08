@@ -1,26 +1,27 @@
-from gupb.controller.botelka_ml.model import get_model
-from gupb.controller.botelka_ml.rewards import calculate_reward
-from gupb.controller.botelka_ml.wisdom import State, get_state
-from gupb.model.arenas import ArenaDescription, Arena
-from gupb.model.characters import Action, ChampionKnowledge, Tabard
 from pathfinding.core.grid import Grid
-from pathfinding.finder.dijkstra import DijkstraFinder
-from gupb.model.characters import ChampionKnowledge, Facing, Action
-from gupb.model.coordinates import Coords, add_coords, sub_coords
-from typing import Optional, Tuple, List
+
+from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon, flee
+from gupb.controller.botelka_ml.utils import debug_print
+from gupb.controller.botelka_ml.state import State, get_state
+from gupb.model.arenas import ArenaDescription, Arena
+from gupb.model.characters import Tabard, ChampionKnowledge, Action, Facing
+from gupb.model.coordinates import Coords
+from gupb.model.tiles import Tile
+from gupb.model.weapons import Knife
 
 LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
 MAP_TILES_COST = {
-    'sea': 0,  # Sea - obstacle
-    'wall': 0,  # Wall  - obstacle
-    'bow': 1,  # Bow
-    'sword': 4,  # Sword
-    'axe': 4,  # Axe
-    'amulet': 4,  # Amulet
-    'land': 3,  # Land
-    'knife': 10000,  # Knife - start weapon, we usually want to avoid it
+    "sea": 0,  # Sea - obstacle
+    "wall": 0,  # Wall  - obstacle
+    "menhir": 0,  # Obstacle
+    "bow": 1,  # Bow
+    "sword": 4,  # Sword
+    "axe": 4,  # Axe
+    "amulet": 4,  # Amulet
+    "land": 3,  # Land
+    "knife": 10000,  # Knife - start weapon, we usually want to avoid it
 }
 
 
@@ -32,15 +33,17 @@ class BotElkaController:
         self.arena = None
 
         self.old_action_no = 0
-        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
+        self.old_state = None
 
-        self.model = get_model()
+        # self.model = get_model()
 
         self.tick = 0
         self.moves_queue = []
+        self.weapons_info = {}
 
-        self.finder = DijkstraFinder()
         self.grid = None
+
+        self.menhir_reached = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BotElkaController):
@@ -59,93 +62,115 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
-        self.model.save()
+        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
+        # self.model.save()
+        pass
 
     def win(self):
-        self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
-        self.model.save()
+        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
+        # self.model.save()
+        pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
-        self.tick = 0
-
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = arena_description.menhir_position
 
-        self.old_action_no = 0
-        self.old_state = State(0, 0, 0, 5, 0, False, 0, 3, 100, 100, 100, 0)
+        self.prepare_grid()
 
-        matrix = [[0] * self.arena.size[0]] * self.arena.size[1]
-        for coords, tile in self.arena.terrain.items():
-            x, y = coords
-            matrix[x][y] = MAP_TILES_COST.get(tile.description().type, 0)
+        self.tick = 0
+        self.old_state = State(self.arena, Coords(0, 0), 5, [], False, Facing.UP, Knife(), 1000,
+                               self.arena.menhir_position, 0, {}, False)
+
+        self.weapons_info = {
+            Coords(*coords): tile.loot.description()
+            for coords, tile in self.arena.terrain.items() if tile.loot
+        }
+
+        self.menhir_reached = False
+
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
+        old_state, new_state = self.old_state, get_state(knowledge, self.arena, self.tick, self.weapons_info)
+        self.weapons_info = new_state.weapons_info
+
+        self.old_state = new_state
+
+        if kill_them_all(self.grid, new_state) == Action.ATTACK:
+            debug_print("DIE!!!")
+            return Action.ATTACK
+
+        if old_state.health > new_state.health:
+            debug_print("Ouch! Running away")
+            return flee(self.grid, new_state)
+
+        if new_state.weapon.description().name == "knife":
+            new_weapon = find_better_weapon(self.grid, new_state)
+
+            if new_weapon == Action.DO_NOTHING:
+                debug_print("Could not find a better weapon, going to the menhir")
+                return go_to_menhir(self.grid, new_state)
+
+            debug_print("Going for a better weapon")
+            return new_weapon
+
+        if not self.menhir_reached:
+            go_to_menhir_action = go_to_menhir(self.grid, new_state)
+            if go_to_menhir_action == Action.DO_NOTHING:
+                debug_print("Menhir reached")
+                self.menhir_reached = True
+            else:
+                debug_print("Going to menhir")
+                return go_to_menhir_action
+
+        if self.menhir_reached:
+            kill = kill_them_all(self.grid, new_state)
+
+            # Nobody to kill, like look around
+            if kill == Action.DO_NOTHING:
+                if new_state.mist_visible:
+                    go_to_menhir_action = go_to_menhir(self.grid, new_state)
+
+                    if go_to_menhir_action == Action.DO_NOTHING:
+                        debug_print("I see mist! But I am already near menhir")
+                        return Action.TURN_RIGHT
+                    else:
+                        debug_print("I see mist! Running away")
+                        return go_to_menhir_action
+
+                debug_print("Nobody to kill, no mist, looking around")
+                return Action.TURN_RIGHT
+
+            debug_print("On a mission to kill")
+            return kill
+
+        return Action.STEP_FORWARD
+
+    def prepare_grid(self):
+        matrix = [
+            [
+                get_tile_cost(self.arena.terrain[Coords(x, y)])
+                for x in range(self.arena.size[0])
+            ]
+            for y in range(self.arena.size[1])
+        ]
+        matrix[self.arena.menhir_position.y][self.arena.menhir_position.x] = 0
+
         self.grid = Grid(matrix=matrix)
 
 
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self.tick += 1
+def get_tile_cost(tile: Tile) -> int:
+    description = tile.description()
 
-        if self.tick == 1:
-            self.moves_queue = self.find_path(self.arena.menhir_position, knowledge)
+    # Sea od Land
+    tile_type = description.type
 
-        if self.moves_queue:
-            return self.moves_queue.pop()
+    if not tile.passable:
+        tile_type = "wall"
 
-        new_state = get_state(knowledge, self.arena, self.tick)
+    # Weapons
+    if description.loot:
+        tile_type = description.loot.name
 
-        reward = calculate_reward(self.old_state, new_state, self.old_action_no)
-
-        # print(reward)
-
-        self.model.update(self.old_state.as_tuple(), new_state.as_tuple(), self.old_action_no, reward)
-
-        new_actions, action_no = self.model.get_next_action(new_state.as_tuple())
-        self.moves_queue.extend(new_actions)
-
-        self.old_action_no = action_no
-        self.old_state = new_state
-
-        return self.moves_queue.pop()
-
-
-    def find_path(self, coords: Coords, knowledge: ChampionKnowledge) -> List[Action]:
-        steps = []
-        self.grid.cleanup()
-
-        start = self.grid.node(knowledge.position.x, knowledge.position.y)
-        end = self.grid.node(coords.x, coords.y)
-        # print(knowledge.position.x, knowledge.position.y, coords.x, coords.y)
-        path, _ = self.finder.find_path(start, end, self.grid)
-
-        facing = knowledge.visible_tiles[(knowledge.position.x, knowledge.position.y)].character.facing
-
-        for x in range(len(path) - 1):
-            actions, facing = self.move_one_tile(facing, path[x], path[x + 1])
-            steps += actions
-
-        return steps
-
-    def move_one_tile(self, starting_facing: Facing, coord_0: Coords, coord_1: Coords) -> Tuple[List[Action], Facing]:
-        exit_facing = Facing(sub_coords(coord_1, coord_0))
-
-        # Determine what is better, turning left or turning right.
-        # Builds 2 lists and compares length.
-        facing_turning_left = starting_facing
-        left_actions = []
-        while facing_turning_left != exit_facing:
-            facing_turning_left = facing_turning_left.turn_left()
-            left_actions += [Action.TURN_LEFT]
-
-        facing_turning_right = starting_facing
-        right_actions = []
-        while facing_turning_right != exit_facing:
-            facing_turning_right = facing_turning_right.turn_right()
-            right_actions += [Action.TURN_RIGHT]
-
-        actions = right_actions if len(left_actions) > len(right_actions) else left_actions
-        actions += [Action.STEP_FORWARD]
-
-        return actions, exit_facing
+    return MAP_TILES_COST[tile_type]
 
 
 POTENTIAL_CONTROLLERS = [
