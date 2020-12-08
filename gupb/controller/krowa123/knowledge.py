@@ -12,7 +12,7 @@ from gupb.model.characters import ChampionKnowledge, Facing, ChampionDescription
 from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
 from gupb.model.tiles import Menhir
-from gupb.model.weapons import Weapon, WeaponDescription
+from gupb.model.weapons import Weapon
 from . import utils
 from .model import SeenTile
 from .pathfinding import astar_search, determine_path_bot
@@ -65,41 +65,11 @@ SNEAKY_POINTS = {
     ]
 }
 
-
-def rank_points(
-    points: List[Coords],
-    position: Coords,
-    distances: FloydDistances,
-    closer_better: bool = True
-) -> List[Coords]:
-    points_distances = [
-        (distances[x][position], x) for x in points
-    ]
-    if closer_better:
-        points_distances = sorted(points_distances, key=lambda e: e[0])
-    else:
-        points_distances = reversed(sorted(points_distances, key=lambda e: e[0]))
-    return [e[1] for e in points_distances]
-
-
-def determine_priority_points(
-    points: List[Coords],
-    menhir_position: Coords,
-    distances: FloydDistances
-) -> List[Dict]:
-    first_points = rank_points(
-        points,
-        menhir_position,
-        distances=distances,
-        closer_better=False
-    )
-    return [first_points[0]] + first_points[-6:-4] + [first_points[-2]]
-
-
 class Knowledge:
     terrain: Dict[Coords, SeenTile]
     menhir_position: Coords
     position: Coords
+    prev_health: int
     health: int
     weapon_type: Type[Weapon]
     facing: Facing
@@ -111,6 +81,7 @@ class Knowledge:
         self.terrain[self.menhir_position] = SeenTile(Menhir().description())
         self.mist_radius = arena.mist_radius
         self.time = 0
+        self.health = None
         self.floyd_results = load_floyd_results(arena_name=arena_description.name)
         self.sneaky_points = SNEAKY_POINTS.get(arena_description.name)
 
@@ -133,6 +104,7 @@ class Knowledge:
     def update(self, champion_knowledge: ChampionKnowledge):
         self.time += 1
         self.position = champion_knowledge.position
+        self.prev_health = self.health
         _, self.health, weapon, self.facing = champion_knowledge.visible_tiles[self.position].character
         self.weapon_type = utils.weapons_dict[weapon.name]
         if self.time % MIST_TTH == 0:
@@ -192,18 +164,13 @@ class Knowledge:
 
         return weapon_dist
 
-    def find_sneaky_path(self) -> Optional[List[Coords]]:
-        if self.floyd_results is None or self.sneaky_points is None:
-            return None
-        try:
-            priority_points = determine_priority_points(
-                points=self.sneaky_points,
-                menhir_position=self.menhir_position,
-                distances=self.floyd_results[0]
-            )
-            return self._build_sneaky_path(priority_points=priority_points)
-        except Exception:
-            return None
+    def menhir_distance(self) -> int:
+        dist = math.inf
+        if self.floyd_results:
+            distances = self.floyd_results[0]
+            dist = distances[self.position][self.menhir_position]
+
+        return dist
 
     def champions_to_attack(self) -> List[Coords, ChampionDescription]:
         return utils.get_champion_positions(
@@ -219,17 +186,3 @@ class Knowledge:
                 if distance == self.mist_radius:
                     self.terrain[coords].tile.effects.append(effects.Mist().description())
 
-    def _build_sneaky_path(self, priority_points: List[Coords]) -> List[Coords]:
-        result = [self.position]
-        for i, point in enumerate(priority_points):
-            pos = result[-1]
-            while pos != point:
-                pos = self.floyd_results[1][pos][point]
-                result.append(pos)
-            if len(priority_points) - (i + 1) < 2:
-                idle = 20
-            else:
-                idle = 0
-            for _ in range(idle):
-                result.append(pos)
-        return result
