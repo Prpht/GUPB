@@ -1,9 +1,10 @@
 import traceback
 
 import numpy as np
-from rl.agents import SARSAAgent
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Flatten, Dense, Input, Conv2D
+from rl.agents import DQNAgent
+from rl.memory import SequentialMemory
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Flatten, Dense, Input, Conv2D, MaxPool2D, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
 
 from gupb.controller import Controller
@@ -36,17 +37,6 @@ class AiController(Controller):
         self.menhir_position = arena_description.menhir_position
 
 
-def create_model(input_shape, action_n):
-    inputs = Input((1, ) + input_shape)
-    layer = Conv2D(32, (5, 5), activation='relu')(inputs)
-    layer = Conv2D(64, (3, 3), activation='relu')(layer)
-    layer = Flatten()(layer)
-    layer = Dense(256, activation='relu')(layer)
-    layer = Dense(256, activation='relu')(layer)
-    outputs = Dense(action_n, activation='softmax')(layer)
-    return Model(inputs=inputs, outputs=outputs)
-
-
 class Ai2Controller(Controller):
     def __init__(self, uname):
         self.uname = uname
@@ -55,15 +45,16 @@ class Ai2Controller(Controller):
 
         action_n = len(list(Action)) - 1
 
-        model = create_model((10, 10, 10), action_n)
+        model = create_model((10, 10, 7), action_n)
 
-        sarsa = SARSAAgent(model=model, nb_actions=action_n, nb_steps_warmup=10)
-        sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
-        sarsa.observations = []
-        sarsa.actions = []
-        sarsa.load_weights("sarsa_weights.h5f")
+        memory = SequentialMemory(limit=50000, window_length=10)
+        agent = DQNAgent(model=model, memory=memory, nb_actions=action_n, nb_steps_warmup=10)
+        agent.compile(Adam(lr=1e-3), metrics=['mae'])
+        agent.observations = []
+        agent.actions = []
+        # agent.load_weights("sarsa_weights.h5f")
 
-        self.sarsa = sarsa
+        self.agent = agent
 
 
     @property
@@ -125,8 +116,7 @@ class Ai2Controller(Controller):
     def decide(self, knowledge: ChampionKnowledge):
         try:
             state = self._get_state(knowledge)
-            xd = self.sarsa.forward(state)
-            print(xd)
+            xd = self.agent.forward(state)
             action = list(Action)[xd]
             print(action)
             return action
@@ -139,3 +129,19 @@ class Ai2Controller(Controller):
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = self.menhir_position
         self.arena.terrain[self.menhir_position] = tiles.Menhir()
+
+
+def create_model(input_shape, action_n):
+    model = Sequential()
+    model.add(Input(input_shape))
+    model.add(Conv2D(32, (3, 3), padding='same', activation='relu', data_format='channels_last'))
+    model.add(Conv2D(64, (3, 3), padding='same', activation='relu', data_format='channels_last'))
+    model.add(MaxPool2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(Conv2D(64, (3, 3), activation='relu', data_format='channels_last'))
+    model.add(Conv2D(128, (3, 3), activation='relu', data_format='channels_last'))
+    model.add(GlobalAveragePooling2D(data_format='channels_last'))
+    model.add(Dense(256, activation='relu'))
+    model.add(Dense(256, activation='relu'))
+    model.add(Dense(action_n, activation='linear'))
+
+    return model

@@ -28,7 +28,7 @@ class Env(gym.Env):
         self.game.cycle()
         self.champion = next(filter(lambda c: c.controller.name == self.controller.name, self.game.champions))
 
-        self.observation_space = spaces.Box(low=0, high=6, shape=(SIZE, SIZE, 10), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=6, shape=(SIZE, SIZE, 7), dtype=np.uint8)
 
     def getFacing(self, facing: Facing):
         return {
@@ -48,7 +48,7 @@ class Env(gym.Env):
         }[weapon]
 
     def _get_state(self, knowledge: ChampionKnowledge, menhir_position):
-        state = np.zeros((SIZE, SIZE, 10), dtype=np.uint8)
+        state = np.zeros((SIZE, SIZE, 7), dtype=np.uint8)
 
         for coord, tile in self.game.arena.terrain.items():
             x, y = coord
@@ -62,19 +62,19 @@ class Env(gym.Env):
 
                     character = knowledge.visible_tiles[coord].character
                     if character and character.controller_name != self.controller.name:
-                        state[x, y, 4] = self.getFacing(character.facing)
-                        state[x, y, 5] = character.health
-                        state[x, y, 6] = self.getWeapon(character.weapon.name)
+                        # state[x, y, 4] = self.getFacing(character.facing)
+                        state[x, y, 4] = character.health
+                        # state[x, y, 6] = self.getWeapon(character.weapon.name)
 
-                    loot = knowledge.visible_tiles[coord].loot
-                    if loot:
-                        state[x, y, 7] = self.getWeapon(loot.name)
+                    # loot = knowledge.visible_tiles[coord].loot
+                    # if loot:
+                    #     state[x, y, 7] = self.getWeapon(loot.name)
 
         if knowledge:
             xx, yy = knowledge.position
-            state[xx, yy, 9] = 1
+            state[xx, yy, 6] = 1
         xx, yy = menhir_position
-        state[xx, yy, 8] = 1
+        state[xx, yy, 5] = 1
 
         return state
 
