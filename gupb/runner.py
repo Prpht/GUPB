@@ -9,6 +9,7 @@ from tqdm import trange
 
 from gupb import controller
 from gupb.controller import keyboard
+from gupb.model.profiling import PROFILE_RESULTS, print_stats
 from gupb.logger import core as logger_core
 from gupb.model import coordinates
 from gupb.model import games
@@ -29,6 +30,7 @@ class Runner:
         self.runs_no: int = config['runs_no']
         self.start_balancing: bool = config['start_balancing']
         self.scores: dict[str, int] = collections.defaultdict(int)
+        self.profiling_metrics = config['profiling_metrics'] if 'profiling_metrics' in config else None
         self._last_arena: Optional[str] = None
         self._last_menhir_position: Optional[coordinates.Coords] = None
         self._last_initial_positions: Optional[list[coordinates.Coords]] = None
@@ -71,6 +73,10 @@ class Runner:
             scores_to_log.append(ControllerScoreReport(name, score))
             print(score_line)
         FinalScoresReport(scores_to_log).log(logging.INFO)
+
+        if self.profiling_metrics:
+            for func in PROFILE_RESULTS.keys():
+                print_stats(func, **{m: True for m in self.profiling_metrics})
 
     @staticmethod
     def run_in_memory(game: games.Game) -> None:

@@ -26,4 +26,5 @@ CONFIGURATION = {
     'visualise': True,
     'show_sight': None,
     'runs_no': 1,
+    'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }
