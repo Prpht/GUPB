@@ -19,7 +19,7 @@ Należy zwrócić uwagę na to, że w przypadku wystąpienia tych samych nazw cz
 
 
 ### Konfiguracja wypisywanych metryk
-Brak wartości w konfiguracji lub pust lista zpowoduje niewypisanie metryk na koniec gry.
+Brak wartości w konfiguracji lub pusta lista spowoduje niewypisanie metryk na koniec gry.
 Możemy podać które metryki chcemy wypisać na koniec, np. pomijając osobne czasy każdego wykonania.
 ```python
 CONFIGURATION = {
