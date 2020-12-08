@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-from gupb.controller.botelka_ml.wisdom import State
+from gupb.controller.botelka_ml.state import State
 from gupb.model.characters import Action
 import tensorflow.compat.v1 as tf
 
@@ -32,7 +32,7 @@ class DeepLearning:
         self.input_count = State.get_length()
 
         # 6 actions possible (6 neurons)
-        self.output_count = 6
+        self.output_count = 3
 
         # Will ne initialized in define_model
         self.model_input = None
@@ -104,11 +104,11 @@ class DeepLearning:
         # argmax picks the higher Q-value and returns the index (FORWARD=0, BACKWARD=1)
         # print(state, ' >>>>>> ', self.get_q(state), ' >>>>>> ', np.argmax(self.get_q(state)))
         action_no = np.argmax(self.get_q(state))
-        return MAPPING[action_no], action_no
+        return action_no
 
     def random_action(self):
-        random_action_no = random.choice(range(len(MAPPING)))
-        return MAPPING[random_action_no], random_action_no
+        random_action_no = random.choice([0, 1, 2])
+        return random_action_no
 
     def train(self, old_state, action_no, reward, new_state):
         # Ask the model for the Q values of the old state (inference)
