@@ -1,8 +1,11 @@
 from pathfinding.core.grid import Grid
 
-from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon, flee
-from gupb.controller.botelka_ml.utils import debug_print
+from gupb.controller.botelka_ml.actions import (
+    go_to_menhir, kill_them_all, find_better_weapon, flee,
+    update_grid_on_incoming_mist, update_grid_tiles_costs,
+)
 from gupb.controller.botelka_ml.state import State, get_state
+from gupb.controller.botelka_ml.utils import debug_print
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Tabard, ChampionKnowledge, Action, Facing
 from gupb.model.coordinates import Coords
@@ -13,15 +16,15 @@ LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
 MAP_TILES_COST = {
-    "sea": 0,  # Sea - obstacle
-    "wall": 0,  # Wall  - obstacle
+    "sea": 0,  # Obstacle
+    "wall": 0,  # Obstacle
     "menhir": 0,  # Obstacle
-    "bow": 1,  # Bow
-    "sword": 4,  # Sword
-    "axe": 4,  # Axe
-    "amulet": 4,  # Amulet
-    "land": 3,  # Land
-    "knife": 10000,  # Knife - start weapon, we usually want to avoid it
+    "bow": 1,
+    "amulet": 1,
+    "sword": 4,
+    "axe": 4,
+    "land": 3,
+    "knife": 10000,
 }
 
 
@@ -89,10 +92,15 @@ class BotElkaController:
         self.menhir_reached = False
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        self.tick += 1
+
         old_state, new_state = self.old_state, get_state(knowledge, self.arena, self.tick, self.weapons_info)
         self.weapons_info = new_state.weapons_info
 
         self.old_state = new_state
+
+        self.grid = update_grid_tiles_costs(knowledge, self.grid)
+        self.grid = update_grid_on_incoming_mist(self.arena, self.grid, self.tick)
 
         if kill_them_all(self.grid, new_state) == Action.ATTACK:
             debug_print("DIE!!!")
