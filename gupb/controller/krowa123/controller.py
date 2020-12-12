@@ -10,10 +10,6 @@ from gupb.model.coordinates import Coords
 from gupb.model.weapons import Bow, Weapon, Sword, Axe, Amulet, Knife
 from . import utils
 from .knowledge import Knowledge
-import traceback
-from timeit import default_timer as timer
-import time
-
 
 __all__ = ["Krowa1233Controller"]
 
@@ -74,13 +70,6 @@ class Krowa1233Controller(Controller):
         self.last_weapon: Optional[Type[Weapon]] = Knife
         self.goals = collections.defaultdict(lambda: [GoalState.NOT_STARTED, None])
 
-    def path_to_weapon(self, weapon_name: str):
-        return sorted([self.knowledge.find_path(self.knowledge.position, axe, False)
-                       for axe in self.knowledge.loot([weapon_name])], key=lambda p: len(p))[0]
-
-    def path_to_menhir(self):
-        return self.knowledge.find_path(self.knowledge.position, self.knowledge.menhir_position)
-
     def find_dijkstra_to_menhir(
         self,
         weapons_to_take: List[Type[Weapon]],
@@ -136,7 +125,7 @@ class Krowa1233Controller(Controller):
 
         for sneaky_point in sneaky_points:
             if not self.knowledge.check_loot(sneaky_point[0]) or self.knowledge.check_loot(sneaky_point[0], self.knowledge.weapon_type):
-                if sneaky_point[1][0] == self.knowledge.position:
+                if sneaky_point[0] == self.knowledge.position:
                     return
                 else:
                     path = self.find_dijkstra([], sneaky_point[0])
@@ -147,12 +136,29 @@ class Krowa1233Controller(Controller):
 
         self.goals[Goals.SAFE_SPOT] = [GoalState.IMPOSSIBLE]
 
+    def _go_towards_menhir(self):
+        if self.knowledge.mist_radius > 10:
+            if self.knowledge.menhir_distance() + 5 > self.knowledge.mist_radius:
+                path = self.find_dijkstra_to_menhir(
+                    weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
+                )
+                self._plan_actions(path)
+        else:
+            dist = max(1, min(4, int(self.knowledge.mist_radius - 2)))
+            if self.knowledge.menhir_distance() > dist:
+                path = self.find_dijkstra_to_menhir(
+                    weapons_to_take=[], dist=dist
+                )
+                self._plan_actions(path)
+
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        action = None
         self.knowledge.update(knowledge)
         if self.goals[Goals.WEAPON][0] == GoalState.FINISHED:
             if self.goals[Goals.WEAPON][2] != self.knowledge.weapon_type and self.knowledge.weapon_type != self.last_weapon:
-                path = [self.last_position, self.knowledge.position]
-                self.action_queue.extendleft(utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path))
+                if self.knowledge.mist_radius >= 10:
+                    path = [self.last_position, self.knowledge.position]
+                    self.action_queue.extendleft(utils.path_to_actions(self.knowledge.position, self.knowledge.facing, path))
         if self.goals[Goals.WEAPON][0] == GoalState.IN_PROGRESS:
             if self.goals[Goals.WEAPON][1] == self.knowledge.position:
                 self.goals[Goals.WEAPON][0] = GoalState.end(self.goals[Goals.WEAPON][2] == self.knowledge.weapon_type)
@@ -169,33 +175,26 @@ class Krowa1233Controller(Controller):
             elif self.goals[Goals.SAFE_SPOT][0] != GoalState.IMPOSSIBLE:
                 self.go_to_sneaky_point()
             if self.goals[Goals.SAFE_SPOT][0] == GoalState.IMPOSSIBLE:
-                if self.knowledge.mist_radius > 10:
-                    path = self.find_dijkstra_to_menhir(
-                        weapons_to_take=[], dist=max(1, int(self.knowledge.mist_radius / 2))
-                    )
-                    self._plan_actions(path)
-                else:
-                    path = self.find_dijkstra_to_menhir(
-                        weapons_to_take=[], dist=max(1, min(4, int(self.knowledge.mist_radius - 1)))
-                    )
-                    self._plan_actions(path)
+                self._go_towards_menhir()
         if self._check_if_hit(knowledge.visible_tiles):
             action = Action.ATTACK
-        elif self._check_if_under_attack():
-            action = Action.DO_NOTHING
-        elif len(self.action_queue) > 0:
-            self.goals[Goals.CAMP] = [GoalState.FINISHED, None]
-            action = self.action_queue.popleft()
-        else:
-            last_turn = self.goals[Goals.CAMP][1]
-            turn_left = self.knowledge.tile_on_left().terrain_transparent()
-            turn_right = self.knowledge.tile_on_right().terrain_transparent()
+        elif len(self.action_queue) == 0 and self._check_if_under_attack():
+            self._go_towards_menhir()
 
-            if last_turn == Action.TURN_LEFT:
-                action = Action.TURN_LEFT if turn_left else Action.TURN_RIGHT
+        if not action:
+            if len(self.action_queue) > 0:
+                self.goals[Goals.CAMP] = [GoalState.FINISHED, None]
+                action = self.action_queue.popleft()
             else:
-                action = Action.TURN_RIGHT if turn_right else Action.TURN_LEFT
-            self.goals[Goals.CAMP] = [GoalState.IN_PROGRESS, action]
+                last_turn = self.goals[Goals.CAMP][1]
+                turn_left = self.knowledge.tile_on_left().terrain_transparent()
+                turn_right = self.knowledge.tile_on_right().terrain_transparent()
+
+                if last_turn == Action.TURN_LEFT:
+                    action = Action.TURN_LEFT if turn_left else Action.TURN_RIGHT
+                else:
+                    action = Action.TURN_RIGHT if turn_right else Action.TURN_LEFT
+                self.goals[Goals.CAMP] = [GoalState.IN_PROGRESS, action]
 
         self.last_action = action
         self.last_position = knowledge.position
@@ -220,7 +219,7 @@ class Krowa1233Controller(Controller):
         return len(self.knowledge.champions_to_attack()) > 0
 
     def _check_if_under_attack(self) -> bool:
-        return False
+        return self.knowledge.prev_health and self.knowledge.prev_health > self.knowledge.health
 
     @property
     def name(self) -> str:

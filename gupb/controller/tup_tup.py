@@ -9,9 +9,10 @@ from gupb.model import arenas, coordinates, weapons, tiles, characters, games
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
+IS_LEARNING = False
 ALPHA = 0.2
-EPSILON = 0.4
-GAMMA = 1
+EPSILON = 0.2
+GAMMA = 0.99
 
 DEFAULT_VAL = 0
 MENHIR_NEIGHBOURHOOD_DISTANCE = 5
@@ -52,13 +53,9 @@ class TupTupController:
         self.episode: int = 0
         self.max_num_of_episodes: int = 0
 
-        self.arenas_knowledge: Dict = {}
         self.arena_name: Optional[str] = None
         self.arena_data: Optional[Dict] = None
-        self.arenas_knowledge: Dict = {arena: {'Q': {perm: 0.0 for perm in product(States, Actions)},
-                                               'state': None, 'action': None, 'reward': None, 'reward_sum': 0,
-                                               'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
-                                               'discount_factor': GAMMA} for arena in ARENA_NAMES}
+        self.arenas_knowledge: Dict = self.__init_model()
         self.game_no: int = 0
         self.action: Optional[Actions] = None
         self.state: Optional[States] = None
@@ -120,7 +117,8 @@ class TupTupController:
                 state = self.arena_data['state']
                 new_action = self.__pick_action(state)
                 new_state = self.__discretize()
-                self.__learn(action, state, reward, new_action, new_state)
+                if IS_LEARNING:
+                    self.__learn(action, state, reward, new_action, new_state)
                 self.action = new_action
                 self.state = new_state
 
@@ -188,12 +186,18 @@ class TupTupController:
             start_y = self.map_size[1] - 1 if quarter[1] == 1.0 else 0
 
         corner = {(start_x, start_y)}
-        while not self.hiding_spot:
+        directions = [(1 if start_x == 0 else -1, 0), (0, 1 if start_y == 0 else -1)]
+        hiding_spots = set()
+        while not hiding_spots:
             for t in corner:
                 if t in self.map and self.map[t].terrain_passable():
                     self.hiding_spot = coordinates.Coords(t[0], t[1])
-                    break
-            corner.update([(t[0] + d[0], t[1] + d[1]) for t in corner for d in [(0, 1), (0, -1), (1, 0), (-1, 0)]])
+                    hiding_spots.add(coordinates.Coords(t[0], t[1]))
+            corner = {(t[0] + d[0], t[1] + d[1]) for t in corner for d in directions}
+
+        for coords in hiding_spots:
+            if self.map[coords].loot:
+                self.hiding_spot = coords
         return True
 
     def __go_to_hiding_spot(self) -> None:
@@ -417,9 +421,113 @@ class TupTupController:
         if (state, action) not in self.arena_data['Q'].keys():
             self.arena_data['Q'][(state, action)] = 0.0
         self.arena_data['Q'][(state, action)] += self.arena_data['alpha'] * (
-                    reward + self.arena_data['discount_factor'] * future_value - old_value)
-        # if self.game_no % 50 == 0: # to show learning progress
+                reward + self.arena_data['discount_factor'] * future_value - old_value)
+        # if self.game_no % 50 == 0:  # to show learning progress
         #     print(self.arenas_knowledge)
+
+    def __init_model(self) -> Dict:
+        if IS_LEARNING:
+            return {arena: {'Q': {perm: 0.0 for perm in product(States, Actions)},
+                            'state': None, 'action': None, 'reward': None, 'reward_sum': 0,
+                            'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
+                            'discount_factor': GAMMA} for arena in ARENA_NAMES}
+        return {
+            'archipelago': {
+                'Q': {(States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.41722293470755467,
+                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): -0.13203678833408955,
+                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): -0.08831999955651262,
+                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): -0.22445743160210288,
+                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.30213287204181355,
+                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): -0.06471180579133734,
+                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.013699968695887976,
+                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.27454205126264564,
+                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): -0.0680767558055854},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
+            'dungeon': {
+                'Q': {
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 2.762341215804712,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.9885297598250103,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.5136528979018524,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 2.2161924115685436,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.8055337787321469,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 3.154740512809939,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.364658303810891,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 1.177279074044015,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.030103414287793062},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
+            'fisher_island': {
+                'Q': {
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 4.712318430294736,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.7940210476546332,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 4.073968803275123,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.046353184691718,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.9692486802376246,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 5.915206903146268,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.9378859644963913,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.4204436102924821,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': 0.00, 'epsilon': 0.0, 'discount_factor': 0.99},
+            'wasteland': {
+                'Q': {
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.9527749999619681,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.7071679712242508,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.6993205458204488,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.3727047315828796,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): -0.049001885046233234,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.7012664529898003,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): -0.021563391334369356,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.35440370987989184,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.37606813091068114},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
+            'island': {
+                'Q': {
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': ALPHA, 'epsilon': EPSILON, 'discount_factor': GAMMA},
+            'mini': {
+                'Q': {
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
+                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
+                'alpha': ALPHA, 'epsilon': EPSILON, 'discount_factor': GAMMA}
+        }
 
 
 class BFSException(Exception):
