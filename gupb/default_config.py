@@ -6,8 +6,6 @@ from gupb.controller import shallow_mind
 from gupb.controller import krowa123
 from gupb.controller import tup_tup
 
-b = botelka_ml.BotElkaController("Z nami na pewno zdasz")
-
 CONFIGURATION = {
     'arenas': [
         'archipelago',
@@ -16,7 +14,7 @@ CONFIGURATION = {
         'fisher_island',
     ],
     'controllers': [
-        b,
+        botelka_ml.BotElkaController("Z nami na pewno zdasz"),
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
@@ -24,7 +22,7 @@ CONFIGURATION = {
         tup_tup.TupTupController('Bot'),
     ],
     'start_balancing': False,
-    'visualise': True,
-    'show_sight': b,
-    'runs_no': 20,
+    'visualise': False,
+    'show_sight': None,
+    'runs_no': 280,
 }
