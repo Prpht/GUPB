@@ -5,11 +5,12 @@ from typing import Dict, Type, Optional, Tuple, List, Set
 from itertools import product
 
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
+from collections import Counter
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
-IS_LEARNING = False
+IS_LEARNING = True
 ALPHA = 0.2
 EPSILON = 0.2
 GAMMA = 0.99
@@ -17,11 +18,20 @@ GAMMA = 0.99
 DEFAULT_VAL = 0
 MENHIR_NEIGHBOURHOOD_DISTANCE = 5
 
+CLOSE_DISTANCE_THRESHOLD = 13
+MODERATE_DISTANCE_THRESHOLD = 19
 
-class States(Enum):
+
+class QuartersRelation(Enum):
     THE_SAME_QUARTER = 0
     OPPOSITE_QUARTERS = 1
     NEIGHBOR_QUARTERS = 2
+
+
+class MenhirToCentreDistance(Enum):
+    CLOSE = 0
+    MODERATE = 1
+    FAR = 2
 
 
 class Actions(Enum):
@@ -29,6 +39,9 @@ class Actions(Enum):
     HIDE_IN_THE_OPPOSITE_QUARTER = 1
     HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL = 2
     HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL = 3
+
+
+states_counter = Counter(product(product(QuartersRelation, MenhirToCentreDistance), Actions)) # todo for debiggung purposes
 
 
 # noinspection PyUnusedLocal
@@ -58,7 +71,7 @@ class TupTupController:
         self.arenas_knowledge: Dict = self.__init_model()
         self.game_no: int = 0
         self.action: Optional[Actions] = None
-        self.state: Optional[States] = None
+        self.state: Optional[QuartersRelation, MenhirToCentreDistance] = None
         self.initial_position: coordinates.Coords = None
 
     def __eq__(self, other: object) -> bool:
@@ -111,10 +124,13 @@ class TupTupController:
                 first_action = random.choice(list(Actions))
                 self.action = first_action
                 self.state = self.__discretize()
-            elif self.arena_data['attempt_no'] > 1 and self.episode == 1:  # learn when a new game begins but after the first game
+            elif self.arena_data[
+                'attempt_no'] > 1 and self.episode == 1:  # learn when a new game begins but after the first game
                 reward = self.arena_data['reward']
+                self.arena_data['reward_history'].append(reward)  # todo for debugging purposes
                 action = self.arena_data['action']
                 state = self.arena_data['state']
+                states_counter[state] += 1
                 new_action = self.__pick_action(state)
                 new_state = self.__discretize()
                 if IS_LEARNING:
@@ -360,15 +376,32 @@ class TupTupController:
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.YELLOW
 
-    def __discretize(self):
+    def __discretize(self) -> Tuple[QuartersRelation, MenhirToCentreDistance]:
         start_quarter = (self.position[0] // (self.map_size[0] / 2), self.position[1] // (self.map_size[1] / 2))
         menhir_quarter = (self.menhir_pos[0] // (self.map_size[0] / 2), self.menhir_pos[1] // (self.map_size[1] / 2))
+        menhir_to_centre_distance = int(((self.map_size[0] // 2 - self.menhir_pos[0]) ** 2 +
+                                         (self.map_size[1] // 2 - self.menhir_pos[1]) ** 2) ** 0.5)
         if start_quarter == menhir_quarter:
-            return States.THE_SAME_QUARTER
+            if menhir_to_centre_distance < CLOSE_DISTANCE_THRESHOLD:
+                return QuartersRelation.THE_SAME_QUARTER, MenhirToCentreDistance.CLOSE
+            elif menhir_to_centre_distance < MODERATE_DISTANCE_THRESHOLD:
+                return QuartersRelation.THE_SAME_QUARTER, MenhirToCentreDistance.MODERATE
+            else:
+                return QuartersRelation.THE_SAME_QUARTER, MenhirToCentreDistance.FAR
         elif (start_quarter[0] + menhir_quarter[0], start_quarter[1] + menhir_quarter[1]) == (1.0, 1.0):
-            return States.OPPOSITE_QUARTERS
+            if menhir_to_centre_distance < CLOSE_DISTANCE_THRESHOLD:
+                return QuartersRelation.OPPOSITE_QUARTERS, MenhirToCentreDistance.CLOSE
+            elif menhir_to_centre_distance < MODERATE_DISTANCE_THRESHOLD:
+                return QuartersRelation.OPPOSITE_QUARTERS, MenhirToCentreDistance.MODERATE
+            else:
+                return QuartersRelation.OPPOSITE_QUARTERS, MenhirToCentreDistance.FAR
         else:
-            return States.NEIGHBOR_QUARTERS
+            if menhir_to_centre_distance < CLOSE_DISTANCE_THRESHOLD:
+                return QuartersRelation.NEIGHBOR_QUARTERS, MenhirToCentreDistance.CLOSE
+            elif menhir_to_centre_distance < MODERATE_DISTANCE_THRESHOLD:
+                return QuartersRelation.NEIGHBOR_QUARTERS, MenhirToCentreDistance.MODERATE
+            else:
+                return QuartersRelation.NEIGHBOR_QUARTERS, MenhirToCentreDistance.FAR
 
     def was_killed_by_mist(self) -> bool:
         mist_free_radius_when_died = self.mist_radius - self.episode // games.MIST_TTH
@@ -385,7 +418,8 @@ class TupTupController:
                 return -3
             elif len(self.path) > 0 and self.path[0] == self.hiding_spot:  # camping in the hiding place
                 return -2
-            elif len(self.path) > MENHIR_NEIGHBOURHOOD_DISTANCE and self.path[0] != self.hiding_spot:  # going to the menhir position
+            elif len(self.path) > MENHIR_NEIGHBOURHOOD_DISTANCE and self.path[
+                0] != self.hiding_spot:  # going to the menhir position
                 return -3
             elif len(self.path) < MENHIR_NEIGHBOURHOOD_DISTANCE:
                 return 3
@@ -402,7 +436,7 @@ class TupTupController:
                 return 2
         return 0
 
-    def __pick_action(self, state: States) -> Actions:
+    def __pick_action(self, state: Tuple[QuartersRelation, MenhirToCentreDistance]) -> Actions:
         if random.uniform(0, 1) < self.arena_data['epsilon']:
             return random.choice(list(Actions))
         else:
@@ -415,119 +449,25 @@ class TupTupController:
             max_value_index = knowledge.index(max_value)
             return Actions(max_value_index)
 
-    def __learn(self, action: Actions, state: States, reward: int, new_action: Actions, new_state: States):
+    def __learn(self, action: Actions, state: Tuple[QuartersRelation, MenhirToCentreDistance], reward: int,
+                new_action: Actions, new_state: Tuple[QuartersRelation, MenhirToCentreDistance]):
         old_value = self.arena_data['Q'].get((state, action), DEFAULT_VAL)
         future_value = self.arena_data['Q'].get((new_state, new_action), DEFAULT_VAL)
         if (state, action) not in self.arena_data['Q'].keys():
             self.arena_data['Q'][(state, action)] = 0.0
         self.arena_data['Q'][(state, action)] += self.arena_data['alpha'] * (
                 reward + self.arena_data['discount_factor'] * future_value - old_value)
-        # if self.game_no % 50 == 0:  # to show learning progress
-        #     print(self.arenas_knowledge)
+        if self.game_no % 20 == 0:  # to show learning progress
+            print(self.arenas_knowledge)
+            print('states counter', states_counter)
 
     def __init_model(self) -> Dict:
         if IS_LEARNING:
-            return {arena: {'Q': {perm: 0.0 for perm in product(States, Actions)},
-                            'state': None, 'action': None, 'reward': None, 'reward_sum': 0,
-                            'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
-                            'discount_factor': GAMMA} for arena in ARENA_NAMES}
-        return {
-            'archipelago': {
-                'Q': {(States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.41722293470755467,
-                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): -0.13203678833408955,
-                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): -0.08831999955651262,
-                      (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): -0.22445743160210288,
-                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.30213287204181355,
-                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): -0.06471180579133734,
-                      (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.013699968695887976,
-                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.27454205126264564,
-                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                      (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): -0.0680767558055854},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
-            'dungeon': {
-                'Q': {
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 2.762341215804712,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.9885297598250103,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.5136528979018524,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 2.2161924115685436,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.8055337787321469,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 3.154740512809939,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.364658303810891,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 1.177279074044015,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.030103414287793062},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
-            'fisher_island': {
-                'Q': {
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 4.712318430294736,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.7940210476546332,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 4.073968803275123,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.046353184691718,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.9692486802376246,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 5.915206903146268,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 1.9378859644963913,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.4204436102924821,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': 0.00, 'epsilon': 0.0, 'discount_factor': 0.99},
-            'wasteland': {
-                'Q': {
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.9527749999619681,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.7071679712242508,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.6993205458204488,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.3727047315828796,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): -0.049001885046233234,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 1.7012664529898003,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): -0.021563391334369356,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.35440370987989184,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.37606813091068114},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': 0.0, 'epsilon': 0.0, 'discount_factor': 0.99},
-            'island': {
-                'Q': {
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': ALPHA, 'epsilon': EPSILON, 'discount_factor': GAMMA},
-            'mini': {
-                'Q': {
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.THE_SAME_QUARTER, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.OPPOSITE_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_STARTING_QUARTER): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_OPPOSITE_QUARTER): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL): 0.0,
-                    (States.NEIGHBOR_QUARTERS, Actions.HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL): 0.0},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'attempt_no': 0,
-                'alpha': ALPHA, 'epsilon': EPSILON, 'discount_factor': GAMMA}
-        }
+            return {arena: {
+                'Q': {perm: 0.0 for perm in product(product(QuartersRelation, MenhirToCentreDistance), Actions)},
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'reward_history': [],
+                'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
+                'discount_factor': GAMMA} for arena in ARENA_NAMES}
 
 
 class BFSException(Exception):
