@@ -1,3 +1,6 @@
+from copy import deepcopy
+from typing import Tuple
+
 import numpy as np
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
@@ -9,6 +12,7 @@ from gupb.model.arenas import Arena
 from gupb.model.characters import Action, Facing, ChampionKnowledge
 from gupb.model.coordinates import sub_coords, Coords, add_coords
 from gupb.model.games import MIST_TTH
+from gupb.model.weapons import Bow, Axe, Sword, Knife, Amulet
 
 
 def go_to_menhir(grid: Grid, state: State) -> Action:
@@ -63,7 +67,9 @@ def kill_them_all(grid: Grid, state: State) -> Action:
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_enemy_coords)
 
 
-def update_grid_on_incoming_mist(arena: Arena, grid: Grid, tick: int) -> Grid:
+def update_grid_on_incoming_mist(arena: Arena, grid: Grid, tick: int) -> Tuple[Grid, bool]:
+    mist_on_map = False
+
     if tick % MIST_TTH == 0:
         arena.mist_radius -= 1 if arena.mist_radius > 0 else arena.mist_radius
 
@@ -75,8 +81,42 @@ def update_grid_on_incoming_mist(arena: Arena, grid: Grid, tick: int) -> Grid:
                 if distance == arena.mist_radius:
                     grid.node(coords.x, coords.y).walkable = False
                     grid.node(coords.x, coords.y).weight = 0
+                    mist_on_map = True
 
-    return grid
+    return grid, mist_on_map
+
+
+def grid_with_players_mask(grid: Grid, knowledge: ChampionKnowledge, state: State) -> Grid:
+    grid_cpy = deepcopy(grid)
+
+    for coords, tile in knowledge.visible_tiles.items():
+        if coords == state.bot_coords:
+            continue
+
+        if not tile.character:
+            continue
+
+        character = tile.character
+        weapon_name = character.weapon.name
+        weapon = {
+            "bow": Bow(),
+            "axe": Axe(),
+            "sword": Sword(),
+            "knife": Knife(),
+            "amulet": Amulet(),
+        }[weapon_name]
+        coords_obj = Coords(*coords)
+
+        grid_cpy.node(coords_obj.x, coords_obj.y).walkable = False
+        grid_cpy.node(coords_obj.x, coords_obj.y).weight = 0
+
+        for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).walkable = False
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 0
+    # print(grid.grid_str())
+    return grid_cpy
 
 
 def update_grid_tiles_costs(knowledge: ChampionKnowledge, grid: Grid) -> Grid:
@@ -110,7 +150,7 @@ def find_better_weapon(grid: Grid, state: State) -> Action:
     ]
 
     def sorting_weapons(coords_weapon_tuple):
-        return weapon_ranking_by_desc(coords_weapon_tuple[1])
+        return weapon_ranking_by_desc(coords_weapon_tuple[1], state.arena.name)
 
     weapons_in_radius.sort(key=sorting_weapons, reverse=True)
 
@@ -128,17 +168,25 @@ def find_better_weapon(grid: Grid, state: State) -> Action:
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_weapon_position)
 
 
+i = 0
+
+
 def flee(grid: Grid, state: State) -> Action:
-    enemies_in_one_line = [
-        enemy_coord
-        for enemy_coord in state.visible_enemies
-        if enemy_coord.x == state.bot_coords.x or enemy_coord.y == state.bot_coords.y
-    ]
-
-    if len(enemies_in_one_line):
+    global i
+    i += 1
+    if i % 2 == 0:
         return Action.TURN_RIGHT
-
     return Action.STEP_FORWARD
+
+    # enemies_in_one_line = [
+    #     enemy_coord
+    #     for enemy_coord in state.visible_enemies
+    #     if enemy_coord.x == state.bot_coords.x or enemy_coord.y == state.bot_coords.y
+    # ]
+    # if len(enemies_in_one_line):
+    #     return Action.TURN_RIGHT
+    #
+    # return Action.STEP_FORWARD
     # enemies_in_one_line = [
     #     enemy_coord
     #     for enemy_coord in state.visible_enemies
