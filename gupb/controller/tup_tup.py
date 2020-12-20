@@ -1,16 +1,15 @@
-from enum import Enum
-from queue import SimpleQueue
 import random
-from typing import Dict, Type, Optional, Tuple, List, Set
 from itertools import product
+from queue import SimpleQueue
+from typing import Dict, Type, Optional, Tuple, List, Set
 
+from gupb.controller.tup_tup_resources.trained_model import QuartersRelation, MenhirToCentreDistance, Actions, MODEL
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
-from collections import Counter
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
 ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
-IS_LEARNING = True
+IS_LEARNING = False
 ALPHA = 0.2
 EPSILON = 0.2
 GAMMA = 0.99
@@ -20,28 +19,6 @@ MENHIR_NEIGHBOURHOOD_DISTANCE = 5
 
 CLOSE_DISTANCE_THRESHOLD = 13
 MODERATE_DISTANCE_THRESHOLD = 19
-
-
-class QuartersRelation(Enum):
-    THE_SAME_QUARTER = 0
-    OPPOSITE_QUARTERS = 1
-    NEIGHBOR_QUARTERS = 2
-
-
-class MenhirToCentreDistance(Enum):
-    CLOSE = 0
-    MODERATE = 1
-    FAR = 2
-
-
-class Actions(Enum):
-    HIDE_IN_THE_STARTING_QUARTER = 0
-    HIDE_IN_THE_OPPOSITE_QUARTER = 1
-    HIDE_IN_THE_NEIGHBOR_QUARTER_HORIZONTAL = 2
-    HIDE_IN_THE_NEIGHBOR_QUARTER_VERTICAL = 3
-
-
-states_counter = Counter(product(product(QuartersRelation, MenhirToCentreDistance), Actions)) # todo for debiggung purposes
 
 
 # noinspection PyUnusedLocal
@@ -124,13 +101,10 @@ class TupTupController:
                 first_action = random.choice(list(Actions))
                 self.action = first_action
                 self.state = self.__discretize()
-            elif self.arena_data[
-                'attempt_no'] > 1 and self.episode == 1:  # learn when a new game begins but after the first game
+            elif self.arena_data['attempt_no'] > 1 and self.episode == 1:  # learn when a new game begins but after the first game
                 reward = self.arena_data['reward']
-                self.arena_data['reward_history'].append(reward)  # todo for debugging purposes
                 action = self.arena_data['action']
                 state = self.arena_data['state']
-                states_counter[state] += 1
                 new_action = self.__pick_action(state)
                 new_state = self.__discretize()
                 if IS_LEARNING:
@@ -457,17 +431,17 @@ class TupTupController:
             self.arena_data['Q'][(state, action)] = 0.0
         self.arena_data['Q'][(state, action)] += self.arena_data['alpha'] * (
                 reward + self.arena_data['discount_factor'] * future_value - old_value)
-        if self.game_no % 20 == 0:  # to show learning progress
-            print(self.arenas_knowledge)
-            print('states counter', states_counter)
+        # if self.game_no % 50 == 0:  # to show learning progress
+        #     print(self.arenas_knowledge)
 
     def __init_model(self) -> Dict:
         if IS_LEARNING:
             return {arena: {
                 'Q': {perm: 0.0 for perm in product(product(QuartersRelation, MenhirToCentreDistance), Actions)},
-                'state': None, 'action': None, 'reward': None, 'reward_sum': 0, 'reward_history': [],
+                'state': None, 'action': None, 'reward': None, 'reward_sum': 0,
                 'attempt_no': 0, 'alpha': ALPHA, 'epsilon': EPSILON,
                 'discount_factor': GAMMA} for arena in ARENA_NAMES}
+        return MODEL
 
 
 class BFSException(Exception):
