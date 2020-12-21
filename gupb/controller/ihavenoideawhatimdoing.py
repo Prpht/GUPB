@@ -179,11 +179,14 @@ class IHaveNoIdeaWhatImDoingController:
         menhirOffset = (knowledge.position - self.menhir_position)
         rotateMap = getRotateAround(self.rotate_diam)[self.menhir_rotation]
         radiusShift = (self.rotate_diam - 1) // 2
-        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance * 2 <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
+        if(max(abs(menhirOffset[0]),abs(menhirOffset[1])) < radiusShift):
+            self.rotate_diam = min(max(abs(menhirOffset[0]),abs(menhirOffset[1])) * 2 + 1  , self.rotate_diam)
+
+        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance+2 <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
             return []
         
         preferedDir = rotateMap[-menhirOffset[1] + radiusShift][menhirOffset[0] + radiusShift]
-        if(self.mist_distance < 15):
+        if(self.mist_distance < 3):
             self.rotate_diam -= 2
         if(preferedDir == self.facing):
             if(self.canStepOn(knowledge.position + preferedDir)):
@@ -204,7 +207,7 @@ class IHaveNoIdeaWhatImDoingController:
             if(coord in self.arena.terrain and not self.arena.terrain[coord].terrain_transparent() or coord == self.menhir_position):
                 return []
             if(coord in self.memory and self.memory[coord][1].character):
-                return [(4 * self.getActionTime("attack"), characters.Action.ATTACK, "attack")]
+                return [(4, characters.Action.ATTACK, "attack")]
         return []
 
     def getActionTime(self, name, percentageOfFalloff=FALLOFF):
