@@ -12,13 +12,6 @@ import numpy as np
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 
-from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten
-from keras.optimizers import Adam
-
-from rl.agents import SARSAAgent
-from rl.policy import BoltzmannQPolicy
-
 dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 MIST_TTH: int = 5
 WEPON_REACH_BENEFIT: int = 0.7
@@ -26,7 +19,6 @@ WEPON_REACH_BENEFIT: int = 0.7
 FALLOFF=12
 INITIAL_ROTATE_DIAMETER = 1+20*2
 
-LOCAL_SIZE = 7
 
 def r(element, times):
     return [element] * times
@@ -143,24 +135,6 @@ class IHaveNoIdeaWhatImDoingController:
         self.menhir_position = arena_description.menhir_position
         # we're just using the static method to avoid repeating parsing files
         self.arena = arenas.Arena.load(arena_description.name)
-        model = Sequential()
-        model.add(Flatten(input_shape=(1,) + (7,7,5)))
-        model.add(Dense(16))
-        model.add(Activation('relu'))
-        model.add(Dense(16))
-        model.add(Activation('relu'))
-        model.add(Dense(16))
-        model.add(Activation('relu'))
-        model.add(Dense(len(list(Action))))
-        model.add(Activation('linear'))
-
-        policy = BoltzmannQPolicy()
-        sarsa = SARSAAgent(model=model, nb_actions=len(list(Action)), nb_steps_warmup=10, policy=policy)
-        sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
-        sarsa.load_weights('ihavenoideawhatimdoing/sarsa_{}_weights.h5f'.format("ihavenoideawhatimdoing"))
-        sarsa.observations = []
-        sarsa.actions = []
-        self.sarsa = sarsa
         pass
 
     def mulitplyCoords(self, coords, val):
@@ -185,28 +159,9 @@ class IHaveNoIdeaWhatImDoingController:
             return coordinates.Coords(0, 1)
 
     def getDiscoverOption(self, knowledge: characters.ChampionKnowledge):
-        if(len(self.decision_log) < 3 or (self.decision_log[0] == "discover" and self.decision_log[1] == "discover")):
+        if(len(self.decision_log) < 3 or any(map(lambda x:x == "discover",self.decision_log))):
             return []
-        if(self.decision_log[0]=="discover"):
-            return [(1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1]+1) % 2], 'discover')]
         return [(0.1, [characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT][(knowledge.position[0] + knowledge.position[1])%2],'discover')]
-
-    def getLocalActionOption(self, knowledge: characters.ChampionKnowledge):
-        new_space = np.zeros((LOCAL_SIZE,LOCAL_SIZE,5), dtype=np.uint8)
-        for coords,tile in self.arena.terrain.items():
-            if knowledge:
-                dist = (knowledge.position - coords)
-                x = abs(dist[0])+LOCAL_SIZE//2
-                y = abs(dist[1])+LOCAL_SIZE//2
-                if(x < LOCAL_SIZE//2 and y < LOCAL_SIZE//2):
-                    new_space[x,y,0] = 1 if tile.terrain_passable() else 0
-                    new_space[x,y,1] = 1 if tile.terrain_transparent() else 0
-                    if coords in knowledge.visible_tiles:
-                        new_space[x,y,2] = 1 if knowledge.visible_tiles[coords].character else 0
-        prediction = self.sarsa.forward(new_space)
-        if(list(Action)[prediction] == Action.DO_NOTHING):
-            return []
-        return [(0.2, list(Action)[prediction],'local')]
 
     def getNavOption(self, knowledge: characters.ChampionKnowledge):
         multiplier = 1 if self.getMistDistance(knowledge) > 8 else 1/2*(8 - self.getMistDistance(knowledge))
@@ -224,11 +179,14 @@ class IHaveNoIdeaWhatImDoingController:
         menhirOffset = (knowledge.position - self.menhir_position)
         rotateMap = getRotateAround(self.rotate_diam)[self.menhir_rotation]
         radiusShift = (self.rotate_diam - 1) // 2
-        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance * 2 <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
+        if(max(abs(menhirOffset[0]),abs(menhirOffset[1])) < radiusShift):
+            self.rotate_diam = min(max(abs(menhirOffset[0]),abs(menhirOffset[1])) * 2 + 1  , self.rotate_diam)
+
+        if(not (abs(menhirOffset[0]) <= radiusShift and abs(menhirOffset[1]) <= radiusShift) or self.mist_distance+2 <= self.rotate_diam or self.heading_map[knowledge.position]["weapon"] != self.weapon):
             return []
         
         preferedDir = rotateMap[-menhirOffset[1] + radiusShift][menhirOffset[0] + radiusShift]
-        if(self.mist_distance < 15):
+        if(self.mist_distance < 3):
             self.rotate_diam -= 2
         if(preferedDir == self.facing):
             if(self.canStepOn(knowledge.position + preferedDir)):
@@ -249,7 +207,7 @@ class IHaveNoIdeaWhatImDoingController:
             if(coord in self.arena.terrain and not self.arena.terrain[coord].terrain_transparent() or coord == self.menhir_position):
                 return []
             if(coord in self.memory and self.memory[coord][1].character):
-                return [(4 * self.getActionTime("attack"), characters.Action.ATTACK, "attack")]
+                return [(4, characters.Action.ATTACK, "attack")]
         return []
 
     def getActionTime(self, name, percentageOfFalloff=FALLOFF):
@@ -288,7 +246,7 @@ class IHaveNoIdeaWhatImDoingController:
             self.computeHeadingMap()
         self.getMistDistance(knowledge)
         options = [*self.getNavOption(knowledge), *self.getAttackOption(
-            knowledge), *self.getObtainOption(knowledge), *self.getObeliskCaptureOption(knowledge), *self.checkStuckOption(knowledge),*self.getDiscoverOption(knowledge),*self.getLocalActionOption(knowledge)]
+            knowledge), *self.getObtainOption(knowledge), *self.getObeliskCaptureOption(knowledge), *self.checkStuckOption(knowledge),*self.getDiscoverOption(knowledge)]
         decision = sorted(options, key=lambda option: -option[0])[0]
         self.position_log.append(knowledge.position)
         if(len(decision) > 2):
