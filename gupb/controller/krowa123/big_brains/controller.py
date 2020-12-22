@@ -9,6 +9,7 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge, Action
 from gupb.model.effects import Mist
+from gupb.model.games import MIST_TTH
 
 
 class LearnController(Controller):
@@ -39,6 +40,7 @@ class TestController(Controller):
         self.uname = uname
         self.menhir_position = None
         self.arena = None
+        self.episode = 0
 
         self.model = load_model(model_name)
 
@@ -82,6 +84,9 @@ class TestController(Controller):
         return state.reshape((-1, 10, 10, 17))
 
     def decide(self, knowledge: ChampionKnowledge):
+        self.episode += 1
+        if self.episode % MIST_TTH == 0:
+            self.arena.increase_mist()
         try:
             state = self._get_state(knowledge)
             action = np.argmax(self.model.predict(state))
@@ -94,6 +99,7 @@ class TestController(Controller):
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir_position = arena_description.menhir_position
+        self.episode = 0
         self.arena = Arena.load(arena_description.name)
         self.arena.menhir_position = self.menhir_position
         self.arena.terrain[self.menhir_position] = tiles.Menhir()
