@@ -14,20 +14,10 @@ facing_to_i = {
 def passable(arena: Arena, coord: coordinates.Coords):
     return coord in arena.terrain and arena.terrain[coord].terrain_passable()
 
-
-
 def get_tile_type(tiles, coord):
     if (coord in tiles):
         return tiles[coord].type
     return None
-
-
-def should_attack(knowledge):
-    current_pos = knowledge.visible_tiles[knowledge.position]
-    in_front = knowledge.visible_tiles[knowledge.position + current_pos.character.facing.value]
-
-    return in_front.character is not None
-
 
 class HidingSpotFinder:
     def __init__(self, controller):

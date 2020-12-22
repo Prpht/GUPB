@@ -67,6 +67,7 @@ class IdentifyFacingCommand(CommandInterface):
                 self.iteration = 0
             else:
                 self.controller.facing = characters.Facing(coordinates.sub_coords(currentPos, self.previusPos))
+                self.controller.facingIsCorrect = True
                 self.controller.currentCommand = ScanCommand(self.controller)
                 action = self.controller.currentCommand.decide(knowledge)
         self.previusPos = currentPos
