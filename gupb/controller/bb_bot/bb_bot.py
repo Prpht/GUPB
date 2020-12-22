@@ -34,6 +34,7 @@ class Weapon:
     def weaponFromName(name:str):
         return Weapon.nameToWeapon.get(name)
 
+
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class BBBotController:
