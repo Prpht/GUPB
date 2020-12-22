@@ -2,7 +2,7 @@ from .controller import Krowa1233Controller
 
 __all__ = [
     "Krowa1233Controller",
-    "POTENTIAL_CONTROLLERS"
+    "POTENTIAL_CONTROLLERS",
 ]
 
 POTENTIAL_CONTROLLERS = [
