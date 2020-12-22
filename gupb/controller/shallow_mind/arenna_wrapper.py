@@ -1,58 +1,35 @@
 from typing import Dict, Tuple, List
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.core.grid import Grid
-from gupb.model import arenas, coordinates, tiles
+
+from gupb.controller.shallow_mind.consts import FIELD_ATTACKED, FIELD_WEIGHT, WEAPONS_ENCODING, WEAPONS_MAP
+from gupb.controller.shallow_mind.utils import points_dist, get_first_possible_move
 from gupb.model import characters
 from gupb.model.arenas import Arena, ArenaDescription
-from gupb.model.characters import ChampionDescription, Facing, Action, ChampionKnowledge
+from gupb.model.characters import ChampionDescription, Facing, Action
 from gupb.model.coordinates import Coords
 from gupb.model.games import MIST_TTH
-from gupb.model.tiles import Menhir, Wall, Sea, Land, TileDescription
-from gupb.model.weapons import Knife, Sword, Bow, Axe, Amulet, WeaponDescription
-from queue import SimpleQueue
-
-FIELD_WEIGHT = 100
-
-TILES = [Land, Sea, Wall, Menhir]
-
-TILES_MAP = {tile().description().type: tile for tile in TILES}
-
-WEAPONS = [(Knife, 100), (Sword, 25), (Bow, 1), (Axe, 10), (Amulet, 25)]
-WEAPONS.sort(key=lambda x: x[1])
-
-WEAPONS_MAP = {weapon().description(): weapon for weapon, _ in WEAPONS}
-
-WEAPONS_ENCODING = {weapon().description(): value for weapon, value in WEAPONS}
+from gupb.model.tiles import Menhir, TileDescription
+from gupb.model.weapons import WeaponDescription
 
 finder = AStarFinder()
 
-FIELD_ATTACKED = FIELD_WEIGHT * FIELD_WEIGHT
 
-WEAPONS_PRIORITY = [weapon[0]().description() for weapon in WEAPONS]
-
-
-def points_dist(cord1, cord2):
-    return int(((cord1.x - cord2.x) ** 2 +
-                (cord1.y - cord2.y) ** 2) ** 0.5)
-
-
-def get_first_possible_move(moves: List[Tuple[Action, int]]):
-    return next((next_move for next_move in moves if next_move[0] != Action.DO_NOTHING), (Action.DO_NOTHING, -1))
-
-
-class ArenaMapped(Arena):
+class ArenaWrapper(Arena):
     def __init__(self, arena_description: ArenaDescription):
         arena = Arena.load(arena_description.name)
         super().__init__(arena.name, arena.terrain)
         self.menhir_position = arena_description.menhir_position
         self.terrain[arena_description.menhir_position] = Menhir()
         self.tiles_memory: Dict[Coords, TileDescription] = {}
+        self.tiles_age: Dict[Coords, int] = {}
         self.current_terrain: Dict[Coords, TileDescription] = {k: v.description() for k, v in
                                                                arena.terrain.items()}
         self.champions: Dict[
             ChampionDescription, Tuple[Coords, int]] = {}  # second value is the age when champ was seen
         self.matrix = []
         self.champion: ChampionDescription = None
+        self.prev_champion: ChampionDescription = None
         self.position: Coords = None
         self.episode: int = 0
         self.effect_weight: int = FIELD_ATTACKED
@@ -71,10 +48,10 @@ class ArenaMapped(Arena):
     def get_next_field(self) -> Coords:
         return self.position + self.champion.facing.value
 
-    def get_left_field(self):
+    def get_left_field(self) -> Coords:
         return self.position + self.champion.facing.turn_left().value
 
-    def get_right_field(self):
+    def get_right_field(self) -> Coords:
         return self.position + self.champion.facing.turn_right().value
 
     def increase_mist(self) -> None:
@@ -87,7 +64,11 @@ class ArenaMapped(Arena):
                     self.terrain_matrix[x][y] = -1
 
     def prepare_matrix(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.prev_champion = self.champion
+        self.tiles_age = {**{k: v + 1 for k, v in self.tiles_age.items()},
+                          **{k: 0 for k in knowledge.visible_tiles.keys()}}
         self.champions = {champ: (tere[0], tere[1] + 1) for champ, tere in self.champions.items()}
+        # todo optimize to keep only items
         self.tiles_memory = {**self.tiles_memory, **knowledge.visible_tiles}
         self.champion = knowledge.visible_tiles.get(knowledge.position).character
         self.position = knowledge.position
@@ -247,68 +228,21 @@ class ArenaMapped(Arena):
                 self.terrain[coord].terrain_transparent() and not self.is_field_safe(coords, coord - coords)]
 
     def find_scan_action(self) -> Action:
+        surrounding = self.check_position_surrounding(self.position)
+        direct_surrounding = [cord.value + self.position for cord in Facing]
+        surrounding = [(self.tiles_age[cords], cords) for cords in surrounding if cords in direct_surrounding]
+        surrounding.sort(reverse=True)
+        surrounding = [x[1] for x in surrounding]
+        if len(surrounding) == 1:
+            if self.position + self.champion.facing.value not in surrounding:
+                return Action.TURN_LEFT
+            return Action.DO_NOTHING
+        if self.get_right_field() == surrounding[0]:
+            return Action.TURN_RIGHT
+        if self.get_left_field() == surrounding[0]:
+            return Action.TURN_LEFT
+        if self.get_right_field() == surrounding[1]:
+            return Action.TURN_RIGHT
+        if self.get_left_field() == surrounding[1]:
+            return Action.TURN_LEFT
         return Action.TURN_LEFT
-
-
-class ShallowMindController:
-    def __init__(self, first_name: str):
-        self.first_name: str = first_name
-        self.prev_champion: ChampionDescription = None
-        self.arena: ArenaMapped = None
-        self.action_queue: SimpleQueue[Action] = SimpleQueue()
-        self.bow_taken = False
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, ShallowMindController):
-            return self.first_name == other.first_name
-        return False
-
-    def __hash__(self) -> int:
-        return hash(self.first_name)
-
-    def reset(self, arena_description: ArenaDescription) -> None:
-        self.arena = ArenaMapped(arena_description)
-        self.bow_taken = False
-
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self.prev_champion = self.arena.champion
-        self.arena.prepare_matrix(knowledge)
-        if not self.action_queue.empty():
-            return self.action_queue.get()
-        champ = self.arena.champion
-        if self.arena.can_hit:
-            return Action.ATTACK
-        if self.arena.calc_mist_dist() > 5:
-            if champ.weapon != WEAPONS_PRIORITY[0]:
-                action, _ = self.arena.find_move_to_nearest_weapon(WEAPONS_PRIORITY[0])
-                if action != Action.DO_NOTHING:
-                    return action
-                elif champ.weapon == WEAPONS_PRIORITY[-1]:
-                    weapons = [self.arena.find_move_to_nearest_weapon(weapon) for weapon in WEAPONS_PRIORITY]
-                    action, _ = get_first_possible_move(weapons)
-                    if action != Action.DO_NOTHING:
-                        return action
-        # todo this need to be redone
-        if self.prev_champion:
-            if champ.health != self.prev_champion.health:
-                action = self.arena.find_escape_action()
-                if action != Action.DO_NOTHING:
-                    self.action_queue.put(Action.STEP_FORWARD)
-                    return action
-        action, length = self.arena.find_move_to_menhir()
-        if action == Action.DO_NOTHING:
-            return self.arena.find_scan_action()
-        return action
-
-    @property
-    def name(self) -> str:
-        return f'ShallowMindController{self.first_name}'
-
-    @property
-    def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.GREY
-
-
-POTENTIAL_CONTROLLERS = [
-    ShallowMindController('test'),
-]
