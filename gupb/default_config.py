@@ -20,9 +20,11 @@ CONFIGURATION = {
         krowa123.Krowa1233Controller("Krowka"),
         shallow_mind.ShallowMindController('test'),
         tup_tup.TupTupController('Bot'),
+        bb_bot.BBBotController("Bartek"),
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 280,
+    'runs_no': 500,
+    'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }

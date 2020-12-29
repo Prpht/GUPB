@@ -1,8 +1,11 @@
 from pathfinding.core.grid import Grid
 
-from gupb.controller.botelka_ml.actions import go_to_menhir, kill_them_all, find_better_weapon, flee
-from gupb.controller.botelka_ml.utils import debug_print
+from gupb.controller.botelka_ml.actions import (
+    go_to_menhir, kill_them_all, find_better_weapon, flee,
+    update_grid_on_incoming_mist, update_grid_tiles_costs, grid_with_players_mask,
+)
 from gupb.controller.botelka_ml.state import State, get_state
+from gupb.controller.botelka_ml.utils import debug_print
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model.characters import Tabard, ChampionKnowledge, Action, Facing
 from gupb.model.coordinates import Coords
@@ -13,15 +16,15 @@ LEARNING_RATE = 0.5  # (alpha)
 DISCOUNT_FACTOR = 0.95  # (gamma)
 
 MAP_TILES_COST = {
-    "sea": 0,  # Sea - obstacle
-    "wall": 0,  # Wall  - obstacle
+    "sea": 0,  # Obstacle
+    "wall": 0,  # Obstacle
     "menhir": 0,  # Obstacle
-    "bow": 1,  # Bow
-    "sword": 4,  # Sword
-    "axe": 4,  # Axe
-    "amulet": 4,  # Amulet
-    "land": 3,  # Land
-    "knife": 10000,  # Knife - start weapon, we usually want to avoid it
+    "bow": 1,
+    "amulet": 1,
+    "sword": 4,
+    "axe": 4,
+    "land": 3,
+    "knife": 10000,
 }
 
 
@@ -43,6 +46,7 @@ class BotElkaController:
 
         self.grid = None
 
+        self.mist_on_map = False
         self.menhir_reached = False
 
     def __eq__(self, other: object) -> bool:
@@ -86,63 +90,56 @@ class BotElkaController:
             for coords, tile in self.arena.terrain.items() if tile.loot
         }
 
+        self.mist_on_map = False
         self.menhir_reached = False
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        self.tick += 1
+
         old_state, new_state = self.old_state, get_state(knowledge, self.arena, self.tick, self.weapons_info)
         self.weapons_info = new_state.weapons_info
 
+        self.grid = update_grid_tiles_costs(knowledge, self.grid)
+        self.grid, mist_on_map = update_grid_on_incoming_mist(self.arena, self.grid, self.tick)
+
+        grid_with_mask = grid_with_players_mask(self.grid, knowledge, new_state)
+
+        if mist_on_map:
+            self.mist_on_map = True
+
+        lost_health = old_state.health > new_state.health
         self.old_state = new_state
 
-        if kill_them_all(self.grid, new_state) == Action.ATTACK:
+        if kill_them_all(grid_with_mask, new_state) == Action.ATTACK:
             debug_print("DIE!!!")
             return Action.ATTACK
 
-        if old_state.health > new_state.health:
-            debug_print("Ouch! Running away")
-            return flee(self.grid, new_state)
+        if lost_health:
+            debug_print("Ouch! Running away.")
+            return flee(grid_with_mask, new_state)
 
         if new_state.weapon.description().name == "knife":
-            new_weapon = find_better_weapon(self.grid, new_state)
+            new_weapon = find_better_weapon(grid_with_mask, new_state)
 
             if new_weapon == Action.DO_NOTHING:
                 debug_print("Could not find a better weapon, going to the menhir")
-                return go_to_menhir(self.grid, new_state)
+                return go_to_menhir(grid_with_mask, new_state)
 
             debug_print("Going for a better weapon")
             return new_weapon
 
-        if not self.menhir_reached:
-            go_to_menhir_action = go_to_menhir(self.grid, new_state)
-            if go_to_menhir_action == Action.DO_NOTHING:
-                debug_print("Menhir reached")
-                self.menhir_reached = True
-            else:
-                debug_print("Going to menhir")
-                return go_to_menhir_action
+        if not self.mist_on_map:
+            debug_print("Mist not yet visible, spinning")
+            return Action.TURN_RIGHT
 
-        if self.menhir_reached:
-            kill = kill_them_all(self.grid, new_state)
+        go_to_menhir_action = go_to_menhir(grid_with_mask, new_state)
 
-            # Nobody to kill, like look around
-            if kill == Action.DO_NOTHING:
-                if new_state.mist_visible:
-                    go_to_menhir_action = go_to_menhir(self.grid, new_state)
+        if go_to_menhir_action == Action.DO_NOTHING:
+            debug_print("Menhir reached, spinning")
+            return Action.TURN_RIGHT
 
-                    if go_to_menhir_action == Action.DO_NOTHING:
-                        debug_print("I see mist! But I am already near menhir")
-                        return Action.TURN_RIGHT
-                    else:
-                        debug_print("I see mist! Running away")
-                        return go_to_menhir_action
-
-                debug_print("Nobody to kill, no mist, looking around")
-                return Action.TURN_RIGHT
-
-            debug_print("On a mission to kill")
-            return kill
-
-        return Action.STEP_FORWARD
+        debug_print("Mist on the map, going to menhir")
+        return go_to_menhir_action
 
     def prepare_grid(self):
         matrix = [

@@ -35,7 +35,13 @@ FACING_TO_INT = {
 MAX_HEALTH = 5
 
 
-def weapon_ranking_by_desc(weapon: WeaponDescription) -> int:
+def weapon_ranking_by_desc(weapon: WeaponDescription, arena_name: str) -> int:
+    if arena_name == "dungeon":
+        if weapon.name == 'bow':
+            return 20
+        if weapon.name == 'amulet':
+            return 6
+    # All other maps
     if weapon.name == 'amulet':
         return 10
     if weapon.name == 'bow':
