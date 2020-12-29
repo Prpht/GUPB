@@ -1,7 +1,7 @@
 from pathfinding.core.grid import Grid
 
 from gupb.controller.botelka_ml.actions import (
-    go_to_menhir, kill_them_all, find_better_weapon, flee,
+    go_to_menhir, kill_them_all, find_better_weapon, run_away,
     update_grid_on_incoming_mist, update_grid_tiles_costs, grid_with_players_mask,
 )
 from gupb.controller.botelka_ml.state import State, get_state
@@ -127,14 +127,12 @@ class BotElkaController:
             debug_print("Mist not yet visible, spinning")
             return Action.TURN_RIGHT
 
-        go_to_menhir_action = go_to_menhir(self.grid_safe_only, new_state)
-
         if new_state.distance_to_menhir < 2.0:
             debug_print("Menhir reached, spinning")
             return Action.TURN_RIGHT
 
         debug_print("Mist on the map, going to menhir")
-        return go_to_menhir_action
+        return go_to_menhir(self.grid_safe_only, new_state)
 
     def prepare_grid(self):
         matrix = [
