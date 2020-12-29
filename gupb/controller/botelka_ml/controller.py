@@ -12,9 +12,6 @@ from gupb.model.coordinates import Coords
 from gupb.model.tiles import Tile
 from gupb.model.weapons import Knife
 
-LEARNING_RATE = 0.5  # (alpha)
-DISCOUNT_FACTOR = 0.95  # (gamma)
-
 MAP_TILES_COST = {
     "sea": 0,  # Obstacle
     "wall": 0,  # Obstacle
@@ -38,13 +35,12 @@ class BotElkaController:
         self.old_action_no = 0
         self.old_state = None
 
-        # self.model = get_model()
-
         self.tick = 0
         self.moves_queue = []
         self.weapons_info = {}
 
         self.grid = None
+        self.grid_safe_only = None
 
         self.mist_on_map = False
         self.menhir_reached = False
@@ -66,13 +62,9 @@ class BotElkaController:
         return Tabard.BLUE
 
     def die(self):
-        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 0)
-        # self.model.save()
         pass
 
     def win(self):
-        # self.model.update(self.old_state.as_tuple(), self.old_state.as_tuple(), self.old_action_no, 10)
-        # self.model.save()
         pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -102,7 +94,10 @@ class BotElkaController:
         self.grid = update_grid_tiles_costs(knowledge, self.grid)
         self.grid, mist_on_map = update_grid_on_incoming_mist(self.arena, self.grid, self.tick)
 
-        grid_with_mask = grid_with_players_mask(self.grid, knowledge, new_state)
+        if self.tick % 5:
+            self.grid_safe_only = grid_with_players_mask(self.grid, knowledge, new_state)
+        else:  # Remember unsafe places for 5 moves
+            self.grid_safe_only = grid_with_players_mask(self.grid_safe_only, knowledge, new_state)
 
         if mist_on_map:
             self.mist_on_map = True
@@ -110,20 +105,20 @@ class BotElkaController:
         lost_health = old_state.health > new_state.health
         self.old_state = new_state
 
-        if kill_them_all(grid_with_mask, new_state) == Action.ATTACK:
+        if kill_them_all(self.grid_safe_only, new_state) == Action.ATTACK:
             debug_print("DIE!!!")
             return Action.ATTACK
 
         if lost_health:
             debug_print("Ouch! Running away.")
-            return flee(grid_with_mask, new_state)
+            return flee(self.grid_safe_only, new_state)
 
         if new_state.weapon.description().name == "knife":
-            new_weapon = find_better_weapon(grid_with_mask, new_state)
+            new_weapon = find_better_weapon(self.grid_safe_only, new_state)
 
             if new_weapon == Action.DO_NOTHING:
                 debug_print("Could not find a better weapon, going to the menhir")
-                return go_to_menhir(grid_with_mask, new_state)
+                return go_to_menhir(self.grid_safe_only, new_state)
 
             debug_print("Going for a better weapon")
             return new_weapon
@@ -132,9 +127,9 @@ class BotElkaController:
             debug_print("Mist not yet visible, spinning")
             return Action.TURN_RIGHT
 
-        go_to_menhir_action = go_to_menhir(grid_with_mask, new_state)
+        go_to_menhir_action = go_to_menhir(self.grid_safe_only, new_state)
 
-        if go_to_menhir_action == Action.DO_NOTHING:
+        if new_state.distance_to_menhir < 2.0:
             debug_print("Menhir reached, spinning")
             return Action.TURN_RIGHT
 
@@ -152,6 +147,7 @@ class BotElkaController:
         matrix[self.arena.menhir_position.y][self.arena.menhir_position.x] = 0
 
         self.grid = Grid(matrix=matrix)
+        self.grid_safe_only = self.grid
 
 
 def get_tile_cost(tile: Tile) -> int:
