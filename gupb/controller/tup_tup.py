@@ -7,6 +7,7 @@ from gupb.controller.tup_tup_resources.trained_model import QuartersRelation, Me
 from gupb.model import arenas, coordinates, weapons, tiles, characters, games
 
 FACING_ORDER = [characters.Facing.LEFT, characters.Facing.UP, characters.Facing.RIGHT, characters.Facing.DOWN]
+weapons_order = [weapons.Knife,  weapons.Amulet, weapons.Axe, weapons.Sword, weapons.Bow]
 ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
 IS_LEARNING = False
@@ -30,7 +31,9 @@ class TupTupController:
         self.facing: Optional[characters.Facing] = None
         self.position: coordinates.Coords = None
         self.weapon: Type[weapons.Weapon] = weapons.Knife
+        self.old_weapon: Type[weapons.Weapon] = self.weapon
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
+        self.pick_weapon_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.has_calculated_path: bool = False
         self.path: List = []
         self.bfs_goal: coordinates.Coords = None
@@ -67,6 +70,7 @@ class TupTupController:
             self.arena_data['reward_sum'] += self.arena_data['reward']
 
         self.action_queue = SimpleQueue()
+        self.pick_weapon_queue = SimpleQueue()
         self.path = []
         self.bfs_potential_goals = set()
         self.bfs_potential_goals_visited = set()
@@ -74,6 +78,8 @@ class TupTupController:
         self.hiding_spot = None
         self.episode = 0
         self.game_no += 1
+        self.weapon = weapons.Knife
+        self.old_weapon = self.weapon
 
         arena = arenas.Arena.load(arena_description.name)
         self.arena_name = arena.name
@@ -118,6 +124,10 @@ class TupTupController:
             if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
                 return characters.Action.ATTACK
 
+            get_weapon_action = self.check_weapons()
+            if get_weapon_action:
+                return get_weapon_action
+
             if not self.action_queue.empty():
                 return self.action_queue.get()
 
@@ -154,8 +164,8 @@ class TupTupController:
     def __update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
         char_description = knowledge.visible_tiles[knowledge.position].character
-        weapons_map = {w.__name__.lower(): w for w in [weapons.Knife, weapons.Sword, weapons.Bow,
-                                                       weapons.Amulet, weapons.Axe]}
+        weapons_map = {w.__name__.lower(): w for w in weapons_order}
+        self.old_weapon = self.weapon
         self.weapon = weapons_map.get(char_description.weapon.name, weapons.Knife)
         self.facing = char_description.facing
 
@@ -341,6 +351,24 @@ class TupTupController:
         else:
             # one of the numbers SHOULD be 0, otherwise sth is wrong with the BFS result
             raise (Exception("The coordinates are not one step away from each other"))
+
+    def check_weapons(self) -> Optional[characters.Action]:
+        if not self.pick_weapon_queue.empty():
+            return self.pick_weapon_queue.get()
+
+        if weapons_order.index(self.weapon) < weapons_order.index(self.old_weapon) and not self.action_queue.empty():
+            next_moves = []
+            while True:
+                next_moves.append(self.action_queue.get())
+                if next_moves[-1] == characters.Action.STEP_FORWARD:
+                    break
+            for m in next_moves:
+                self.pick_weapon_queue.put(m)
+            for _ in range(2):
+                self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
+                self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
+                self.pick_weapon_queue.put(characters.Action.STEP_FORWARD)
+            return self.pick_weapon_queue.get()
 
     @property
     def name(self) -> str:
