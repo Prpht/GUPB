@@ -124,9 +124,10 @@ class TupTupController:
             if self.__is_enemy_in_range(knowledge.position, knowledge.visible_tiles):
                 return characters.Action.ATTACK
 
-            get_weapon_action = self.check_weapons()
-            if get_weapon_action:
-                return get_weapon_action
+            if not self.has_calculated_path or len(self.path) > 5:
+                self.check_weapons()
+            if not self.pick_weapon_queue.empty():
+                return self.pick_weapon_queue.get()
 
             if not self.action_queue.empty():
                 return self.action_queue.get()
@@ -352,11 +353,10 @@ class TupTupController:
             # one of the numbers SHOULD be 0, otherwise sth is wrong with the BFS result
             raise (Exception("The coordinates are not one step away from each other"))
 
-    def check_weapons(self) -> Optional[characters.Action]:
-        if not self.pick_weapon_queue.empty():
-            return self.pick_weapon_queue.get()
-
-        if weapons_order.index(self.weapon) < weapons_order.index(self.old_weapon) and not self.action_queue.empty():
+    def check_weapons(self) -> None:
+        if weapons_order.index(self.weapon) < weapons_order.index(self.old_weapon):
+            if self.action_queue.empty():
+                self.__add_moves(1)
             next_moves = []
             while True:
                 next_moves.append(self.action_queue.get())
@@ -368,7 +368,6 @@ class TupTupController:
                 self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
                 self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
                 self.pick_weapon_queue.put(characters.Action.STEP_FORWARD)
-            return self.pick_weapon_queue.get()
 
     @property
     def name(self) -> str:
