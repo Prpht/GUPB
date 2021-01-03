@@ -42,6 +42,7 @@ class Game(statemachine.StateMachine):
         self.episode: int = 0
         self.deaths: list[ChampionDeath] = []
         self.finished = False
+        self.last_champion = None
         super(statemachine.StateMachine, self).__init__()
 
     def on_enter_actions_done(self) -> None:
@@ -99,19 +100,22 @@ class Game(statemachine.StateMachine):
                 death = ChampionDeath(champion, self.episode)
                 self.deaths.append(death)
         self.champions = alive
+
         if len(self.champions) == 1:
             verbose_logger.debug(f"Champion {self.champions[0].controller.name} was the last one standing.")
             LastManStandingReport(self.champions[0].controller.name).log(logging.DEBUG)
-            champion = self.champions.pop()
+            self.last_champion = self.champions[-1]
+
+        if not self.champions:
+            self.finished = True
+
+            champion = self.last_champion
             death = ChampionDeath(champion, self.episode)
             self.deaths.append(death)
 
             win_callable = getattr(champion.controller, "win", None)
             if win_callable:
                 win_callable()
-
-        if not self.champions:
-            self.finished = True
 
     def _champion_action(self) -> None:
         champion = self.action_queue.pop()

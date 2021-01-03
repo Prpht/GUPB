@@ -16,6 +16,7 @@ from gupb.view import render
 
 verbose_logger = logging.getLogger('verbose')
 
+MENHIR_MANIPULATED = coordinates.Coords(8, 1)
 
 class Runner:
     def __init__(self, config: dict[str, Any]) -> None:
@@ -45,7 +46,7 @@ class Runner:
         RandomArenaPickReport(arena).log(logging.DEBUG)
         if not self.start_balancing or game_no % len(self.controllers) == 0:
             random.shuffle(self.controllers)
-            game = games.Game(arena, self.controllers)
+            game = games.Game(arena, self.controllers, MENHIR_MANIPULATED) if MENHIR_MANIPULATED else games.Game(arena, self.controllers)
         else:
             self.controllers = self.controllers[1:] + [self.controllers[0]]
             game = games.Game(self._last_arena, self.controllers, self._last_menhir_position, self._last_initial_positions)

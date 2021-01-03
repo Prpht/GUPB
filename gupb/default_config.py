@@ -8,22 +8,22 @@ from gupb.controller import tup_tup
 
 CONFIGURATION = {
     'arenas': [
-        'archipelago',
-        'wasteland',
-        'dungeon',
+        # 'archipelago',
+        # 'wasteland',
+        # 'dungeon',
         'fisher_island',
     ],
     'controllers': [
-        botelka_ml.BotElkaController("Z nami na pewno zdasz"),
-        claret_wolf.ClaretWolfController(),
-        ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
-        krowa123.Krowa1233Controller("Krowka"),
-        shallow_mind.ShallowMindController('test'),
-        tup_tup.TupTupController('Bot'),
+        # botelka_ml.BotElkaController("Z nami na pewno zdasz"),
+        # claret_wolf.ClaretWolfController(),
+        # ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
+        # krowa123.Krowa1233Controller("Krowka"),
+        # shallow_mind.ShallowMindController('test'),
+        # tup_tup.TupTupController('Bot'),
         bb_bot.BBBotController("Bartek"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 280,
+    'runs_no': 1,
 }
