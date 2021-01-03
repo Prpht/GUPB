@@ -27,7 +27,10 @@ def go_to_menhir(grid: Grid, state: State) -> Action:
         add_coords(state.menhir_coords, Facing.LEFT.value),
     ]
 
-    for menhir_surrounding in menhir_surroundings:
+    sorted_menhir_surroundings = sorted(menhir_surroundings, key=lambda
+        coord: np.sqrt((coord.x - state.bot_coords.x) ** 2 + (coord.y - state.bot_coords.y) ** 2))
+
+    for menhir_surrounding in sorted_menhir_surroundings:
         if menhir_surrounding == state.bot_coords:
             return Action.DO_NOTHING
 
@@ -107,14 +110,28 @@ def grid_with_players_mask(grid: Grid, knowledge: ChampionKnowledge, state: Stat
         }[weapon_name]
         coords_obj = Coords(*coords)
 
-        # grid_cpy.node(coords_obj.x, coords_obj.y).walkable = False
         grid_cpy.node(coords_obj.x, coords_obj.y).weight = 10000
 
+        # take into consideration future moves of an enemy
+        # TURN_LEFT
+        for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing.turn_left()):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+        # TURN_RIGHT
+        for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing.turn_right()):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+        # STEP_FORWARD
+        for cut_pos in weapon.cut_positions(state.arena.terrain, add_coords(coords_obj, character.facing.value),
+                                            character.facing):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+
+        # take into consideration actual position of enemy
         for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing):
             cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
-
-            # grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).walkable = False
             grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 10000
+
     # print(grid.grid_str())
     return grid_cpy
 

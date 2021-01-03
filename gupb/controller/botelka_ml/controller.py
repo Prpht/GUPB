@@ -111,7 +111,7 @@ class BotElkaController:
 
         if lost_health:
             debug_print("Ouch! Running away.")
-            return flee(self.grid_safe_only, new_state)
+            return run_away(self.grid_safe_only, new_state)
 
         if new_state.weapon.description().name == "knife":
             new_weapon = find_better_weapon(self.grid_safe_only, new_state)
@@ -127,7 +127,7 @@ class BotElkaController:
             debug_print("Mist not yet visible, spinning")
             return Action.TURN_RIGHT
 
-        if new_state.distance_to_menhir < 2.0:
+        if new_state.distance_to_menhir <= 1.0:
             debug_print("Menhir reached, spinning")
             return Action.TURN_RIGHT
 

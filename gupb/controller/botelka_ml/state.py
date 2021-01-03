@@ -40,7 +40,7 @@ def weapon_ranking_by_desc(weapon: WeaponDescription, arena_name: str) -> int:
         if weapon.name == 'bow':
             return 20
         if weapon.name == 'amulet':
-            return 6
+            return 8
     # All other maps
     if weapon.name == 'amulet':
         return 10
