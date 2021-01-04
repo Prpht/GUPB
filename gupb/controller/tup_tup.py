@@ -12,14 +12,14 @@ ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island',
 
 IS_LEARNING = False
 ALPHA = 0.2
-EPSILON = 0.2
+EPSILON = 0.5
 GAMMA = 0.99
 
 DEFAULT_VAL = 0
 MENHIR_NEIGHBOURHOOD_DISTANCE = 5
 
-CLOSE_DISTANCE_THRESHOLD = 13
-MODERATE_DISTANCE_THRESHOLD = 19
+CLOSE_DISTANCE_THRESHOLD = 12
+MODERATE_DISTANCE_THRESHOLD = 18
 
 
 # noinspection PyUnusedLocal
@@ -126,6 +126,7 @@ class TupTupController:
 
             if not self.has_calculated_path or len(self.path) > 5:
                 self.check_weapons()
+
             if not self.pick_weapon_queue.empty():
                 return self.pick_weapon_queue.get()
 
@@ -355,15 +356,20 @@ class TupTupController:
 
     def check_weapons(self) -> None:
         if weapons_order.index(self.weapon) < weapons_order.index(self.old_weapon):
-            if self.action_queue.empty():
-                self.__add_moves(1)
-            next_moves = []
-            while True:
-                next_moves.append(self.action_queue.get())
-                if next_moves[-1] == characters.Action.STEP_FORWARD:
-                    break
-            for m in next_moves:
-                self.pick_weapon_queue.put(m)
+            if not (len(self.path) == 0 and self.action_queue.empty()):
+                if self.action_queue.empty():
+                    self.__add_moves(1)
+                next_moves = []
+                while not self.action_queue.empty():
+                    next_moves.append(self.action_queue.get())
+                    if next_moves[-1] == characters.Action.STEP_FORWARD:
+                        break
+                if not next_moves[-1] == characters.Action.STEP_FORWARD:
+                    for m in next_moves:
+                        self.action_queue.put(m)
+                    return None
+                for m in next_moves:
+                    self.pick_weapon_queue.put(m)
             for _ in range(2):
                 self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
                 self.pick_weapon_queue.put(characters.Action.TURN_LEFT)
@@ -458,8 +464,9 @@ class TupTupController:
             self.arena_data['Q'][(state, action)] = 0.0
         self.arena_data['Q'][(state, action)] += self.arena_data['alpha'] * (
                 reward + self.arena_data['discount_factor'] * future_value - old_value)
-        # if self.game_no % 50 == 0:  # to show learning progress
+        # if self.game_no % 20 == 0:  # to show learning progress
         #     print(self.arenas_knowledge)
+
 
     def __init_model(self) -> Dict:
         if IS_LEARNING:
