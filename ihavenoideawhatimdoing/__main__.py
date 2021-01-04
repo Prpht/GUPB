@@ -2,8 +2,8 @@ import gym
 from gym import spaces
 from gupb.__main__ import main
 import numpy as np
-from observation_encoding import encode_observation
-from openaigym_env import *
+from .tf_agents_experiment import *
+from .observation_encoding import encode_observation
 
 
 class CustomEnv(gym.Env):
@@ -23,8 +23,11 @@ class CustomEnv(gym.Env):
         self.game = game
 
     def step(self, action):
-        game.cycle()
         champion = list(filter(lambda c: c.controller.name() == 'IHaveNoIdeaWhatImDoingController', game.champions))[0]
+        champion.insert_next_action(action)
+
+        game.cycle()
+
         done = False
         if champion.controller.health <= 1:
             done = True
@@ -38,9 +41,9 @@ class CustomEnv(gym.Env):
         return obs, reward, done, {}
 
     def reset(self):
-        game = main(prog_name='python -m gupb')
+        self.game = main(prog_name='python -m gupb')
         game.cycle()
-        champion = list(filter(lambda c: c.controller.name() == 'IHaveNoIdeaWhatImDoingController', game.champions))[0]
+        champion = list(filter(lambda c: c.controller.name == 'IHaveNoIdeaWhatImDoingController', self.game.champions))[0]
 
         return encode_observation(champion.controller.knowledge)
 
