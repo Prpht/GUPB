@@ -7,6 +7,7 @@ from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model import weapons
 from gupb.model import tiles
+from gupb.model.games import MIST_TTH
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -72,11 +73,15 @@ class BBBotController:
         self.__init__(self.first_name)
         self.menhirPos = arena_description.menhir_position
         self.arena = arenas.Arena.load(arena_description.name)
+        self.arena.menhir_position= arena_description.menhir_position
+        self.mist_radius = self.arena.mist_radius
         self.actions_buffer = list()
         self.learning_controller = LearningController(self.QL, self, learning=True)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.iteration += 1
+        self.arena_housekeeping()
+
         self.currentPos = knowledge.position
         self.scanedArena.update(knowledge.visible_tiles)
 
@@ -89,16 +94,20 @@ class BBBotController:
         if self.learning:
             if len(self.actions_buffer) == 0:
                 try:
+                    reward = 1 + self.learning_controller.apply_menhir_reward()
                     if self.iteration > 1:
-                        reward = 1 + self.learning_controller.apply_menhir_reward()
-                        state, action = self.learning_controller.episode(reward)
-                    else:
                         state, action = self.learning_controller.initial_ep()
+                    else:
+                        state, action = self.learning_controller.episode(reward)
+
+                    # self.learning_controller.explain_state(state)
+                    # self.learning_controller.explain_action(action)
 
                 except Exception as e:
                     print(e)
 
                 self.actions_buffer = self.learning_controller.translate_action(action)
+                # tmp = input()
 
             return self.actions_buffer.pop()
 
@@ -143,6 +152,11 @@ class BBBotController:
             result |= (self.scanedArena[pos].character is not None and self.scanedArena[
                 pos].character.controller_name != self.name)
         return result
+
+    def arena_housekeeping(self):
+        if self.iteration % MIST_TTH == 0:
+            self.arena.increase_mist()
+
 
     @property
     def name(self) -> str:

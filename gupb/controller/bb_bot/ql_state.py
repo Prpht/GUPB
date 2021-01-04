@@ -15,8 +15,9 @@ from gupb.model import coordinates, characters, arenas
 import numpy as np
 import os
 import json
+import matplotlib.ticker as ticker
 
-M_DIST_CAP = 32
+M_DIST_CAP = 10
 
 MENHIR_REW = 30
 
@@ -25,8 +26,9 @@ EPSILON = 0.9
 GAMMA = 0.96
 LR = 0.4
 
-MODEL_NAME = "imspecial2"
+MODEL_NAME = "mist-runner"
 GAMES_FREQ = 200
+N = 3
 
 
 class QAction(Enum):
@@ -42,15 +44,23 @@ QActions = list(QAction)
 def get_state(position: coordinates.Coords, facing: characters.Facing, controller):
     # import code;
     # code.interact(local=dict(globals(), **locals()))
-    menhir_pos: coordinates.Coords = controller.menhirPos
+    x = M_DIST_CAP
+    y = M_DIST_CAP
+    for coords in controller.arena.terrain:
+        if len(controller.arena.terrain[coords].effects) == 0 or not controller.arena.terrain[coords].effects[0].description().type == 'mist':
+            continue
 
-    menhir_x = menhir_pos.x - position.x
-    menhir_y = menhir_pos.y - position.y
+        nx = coords.x - position.x
+        ny = coords.y - position.y
 
+        if abs(nx) < abs(x):
+            x = nx
+        if abs(ny) < abs(y):
+            y = ny
 
     return (
-        min(menhir_x, M_DIST_CAP) + M_DIST_CAP,
-        min(menhir_y, M_DIST_CAP) + M_DIST_CAP,
+        max(min(x, M_DIST_CAP), -M_DIST_CAP) + M_DIST_CAP,
+        max(min(y, M_DIST_CAP), -M_DIST_CAP) + M_DIST_CAP,
     )
 
 
@@ -68,24 +78,45 @@ class Model:
         if GAMES_FREQ is None or games % GAMES_FREQ != 0:
             return
 
-        heatmap = np.zeros(controller.arena.size)
+        heatmap = np.zeros(self.q_table.shape)
 
-        # import code;
-        # code.interact(local=dict(globals(), **locals()))
-
-        for pos in controller.arena.terrain.keys():
-            menhir_x = controller.menhirPos.x - pos.x
-            menhir_y = controller.menhirPos.y - pos.y
-            mx = min(menhir_x, M_DIST_CAP) + M_DIST_CAP
-            my = min(menhir_y, M_DIST_CAP) + M_DIST_CAP
-            heatmap[pos.y, pos.x] = np.max(self.q_table[mx, my, :])
-
-        # print(heatmap)
+        labels = range(-M_DIST_CAP, M_DIST_CAP+1)
+        ticks = range(len(labels))
 
         plt.clf()
-        plt.imshow(heatmap, cmap='hot')
-        plt.colorbar()
+        fig, (ax1, ax2, ax3, ax4, cax) = plt.subplots(1, 5, figsize=(14, 4))
+        axes = [ax1, ax2, ax3, ax4]
+
+        for dir in range(len(QActions)):
+            for x in ticks:
+                for y in ticks:
+                    xv = labels[x]
+                    yv = labels[y]
+
+                    dx = max(min(xv, M_DIST_CAP), -M_DIST_CAP) + M_DIST_CAP
+                    dy = max(min(yv, M_DIST_CAP), -M_DIST_CAP) + M_DIST_CAP
+                    total =  np.sum(self.q_table[dx, dy, :])
+
+                    v = self.q_table[dx, dy, dir] / total if total > 0.0 else -0.1
+                    heatmap[y, x, dir] = v
+
+            ax = axes[dir]
+            ax.set_title(str(QActions[dir]))
+            im = ax.imshow(heatmap[:,:,dir], cmap='viridis', vmin=-0.1, vmax=1.0)
+
+            ax.xaxis.set_major_locator(ticker.FixedLocator(ticks))
+            # ax.set_xticks(ticks, labels)
+            ax.set_xticklabels(labels)
+            ax.yaxis.set_major_locator(ticker.FixedLocator(ticks))
+            # ax.set_yticks(ticks, labels)
+            ax.set_yticklabels(labels)
+
+        fig.tight_layout(pad=2.0)
+        fig.colorbar(im, cax=cax)
+        cax.set_box_aspect(4)
+
         plt.savefig("./bb_bot_resources/{}/heatmap_{}.png".format(MODEL_NAME, games))
+        plt.close(fig)
 
     def plot_rewards(self):
         games = len(self.rewards)
@@ -105,8 +136,7 @@ class Model:
 
         plt.clf()
         plt.plot(moving_averages)
-        plt.savefig("./bb_bot_resources/{}/rewards.png".format(MODEL_NAME))
-
+        plt.savefig("./bb_bot_resources/{}/rewards_{}.png".format(MODEL_NAME, games))
 
     def audit_hits(self):
         games = len(self.rewards)
@@ -226,11 +256,10 @@ class LearningController:
     def explain_state(self, state):
         x = state[0] - M_DIST_CAP
         y = state[1] - M_DIST_CAP
-        print("X: {};\tY: {};".format(x, y))
+        print("Mist is far by X: {};\tY: {};".format(x, y))
 
     def explain_action(self, action):
         print("Going {}".format(str(QActions[action])))
-
 
     def translate_action(self, action: int):
         turns = 0
@@ -243,4 +272,5 @@ class LearningController:
             orient_i += 1
             orient_i %= len(QActions)
 
-        return [characters.Action.STEP_FORWARD] + [characters.Action.TURN_RIGHT] * turns
+        turning = [characters.Action.TURN_LEFT] if turns == 3 else [characters.Action.TURN_RIGHT] * turns
+        return [characters.Action.STEP_FORWARD] + turning
