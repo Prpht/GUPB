@@ -1,9 +1,8 @@
 from gupb.controller.shallow_mind.arenna_wrapper import ArenaWrapper
 from gupb.controller.shallow_mind.consts import WEAPONS_PRIORITY
-from gupb.controller.shallow_mind.utils import get_first_possible_move
 from gupb.model import characters
 from gupb.model.arenas import ArenaDescription
-from gupb.model.characters import ChampionDescription, Action, ChampionKnowledge
+from gupb.model.characters import Action, ChampionKnowledge
 from queue import SimpleQueue
 
 
@@ -34,23 +33,19 @@ class ShallowMindController:
         if self.arena.can_hit:
             return Action.ATTACK
         if self.arena.prev_champion:
-            if champ.health != self.arena.prev_champion.health:
+            if champ.health != self.arena.prev_champion.health and self.arena.calc_mist_dist() > 0:
                 action = self.arena.find_escape_action()
                 if action != Action.DO_NOTHING:
                     self.action_queue.put(Action.STEP_FORWARD)
                     return action
         if self.arena.calc_mist_dist() > 5:
-            if champ.weapon != WEAPONS_PRIORITY[0]:
-                action, _ = self.arena.find_move_to_nearest_weapon(WEAPONS_PRIORITY[0])
-                if action != Action.DO_NOTHING:
-                    return action
-                elif champ.weapon == WEAPONS_PRIORITY[-1]:
-                    weapons = [self.arena.find_move_to_nearest_weapon(weapon) for weapon in WEAPONS_PRIORITY]
-                    action, _ = get_first_possible_move(weapons)
-                    if action != Action.DO_NOTHING:
-                        return action
-        # todo this need to be redone
-        action, length = self.arena.find_move_to_menhir()
+            for weapon in WEAPONS_PRIORITY:
+                if champ.weapon == weapon:
+                    break
+                action_to_weapon = self.arena.find_move_to_nearest_weapon(weapon)
+                if action_to_weapon.reachable:
+                    return action_to_weapon.action
+        action = self.arena.move_to_menhir.action
         if action == Action.DO_NOTHING:
             return self.arena.find_scan_action()
         return action
