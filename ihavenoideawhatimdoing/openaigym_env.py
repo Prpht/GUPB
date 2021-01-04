@@ -1,95 +1,104 @@
-from gupb.controller import ihavenoideawhatimdoing
-import gym
-from gupb.model import characters
+import tensorflow as tf
 from gupb.model.characters import Action, ChampionKnowledge
-from gupb.model.games import Game
-from gupb.model import weapons, arenas
-from gym import spaces
-import numpy as np
-from gupb.default_config import CONFIGURATION
-from gupb.controller.ihavenoideawhatimdoing import IHaveNoIdeaWhatImDoingController
+from tf_agents.agents.categorical_dqn import categorical_dqn_agent
+from tf_agents.environments import suite_gym
+from tf_agents.networks import categorical_q_network
+from tf_agents.utils import common
+from tf_agents.replay_buffers import tf_uniform_replay_buffer
+
 N_DISCRETE_ACTIONS = len(Action)
 
 ARENA_NAMES = ['archipelago', 'dungeon', 'fisher_island', 'wasteland', 'island', 'mini']
 
 SIZE = 7
+num_iterations = 15000
+min_q_value = -20
+max_q_value = 20
+n_step_update = 2
+learning_rate = 1e-3
+gamma = 0.99
+log_interval = 200
+eval_interval = 1000
+num_eval_episodes = 10
+
+###
+### Training routines taken from https://www.tensorflow.org/agents/tutorials/9_c51_tutorial
+###
 
 
-# class MyController():
-#     def __init__(self):
-#         self.knowledge = None
-#         self.menhir_position = None
-#     @property
-#     def preferred_tabard(self) -> characters.Tabard:
-#         return characters.Tabard.RED
-#     @property
-#     def name(self):
-#         return "MyController"
-#     def decide(self, knowledge: ChampionKnowledge):
-#         self.knowledge = knowledge
-#         return self.next_action
-#     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-#         self.menhir_position = arena_description.menhir_position
+def compute_avg_return(environment, policy, num_episodes=10):
 
-class GameEnv(gym.Env):
-#   metadata = {'render.modes': ['human']}
+    total_return = 0.0
+    for _ in range(num_episodes):
+        time_step = environment.reset()
+        episode_return = 0.0
 
-    def getWeaponFromDesc(self, weapon: weapons.WeaponDescription):
-        if not weapon:
-            return 0
-        return {
-            "amulet": 1,
-            "axe": 2,
-            "knife": 3,
-            "sword":4,
-            "bow": 5
-        }[weapon.name]
-    def getWeaponFromWeapon(self, weapon: weapons.Weapon):
-        if not weapon:
-            return 0
-        return {
-            "Amulet": 1,
-            "Axe": 2,
-            "Knife": 3,
-            "Sword":4,
-            "Bow": 5
-        }[type(weapon).__name__]
+    while not time_step.is_last():
+      action_step = policy.action(time_step)
+      time_step = environment.step(action_step.action)
+      episode_return += time_step.reward
+    total_return += episode_return
 
-    def __init__(self, arena="archipelago"):
-        super(GameEnv, self).__init__()
-        self.action_space = spaces.Discrete(N_DISCRETE_ACTIONS)
-        self.controller = IHaveNoIdeaWhatImDoingController()
-        self.game = Game(arena_name=arena,to_spawn=[*CONFIGURATION["controllers"],self.controller])
-        self.observation_space = spaces.Box(low=0, high=5,
-                                            shape=(SIZE,SIZE,5), dtype=np.uint8)
-    def get_obs(self, knowledge: ChampionKnowledge, menhir_position):
-        new_space = np.zeros((SIZE,SIZE,5), dtype=np.uint8)
-        for coords,tile in self.game.arena.terrain.items():
-            if knowledge:
-                dist = (knowledge.position - coords)
-                x = abs(dist[0])+SIZE//2
-                y = abs(dist[1])+SIZE//2
-                if(x < SIZE//2 and y < SIZE//2):
-                    new_space[x,y,0] = 1 if tile.terrain_passable() else 0
-                    new_space[x,y,1] = 1 if tile.terrain_transparent() else 0
-                    if coords in knowledge.visible_tiles:
-                        new_space[x,y,2] = 1 if knowledge.visible_tiles[coords].character else 0
-        return new_space
+    avg_return = total_return / num_episodes
+    return avg_return.numpy()[0]
 
-    def step(self, action):
-        self.controller.next_action = list(Action)[action]
-        self.game.cycle()
-        mycontrollers = list(filter(lambda x: x.controller.name == "IHaveNoIdeaWhatImDoingController",self.game.champions))
-        if len(mycontrollers) > 0:
-            me = mycontrollers[0]
-        killed = 1+len(list(filter(lambda x: not x.alive,self.game.champions)))
-        return self.get_obs(self.controller.knowledge, self.controller.menhir_position), killed if (len(mycontrollers) and me.alive) else 0, not (len(mycontrollers) and me.alive), {}
-    def reset(self, arena="archipelago"):
-        self.controller = IHaveNoIdeaWhatImDoingController()
-        self.game = Game(arena_name=arena,to_spawn=[*CONFIGURATION["controllers"],self.controller])
-        return self.get_obs(self.controller.knowledge, self.controller.menhir_position)
 
-    def render(self, mode='human'):
-        pass
-    def close(self):
-        pass
+def run_training(env):
+    train_env = suite_gym.wrap_env(env)
+
+    categorical_q_net = categorical_q_network.CategoricalQNetwork(
+        train_env.observation_spec(),
+        train_env.action_spec())
+
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate)
+
+    train_step_counter = tf.compat.v2.Variable(0)
+
+    agent = categorical_dqn_agent.CategoricalDqnAgent(
+        train_env.time_step_spec(),
+        train_env.action_spec(),
+        categorical_q_network=categorical_q_net,
+        optimizer=optimizer,
+        min_q_value=min_q_value,
+        max_q_value=max_q_value,
+        n_step_update=n_step_update,
+        td_errors_loss_fn=common.element_wise_squared_loss,
+        gamma=gamma,
+        train_step_counter=train_step_counter)
+
+    replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+        data_spec=agent.collect_data_spec,
+        batch_size=train_env.batch_size)
+
+    agent.initialize()
+
+    # (Optional) Optimize by wrapping some of the code in a graph using TF function.
+    agent.train = common.function(agent.train)
+
+    # Reset the train step
+    agent.train_step_counter.assign(0)
+
+    # Evaluate the agent's policy once before training.
+    avg_return = compute_avg_return(train_env, agent.policy, num_eval_episodes)
+    returns = [avg_return]
+
+    dataset = replay_buffer.as_dataset(
+        num_parallel_calls=3, num_steps=n_step_update + 1).prefetch(3)
+
+    iterator = iter(dataset)
+
+    for _ in range(num_iterations):
+
+        # Sample a batch of data from the buffer and update the agent's network.
+        experience, unused_info = next(iterator)
+        train_loss = agent.train(experience)
+
+        step = agent.train_step_counter.numpy()
+
+        if step % log_interval == 0:
+            print('step = {0}: loss = {1}'.format(step, train_loss.loss))
+
+        if step % eval_interval == 0:
+            avg_return = compute_avg_return(train_env, agent.policy, num_eval_episodes)
+            print('step = {0}: Average Return = {1:.2f}'.format(step, avg_return))
+            returns.append(avg_return)
