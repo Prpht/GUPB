@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    ShallowMindController('test'),
+    ShallowMindController('v6'),
 ]

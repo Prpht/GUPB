@@ -1,10 +1,10 @@
 import copy
-from typing import Dict, Tuple, List
+from typing import Dict, List
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.core.grid import Grid
 
 from gupb.controller.shallow_mind.consts import FIELD_ATTACKED, FIELD_WEIGHT, WEAPONS_ENCODING, WEAPONS_MAP
-from gupb.controller.shallow_mind.utils import points_dist, get_first_possible_move
+from gupb.controller.shallow_mind.utils import points_dist
 from gupb.model import characters
 from gupb.model.arenas import Arena, ArenaDescription
 from gupb.model.characters import ChampionDescription, Facing, Action
@@ -89,8 +89,8 @@ class ArenaWrapper(Arena):
                 y, x = coords
                 if distance == self.mist_radius:
                     self.terrain_matrix[x][y] = FIELD_ATTACKED if self.terrain_matrix[x][y] else 0
-                elif distance == self.mist_radius + 2:
-                    self.terrain_matrix[x][y] = -2
+                    self.terrain[coords].effects = True
+                    self.terrain[coords].loot = None
 
     def prepare_matrix(self, knowledge: characters.ChampionKnowledge) -> None:
 
@@ -260,6 +260,8 @@ class ArenaWrapper(Arena):
         while safe:
             coord += facing
             if coord[0] < 0 or coord[1] < 0 or coord[0] >= x or coord[1] >= y:
+                break
+            if self.terrain[coord].effects:
                 break
             if self.terrain[coord].terrain_passable():
                 safe = False
