@@ -27,7 +27,10 @@ def go_to_menhir(grid: Grid, state: State) -> Action:
         add_coords(state.menhir_coords, Facing.LEFT.value),
     ]
 
-    for menhir_surrounding in menhir_surroundings:
+    sorted_menhir_surroundings = sorted(menhir_surroundings, key=lambda
+        coord: np.sqrt((coord.x - state.bot_coords.x) ** 2 + (coord.y - state.bot_coords.y) ** 2))
+
+    for menhir_surrounding in sorted_menhir_surroundings:
         if menhir_surrounding == state.bot_coords:
             return Action.DO_NOTHING
 
@@ -107,14 +110,28 @@ def grid_with_players_mask(grid: Grid, knowledge: ChampionKnowledge, state: Stat
         }[weapon_name]
         coords_obj = Coords(*coords)
 
-        grid_cpy.node(coords_obj.x, coords_obj.y).walkable = False
-        grid_cpy.node(coords_obj.x, coords_obj.y).weight = 0
+        grid_cpy.node(coords_obj.x, coords_obj.y).weight = 10000
 
+        # take into consideration future moves of an enemy
+        # TURN_LEFT
+        for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing.turn_left()):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+        # TURN_RIGHT
+        for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing.turn_right()):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+        # STEP_FORWARD
+        for cut_pos in weapon.cut_positions(state.arena.terrain, add_coords(coords_obj, character.facing.value),
+                                            character.facing):
+            cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 500
+
+        # take into consideration actual position of enemy
         for cut_pos in weapon.cut_positions(state.arena.terrain, coords_obj, character.facing):
             cut_pos_obj = Coords(cut_pos[0], cut_pos[1])
+            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 10000
 
-            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).walkable = False
-            grid_cpy.node(cut_pos_obj.x, cut_pos_obj.y).weight = 0
     # print(grid.grid_str())
     return grid_cpy
 
@@ -168,53 +185,24 @@ def find_better_weapon(grid: Grid, state: State) -> Action:
     return _go_to_coords(grid, state.bot_coords, state.facing, closest_weapon_position)
 
 
-i = 0
+def run_away(grid: Grid, state: State) -> Action:
+    def simple_dist(bot_coords, node_coords):
+        diff = sub_coords(bot_coords, node_coords)
+        return np.sqrt(diff.x ** 2 + diff.y ** 2)
 
+    grid.node(state.bot_coords.x, state.bot_coords.y).weight = 10000
 
-def flee(grid: Grid, state: State) -> Action:
-    global i
-    i += 1
-    if i % 2 == 0:
-        return Action.TURN_RIGHT
-    return Action.STEP_FORWARD
+    safe_blocks = sorted(
+        [
+            Coords(node.x, node.y)
+            for nodes in grid.nodes
+            for node in nodes
+            if node.walkable and node.weight < 100
+        ],
+        key=lambda coord: simple_dist(state.bot_coords, coord)  # Sort ascending by distance
+    )
 
-    # enemies_in_one_line = [
-    #     enemy_coord
-    #     for enemy_coord in state.visible_enemies
-    #     if enemy_coord.x == state.bot_coords.x or enemy_coord.y == state.bot_coords.y
-    # ]
-    # if len(enemies_in_one_line):
-    #     return Action.TURN_RIGHT
-    #
-    # return Action.STEP_FORWARD
-    # enemies_in_one_line = [
-    #     enemy_coord
-    #     for enemy_coord in state.visible_enemies
-    #     if enemy_coord.x == state.bot_coords.x or enemy_coord.y == state.bot_coords.y
-    # ]
-    #
-    # dangerous_x = {enemy.x for enemy in enemies_in_one_line}
-    # dangerous_y = {enemy.y for enemy in enemies_in_one_line}
-    #
-    # dangerous_x.add(state.bot_coords.x)
-    # dangerous_y.add(state.bot_coords.y)
-    #
-    # safe_coords = None
-    #
-    # for x in range(grid.width):
-    #     if x in dangerous_x:
-    #         continue
-    #
-    #     for y in range(grid.height):
-    #         if y in dangerous_y:
-    #             continue
-    #
-    #         if grid.node(x, y).walkable:
-    #             safe_coords = Coords(x, y)
-    #
-    # safe_coords = safe_coords if safe_coords else state.menhir_coords
-    #
-    # return _go_to_coords(grid, state.bot_coords, state.facing, safe_coords)
+    return _go_to_coords(grid, state.bot_coords, state.facing, safe_blocks[0]) if safe_blocks else Action.STEP_FORWARD
 
 
 def _go_to_coords(grid: Grid, bot_coords: Coords, bot_facing: Facing, destination_coords: Coords) -> Action:
