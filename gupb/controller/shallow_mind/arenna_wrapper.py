@@ -90,7 +90,6 @@ class ArenaWrapper(Arena):
                 if distance == self.mist_radius:
                     self.terrain_matrix[x][y] = FIELD_ATTACKED if self.terrain_matrix[x][y] else 0
                     self.terrain[coords].effects = True
-                    self.terrain[coords].loot = None
 
     def prepare_matrix(self, knowledge: characters.ChampionKnowledge) -> None:
 
@@ -109,7 +108,7 @@ class ArenaWrapper(Arena):
         for position, tileDescription in knowledge.visible_tiles.items():
             if tileDescription.character and tileDescription.character != self.champion:
                 self.champions[tileDescription.character] = position
-            elif tileDescription.loot:
+            if tileDescription.loot:
                 self.terrain_description[position] = tileDescription
 
         self.champions = {champ: cords for champ, cords in self.champions.items() if
@@ -169,6 +168,8 @@ class ArenaWrapper(Arena):
         time = 0
         if end_position == self.position:
             return DestinationWrapper(end_position, time=time)
+        if self.terrain[end_position].effects:
+            return DestinationWrapper(end_position, time=-1)
         grid = Grid(matrix=self.matrix)
         start = grid.node(*self.position)
         end = grid.node(*end_position)
