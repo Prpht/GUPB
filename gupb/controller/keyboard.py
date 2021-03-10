@@ -43,6 +43,10 @@ class KeyboardController:
     def name(self) -> str:
         return 'KeyboardController'
 
+    @property
+    def preferred_tabard(self) -> characters.Tabard:
+        return characters.Tabard.WHITE
+
 
 POTENTIAL_CONTROLLERS = [
     KeyboardController(),

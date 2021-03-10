@@ -1,19 +1,30 @@
-from gupb.controller import keyboard
-from gupb.controller import random
-
-KEYBOARD_CONTROLLER = keyboard.KeyboardController()
+from gupb.controller import bb_bot
+from gupb.controller import botelka_ml
+from gupb.controller import claret_wolf
+from gupb.controller import ihavenoideawhatimdoing
+from gupb.controller import shallow_mind
+from gupb.controller import krowa123
+from gupb.controller import tup_tup
 
 CONFIGURATION = {
     'arenas': [
-        'island',
+        'archipelago',
+        'wasteland',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
-        KEYBOARD_CONTROLLER,
-        random.RandomController("Alice"),
-        random.RandomController("Bob"),
-        random.RandomController("Cecilia"),
+        botelka_ml.BotElkaController("Z nami na pewno zdasz"),
+        claret_wolf.ClaretWolfController(),
+        ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
+        krowa123.Krowa1233Controller("Krowka"),
+        shallow_mind.ShallowMindController('v6'),
+        tup_tup.TupTupController('Bot'),
+        bb_bot.BBBotController("Bartek"),
     ],
-    'visualise': True,
-    'show_sight': KEYBOARD_CONTROLLER,
-    'runs_no': 1,
+    'start_balancing': False,
+    'visualise': False,
+    'show_sight': None,
+    'runs_no': 300,
+    'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }

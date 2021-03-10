@@ -1,11 +1,15 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import logging
 from enum import auto, Enum
 import functools
 from typing import NamedTuple
 
+from gupb.logger import core as logger_core
 from gupb.model import characters
+
+verbose_logger = logging.getLogger('verbose')
 
 CUT_DAMAGE: int = 1
 MIST_DAMAGE: int = 1
@@ -53,7 +57,8 @@ class Mist(Effect):
 
     @staticmethod
     def stay(champion: characters.Champion) -> None:
-        logging.debug(f"Champion {champion.controller.name} was damaged by deadly mist.")
+        verbose_logger.debug(f"Champion {champion.controller.name} was damaged by deadly mist.")
+        ChampionDamagedByMistReport(champion.controller.name, MIST_DAMAGE).log(logging.DEBUG)
         champion.damage(MIST_DAMAGE)
 
     @staticmethod
@@ -64,7 +69,8 @@ class Mist(Effect):
 class WeaponCut(Effect):
     @staticmethod
     def instant(champion: characters.Champion) -> None:
-        logging.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
+        verbose_logger.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
+        ChampionDamagedByWeaponCutReport(champion.controller.name, CUT_DAMAGE).log(logging.DEBUG)
         champion.damage(CUT_DAMAGE)
 
     @staticmethod
@@ -74,6 +80,18 @@ class WeaponCut(Effect):
     @staticmethod
     def lifetime() -> EffectLifetime:
         return EffectLifetime.INSTANT
+
+
+@dataclass(frozen=True)
+class ChampionDamagedByMistReport(logger_core.LoggingMixin):
+    controller_name: str
+    damage: int
+
+
+@dataclass(frozen=True)
+class ChampionDamagedByWeaponCutReport(logger_core.LoggingMixin):
+    controller_name: str
+    damage: int
 
 
 EFFECTS_ORDER = {

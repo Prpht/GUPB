@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import itertools
 from typing import Any, Optional, TypeVar
 
 import pygame
@@ -29,7 +30,7 @@ def load_sprite(group: str, name: str, transparent: pygame.Color = None) -> Spri
 
 class SpriteRepository:
     def __init__(self) -> None:
-        self.sprites: dict[type, Sprite] = {
+        self.sprites: dict[Any, Sprite] = {
             tiles.Land: load_sprite('tiles', 'land'),
             tiles.Sea: load_sprite('tiles', 'sea'),
             tiles.Wall: load_sprite('tiles', 'wall'),
@@ -41,21 +42,47 @@ class SpriteRepository:
             weapons.Bow: load_sprite('weapons', 'bow', BLACK),
             weapons.Amulet: load_sprite('weapons', 'amulet', BLACK),
 
-            characters.Champion: load_sprite('characters', 'champion', BLACK),
+            characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
+            characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
+            characters.Tabard.GREY: load_sprite('characters', 'champion_grey', BLACK),
+            characters.Tabard.RED: load_sprite('characters', 'champion_red', BLACK),
+            characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
+            characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
+            characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
         }
-        self.champion_sprites: dict[characters.Facing, Sprite] = {
-            characters.Facing.RIGHT: self.sprites[characters.Champion],
-            characters.Facing.UP: pygame.transform.rotate(self.sprites[characters.Champion], 90),
-            characters.Facing.LEFT: pygame.transform.rotate(self.sprites[characters.Champion], 180),
-            characters.Facing.DOWN: pygame.transform.rotate(self.sprites[characters.Champion], 270),
+        self.rotation_values: dict[characters.Facing, int] = {
+            characters.Facing.RIGHT: 0,
+            characters.Facing.UP: 90,
+            characters.Facing.LEFT: 180,
+            characters.Facing.DOWN: 270,
+        }
+        self.champion_sprites: dict[tuple[characters.Tabard, characters.Facing], Sprite] = {
+            (tabard, facing): pygame.transform.rotate(self.sprites[tabard], self.rotation_values[facing])
+            for tabard, facing in itertools.product(
+                [
+                    characters.Tabard.BLUE,
+                    characters.Tabard.BROWN,
+                    characters.Tabard.GREY,
+                    characters.Tabard.RED,
+                    characters.Tabard.VIOLET,
+                    characters.Tabard.WHITE,
+                    characters.Tabard.YELLOW,
+                ],
+                [
+                    characters.Facing.RIGHT,
+                    characters.Facing.UP,
+                    characters.Facing.LEFT,
+                    characters.Facing.DOWN,
+                ]
+            )
         }
 
     def match_sprite(self, element: Any) -> Sprite:
         if isinstance(element, characters.Champion):
-            return self.champion_sprites[element.facing]
+            return self.champion_sprites[(element.tabard, element.facing)]
         else:
             return self.sprites[type(element)]
 
