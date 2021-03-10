@@ -18,13 +18,13 @@ CONFIGURATION = {
         claret_wolf.ClaretWolfController(),
         ihavenoideawhatimdoing.IHaveNoIdeaWhatImDoingController(),
         krowa123.Krowa1233Controller("Krowka"),
-        shallow_mind.ShallowMindController('test'),
+        shallow_mind.ShallowMindController('v6'),
         tup_tup.TupTupController('Bot'),
         bb_bot.BBBotController("Bartek"),
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 500,
+    'runs_no': 300,
     'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }
