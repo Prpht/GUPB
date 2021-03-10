@@ -10,6 +10,13 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
+TABARD_ASSIGNMENT = {
+    "Alice": characters.Tabard.BLUE,
+    "Bob": characters.Tabard.YELLOW,
+    "Cecilia": characters.Tabard.RED,
+    "Darius": characters.Tabard.GREY,
+}
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -28,7 +35,7 @@ class RandomController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         pass
 
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
 
     @property
@@ -37,7 +44,7 @@ class RandomController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
 
 
 POTENTIAL_CONTROLLERS = [
