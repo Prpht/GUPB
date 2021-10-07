@@ -4,6 +4,8 @@ Gra Udająca Prawdziwe Battle-Royale (polish for "Game Pretending to be a True B
 
 A simplified action game used for teaching machine learning courses at AGH University of Science and Technology.
 
+![Sample GUPB State](https://github.com/Prpht/GUPB/blob/master/screenshots/gupb_sample_state.png?raw=true)
+
 ## Requirements
 
 The projects requires Python 3.8 or higher.
