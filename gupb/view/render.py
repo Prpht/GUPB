@@ -4,6 +4,7 @@ import itertools
 from typing import Any, Optional, TypeVar
 
 import pygame
+import pygame.freetype
 
 from gupb.controller import keyboard
 from gupb.model import characters
@@ -17,7 +18,10 @@ pygame.init()
 Sprite = TypeVar('Sprite')
 
 TILE_SIZE = 8
+HEALTH_BAR_HEIGHT = 3
+
 BLACK = pygame.Color('black')
+GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
 
 
 def load_sprite(group: str, name: str, transparent: pygame.Color = None) -> Sprite:
@@ -103,6 +107,7 @@ class Renderer:
             keyboard_controller: Optional[keyboard.KeyboardController] = None,
     ) -> None:
         self.screen = self._resize_window(game)
+        self._render_starting_screen()
 
         time_to_cycle = self._time_to_cycle(game)
         self.clock.tick()
@@ -129,6 +134,18 @@ class Renderer:
     def _time_to_cycle(self, game: games.Game) -> int:
         return self.ms_per_time_unit * game.current_state.value
 
+    def _render_starting_screen(self):
+        wait_for_start_key = True
+        while wait_for_start_key:
+            GAME_FONT.render_to(self.screen, (70, 180), "Press X to start..!", (250, 250, 250))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_x:
+                    wait_for_start_key = False
+
     def _render(self, game: games.Game, show_sight: Optional[characters.Champion]) -> None:
         background = pygame.Surface(self.screen.get_size())
         background.convert()
@@ -139,6 +156,20 @@ class Renderer:
         pygame.display.flip()
 
     def _render_arena(self, game: games.Game, background: pygame.Surface) -> None:
+        def render_character() -> None:
+            def prepare_heath_bar_rect(health: int) -> pygame.Rect:
+                return pygame.Rect(
+                    blit_destination[0],
+                    blit_destination[1] - HEALTH_BAR_HEIGHT - 1,
+                    health,
+                    HEALTH_BAR_HEIGHT
+                )
+
+            character_sprite = self.sprite_repository.match_sprite(tile.character)
+            background.blit(character_sprite, blit_destination)
+            pygame.draw.rect(background, (0, 0, 0), prepare_heath_bar_rect(characters.CHAMPION_STARTING_HP))
+            pygame.draw.rect(background, (250, 0, 0), prepare_heath_bar_rect(tile.character.health))
+
         for i, j in game.arena.terrain:
             blit_destination = (i * TILE_SIZE, j * TILE_SIZE)
             tile = game.arena.terrain[i, j]
@@ -148,8 +179,7 @@ class Renderer:
                 loot_sprite = self.sprite_repository.match_sprite(tile.loot)
                 background.blit(loot_sprite, blit_destination)
             if tile.character:
-                character_sprite = self.sprite_repository.match_sprite(tile.character)
-                background.blit(character_sprite, blit_destination)
+                render_character()
             if tile.effects:
                 for effect in tile.effects:
                     effect_sprite = self.sprite_repository.match_sprite(effect)
@@ -160,7 +190,7 @@ class Renderer:
         if show_sight in game.champions:
             darken_percent = 0.5
             dark = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
-            dark.fill((0, 0, 0, darken_percent * 255))
+            dark.fill((0, 0, 0, int(darken_percent * 255)))
             visible = game.arena.visible_coords(show_sight)
             for i, j in game.arena.terrain:
                 if (i, j) not in visible:

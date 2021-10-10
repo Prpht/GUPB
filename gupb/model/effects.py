@@ -11,7 +11,7 @@ from gupb.model import characters
 
 verbose_logger = logging.getLogger('verbose')
 
-CUT_DAMAGE: int = 1
+CUT_DAMAGE: int = 2
 MIST_DAMAGE: int = 1
 
 

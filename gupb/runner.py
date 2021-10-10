@@ -50,7 +50,12 @@ class Runner:
             game = games.Game(arena, self.controllers)
         else:
             self.controllers = self.controllers[1:] + [self.controllers[0]]
-            game = games.Game(self._last_arena, self.controllers, self._last_menhir_position, self._last_initial_positions)
+            game = games.Game(
+                self._last_arena,
+                self.controllers,
+                self._last_menhir_position,
+                self._last_initial_positions
+            )
         self._last_arena = game.arena.name
         self._last_menhir_position = game.arena.menhir_position
         self._last_initial_positions = game.initial_champion_positions

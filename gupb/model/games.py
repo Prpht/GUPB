@@ -15,7 +15,7 @@ from gupb.model import coordinates
 
 verbose_logger = logging.getLogger('verbose')
 
-MIST_TTH: int = 5
+MIST_TTH: int = 30
 
 ChampionDeath = NamedTuple('ChampionDeath', [('champion', characters.Champion), ('episode', int)])
 

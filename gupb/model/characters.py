@@ -15,7 +15,7 @@ from gupb.model import weapons
 
 verbose_logger = logging.getLogger('verbose')
 
-CHAMPION_STARTING_HP: int = 5
+CHAMPION_STARTING_HP: int = 8
 
 
 class ChampionKnowledge(NamedTuple):

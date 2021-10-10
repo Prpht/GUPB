@@ -35,6 +35,7 @@ def humanize_time(time_diff_secs):
     return '{:.2f} {}'.format(shown_num, unit)
 
 
+# noinspection PyShadowingBuiltins
 def print_stats(function_name, all=False, total=True, avg=True):
     if function_name not in PROFILE_RESULTS:
         print("{!r} wasn't profiled, nothing to display.".format(function_name))
@@ -44,9 +45,8 @@ def print_stats(function_name, all=False, total=True, avg=True):
         average = total_runtime / len(runtimes)
         print('Stats for function: {!r}'.format(function_name))
         if all:
-            print('  run times: {}'.format([humanize_time(time) for time in runtimes]))
+            print('  run times: {}'.format([humanize_time(run_time) for run_time in runtimes]))
         if total:
             print('  total run time: {}'.format(humanize_time(total_runtime)))
         if avg:
             print('  average run time: {}'.format(humanize_time(average)))
-

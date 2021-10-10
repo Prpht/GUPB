@@ -18,12 +18,16 @@ class Weapon(ABC):
 
     @classmethod
     @abstractmethod
-    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+    def cut_positions(
+            cls,
+            terrain: arenas.Terrain,
+            position: coordinates.Coords,
+            facing: characters.Facing
+    ) -> List[coordinates.Coords]:
         raise NotImplementedError
 
-    @classmethod
     @abstractmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         raise NotImplementedError
 
     @staticmethod
@@ -39,7 +43,12 @@ class LineWeapon(Weapon, ABC):
         raise NotImplementedError
 
     @classmethod
-    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+    def cut_positions(
+            cls,
+            terrain: arenas.Terrain,
+            position: coordinates.Coords,
+            facing: characters.Facing
+    ) -> List[coordinates.Coords]:
         cut_positions = []
         cut_position = position
         for _ in range(cls.reach()):
@@ -51,10 +60,9 @@ class LineWeapon(Weapon, ABC):
                 break
         return cut_positions
 
-    @classmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
-        for cut_position in cls.cut_positions(arena.terrain, position, facing):
-            cls.cut_transparent(arena, cut_position)
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        for cut_position in self.cut_positions(arena.terrain, position, facing):
+            self.cut_transparent(arena, cut_position)
 
 
 class Knife(LineWeapon):
@@ -70,33 +78,55 @@ class Sword(LineWeapon):
 
 
 class Bow(LineWeapon):
+    def __init__(self):
+        self.ready: bool = False
+
     @staticmethod
     def reach() -> int:
         return 50
 
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        if self.ready:
+            super().cut(arena, position, facing)
+            self.ready = False
+        else:
+            self.ready = True
+
 
 class Axe(Weapon):
-
     @classmethod
-    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
+    def cut_positions(
+            cls,
+            terrain: arenas.Terrain,
+            position: coordinates.Coords,
+            facing: characters.Facing
+    ) -> List[coordinates.Coords]:
         centre_position = position + facing.value
         left_position = centre_position + facing.turn_left().value
         right_position = centre_position + facing.turn_right().value
         return [left_position, centre_position, right_position]
 
-    @classmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
-        for cut_position in cls.cut_positions(arena.terrain, position, facing):
-            cls.cut_transparent(arena, cut_position)
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        for cut_position in self.cut_positions(arena.terrain, position, facing):
+            self.cut_transparent(arena, cut_position)
 
 
 class Amulet(Weapon):
 
     @classmethod
-    def cut_positions(cls, terrain: arenas.Terrain, position: coordinates.Coords, facing: characters.Facing) -> List[coordinates.Coords]:
-        return [position + (1, 1), position + (-1, 1), position + (1, -1), position + (-1, -1)]
+    def cut_positions(
+            cls,
+            terrain: arenas.Terrain,
+            position: coordinates.Coords,
+            facing: characters.Facing
+    ) -> List[coordinates.Coords]:
+        return [
+            coordinates.Coords(*position + (1, 1)),
+            coordinates.Coords(*position + (-1, 1)),
+            coordinates.Coords(*position + (1, -1)),
+            coordinates.Coords(*position + (-1, -1))
+        ]
 
-    @classmethod
-    def cut(cls, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
-        for cut_position in cls.cut_positions(arena.terrain, position, facing):
-            cls.cut_transparent(arena, cut_position)
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        for cut_position in self.cut_positions(arena.terrain, position, facing):
+            self.cut_transparent(arena, cut_position)
