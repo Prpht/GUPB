@@ -81,6 +81,9 @@ class Bow(LineWeapon):
     def __init__(self):
         self.ready: bool = False
 
+    def description(self) -> WeaponDescription:
+        return WeaponDescription(f"{self.__class__.__name__.lower()}_{'loaded' if self.ready else 'unloaded'}")
+
     @staticmethod
     def reach() -> int:
         return 50
