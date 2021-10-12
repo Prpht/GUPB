@@ -27,8 +27,8 @@ class BotController:
     def __init__(self):
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.current_weapon = 'knife'
-        self.facing = None # inicjalizacja przy pierwszym decide
-        self.position = None # inicjalizacja przy pierwszym decide
+        self.facing = None  # inicjalizacja przy pierwszym decide
+        self.position = None  # inicjalizacja przy pierwszym decide
         self.menhir_coord: coordinates.Coords = None
 
     def __eq__(self, other: object) -> bool:
@@ -42,7 +42,7 @@ class BotController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         pass
 
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
 
         if self.__can_attack(knowledge.visible_tiles):
@@ -59,7 +59,7 @@ class BotController:
 
     def __refresh_info(self, knowledge: characters.ChampionKnowledge):
         self.position = knowledge.position
-        character = knowledge.visible_tiles[self.position].character 
+        character = knowledge.visible_tiles[self.position].character
         self.facing = character.facing
         self.current_weapon = character.weapon.name
 
@@ -81,7 +81,7 @@ class BotController:
                 for cut_position in cut_positions:
                     if visible_tiles[cut_position].character:
                         return True
-            elif self.current_weapon == 'bow' or self.current_weapon == 'sword' or self.current_weapon == 'knife':
+            elif self.current_weapon == 'bow_unloaded' or self.current_weapon == 'bow_loaded' or self.current_weapon == 'sword' or self.current_weapon == 'knife':
                 reach = WEAPON_RANGE[self.current_weapon]
                 tile = self.position
                 for _ in range(1, reach + 1):
@@ -92,7 +92,6 @@ class BotController:
             # kafelek nie byl widoczny
             return False
         return False
-
 
 
 POTENTIAL_CONTROLLERS = [
