@@ -1,4 +1,5 @@
 import random
+import math
 from queue import SimpleQueue
 from gupb.model import weapons, coordinates, tiles
 from typing import Type, Dict
@@ -40,13 +41,19 @@ class BotController:
         return hash(self.name)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.menhir_coord = arena_description.menhir_position
+        self.current_weapon = 'knife'
+        self.action_queue = SimpleQueue()
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
 
-        if self.__can_attack(knowledge.visible_tiles):
+        if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
             return characters.Action.ATTACK
+
+        if not self.action_queue.empty():
+            return self.action_queue.get()
+
         return random.choice(POSSIBLE_ACTIONS)
 
     @property
@@ -81,7 +88,7 @@ class BotController:
                 for cut_position in cut_positions:
                     if visible_tiles[cut_position].character:
                         return True
-            elif self.current_weapon == 'bow_unloaded' or self.current_weapon == 'bow_loaded' or self.current_weapon == 'sword' or self.current_weapon == 'knife':
+            elif self.current_weapon == 'bow_loaded' or self.current_weapon == 'sword' or self.current_weapon == 'knife':
                 reach = WEAPON_RANGE[self.current_weapon]
                 tile = self.position
                 for _ in range(1, reach + 1):
@@ -92,6 +99,13 @@ class BotController:
             # kafelek nie byl widoczny
             return False
         return False
+
+    def __should_reload(self):
+        return self.current_weapon == 'bow_unloaded'
+
+    def __calculate_shortest_path(self):
+        pass
+
 
 
 POTENTIAL_CONTROLLERS = [
