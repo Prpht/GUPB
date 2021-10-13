@@ -3,12 +3,12 @@ import random
 from gupb.model import arenas
 from gupb.model import characters
 
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
-]
+ACTIONS_WITH_WEIGHTS = {
+    characters.Action.TURN_LEFT: 0.2,
+    characters.Action.TURN_RIGHT: 0.2,
+    characters.Action.STEP_FORWARD: 0.5,
+    characters.Action.ATTACK: 0.1,
+}
 
 TABARD_ASSIGNMENT = {
     "Alice": characters.Tabard.BLUE,
@@ -36,7 +36,10 @@ class RandomController:
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return random.choice(POSSIBLE_ACTIONS)
+        # return random action considering probability distribution 
+        return random.choices(population=list(ACTIONS_WITH_WEIGHTS.keys()), 
+                              weights=list(ACTIONS_WITH_WEIGHTS.values()), 
+                              k=1)[0]
 
     @property
     def name(self) -> str:
