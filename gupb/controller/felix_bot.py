@@ -1,6 +1,5 @@
 import random
 import math
-from queue import SimpleQueue
 from gupb.model import weapons, coordinates, tiles
 from typing import Type, Dict
 
@@ -17,7 +16,7 @@ POSSIBLE_ACTIONS = [
 ]
 
 WEAPON_RANGE = {
-    'bow': 50,
+    'bow_loaded': 50,
     'sword': 3,
     'knife': 1
 }
@@ -25,18 +24,21 @@ WEAPON_RANGE = {
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BotController:
-    def __init__(self):
-        self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
+class FelixBotController:
+    def __init__(self, first_name: str):
+        self.first_name: str = first_name
+        self.action_queue = []
         self.current_weapon = 'knife'
         self.facing = None  # inicjalizacja przy pierwszym decide
         self.position = None  # inicjalizacja przy pierwszym decide
         self.menhir_coord: coordinates.Coords = None
         self.grid = {}
         self.reached_menhir = False
+        self.close_to_menhir = False
+        self.finding_weapon = True
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, BotController):
+        if isinstance(other, FelixBotController):
             return True
         return False
 
@@ -46,8 +48,10 @@ class BotController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir_coord = arena_description.menhir_position
         self.current_weapon = 'knife'
-        self.action_queue = SimpleQueue()
+        self.action_queue = []
         self.reached_menhir = False
+        self.close_to_menhir = False
+        self.finding_weapon = True
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
@@ -55,14 +59,40 @@ class BotController:
         if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
             return characters.Action.ATTACK
 
-        if not self.reached_menhir:
+        is_mist_coming = self.__is_mist_coming(knowledge.visible_tiles)
+        if is_mist_coming or self.current_weapon != 'knife':
+            self.finding_weapon = False
+        else:
+            self.finding_weapon = True
+
+        if self.finding_weapon:
+            weapon_coord = self.__get_best_weapon_coordinate()
+            if weapon_coord is not None:
+                path = Astar.astar(self.grid, self.position, weapon_coord)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+                    self.finding_weapon = False
+
+        if len(self.action_queue) > 0:
+            return self.action_queue.pop(0)
+
+        if not self.reached_menhir and not self.finding_weapon:
             path = Astar.astar(self.grid, self.position, self.menhir_coord)
             if path is not None:
                 self.action_queue = self.__generate_queue_from_path(path[:-1]) # without last element, because last element is menhir
                 self.reached_menhir = True
 
-        if not self.action_queue.empty():
-            return self.action_queue.get()
+        if not self.reached_menhir and not self.close_to_menhir and is_mist_coming:
+            nearest_menhir_coord = self.__get_nearest_menhir_coord()
+            path = Astar.astar(self.grid, self.position, self.menhir_coord)
+            if path is not None:
+                self.action_queue = self.__generate_queue_from_path(
+                    path)
+                self.close_to_menhir = True
+
+        if len(self.action_queue) > 0:
+            return self.action_queue.pop(0)
         elif self.reached_menhir:
             return characters.Action.TURN_LEFT
         else:
@@ -72,7 +102,7 @@ class BotController:
 
     @property
     def name(self) -> str:
-        return 'BotController'
+        return f'Controller{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
@@ -118,8 +148,42 @@ class BotController:
     def __should_reload(self):
         return self.current_weapon == 'bow_unloaded'
 
+    def __is_mist_coming(self, visible_tiles):
+        for tile in visible_tiles.values():
+            for effect in tile.effects:
+                if effect.type == 'mist':
+                    return True
+        return False
+
+    def __get_nearest_menhir_coord(self):
+        best_coord = self.position
+        smallest_distance = abs(self.menhir_coord[0] - self.position[0]) + abs(
+                self.menhir_coord[1] - self.position[1])
+        for coord in self.grid.keys():
+            distance = abs(self.menhir_coord[0] - coord[0]) + abs(
+                self.menhir_coord[1] - coord[1])
+            if distance < smallest_distance:
+                best_coord = coord
+                smallest_distance = distance
+        return best_coord
+
+    def __get_best_weapon_coordinate(self):
+        weapons = {}
+        for coord, tile in self.grid.items():
+            if tile.loot and tile.loot.name in ('bow_unloaded', 'axe', 'sword'):
+                weapons[tile.loot.name] = coord
+        best_weapon = weapons.get('bow_unloaded')
+        if best_weapon is not None:
+            return best_weapon
+        best_weapon = weapons.get('axe')
+        if best_weapon is not None:
+            return best_weapon
+        best_weapon = weapons.get('sword')
+        if best_weapon is not None:
+            return best_weapon
+
     def __generate_queue_from_path(self, path):
-        queue = SimpleQueue()
+        queue = []
         current_cord = self.position
         current_facing = self.facing
         while len(path) > 0:
@@ -129,22 +193,22 @@ class BotController:
                     current_facing == Facing.DOWN and desired_facing == Facing.LEFT) or (
                     current_facing == Facing.LEFT and desired_facing == Facing.UP) or (
                     current_facing == Facing.UP and desired_facing == Facing.RIGHT):
-                queue.put(characters.Action.TURN_RIGHT)
+                queue.append(characters.Action.TURN_RIGHT)
 
             if (current_facing == Facing.RIGHT and desired_facing == Facing.UP) or (
                     current_facing == Facing.UP and desired_facing == Facing.LEFT) or (
                     current_facing == Facing.LEFT and desired_facing == Facing.DOWN) or (
                     current_facing == Facing.DOWN and desired_facing == Facing.RIGHT):
-                queue.put(characters.Action.TURN_LEFT)
+                queue.append(characters.Action.TURN_LEFT)
                 
             if (current_facing == Facing.RIGHT and desired_facing == Facing.LEFT) or (
                     current_facing == Facing.UP and desired_facing == Facing.DOWN) or (
                     current_facing == Facing.LEFT and desired_facing == Facing.RIGHT) or (
                     current_facing == Facing.DOWN and desired_facing == Facing.UP):
-                queue.put(characters.Action.TURN_LEFT)
-                queue.put(characters.Action.TURN_LEFT)
+                queue.append(characters.Action.TURN_LEFT)
+                queue.append(characters.Action.TURN_LEFT)
 
-            queue.put(characters.Action.STEP_FORWARD)
+            queue.append(characters.Action.STEP_FORWARD)
 
             current_cord = next_coord
             current_facing = desired_facing
@@ -226,5 +290,5 @@ class Node():
 
 
 POTENTIAL_CONTROLLERS = [
-    BotController(),
+    FelixBotController('Felix'),
 ]
