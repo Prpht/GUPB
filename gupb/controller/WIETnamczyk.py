@@ -68,6 +68,7 @@ class WIETnamczyk:
 
         path_to_menhir = self.find_path((bot_pos.x, bot_pos.y), self.map, (menhir.x, menhir.y))
 
+
         def dist(tile1: coordinates.Coords, tile2: coordinates.Coords):
             return abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
 
@@ -76,6 +77,8 @@ class WIETnamczyk:
             if distance == 1:
                 if description.character:
                     return characters.Action.ATTACK
+                if len(path_to_menhir) == 1:
+                    return characters.Action.TURN_RIGHT
                 next_tile = path_to_menhir[0]
 
                 if next_tile == (tile[0], tile[1]):
