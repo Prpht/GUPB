@@ -1,31 +1,25 @@
 import random
+import numpy as np
 
 from gupb.model import arenas
 from gupb.model import characters
 
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
-]
-
-TABARD_ASSIGNMENT = {
-    "Alice": characters.Tabard.BLUE,
-    "Bob": characters.Tabard.YELLOW,
-    "Cecilia": characters.Tabard.RED,
-    "Darius": characters.Tabard.GREY,
-}
-
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class RandomController:
+class BerserkBot:
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        self._possible_actions = [
+            characters.Action.TURN_LEFT,
+            characters.Action.TURN_RIGHT,
+            characters.Action.STEP_FORWARD,
+            characters.Action.ATTACK,
+        ]
+        self.probabilities = [0.2, 0.2, 0.1, 0.5]
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, RandomController):
+        if isinstance(other, BerserkBot):
             return self.first_name == other.first_name
         return False
 
@@ -36,20 +30,21 @@ class RandomController:
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return random.choice(POSSIBLE_ACTIONS)
+        self.update_probabilities(knowledge)
+        return np.random.choice(self._possible_actions, 1, p=self.probabilities)
 
     @property
     def name(self) -> str:
-        return f'RandomController{self.first_name}'
+        return f'BerserkBot{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.GREY
+
+    def update_probabilities(self, knowledge: characters.ChampionKnowledge) -> None:
+        pass
 
 
 POTENTIAL_CONTROLLERS = [
-    RandomController("Alice"),
-    RandomController("Bob"),
-    RandomController("Cecilia"),
-    RandomController("Darius"),
+    BerserkBot("Ragnar")
 ]
