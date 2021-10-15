@@ -6,8 +6,8 @@ from typing import NamedTuple, Optional, Dict
 
 class EvaderController:
 
-	def __init__(self):
-		pass
+	def __init__(self, first_name: str):
+		self.first_name: str = first_name
 
 	def __eq__(self, other: object) -> bool:
 		if isinstance(other, EvaderController):
@@ -34,7 +34,7 @@ class EvaderController:
 
 
 
-	def scan_for_enemies(self, knowledge: characters.ChampionKnowledge) -> Optional[NamedTuple, None]:
+	def scan_for_enemies(self, knowledge: characters.ChampionKnowledge) -> Optional[NamedTuple]:
 		tiles_in_sight = knowledge.visible_tiles
 		my_position = knowledge.position
 		my_character = knowledge.visible_tiles[my_position].character
@@ -54,3 +54,11 @@ class EvaderController:
 			if distance  < nearest:
 				nearest = distance
 		return nearest
+
+	@property
+	def name(self) -> str:
+		return f'RandomController{self.first_name}'
+
+	@property
+	def preferred_tabard(self) -> characters.Tabard:
+		return characters.Tabard.VIOLET

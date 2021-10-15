@@ -1,4 +1,4 @@
-from gupb.controller import random
+from gupb.controller import random, run4UrLife
 
 CONFIGURATION = {
     'arenas': [
@@ -9,6 +9,7 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        run4UrLife.EvaderController("Marwin")
     ],
     'start_balancing': False,
     'visualise': True,
