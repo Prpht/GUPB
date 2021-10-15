@@ -78,7 +78,7 @@ class FelixBotController:
             return self.action_queue.pop(0)
 
         if not self.reached_menhir and not self.finding_weapon:
-            path = Astar.astar(self.grid, self.position, self.menhir_coord)
+            path = Astar.astar(self.grid, self.position, self.menhir_coord, ['land', 'menhir'])
             if path is not None:
                 self.action_queue = self.__generate_queue_from_path(path[:-1]) # without last element, because last element is menhir
                 self.reached_menhir = True
@@ -159,7 +159,7 @@ class FelixBotController:
         best_coord = self.position
         smallest_distance = abs(self.menhir_coord[0] - self.position[0]) + abs(
                 self.menhir_coord[1] - self.position[1])
-        for coord in self.grid.keys():
+        for coord, tile in self.grid.items():
             distance = abs(self.menhir_coord[0] - coord[0]) + abs(
                 self.menhir_coord[1] - coord[1])
             if distance < smallest_distance:
@@ -217,7 +217,7 @@ class FelixBotController:
 
 class Astar:
     @staticmethod
-    def astar(grid, start_position, end_position):
+    def astar(grid, start_position, end_position, passable_tiles=['land']):
         start_node = Node(None, start_position)
         end_node = Node(None, end_position)
 
@@ -247,7 +247,7 @@ class Astar:
                 node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
                 # # Make sure walkable terrain
-                if grid.get(node_position) is None or grid[node_position].type in ['sea', 'wall']:
+                if grid.get(node_position) is None or grid[node_position].type not in passable_tiles:
                     continue
 
                 # Create new node
