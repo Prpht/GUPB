@@ -1,5 +1,5 @@
 from gupb.controller import random
-from gupb.controller.Berserk import berserk
+from gupb.controller import berserk
 
 CONFIGURATION = {
     'arenas': [

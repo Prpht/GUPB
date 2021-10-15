@@ -3,7 +3,8 @@ import numpy as np
 
 from gupb.model import arenas
 from gupb.model import characters
-from .knowledge_decoder import KnowledgeDecoder
+from gupb.controller.Berserk.knowledge_decoder import KnowledgeDecoder
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -17,7 +18,8 @@ class BerserkBot:
             characters.Action.STEP_FORWARD,
             characters.Action.ATTACK,
         ]
-        self.probabilities = [0.4, 0.05, 0.05, 0.5]
+        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.move_counter = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BerserkBot):
@@ -28,13 +30,15 @@ class BerserkBot:
         return hash(self.first_name)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.move_counter = 0
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.update_probabilities(knowledge)
         self.knowledge_decoder.knowledge = knowledge
-        enemies_in_sight, *rest = self.knowledge_decoder.decode()
-        return np.random.choice(self._possible_actions, 1, p=self.probabilities)
+        enemies_in_sight, cords, *rest = self.knowledge_decoder.decode()
+        self.update_probabilities(enemies_in_sight)
+        self.move_counter += 1
+        return np.random.choice(self._possible_actions, 1, p=self.probabilities)[0]
 
     @property
     def name(self) -> str:
@@ -44,8 +48,17 @@ class BerserkBot:
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.GREY
 
-    def update_probabilities(self, knowledge: characters.ChampionKnowledge) -> None:
-        pass
+    def update_probabilities(self, enemies_in_sight: list) -> None:
+        enemies = len(enemies_in_sight)
+        if enemies == 1:
+            self.probabilities = [0.2, 0.2, 0.2, 0.4]
+        elif enemies > 1:
+            self.probabilities = [0.05, 0.05, 0.2, 0.7]
+        elif enemies == 0 and self.move_counter >= 10:
+            self.probabilities = [0.25, 0.25, 0.4, 0.1]
+        else:
+            self.probabilities = [0.4, 0.4, 0.1, 0.1]
+
 
 
 POTENTIAL_CONTROLLERS = [
