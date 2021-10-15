@@ -53,7 +53,7 @@ class BerserkBot:
         if enemies == 1:
             self.probabilities = [0.2, 0.2, 0.2, 0.4]
         elif enemies > 1:
-            self.probabilities = [0.05, 0.05, 0.2, 0.7]
+            self.probabilities = [0.05, 0.05, 0.1, 0.8]
         elif enemies == 0 and self.move_counter >= 10:
             self.probabilities = [0.25, 0.25, 0.4, 0.1]
         else:
