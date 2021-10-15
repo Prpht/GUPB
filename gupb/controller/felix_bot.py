@@ -64,6 +64,7 @@ class FelixBotController:
             self.finding_weapon = False
         else:
             self.finding_weapon = True
+            self.reached_menhir = False
 
         if self.finding_weapon:
             weapon_coord = self.__get_best_weapon_coordinate()
