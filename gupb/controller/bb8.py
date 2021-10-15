@@ -13,18 +13,18 @@ ACTIONS_WITH_WEIGHTS = {
 }
 
 TABARD_ASSIGNMENT = {
-    "R2D2": characters.Tabard.WHITE
+    "BB8": characters.Tabard.WHITE
 }
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class R2D2Controller:
+class BB8Controller:
     def __init__(self, first_name: str):
         self.first_name: str = first_name
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, R2D2Controller):
+        if isinstance(other, BB8Controller):
             return self.first_name == other.first_name
         return False
 
@@ -76,5 +76,5 @@ class R2D2Controller:
 
 
 POTENTIAL_CONTROLLERS = [
-    R2D2Controller("R2D2")
+    BB8Controller("BB8")
 ]
