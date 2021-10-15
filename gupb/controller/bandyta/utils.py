@@ -32,6 +32,5 @@ def left_walk(knowledge: ChampionKnowledge, direction: Direction) -> characters.
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
+    characters.Action.STEP_FORWARD
 ]
