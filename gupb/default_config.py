@@ -1,4 +1,5 @@
 from gupb.controller import random
+from gupb.controller import bb8
 
 CONFIGURATION = {
     'arenas': [
@@ -8,7 +9,7 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
-        random.RandomController("Darius"),
+        bb8.BB8Controller("BB8")
     ],
     'start_balancing': False,
     'visualise': True,
