@@ -1,0 +1,1 @@
+..\srodowisko\venv\Scripts\python.exe -m gupb
