@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os
+import os, sys
 import itertools
 from typing import Any, Optional, TypeVar
 
@@ -21,8 +21,11 @@ TILE_SIZE = 8
 HEALTH_BAR_HEIGHT = 3
 
 BLACK = pygame.Color('black')
-#GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
-GAME_FONT = pygame.freetype.Font("/Library/Fonts/Arial Unicode.ttf", 24)
+
+if 'darwin' in sys.platform:
+    GAME_FONT = pygame.freetype.Font("/Library/Fonts/Arial Unicode.ttf", 24)
+else:
+    GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
 
 
 

@@ -1,8 +1,16 @@
-import math
+import math, random
 
 from gupb.model import arenas
 from gupb.model import characters
-from typing import NamedTuple, Optional, Dict
+from typing import NamedTuple, Optional
+
+POSSIBLE_ACTIONS = [
+    characters.Action.TURN_LEFT,
+    characters.Action.TURN_RIGHT,
+    characters.Action.STEP_FORWARD,
+	characters.Action.DO_NOTHING,
+]
+
 
 class EvaderController:
 
@@ -15,49 +23,50 @@ class EvaderController:
 		return False
 
 	def __hash__(self) -> int:
-		return 99
+		return hash(self.first_name)
 
 	def reset(self, arena_description: arenas.ArenaDescription) -> None:
 		pass
 
 	def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-		enemies_facing_our_way = self.scan_for_enemies(knowledge)
+		champion = self._get_champion(knowledge)
+		enemies_facing_our_way = self._scan_for_enemies(knowledge)
 		if enemies_facing_our_way:
-			nearest_enemy = self.calc_distance(enemies_facing_our_way)
+			nearest_enemy = self._calc_distance(enemies_facing_our_way)
 			if nearest_enemy <= 2.0:
-				action = characters.Action.STEP_FORWARD
+				action = characters.Action.ATTACK
 			else:
 				action = characters.Action.TURN_LEFT
 
-		else: action = characters.Action.DO_NOTHING
+		else: action = random.choice(POSSIBLE_ACTIONS)
 		return action  # DO_NOTHING
+	
+	def _get_champion(self, knowledge: characters.ChampionKnowledge) -> characters.Champion:
+		position = knowledge.position
+		return knowledge.visible_tiles[position].character
 
-
-
-	def scan_for_enemies(self, knowledge: characters.ChampionKnowledge) -> Optional[NamedTuple]:
+	def _scan_for_enemies(self, knowledge: characters.ChampionKnowledge) -> Optional[NamedTuple]:
 		tiles_in_sight = knowledge.visible_tiles
 		my_position = knowledge.position
 		my_character = knowledge.visible_tiles[my_position].character
 		enemies_facing_our_way = []
 		for tile, tile_desc in tiles_in_sight.items():
-			if tile_desc.character:  ## enemy in sight
-				if tile_desc.character.facing == (-my_character.facing):
-					enemies_facing_our_way.append(tile)
+			if tile_desc.character and tile_desc.character != my_character:  ## enemy in sight
+				enemies_facing_our_way.append(tile)
 
-		return None if not enemies_facing_our_way else enemies_facing_our_way
+		return enemies_facing_our_way or None
 
-
-	def calc_distance(self, enemies) -> float:
+	def _calc_distance(self, enemies) -> float:
 		nearest = math.inf
 		for position in enemies:
-			distance = math.sqrt(pow(position["x"],2) + pow(position["y"],2))
-			if distance  < nearest:
+			distance = (position[0] ** 2 + position[1] ** 2) ** 0.5
+			if distance < nearest:
 				nearest = distance
 		return nearest
 
 	@property
 	def name(self) -> str:
-		return f'RandomController{self.first_name}'
+		return f'EvaderController{self.first_name}'
 
 	@property
 	def preferred_tabard(self) -> characters.Tabard:
