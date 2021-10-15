@@ -8,6 +8,9 @@ def find_path(start: Coords, end: Coords, grid: Dict[int, Dict[int, str]]):
     visited_list: List[Coords] = []
 
     while len(queue) > 0:
+        if len(queue) > 1000:
+            return []
+
         node, path = queue.pop(0)
         path.append(node)
         mark_visited(node, visited_list)
