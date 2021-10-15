@@ -85,7 +85,8 @@ class EkonometronController:
                 return self._make_a_move(0.35, 0.65)
         # move towards weapons on the ground (unless those are knives)
         if self._weapon_in_sight(knowledge):
-            return characters.Action.STEP_FORWARD
+            # return characters.Action.STEP_FORWARD
+            return self._make_a_move(0.025, 0.975)
         # attack another player in sight
         if self._enemy_in_sight(knowledge):
             # if enemy is in the area of attack
