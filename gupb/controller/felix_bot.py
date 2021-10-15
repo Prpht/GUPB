@@ -171,9 +171,12 @@ class FelixBotController:
     def __get_best_weapon_coordinate(self):
         weapons = {}
         for coord, tile in self.grid.items():
-            if tile.loot and tile.loot.name in ('bow_unloaded', 'axe', 'sword'):
+            if tile.loot and tile.loot.name in ('bow_unloaded', 'bow_loaded', 'axe', 'sword'):
                 weapons[tile.loot.name] = coord
         best_weapon = weapons.get('bow_unloaded')
+        if best_weapon is not None:
+            return best_weapon
+        best_weapon = weapons.get('bow_loaded')
         if best_weapon is not None:
             return best_weapon
         best_weapon = weapons.get('axe')
