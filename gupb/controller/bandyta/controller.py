@@ -14,6 +14,10 @@ from gupb.model.weapons import WeaponDescription
 
 
 class Bandyta:
+    """
+    Dziary na pół ryja...
+    """
+
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.landscape_map: Dict[int, Dict[int, str]] = {}
@@ -48,12 +52,12 @@ class Bandyta:
 
             if player is not None or menhir is not None or len(self.path) != 0:
                 if len(self.path) == 0:
-                    if player is not None and get_distance(knowledge.position, player) < 8:
+                    if player is not None:
                         self.path = find_path(knowledge.position, player, self.landscape_map)
                         if len(self.path) != 0:
                             self.path.pop(0)
 
-                    if menhir is not None and get_distance(knowledge.position, menhir) < 8:
+                    if menhir is not None:
                         self.path = find_path(knowledge.position, menhir, self.landscape_map)
                         if len(self.path) != 0:
                             self.path.pop(0)

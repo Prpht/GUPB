@@ -1,51 +1,57 @@
+from __future__ import annotations
+
 from typing import List, Dict
+
+from gupb.controller.bandyta.utils import Direction
 from gupb.model.coordinates import Coords
 
 
 def find_path(start: Coords, end: Coords, grid: Dict[int, Dict[int, str]]):
-    queue = [(start, [])]  # start point, empty path
-    #queue: Dict[Coords, List[Coords]] = {start: []}
+    queue: List[Coords] = [start]
+    return_path: Dict[Coords, Coords | None] = {start: None}
     visited_list: List[Coords] = []
 
+    mark_visited(start, visited_list)
     while len(queue) > 0:
-        if len(queue) > 1000:
-            return []
-
-        node, path = queue.pop(0)
-        path.append(node)
-        mark_visited(node, visited_list)
+        node = queue.pop(0)
 
         if node == end:
-            return path
+            break
 
-        adj_nodes = get_neighbors(node, grid, visited_list)
-        for item in adj_nodes:
-            queue.append((item, path[:]))
+        explore_neighbors(node, grid, visited_list, queue, return_path)
 
-    return []
+    return reconstruct_path(start, end, return_path)
 
 
-def mark_visited(node: Coords, visited_list: List[Coords]) -> None:
+def mark_visited(node: Coords, visited_list: List[Coords]):
     if node not in visited_list:
         visited_list.append(node)
 
 
-def get_neighbors(node: Coords, grid: Dict[int, Dict[int, str]], visited_list: List[Coords]) -> List[Coords]:
-    neighbors: List[Coords] = []
-    append_neighbor(Coords(node[0] + 1, node[1]), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0] - 1, node[1]), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0], node[1] + 1), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0], node[1] - 1), grid, neighbors, visited_list)
-    return neighbors
+def explore_neighbors(parent_node: Coords,
+                      grid: Dict[int, Dict[int, str]],
+                      visited_list: List[Coords],
+                      queue: List[Coords],
+                      return_path: Dict[Coords, Coords]):
+    for direction in Direction:
+        node = parent_node + direction.value
+        if node[0] in grid and \
+                node[1] in grid[node[0]] and \
+                grid[node[0]][node[1]] == 'land' and \
+                node not in visited_list:
+            queue.append(node)
+            mark_visited(node, visited_list)
+            return_path[node] = parent_node
 
 
-def append_neighbor(
-        node: Coords,
-        grid: Dict[int, Dict[int, str]],
-        neighbor_list: List[Coords],
-        visited_list: List[Coords]) -> None:
-    if node[0] in grid and \
-            node[1] in grid[node[0]] and \
-            grid[node[0]][node[1]] == 'land' and \
-            node not in visited_list:
-        neighbor_list.append(node)
+def reconstruct_path(start: Coords, end: Coords, return_path: Dict[Coords, Coords | None]):
+    path: List[Coords] = []
+    iterator = end
+
+    while iterator is not None:
+        path.append(iterator)
+        iterator = return_path[iterator]
+
+    path.reverse()
+    return path if path[0] is start else None
+
