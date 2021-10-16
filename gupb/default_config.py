@@ -1,4 +1,8 @@
-from gupb.controller import bandyta, keyboard
+from gupb.controller import bandyta
+from gupb.controller import keyboard
+from gupb.controller import random
+from gupb.controller import bb8
+
 
 CONFIGURATION = {
     'arenas': [
@@ -6,7 +10,9 @@ CONFIGURATION = {
     ],
     'controllers': [
         keyboard.KeyboardController(),
-        bandyta.Bandyta("1.0")
+        random.RandomController("Alice"),
+        random.RandomController("Bob"),
+        random.RandomController("Cecilia"),
     ],
     'start_balancing': False,
     'visualise': True,
