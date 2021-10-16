@@ -11,7 +11,8 @@ from gupb.model import characters
 class KeyboardController:
     def __init__(self):
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
-
+        self.cached_enemy_coords = None
+        self.facing_word = None
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KeyboardController):
             return True
@@ -24,6 +25,9 @@ class KeyboardController:
         pass
 
     def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+        
+
+        
         if self.action_queue.empty():
             return characters.Action.DO_NOTHING
         else:

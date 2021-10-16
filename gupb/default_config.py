@@ -1,4 +1,6 @@
-from gupb.controller import random, run4UrLife
+from gupb.controller import random
+from gupb.controller import keyboard
+
 
 CONFIGURATION = {
     'arenas': [
@@ -9,11 +11,11 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        run4UrLife.EvaderController("Marwin")
+        keyboard.KeyboardController(),
     ],
     'start_balancing': False,
-    'visualise': True,
+    'visualise': False,
     'show_sight': None,
-    'runs_no': 300,
+    'runs_no': 20,
     'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }
