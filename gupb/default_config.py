@@ -1,7 +1,5 @@
-from gupb.controller import bandyta
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller import bb8
 
 
 CONFIGURATION = {
@@ -13,6 +11,7 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
+        random.RandomController("Darius")
     ],
     'start_balancing': False,
     'visualise': True,
