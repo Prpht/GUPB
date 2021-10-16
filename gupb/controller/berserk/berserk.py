@@ -1,9 +1,8 @@
-import random
 import numpy as np
 
 from gupb.model import arenas
 from gupb.model import characters
-from gupb.controller.Berserk.knowledge_decoder import KnowledgeDecoder
+from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
 
 
 # noinspection PyUnusedLocal
@@ -60,7 +59,3 @@ class BerserkBot:
             self.probabilities = [0.4, 0.4, 0.1, 0.1]
 
 
-
-POTENTIAL_CONTROLLERS = [
-    BerserkBot("Ragnar")
-]

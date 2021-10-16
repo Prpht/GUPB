@@ -1,5 +1,5 @@
 from gupb.controller import random
-from gupb.controller import berserk
+
 
 CONFIGURATION = {
     'arenas': [
@@ -9,9 +9,7 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
-        random.RandomController("Darius"),
-        berserk.BerserkBot('Berserk')
-
+        random.RandomController("Darius")
     ],
     'start_balancing': False,
     'visualise': True,
