@@ -118,7 +118,7 @@ class Wall(Tile):
 class Menhir(Tile):
     @staticmethod
     def terrain_passable() -> bool:
-        return False
+        return True
 
     @staticmethod
     def terrain_transparent() -> bool:
