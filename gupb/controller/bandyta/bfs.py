@@ -6,7 +6,7 @@ from gupb.controller.bandyta.utils import Direction
 from gupb.model.coordinates import Coords
 
 
-def find_path(start: Coords, end: Coords, grid: Dict[int, Dict[int, str]]):
+def find_path(start: Coords, end: Coords, grid: Dict[int, Dict[int, str]]) -> List[Coords]:
     queue: List[Coords] = [start]
     return_path: Dict[Coords, Coords | None] = {start: None}
     visited_list: List[Coords] = []
@@ -50,8 +50,16 @@ def reconstruct_path(start: Coords, end: Coords, return_path: Dict[Coords, Coord
 
     while iterator is not None:
         path.append(iterator)
+
+        if iterator not in return_path.keys():
+            break
+
         iterator = return_path[iterator]
 
     path.reverse()
-    return path if path[0] is start else None
 
+    if path[0] is start:
+        path.pop(0)
+        return path
+
+    return []
