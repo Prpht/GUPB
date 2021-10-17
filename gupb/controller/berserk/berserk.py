@@ -45,7 +45,7 @@ class BerserkBot:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.GREY
+        return characters.Tabard.RED
 
     def update_probabilities(self, enemies_in_sight: list) -> None:
         enemies = len(enemies_in_sight)

@@ -24,4 +24,3 @@ class Controller(Protocol):
     @abstractmethod
     def preferred_tabard(self) -> characters.Tabard:
         raise NotImplementedError
-

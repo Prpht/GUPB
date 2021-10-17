@@ -106,8 +106,3 @@ class Bandyta:
             return characters.Action.STEP_FORWARD
         else:
             return characters.Action.TURN_LEFT
-
-
-POTENTIAL_CONTROLLERS = [
-    Bandyta('test'),
-]

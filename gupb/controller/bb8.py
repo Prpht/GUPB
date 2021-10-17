@@ -68,11 +68,11 @@ class BB8Controller:
 
     @property
     def name(self) -> str:
-        return f'RandomController{self.first_name}'
+        return f'{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.WHITE
 
 
 POTENTIAL_CONTROLLERS = [

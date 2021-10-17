@@ -103,7 +103,7 @@ class FelixBotController:
 
     @property
     def name(self) -> str:
-        return f'Controller{self.first_name}'
+        return f'{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
@@ -294,5 +294,5 @@ class Node():
 
 
 POTENTIAL_CONTROLLERS = [
-    FelixBotController('Felix'),
+    FelixBotController("Felix"),
 ]

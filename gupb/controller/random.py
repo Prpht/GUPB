@@ -10,13 +10,6 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-TABARD_ASSIGNMENT = {
-    "Alice": characters.Tabard.BLUE,
-    "Bob": characters.Tabard.YELLOW,
-    "Cecilia": characters.Tabard.RED,
-    "Darius": characters.Tabard.GREY,
-}
-
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -44,7 +37,7 @@ class RandomController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.WHITE
 
 
 POTENTIAL_CONTROLLERS = [

@@ -7,5 +7,3 @@ python-statemachine==0.8.0
 questionary==1.9.0
 sortedcontainers==2.3.0
 tqdm==4.59.0
-
-numpy==1.21.2
