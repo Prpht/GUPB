@@ -6,21 +6,89 @@ from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.arenas import Arena
+from gupb.model.coordinates import Coords
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class WIETnamczyk:
+    FIND_WEAPON = "find_weapon"
+    # czy zarezerwowano caly przedzial dla psa?
+    KRAZ_MIEDZY_SAFEPOINTAMI = "travel_to_safepoints"
+    FIND_MENHIR = "find_menhir"
+
     def __init__(self):
+        self.safe_places = [
+            Coords(6, 6),
+            Coords(6, 13),
+            Coords(13, 6),
+            Coords(13, 13),
+        ]
+
+        self.menhir_pos = Coords(9, 9)
+        self.good_weapons = ["sword", "axe"]
         self.first_name: str = "Adam"
         self.map = self.parse_map()
         self.arena_description = None
+        self.current_weapon = "knife"
+        self.state = WIETnamczyk.FIND_WEAPON
+        self.next_dest = None
+
+    def dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
+        return abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
+
+    def get_random_safe_place(self, current_pos: coordinates.Coords):
+        prob = [0.2, 0.3, 0.3, 0.2]
+        places = list(sorted(list(map(lambda item: (item, self.dist(item, current_pos)), self.safe_places)),
+                             key=lambda item: item[1]))
+        return random.choices(places, weights=prob)[0]
+
+    def find_good_weapon(self):
+        for i in range(len(self.map)):
+            for j in range(len(self.map[0])):
+                weapon_opt = self.map[i][j].loot
+                if weapon_opt and weapon_opt.name in self.good_weapons:
+                    return i, j
+        # go to safe place
+        return None
+
+    def find_direction(self, path_to_destination, knowledge, bot_pos):
+        for tile, description in knowledge.visible_tiles.items():
+            distance = self.dist(bot_pos, tile)
+            if distance == 1:
+                current_tile = tile
+                next_tile = path_to_destination[0]
+
+                if next_tile == (current_tile[0], current_tile[1]):
+                    return characters.Action.STEP_FORWARD
+
+                x1 = next_tile[0] - bot_pos[0]
+                y1 = next_tile[1] - bot_pos[1]
+                x2 = current_tile[0] - bot_pos[0]
+                y2 = current_tile[1] - bot_pos[1]
+                angle = atan2(y2, x2) - atan2(y1, x1)
+
+                if angle > 0:
+                    return characters.Action.TURN_LEFT
+                else:
+                    return characters.Action.TURN_RIGHT
+        return characters.Action.TURN_RIGHT
+
+    def is_mist_nearby(self, current_pos):
+        pass
+
+    def is_tile_valid(self):
+        pass
+
+    def update_knowledge(self, visible_tiles):
+        for tile, description in visible_tiles.items():
+            self.map[tile[0]][tile[1]] = description
 
     def parse_map(self):
-        arena = Arena.load("fisher_island")
+        arena = Arena.load("isolated_shrine")
         map_matrix = [[None for i in range(arena.size[0])] for j in range(arena.size[1])]
         for k, v in arena.terrain.items():
-            map_matrix[k.x][k.y] = v.description().type
+            map_matrix[k[0]][k[1]] = v.description()
         return map_matrix
 
     def find_path(self, start_pos, map_matrix, dest_coord):
@@ -47,7 +115,9 @@ class WIETnamczyk:
                     adj_x = s[0] + s_x
                     adj_y = s[1] + s_y
                     adj = (adj_x, adj_y)
-                    if 0 <= adj_x < X and 0 <= adj_y < Y and map_matrix[adj_x][adj_y] == 'land' and not visited[adj_x][adj_y]:
+                    if 0 <= adj_x < X and 0 <= adj_y < Y and map_matrix[adj_x][adj_y].type == 'land' and not \
+                            visited[adj_x][
+                                adj_y]:
                         queue.append(adj)
                         parent[adj] = s
 
@@ -63,37 +133,28 @@ class WIETnamczyk:
         self.arena_description = arena_description
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.update_knowledge(knowledge.visible_tiles)
         bot_pos = knowledge.position
-        menhir = self.arena_description.menhir_position
 
-        path_to_menhir = self.find_path((bot_pos.x, bot_pos.y), self.map, (menhir.x, menhir.y))
+        # todo: fight if ....
 
+        if self.state == WIETnamczyk.FIND_WEAPON:
+            #todo: update weapon
+            weapon_pos = self.find_good_weapon()
+            if not weapon_pos:
+                self.state = WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI
+            else:
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map, (weapon_pos[0], weapon_pos[1]))
+                return self.find_direction(path_to_destination, knowledge, bot_pos)
 
-        def dist(tile1: coordinates.Coords, tile2: coordinates.Coords):
-            return abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
-
-        for tile, description in knowledge.visible_tiles.items():
-            distance = dist(bot_pos, tile)
-            if distance == 1:
-                if description.character:
-                    return characters.Action.ATTACK
-                if len(path_to_menhir) == 1:
+        if self.state == WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI:
+            if not self.next_dest or self.dist(self.next_dest, bot_pos) < 1:
+                dest = self.get_random_safe_place(bot_pos)
+                if dest[0] == self.next_dest[0] and dest[1] == self.next_dest[1]:
                     return characters.Action.TURN_RIGHT
-                next_tile = path_to_menhir[0]
-
-                if next_tile == (tile[0], tile[1]):
-                    return characters.Action.STEP_FORWARD
-
-                x1 = next_tile[0] - bot_pos.x
-                y1 = next_tile[1] - bot_pos.y
-                x2 = tile[0] - bot_pos.x
-                y2 = tile[1] - bot_pos.y
-                angle = atan2(y2, x2) - atan2(y1, x1)
-
-                if angle > 0:
-                    return characters.Action.TURN_LEFT
-                else:
-                    return characters.Action.TURN_RIGHT
+                self.next_dest = dest
+            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map, (self.next_dest[0], self.next_dest[1]))
+            return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         return random.choice(POSSIBLE_ACTIONS)
 
