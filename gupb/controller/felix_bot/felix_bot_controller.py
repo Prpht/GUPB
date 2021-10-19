@@ -60,7 +60,14 @@ class FelixBotController:
             return characters.Action.ATTACK
 
         if len(self.action_queue) == 0:
-            if self.menhir_coord is not None and not self.reached_menhir:
+            if not self.is_mist_coming and self.current_weapon not in ['bow_loaded', 'bow_unloaded']:
+                weapon_coord = self.__get_weapon_coordinate(['bow_loaded', 'bow_unloaded'])
+                if weapon_coord is not None:
+                    path = Astar.astar(self.grid, self.position, weapon_coord)
+                    if path is not None:
+                        self.action_queue = self.__generate_queue_from_path(
+                            path)
+            elif self.is_mist_coming and  self.menhir_coord is not None and not self.reached_menhir:
                 path = Astar.astar(self.grid, self.position, self.menhir_coord)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
@@ -142,23 +149,16 @@ class FelixBotController:
     def __is_allowed_action(self, action):
         return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in ['wall', 'sea'])
 
-    def __get_best_weapon_coordinate(self):
-        weapons = {}
+    def __get_weapon_coordinate(self, weapons_names):
+        weapon_coord = None
+        weapon_distance = 10000000
         for coord, tile in self.grid.items():
-            if tile.loot and tile.loot.name in ('bow_unloaded', 'bow_loaded', 'axe', 'sword'):
-                weapons[tile.loot.name] = coord
-        best_weapon = weapons.get('bow_unloaded')
-        if best_weapon is not None:
-            return best_weapon
-        best_weapon = weapons.get('bow_loaded')
-        if best_weapon is not None:
-            return best_weapon
-        best_weapon = weapons.get('axe')
-        if best_weapon is not None:
-            return best_weapon
-        best_weapon = weapons.get('sword')
-        if best_weapon is not None:
-            return best_weapon
+            if tile.loot is not None and tile.loot.name in weapons_names and self.__get_distance(coord) < weapon_distance:
+                weapon_coord = coord
+        return weapon_coord
+
+    def __get_distance(self, coord):
+        return abs(self.position[0] - coord[0]) + abs(self.position[1] - coord[1])
 
     def __generate_queue_from_path(self, path):
         queue = []
