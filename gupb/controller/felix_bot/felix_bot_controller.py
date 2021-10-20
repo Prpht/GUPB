@@ -35,8 +35,8 @@ class FelixBotController:
         self.grid = {}
         self.reached_menhir = False
         self.is_mist_coming = False
-        for x_index in range(20):
-            for y_index in range(20):
+        for x_index in range(200):
+            for y_index in range(200):
                 self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None, effects=[])
 
     def __eq__(self, other: object) -> bool:
@@ -60,14 +60,21 @@ class FelixBotController:
             return characters.Action.ATTACK
 
         if len(self.action_queue) == 0:
-            if not self.is_mist_coming and self.current_weapon not in ['bow_loaded', 'bow_unloaded']:
-                weapon_coord = self.__get_weapon_coordinate(['bow_loaded', 'bow_unloaded'])
+            if not self.is_mist_coming and self.current_weapon not in ['axe']:
+                weapon_coord = self.__get_weapon_coordinate(['axe'])
                 if weapon_coord is not None:
                     path = Astar.astar(self.grid, self.position, weapon_coord)
                     if path is not None:
                         self.action_queue = self.__generate_queue_from_path(
                             path)
-            elif self.is_mist_coming and  self.menhir_coord is not None and not self.reached_menhir:
+            elif not self.is_mist_coming and self.current_weapon in ['axe']:
+                path = Astar.astar(self.grid, self.position, Coords(6, 6))
+                if len(path) == 0:
+                    return characters.Action.TURN_LEFT
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+            elif self.is_mist_coming and self.menhir_coord is not None and not self.reached_menhir:
                 path = Astar.astar(self.grid, self.position, self.menhir_coord)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
@@ -77,7 +84,7 @@ class FelixBotController:
 
         if len(self.action_queue) > 0:
             return self.action_queue.pop(0)
-        elif self.reached_menhir:
+        elif self.reached_menhir and self.is_mist_coming:
             return characters.Action.TURN_LEFT
         else:
             return random.choice([characters.Action.TURN_LEFT,
@@ -105,6 +112,7 @@ class FelixBotController:
                 for effect in tile.effects:
                     if effect.type == 'mist':
                         self.is_mist_coming = True
+                        self.action_queue = [] # reset queue since mist appeared
             if tile.type == 'menhir' and self.position == coord:
                 self.reached_menhir = True
 
@@ -153,8 +161,11 @@ class FelixBotController:
         weapon_coord = None
         weapon_distance = 10000000
         for coord, tile in self.grid.items():
-            if tile.loot is not None and tile.loot.name in weapons_names and self.__get_distance(coord) < weapon_distance:
-                weapon_coord = coord
+            if tile.loot is not None and tile.loot.name in weapons_names:
+                distance = self.__get_distance(coord)
+                if distance < weapon_distance:
+                    weapon_distance = distance
+                    weapon_coord = coord
         return weapon_coord
 
     def __get_distance(self, coord):
