@@ -122,7 +122,7 @@ class Menhir(Tile):
 
     @staticmethod
     def terrain_transparent() -> bool:
-        return False
+        return True
 
 
 @dataclass(frozen=True)
