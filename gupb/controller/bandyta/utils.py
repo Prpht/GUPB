@@ -3,6 +3,7 @@ from math import fabs
 from typing import NamedTuple, List, Optional, Dict
 
 from gupb.model import characters, tiles
+from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords, sub_coords
 from gupb.model.weapons import WeaponDescription
@@ -16,6 +17,7 @@ class Direction(Enum):
 
 
 class Weapon(Enum):
+    bow = 'bow'
     bow_unloaded = 'bow_unloaded'
     bow_loaded = 'bow_loaded'
     axe = 'axe'
@@ -118,9 +120,62 @@ def find_furthest_point(knowledge: ChampionKnowledge):
     furthest_point = knowledge.position
     for tile, desc in knowledge.visible_tiles:
         furthest_point = tile if \
-            desc == 'land' and get_distance(knowledge.position, tile) > get_distance(knowledge.position, furthest_point) else \
+            desc == 'land' and get_distance(knowledge.position, tile) > get_distance(knowledge.position,
+                                                                                     furthest_point) else \
             furthest_point
     return furthest_point
+
+
+def read_arena(arena_description: ArenaDescription):
+    arena = {'land': [], 'knife': [], 'sword': [], 'axe': [], 'bow': [], 'amulet': []}
+    with open(f"resources/arenas/{arena_description.name}.gupb", "r") as f:
+        y = 1
+        for line in f.read().split("\n"):
+            x = 1
+            for char in line:
+                key = None
+                if char == '.':
+                    key = 'land'
+                elif char == 'K':
+                    key = Weapon.knife.value
+                elif char == 'S':
+                    key = Weapon.sword.value
+                elif char == 'A':
+                    key = Weapon.axe.value
+                elif char == 'B':
+                    key = Weapon.bow.value
+                elif char == 'M':
+                    key = Weapon.amulet.value
+                if key is not None:
+                    arena[key].append(Coords(x, y))
+                x += 1
+            y += 1
+        arena['x_size'] = x
+        arena['y_size'] = y
+    return arena
+
+
+def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function) -> list[DirectedCoords]:
+    l = []
+    for i in range(reach_number):
+        l.append(DirectedCoords(Coords(0, 1 + i), Direction.S))
+        l.append(DirectedCoords(Coords(0, -1 - i), Direction.N))
+        l.append(DirectedCoords(Coords(1 + i, 0), Direction.E))
+        l.append(DirectedCoords(Coords(-1 - i, 0), Direction.W))
+
+    def mapping(c: DirectedCoords):
+        return DirectedCoords(sub_coords(target, c.coords), c.direction)
+
+    possible = list(map(mapping, l))
+    return list(filter(filter_function, possible))
+
+def axe_attack_coords(target: Coords, filter_function) -> list[DirectedCoords]:
+    #todo
+    return []
+
+def amulet_attack_coords(target: Coords, filter_function) -> list[DirectedCoords]:
+    #todo
+    return []
 
 
 POSSIBLE_ACTIONS = [

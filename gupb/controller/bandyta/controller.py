@@ -6,7 +6,8 @@ from typing import Dict
 from gupb.controller.bandyta.bfs import find_path
 from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
     find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
-    get_distance, Weapon, get_rank_weapons
+    get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
+    amulet_attack_coords
 from gupb.model import arenas
 from gupb.model import characters, tiles
 from gupb.model.characters import ChampionKnowledge
@@ -26,6 +27,7 @@ class Bandyta:
         self.item_map: Dict[Coords, WeaponDescription] = {}
         self.path = Path(None, [])
         self.menhir: Coords | None = None
+        self.arena = None
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):
@@ -79,7 +81,7 @@ class Bandyta:
             return random.choice(POSSIBLE_ACTIONS)
 
     def reset(self, arena_description: arenas.ArenaDescription):
-        pass
+        self.arena = read_arena(arena_description)
 
     def get_my_weapon(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for cords, tile in visible_tiles.items():
@@ -122,6 +124,27 @@ class Bandyta:
                 characters.Action.TURN_LEFT
         else:
             return characters.Action.STEP_FORWARD
+
+    def possible_attack_coords(self, enemy_position: Coords, weapon: Weapon) -> list[DirectedCoords]:
+        possible_coords = []
+        if weapon == Weapon.knife:
+            possible_coords = line_weapon_attack_coords(enemy_position, 1, self.is_valid_coords)
+        elif weapon == Weapon.bow or Weapon.bow_unloaded or Weapon.bow_loaded:
+            possible_coords = line_weapon_attack_coords(enemy_position, 50, self.is_valid_coords)
+        elif weapon == Weapon.sword:
+            possible_coords = line_weapon_attack_coords(enemy_position, 3, self.is_valid_coords)
+        elif weapon == Weapon.axe:
+            possible_coords = axe_attack_coords(enemy_position, self.is_valid_coords)
+        elif weapon == Weapon.amulet:
+            possible_coords = amulet_attack_coords(enemy_position, self.is_valid_coords)
+        else:
+            raise KeyError(f"Not known weapon {weapon.name}.")
+        return possible_coords
+
+
+    def is_valid_coords(self, coords: DirectedCoords) -> bool:
+        c = coords.coords
+        return 0 < c.x <= self.arena['x_size'] and 0 < c.y <= self.arena['y_size'] and c in self.arena['land']
 
 
 POTENTIAL_CONTROLLERS = [
