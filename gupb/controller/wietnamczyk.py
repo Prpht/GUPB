@@ -65,10 +65,8 @@ class WIETnamczyk:
     def should_attack(self, self_pos, knowledge):
         if self.current_weapon.name == 'sword':
             for tile, description in knowledge.visible_tiles.items():
-                ##print('go for')
                 distance = self.dist(tile, self_pos)
                 if distance == 0 or (description.character is None or distance > 3):
-                    #print('continue sword')
                     continue
                 if (self.facing == Facing.UP or self.facing == Facing.DOWN) and (tile[0] - self_pos[0]) == 0:
                     return True
@@ -76,9 +74,7 @@ class WIETnamczyk:
                     return True
         if self.current_weapon.name == 'axe':
             for tile, description in knowledge.visible_tiles.items():
-                ##print('go for')
                 if self.max_dist(tile, self_pos) != 1:
-                    #print('continue axe')
                     continue
                 if description.character is not None:
                     return True
@@ -106,7 +102,6 @@ class WIETnamczyk:
                     return True
                 if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
                     return True
-        #print(self.current_weapon)
         return False
 
     def find_good_weapon(self, bot_pos):
@@ -130,16 +125,13 @@ class WIETnamczyk:
             if distance == 1:
                 current_tile = tile
                 next_tile = path_to_destination[0]
-
                 if next_tile == (current_tile[0], current_tile[1]):
                     return characters.Action.STEP_FORWARD
-
                 x1 = next_tile[0] - bot_pos[0]
                 y1 = next_tile[1] - bot_pos[1]
                 x2 = current_tile[0] - bot_pos[0]
                 y2 = current_tile[1] - bot_pos[1]
                 angle = atan2(y2, x2) - atan2(y1, x1)
-
                 if angle > 0:
                     return characters.Action.TURN_LEFT
                 else:
@@ -190,7 +182,6 @@ class WIETnamczyk:
 
             if not visited[s[0]][s[1]]:
                 visited[s[0]][s[1]] = True
-
                 for s_x, s_y in [(-1, 0), (1, 0), (0, 1), (0, -1)]:
                     adj_x = s[0] + s_x
                     adj_y = s[1] + s_y
