@@ -26,13 +26,17 @@ class WIETnamczyk:
             Coords(12, 6),
             Coords(12, 12)
         ]
+        self.outer_prob = [0.2, 0.3, 0.3, 0.2]
         self.inner_places = [
             Coords(8, 8),
             Coords(8, 10),
+            Coords(9,9),
             Coords(10, 8),
             Coords(10, 10)
         ]
+        self.inner_prob = [0.17, 0.18, 0.3, 0.18, 0.17]
         self.safe_places = self.outer_places
+        self.prob = self.outer_prob
         self.mist_range = 3
 
         self.menhir_pos = Coords(9, 9)
@@ -54,11 +58,9 @@ class WIETnamczyk:
         return max(abs(tile1[0] - tile2[0]), abs(tile1[1] - tile2[1]))
 
     def get_random_safe_place(self, current_pos: coordinates.Coords):
-        prob = [0.2, 0.3, 0.3, 0.2]
-
         places = list(sorted(map(lambda place: (place, self.dist(place, current_pos)), self.safe_places),
                              key=lambda pair: pair[1]))
-        return random.choices(places, weights=prob)[0][0]
+        return random.choices(places, weights=self.prob)[0][0]
 
     def should_attack(self, self_pos, knowledge):
         if self.current_weapon.name == 'sword':
@@ -149,6 +151,7 @@ class WIETnamczyk:
             if self.max_dist(tile, current_pos) <= self.mist_range:
                 if 'mist' in list(map(lambda item: item.type, description.effects)):
                     self.safe_places = self.inner_places
+                    self.prob = self.inner_prob
 
     def is_tile_valid(self):
         pass
