@@ -1,3 +1,4 @@
+import logging
 import random
 from math import atan2
 from collections import deque
@@ -7,7 +8,6 @@ from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.arenas import Arena
 from gupb.model.coordinates import Coords
-
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -20,9 +20,9 @@ class WIETnamczyk:
     def __init__(self):
         self.safe_places = [
             Coords(6, 6),
-            Coords(6, 13),
-            Coords(13, 6),
-            Coords(13, 13),
+            Coords(6, 12),
+            Coords(12, 6),
+            Coords(12, 12)
         ]
 
         self.menhir_pos = Coords(9, 9)
@@ -33,15 +33,19 @@ class WIETnamczyk:
         self.current_weapon = "knife"
         self.state = WIETnamczyk.FIND_WEAPON
         self.next_dest = None
+        self.hp = None
+        self.facing = None
 
     def dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
-        return abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
+        dist = abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
+        return dist
 
     def get_random_safe_place(self, current_pos: coordinates.Coords):
         prob = [0.2, 0.3, 0.3, 0.2]
-        places = list(sorted(list(map(lambda item: (item, self.dist(item, current_pos)), self.safe_places)),
-                             key=lambda item: item[1]))
-        return random.choices(places, weights=prob)[0]
+
+        places = list(sorted(map(lambda place: (place, self.dist(place, current_pos)), self.safe_places),
+                             key=lambda pair: pair[1]))
+        return random.choices(places, weights=prob)[0][0]
 
     def find_good_weapon(self):
         for i in range(len(self.map)):
@@ -80,9 +84,13 @@ class WIETnamczyk:
     def is_tile_valid(self):
         pass
 
-    def update_knowledge(self, visible_tiles):
+    def update_knowledge(self, visible_tiles, bot_pos):
         for tile, description in visible_tiles.items():
             self.map[tile[0]][tile[1]] = description
+            if self.dist(tile, bot_pos) == 0:
+                self.current_weapon = description.character.weapon
+                self.hp = description.character.health
+                self.facing = description.character.facing
 
     def parse_map(self):
         arena = Arena.load("isolated_shrine")
@@ -120,6 +128,7 @@ class WIETnamczyk:
                                 adj_y]:
                         queue.append(adj)
                         parent[adj] = s
+        return []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, WIETnamczyk):
@@ -133,15 +142,14 @@ class WIETnamczyk:
         self.arena_description = arena_description
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.update_knowledge(knowledge.visible_tiles)
         bot_pos = knowledge.position
+        self.update_knowledge(knowledge.visible_tiles, bot_pos)
 
         # todo: fight if ....
 
         if self.state == WIETnamczyk.FIND_WEAPON:
-            #todo: update weapon
             weapon_pos = self.find_good_weapon()
-            if not weapon_pos:
+            if not weapon_pos or self.current_weapon.name in self.good_weapons:
                 self.state = WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI
             else:
                 path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map, (weapon_pos[0], weapon_pos[1]))
@@ -150,10 +158,12 @@ class WIETnamczyk:
         if self.state == WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI:
             if not self.next_dest or self.dist(self.next_dest, bot_pos) < 1:
                 dest = self.get_random_safe_place(bot_pos)
-                if dest[0] == self.next_dest[0] and dest[1] == self.next_dest[1]:
+                if dest[0] == bot_pos[0] and dest[1] == bot_pos[1]:
                     return characters.Action.TURN_RIGHT
                 self.next_dest = dest
-            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map, (self.next_dest[0], self.next_dest[1]))
+            #todo: bad weapon is an obstacle with some probability
+            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map,
+                                                 (self.next_dest[0], self.next_dest[1]))
             return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         return random.choice(POSSIBLE_ACTIONS)
