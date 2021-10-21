@@ -195,7 +195,7 @@ class WIETnamczyk:
                     adj_x = s[0] + s_x
                     adj_y = s[1] + s_y
                     adj = (adj_x, adj_y)
-                    if 0 <= adj_x < X and 0 <= adj_y < Y and map_matrix[adj_x][adj_y].type == 'land' and not \
+                    if 0 <= adj_x < X and 0 <= adj_y < Y and (map_matrix[adj_x][adj_y].type == 'land' or map_matrix[adj_x][adj_y].type == 'menhir')  and not \
                             visited[adj_x][
                                 adj_y]:
                         queue.append(adj)
