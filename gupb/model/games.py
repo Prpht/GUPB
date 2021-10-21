@@ -15,7 +15,7 @@ from gupb.model import coordinates
 
 verbose_logger = logging.getLogger('verbose')
 
-MIST_TTH: int = 30
+MIST_TTH_PER_CHAMPION: int = 5
 
 ChampionDeath = NamedTuple('ChampionDeath', [('champion', characters.Champion), ('episode', int)])
 
@@ -40,6 +40,7 @@ class Game(statemachine.StateMachine):
         self.champions: list[characters.Champion] = self._spawn_champions(to_spawn)
         self.action_queue: list[characters.Champion] = []
         self.episode: int = 0
+        self.episodes_since_mist_increase: int = 0
         self.deaths: list[ChampionDeath] = []
         self.finished = False
         super(statemachine.StateMachine, self).__init__()
@@ -85,10 +86,12 @@ class Game(statemachine.StateMachine):
         self._clean_dead_champions()
         self.action_queue = self.champions.copy()
         self.episode += 1
+        self.episodes_since_mist_increase += 1
         verbose_logger.debug(f"Starting episode {self.episode}.")
         EpisodeStartReport(self.episode).log(logging.DEBUG)
-        if self.episode % MIST_TTH == 0:
+        if self.episodes_since_mist_increase >= MIST_TTH_PER_CHAMPION * len(self.champions):
             self.arena.increase_mist()
+            self.episodes_since_mist_increase = 0
 
     def _clean_dead_champions(self):
         alive = []

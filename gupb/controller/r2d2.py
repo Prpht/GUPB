@@ -1,6 +1,9 @@
 from queue import SimpleQueue
+from typing import Optional
+
 from gupb.model import arenas, coordinates
 from gupb.model import characters
+
 
 class R2D2Controller:
     def __init__(self, first_name: str):
@@ -38,15 +41,14 @@ class R2D2Controller:
         char_description = knowledge.visible_tiles[knowledge.position].character
         self.facing = char_description.facing
 
-
     def is_mist_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
-        for i in reversed(range(1,5)):
-            visible_tile=self.position
+        for i in reversed(range(1, 5)):
+            visible_tile = self.position
             for j in range(i):
-                visible_tile=visible_tile+self.facing.value
+                visible_tile = visible_tile + self.facing.value
             if visible_tile in knowledge.visible_tiles.keys():
                 for e in knowledge.visible_tiles[visible_tile].effects:
-                    if e.type=='mist':
+                    if e.type == 'mist':
                         return True
         else:
             return False
@@ -68,5 +70,5 @@ class R2D2Controller:
 
 
 POTENTIAL_CONTROLLERS = [
-    R2D2Controller('R2D2'),
+    R2D2Controller("R2D2"),
 ]

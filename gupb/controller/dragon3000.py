@@ -17,17 +17,10 @@ POSSIBLE_ACTIONS2 = [
     characters.Action.STEP_FORWARD,
 ]
 
-TABARD_ASSIGNMENT = {
-    "Alice": characters.Tabard.BLUE,
-    "Bob": characters.Tabard.YELLOW,
-    "Cecilia": characters.Tabard.RED,
-    "Darius": characters.Tabard.GREY,
-}
-
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BotController:
+class Dragon3000Controller:
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.cached_enemy_coords = None
@@ -36,8 +29,9 @@ class BotController:
         self.counter = 0
         self.old_coords = None
         self.old_facing = None
+
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, BotController):
+        if isinstance(other, Dragon3000Controller):
             return self.first_name == other.first_name
         return False
 
@@ -48,37 +42,36 @@ class BotController:
         pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        
+
         fields = knowledge[1]
         enemy_coords = None
-        
+
         for key in fields:
             char = fields[key][2]
             if char != None and char[0] != "BotControllerAlice":
                 enemy_coords = key
                 self.cached_enemy_coords = enemy_coords
                 break
-                
+
             if char != None and char[0] == "BotControllerAlice":
                 self.facing = char.facing.value
                 self.facing_word = char[3]
-        
+
         combat = False
         if enemy_coords != None:
-            if (knowledge[0][0] + self.facing[0] == enemy_coords[0] and knowledge[0][1] + self.facing[1] == enemy_coords[1]):
+            if (knowledge[0][0] + self.facing[0] == enemy_coords[0] and knowledge[0][1] + self.facing[1] ==
+                    enemy_coords[1]):
                 combat = True
-                
+
         if (self.old_coords == knowledge[0] and self.old_facing == self.facing and combat == False):
             self.counter = 3
-            
 
-            
         self.old_coords = knowledge[0]
         self.old_facing = self.facing
 
         if self.cached_enemy_coords == None:
             return random.choice(POSSIBLE_ACTIONS2)
-            
+
         if combat == True:
             return characters.Action.ATTACK
 
@@ -88,34 +81,31 @@ class BotController:
 
         if self.cached_enemy_coords != None:
 
-            x = self.cached_enemy_coords[0]-knowledge[0][0]
-            y = self.cached_enemy_coords[1]-knowledge[0][1]
-            
-            angle1 = math.atan2(y,x)
-            angle2 = math.atan2(self.facing[1],self.facing[0])
-            
+            x = self.cached_enemy_coords[0] - knowledge[0][0]
+            y = self.cached_enemy_coords[1] - knowledge[0][1]
+
+            angle1 = math.atan2(y, x)
+            angle2 = math.atan2(self.facing[1], self.facing[0])
+
             angle3 = angle2 - angle1
-            if (angle3 > math.pi): angle3 = angle3 - 2*math.pi
+            if (angle3 > math.pi): angle3 = angle3 - 2 * math.pi
             angle3 *= 57.3
-            if (angle3 < -46): 
+            if (angle3 < -46):
                 return characters.Action.TURN_RIGHT
- 
-            if angle3 > 46: 
+
+            if angle3 > 46:
                 return characters.Action.TURN_LEFT
             return characters.Action.STEP_FORWARD
 
     @property
     def name(self) -> str:
-        return f'BotController{self.first_name}'
+        return f'Dragon3000Controller{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.YELLOW
 
 
 POTENTIAL_CONTROLLERS = [
-    BotController("Alice"),
-    BotController("Bob"),
-    BotController("Cecilia"),
-    BotController("Darius"),
+    Dragon3000Controller("1.0"),
 ]

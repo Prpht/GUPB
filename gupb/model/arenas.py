@@ -30,12 +30,15 @@ WEAPON_ENCODING = {
     'M': weapons.Amulet,
 }
 
+FIXED_MENHIRS = {
+    'isolated_shrine': coordinates.Coords(9, 9)
+}
+
 Terrain = Dict[coordinates.Coords, tiles.Tile]
 
 
 class ArenaDescription(NamedTuple):
     name: str
-    menhir_position: coordinates.Coords
 
 
 class Arena:
@@ -64,7 +67,7 @@ class Arena:
         return Arena(name, terrain)
 
     def description(self) -> ArenaDescription:
-        return ArenaDescription(self.name, self.menhir_position)
+        return ArenaDescription(self.name)
 
     def empty_coords(self) -> set[coordinates.Coords]:
         return set(coords for coords, tile in self.terrain.items() if tile.empty)
@@ -115,6 +118,7 @@ class Arena:
         if self.menhir_position:
             self.terrain[self.menhir_position] = tiles.Land()
         new_position = random.sample(self.empty_coords(), 1)[0] if new_position is None else new_position
+        new_position = FIXED_MENHIRS[self.name] if self.name in FIXED_MENHIRS else new_position
         self.menhir_position = new_position
         self.terrain[self.menhir_position] = tiles.Menhir()
         verbose_logger.debug(f"Menhir spawned at {self.menhir_position}.")

@@ -10,12 +10,6 @@ from gupb.model.characters import Facing
 from gupb.model import coordinates
 
 
-TABARD_ASSIGNMENT = {
-    "Johnathan": characters.Tabard.BROWN,
-    "Michael": characters.Tabard.VIOLET
-}
-
-
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class EkonometronController:
@@ -192,10 +186,9 @@ class EkonometronController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.BROWN
 
 
 POTENTIAL_CONTROLLERS = [
     EkonometronController("Johnathan"),
-    EkonometronController("Michael")
 ]

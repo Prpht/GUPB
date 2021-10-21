@@ -2,7 +2,7 @@ import random
 from math import atan2
 from collections import deque
 
-from gupb.controller.random import POSSIBLE_ACTIONS, TABARD_ASSIGNMENT
+from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.arenas import Arena
@@ -103,7 +103,7 @@ class WIETnamczyk:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return TABARD_ASSIGNMENT[self.first_name] if self.first_name in TABARD_ASSIGNMENT else characters.Tabard.WHITE
+        return characters.Tabard.BLUE
 
 
 POTENTIAL_CONTROLLERS = [
