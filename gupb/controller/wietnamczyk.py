@@ -7,6 +7,7 @@ from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.arenas import Arena
+from gupb.model.characters import Facing
 from gupb.model.coordinates import Coords
 
 
@@ -19,12 +20,20 @@ class WIETnamczyk:
     FIND_MENHIR = "find_menhir"
 
     def __init__(self):
-        self.safe_places = [
+        self.outer_places = [
             Coords(6, 6),
             Coords(6, 12),
             Coords(12, 6),
             Coords(12, 12)
         ]
+        self.inner_places = [
+            Coords(8, 8),
+            Coords(8, 10),
+            Coords(10, 8),
+            Coords(10, 10)
+        ]
+        self.safe_places = self.outer_places
+        self.mist_range = 3
 
         self.menhir_pos = Coords(9, 9)
         self.good_weapons = ["sword", "axe"]
@@ -41,12 +50,62 @@ class WIETnamczyk:
         dist = abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
         return dist
 
+    def max_dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
+        return max(abs(tile1[0] - tile2[0]), abs(tile1[1] - tile2[1]))
+
     def get_random_safe_place(self, current_pos: coordinates.Coords):
         prob = [0.2, 0.3, 0.3, 0.2]
 
         places = list(sorted(map(lambda place: (place, self.dist(place, current_pos)), self.safe_places),
                              key=lambda pair: pair[1]))
         return random.choices(places, weights=prob)[0][0]
+
+    def should_attack(self, self_pos, knowledge):
+        if self.current_weapon.name == 'sword':
+            for tile, description in knowledge.visible_tiles.items():
+                ##print('go for')
+                distance = self.dist(tile, self_pos)
+                if distance == 0 or (description.character is None or distance > 3):
+                    #print('continue sword')
+                    continue
+                if (self.facing == Facing.UP or self.facing == Facing.DOWN) and (tile[0] - self_pos[0]) == 0:
+                    return True
+                if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
+                    return True
+        if self.current_weapon.name == 'axe':
+            for tile, description in knowledge.visible_tiles.items():
+                ##print('go for')
+                if self.max_dist(tile, self_pos) != 1:
+                    #print('continue axe')
+                    continue
+                if description.character is not None:
+                    return True
+        if self.current_weapon.name == 'amulet':
+            for tile, description in knowledge.visible_tiles.items():
+                if self.max_dist(tile, self_pos) > 1:
+                    continue
+                if description.character is not None and self.dist(tile, self_pos) == 2:
+                    return True
+        if self.current_weapon.name == 'bow':
+            for tile, description in knowledge.visible_tiles.items():
+                distance = self.dist(tile, self_pos)
+                if distance == 0 or description.character is None:
+                    continue
+                if (self.facing == Facing.UP or self.facing == Facing.DOWN) and (tile[0] - self_pos[0]) == 0:
+                    return True
+                if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
+                    return True
+        if self.current_weapon.name == 'knife':
+            for tile, description in knowledge.visible_tiles.items():
+                distance = self.dist(tile, self_pos)
+                if description.character is None or distance != 1:
+                    continue
+                if (self.facing == Facing.UP or self.facing == Facing.DOWN) and (tile[0] - self_pos[0]) == 0:
+                    return True
+                if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
+                    return True
+        #print(self.current_weapon)
+        return False
 
     def find_good_weapon(self, bot_pos):
         weapons_pos = []
@@ -85,8 +144,11 @@ class WIETnamczyk:
                     return characters.Action.TURN_RIGHT
         return characters.Action.TURN_RIGHT
 
-    def is_mist_nearby(self, current_pos):
-        pass
+    def evaluate_mist(self, current_pos, knowledge):
+        for tile, description in knowledge.visible_tiles.items():
+            if self.max_dist(tile, current_pos) <= self.mist_range:
+                if 'mist' in list(map(lambda item: item.type, description.effects)):
+                    self.safe_places = self.inner_places
 
     def is_tile_valid(self):
         pass
@@ -151,7 +213,9 @@ class WIETnamczyk:
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         bot_pos = knowledge.position
         self.update_knowledge(knowledge.visible_tiles, bot_pos)
-        # todo: fight if ....
+        self.evaluate_mist(bot_pos, knowledge)
+        if self.should_attack(bot_pos, knowledge):
+            return characters.Action.ATTACK
 
         if self.state == WIETnamczyk.FIND_WEAPON:
             weapon_pos = self.find_good_weapon(bot_pos)
