@@ -238,7 +238,6 @@ class WIETnamczyk:
                 if dest[0] == bot_pos[0] and dest[1] == bot_pos[1]:
                     return characters.Action.TURN_RIGHT
                 self.next_dest = dest
-            # todo: bad weapon is an obstacle with some probability
             path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map,
                                                  (self.next_dest[0], self.next_dest[1]))
             return self.find_direction(path_to_destination, knowledge, bot_pos)
