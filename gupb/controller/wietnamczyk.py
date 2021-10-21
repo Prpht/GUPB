@@ -30,7 +30,7 @@ class WIETnamczyk:
         self.inner_places = [
             Coords(8, 8),
             Coords(8, 10),
-            Coords(9,9),
+            Coords(9, 9),
             Coords(10, 8),
             Coords(10, 10)
         ]
@@ -116,10 +116,13 @@ class WIETnamczyk:
             return None
         closest_good_weapon = \
             list(
-                sorted(map(lambda pos: (pos, len(self.find_path(pos, self.map, bot_pos))), weapons_pos), key=lambda item: item[1]))
+                sorted(map(lambda pos: (pos, len(self.find_path(pos, self.map, bot_pos))), weapons_pos),
+                       key=lambda item: item[1]))
         return closest_good_weapon[0][0]
 
     def find_direction(self, path_to_destination, knowledge, bot_pos):
+        if len(path_to_destination) == 0:
+            return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
         for tile, description in knowledge.visible_tiles.items():
             distance = self.dist(bot_pos, tile)
             if distance == 1:
@@ -145,8 +148,18 @@ class WIETnamczyk:
                     self.safe_places = self.inner_places
                     self.prob = self.inner_prob
 
-    def is_tile_valid(self):
-        pass
+    def is_tile_valid(self, tile):
+        if tile.type == 'land' or tile.type == 'menhir':
+            return False
+        loot = tile.loot
+        weapons_prob = {'sword': 1.0, 'axe': 1.0, 'knife': 0.4, 'amulet': 0.1, 'bow_loaded': 0.1, 'bow_unloaded': 0.05}
+        if loot:
+            prob = weapons_prob[loot.name]
+            r = random.uniform(0, 1)
+            if r <= prob:
+                return True
+            return False
+        return True
 
     def update_knowledge(self, visible_tiles, bot_pos):
         for tile, description in visible_tiles.items():
