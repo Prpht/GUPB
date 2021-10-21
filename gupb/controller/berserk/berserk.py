@@ -34,8 +34,7 @@ class BerserkBot:
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.knowledge_decoder.knowledge = knowledge
-        enemies_in_sight, cords, *rest = self.knowledge_decoder.decode()
-        self.update_probabilities(enemies_in_sight)
+        self.update_probabilities(self.knowledge_decoder['enemies_in_sight'])
         self.move_counter += 1
         return np.random.choice(self._possible_actions, 1, p=self.probabilities)[0]
 
