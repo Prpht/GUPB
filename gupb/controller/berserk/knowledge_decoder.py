@@ -1,11 +1,14 @@
 from gupb.model import characters
 from gupb.model.coordinates import Coords
+from model.arenas import Arena
+from pathfinding.core.grid import Grid
 
 
 class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
         self._info = {}
+        self.map = self.load_map()
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -59,3 +62,10 @@ class KnowledgeDecoder:
     def knowledge(self, new_knowledge):
         self._knowledge = new_knowledge
         self.decode()
+
+    def load_map(self, map_name):
+        arena = Arena.load(map_name)
+        map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
+        for cords, tile in arena.terrain.items():
+            map_matrix[cords.x][cords.y] = 0 if tile.description().type.lower() not in ['wall', 'sea'] else 1
+        return Grid(map_matrix)

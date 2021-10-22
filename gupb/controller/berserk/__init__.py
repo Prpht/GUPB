@@ -7,12 +7,12 @@ POTENTIAL_CONTROLLERS = [
 
 """
 TO DO:
-[ ] Pathfinding
+[X] Pathfinding
 [ ] Wydobywanie informacji o broni i mgle
-[ ] Poluj
-[ ] Rozglądaj się 
-[ ] Idź do...
-[ ] Sprawdzić informacje o stanie zdrowia 
+[X] Poluj
+[X] Rozglądaj się 
+[X] Idź do...
+[X] Sprawdzić informacje o stanie zdrowia 
 [ ] Sposób na zarządzania bronią 
 
 """
