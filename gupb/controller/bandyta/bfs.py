@@ -7,7 +7,7 @@ from gupb.controller.bandyta.utils import Direction, DirectedCoords, rotate_cw, 
 from gupb.model.coordinates import Coords
 
 
-def find_path(start: DirectedCoords, end: Coords, grid: Dict[int, Dict[int, str]]) -> List[DirectedCoords]:
+def find_path(start: DirectedCoords, end: DirectedCoords, grid: Dict[int, Dict[int, str]]) -> List[DirectedCoords]:
     queue: List[DirectedCoords] = [start]
     return_path: Dict[DirectedCoords, DirectedCoords | None] = {start: None}
     visited_list: List[DirectedCoords] = []
@@ -19,7 +19,10 @@ def find_path(start: DirectedCoords, end: Coords, grid: Dict[int, Dict[int, str]
         steps += 1
         node = queue.pop(0)
 
-        if node.coords == end:
+        if end.direction is not None and node == end:
+            directed_end = node
+            break
+        elif node.coords == end.coords:
             directed_end = node
             break
 
