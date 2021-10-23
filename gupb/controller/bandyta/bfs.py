@@ -19,10 +19,8 @@ def find_path(start: DirectedCoords, end: DirectedCoords, grid: Dict[int, Dict[i
         steps += 1
         node = queue.pop(0)
 
-        if end.direction is not None and node == end:
-            directed_end = node
-            break
-        elif node.coords == end.coords:
+        if (end.direction is not None and node == end) or \
+                (end.direction is None and node.coords == end.coords):
             directed_end = node
             break
 

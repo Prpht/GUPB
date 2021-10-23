@@ -1,6 +1,6 @@
 from enum import Enum
 from math import fabs
-from typing import NamedTuple, List, Optional, Dict
+from typing import NamedTuple, List, Optional, Dict, Tuple
 import random
 
 from gupb.model import characters, tiles
@@ -15,6 +15,7 @@ class Direction(Enum):
     W = Coords(-1, 0)
     N = Coords(0, -1)
     E = Coords(1, 0)
+
     @staticmethod
     def get_all():
         return [Direction.S, Direction.W, Direction.N, Direction.E]
@@ -35,7 +36,13 @@ class Weapon(Enum):
 
     @staticmethod
     def get_all():
-        return [Weapon.bow, Weapon.axe, Weapon.sword, Weapon.knife, Weapon.amulet, Weapon.bow_loaded, Weapon.bow_unloaded]
+        return [Weapon.bow,
+                Weapon.axe,
+                Weapon.sword,
+                Weapon.knife,
+                Weapon.amulet,
+                Weapon.bow_loaded,
+                Weapon.bow_unloaded]
 
     @staticmethod
     def from_string(string: str):
@@ -45,12 +52,12 @@ class Weapon(Enum):
         raise KeyError("Not known weapon with name ", string)
 
 
-DirectedCoords = NamedTuple('DirectedCoords', [('coords', Coords), ('direction', Direction)])
+DirectedCoords = NamedTuple('DirectedCoords', [('coords', Coords), ('direction', Optional[Direction])])
 Path = NamedTuple('Path', [('dest', Optional[str]), ('route', List[DirectedCoords])])
 
 
 def get_rank_weapons() -> List[Weapon]:
-    return [Weapon.bow_unloaded, Weapon.bow_loaded, Weapon.sword, Weapon.axe]
+    return [Weapon.bow_unloaded, Weapon.bow_loaded, Weapon.sword, Weapon.axe, Weapon.amulet]
 
 
 def rotate_cw(direction: Direction) -> Direction:
@@ -95,18 +102,25 @@ def knife_attack_possible(my_coord: Coords, enemy_coord: Coords):
     return (fabs(sub.x) == 1 and sub.y == 0) or (fabs(sub.y) == 1 and sub.x == 0)
 
 
-def is_attack_possible(my_coord: Coords, enemy_coord: Coords, weapon: WeaponDescription) -> bool:
-    sub = sub_coords(my_coord, enemy_coord)
-    if weapon.name == Weapon.sword.value:
-        return (fabs(sub.x) <= 3 and sub.y == 0) or (fabs(sub.y) <= 3 and sub.x == 0)
-    elif weapon.name in [Weapon.bow_unloaded.value, Weapon.bow_loaded.value]:
-        return (fabs(sub.x) <= 50 and sub.y == 0) or (fabs(sub.y) <= 50 and sub.x == 0)
-    elif weapon.name == Weapon.axe.value:
-        return fabs(sub.x) <= 1 and fabs(sub.y) <= 1
-    elif weapon.name == Weapon.amulet.value:
-        return fabs(sub.x) == 1 and fabs(sub.y) == 1
-    else:
-        knife_attack_possible(my_coord, enemy_coord)
+def is_attack_possible(knowledge: ChampionKnowledge, weapon: Weapon, my_name: str) -> bool:
+    players: Dict[str, Coords] = find_players(my_name, knowledge.visible_tiles)
+
+    for enemy_coord in players.values():
+        sub = sub_coords(knowledge.position, enemy_coord)
+        if weapon == Weapon.sword and ((fabs(sub.x) <= 3 and sub.y == 0) or (fabs(sub.y) <= 3 and sub.x == 0)):
+            return True
+        elif weapon in [Weapon.bow_unloaded, Weapon.bow_loaded] and ((fabs(sub.x) <= 50 and sub.y == 0) or (fabs(sub.y) <= 50 and sub.x == 0)):
+            return True
+        elif weapon == Weapon.axe and (fabs(sub.x) <= 1 and fabs(sub.y) <= 1):
+            return True
+        elif weapon == Weapon.amulet and (fabs(sub.x) == 1 and fabs(sub.y) == 1):
+            return True
+        elif weapon == Weapon.knife and knife_attack_possible(knowledge.position, enemy_coord):
+            return True
+        else:
+            continue
+
+    return False
 
 
 def find_players(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]):
@@ -114,7 +128,7 @@ def find_players(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]):
     for cords, tile in visible_tiles.items():
         if (tile.character is not None and
                 tile.character.controller_name != name):
-            players[tile.character.controller_name] = cords
+            players[tile.character.controller_name] = Coords(cords[0], cords[1])
     return players
 
 
@@ -131,7 +145,7 @@ def find_closest_player(name: str, knowledge: ChampionKnowledge):
     return player, players[player]
 
 
-def find_target_player(name: str, knowledge: ChampionKnowledge, target: str):
+def find_target_player(name: str, knowledge: ChampionKnowledge, target: str) -> Tuple[str, Coords]:
     players = find_players(name, knowledge.visible_tiles)
     return (target, players[target]) if target in players.keys() else \
         (list(players.keys())[0], list(players.values())[0]) if len(players) > 0 else None
@@ -146,7 +160,7 @@ def find_menhir(visible_tiles: Dict[Coords, tiles.TileDescription]):
 
 def find_furthest_point(knowledge: ChampionKnowledge):
     furthest_point = knowledge.position
-    for tile, desc in knowledge.visible_tiles:
+    for tile, desc in knowledge.visible_tiles.items():
         furthest_point = tile if \
             desc == 'land' and get_distance(knowledge.position, tile) > get_distance(knowledge.position,
                                                                                      furthest_point) else \
@@ -157,9 +171,9 @@ def find_furthest_point(knowledge: ChampionKnowledge):
 def read_arena(arena_description: ArenaDescription):
     arena = {'land': [], 'wall': [], 'knife': [], 'sword': [], 'axe': [], 'bow': [], 'amulet': []}
     with open(f"resources/arenas/{arena_description.name}.gupb", "r") as f:
-        y = 1
+        y = 0
         for line in f.read().split("\n"):
-            x = 1
+            x = 0
             for char in line:
                 key = None
                 if char == '.':
@@ -185,42 +199,30 @@ def read_arena(arena_description: ArenaDescription):
     return arena
 
 
-def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function, is_wall) -> list[DirectedCoords]:
-    possible = []
-    S = True
-    N = True
-    E = True
-    W = True
-    for i in range(reach_number):
-        if S:
-            c = sub_coords(target, Coords(0, 1 + i))
-            if is_wall(c):
-                S = False
-            else:
-                possible.append(DirectedCoords(c, Direction.S))
-        if N:
-            c = sub_coords(target, Coords(0, -1 - i))
-            if is_wall(c):
-                N = False
-            else:
-                possible.append(DirectedCoords(c, Direction.N))
-        if E:
-            c = sub_coords(target, Coords(1 + i, 0))
-            if is_wall(c):
-                E = False
-            else:
-                possible.append(DirectedCoords(c, Direction.E))
-        if W:
-            c = sub_coords(target, Coords(-1 - i, 0))
-            if is_wall(c):
-                W = False
-            else:
-                possible.append(DirectedCoords(c, Direction.W))
+def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function, is_wall) -> List[DirectedCoords]:
+    possible: List[DirectedCoords] = []
+    do_search_map: Dict[Direction, bool] = {
+        Direction.S: True,
+        Direction.N: True,
+        Direction.E: True,
+        Direction.W: True
+    }
+
+    #start = 2 if reach_number > 1 else 1
+
+    for i in range(1, reach_number):
+        for direction, do_search in do_search_map.items():
+            if do_search:
+                c = target + i * direction.value
+                if is_wall(c):
+                    do_search_map[direction] = False
+                else:
+                    possible.append(DirectedCoords(c, direction))
 
     return list(filter(filter_function, possible))
 
 
-def axe_attack_coords(target: Coords, filter_function) -> list[DirectedCoords]:
+def axe_attack_coords(target: Coords, filter_function) -> List[DirectedCoords]:
     possible = []
     x = target.x
     y = target.y
@@ -232,7 +234,7 @@ def axe_attack_coords(target: Coords, filter_function) -> list[DirectedCoords]:
     return list(filter(filter_function, possible))
 
 
-def amulet_attack_coords(target: Coords, filter_function) -> list[DirectedCoords]:
+def amulet_attack_coords(target: Coords, filter_function) -> List[DirectedCoords]:
     x = target.x
     y = target.y
     possible = [
