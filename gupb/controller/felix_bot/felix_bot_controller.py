@@ -99,7 +99,11 @@ class FelixBotController:
             elif not self.is_mist_coming and self.current_weapon in ['axe']:
                 path = Astar.astar(self.grid, self.position, Coords(6, 6))
                 if len(path) == 0:
-                    return self.get_turning_direction(knowledge)
+                    if self.facing == Facing.DOWN or self.facing == Facing.LEFT:
+                        return characters.Action.TURN_LEFT
+                    else:
+                        return characters.Action.TURN_RIGHT
+                    # return self.get_turning_direction(knowledge)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
                         path)
@@ -134,6 +138,7 @@ class FelixBotController:
         self.facing = character.facing
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
+        self.reached_menhir = False
         for coord, tile in knowledge.visible_tiles.items():
             if self.menhir_coord is None and tile.type == 'menhir':
                 self.menhir_coord = coord
