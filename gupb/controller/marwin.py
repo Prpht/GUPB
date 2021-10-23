@@ -120,7 +120,7 @@ def _is_tile_transparent(tile_name):
 
     for key, tile_cls in tiles_cls.items():
         if key in tile_name.lower():
-            return tiles_cls[key].terrain_transparent()
+            return tile_cls.terrain_transparent()
     return True
 
 
