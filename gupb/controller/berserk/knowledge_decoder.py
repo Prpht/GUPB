@@ -1,6 +1,6 @@
 from gupb.model import characters
 from gupb.model.coordinates import Coords
-from model.arenas import Arena
+from gupb.model.arenas import Arena
 from pathfinding.core.grid import Grid
 
 
@@ -8,7 +8,7 @@ class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
         self._info = {}
-        self.map = self.load_map()
+        # self.map = self.load_map()
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -31,18 +31,13 @@ class KnowledgeDecoder:
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
                 if tile.character and coords != self.knowledge.position]
 
-    def _get_nearest_area(self):
-        x, y = self._knowledge.position
+    def _get_nearest_area(self, d=4):
+        nearest_area = []
+        for i in range(-d, d + 1):
+            for j in range(-d, d + 1):
+                nearest_area.append(self.knowledge.position + Coords(i, j))
 
-        nearest_area = [Coords(x + 1, y),
-                        Coords(x, y + 1),
-                        Coords(x - 1, y),
-                        Coords(x, y + 1),
-                        Coords(x + 1, y + 1),
-                        Coords(x + 1, y - 1),
-                        Coords(x - 1, y + 1),
-                        Coords(x - 1, y - 1)]
-        return nearest_area
+        return [point for point in nearest_area if point in self.knowledge.visible_tiles.keys()]
 
     def _look_for_mist(self):
         visible_tiles = self.knowledge.visible_tiles
