@@ -1,4 +1,6 @@
 import random
+import math
+import time
 from gupb.model import coordinates, tiles
 from typing import Dict
 from .astar import Astar
@@ -35,9 +37,13 @@ class FelixBotController:
         self.grid = {}
         self.reached_menhir = False
         self.is_mist_coming = False
+        self.turning_direction = characters.Action.TURN_LEFT
+        self.turning_state_on = False
+
         for x_index in range(200):
             for y_index in range(200):
-                self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None, effects=[])
+                self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
+                                                                      effects=[])
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, FelixBotController):
@@ -52,6 +58,29 @@ class FelixBotController:
         self.action_queue = []
         self.reached_menhir = False
         self.is_mist_coming = False
+
+    def change_turning_direction(self):
+        if self.turning_direction == characters.Action.TURN_LEFT:
+            return characters.Action.TURN_RIGHT
+        else:
+            return characters.Action.TURN_LEFT
+
+    def get_turning_direction(self, knowledge):
+        # look for field with distance 1.0 -> field bot is looking at
+        for i in knowledge.visible_tiles:
+            x_diff = i[0] - knowledge.position[0]
+            y_diff = i[1] - knowledge.position[1]
+            distance = math.sqrt(x_diff * x_diff + y_diff * y_diff)
+            if distance >= 0.9 and distance < 1.1:
+                field_front_of_bot = knowledge.visible_tiles[i][0]
+                if field_front_of_bot == "land":
+                    # turn on turning state
+                    self.turning_state_on = True
+                if field_front_of_bot == "wall" and self.turning_state_on:
+                    # change turning direction if bot see wall
+                    turning = self.change_turning_direction()
+                    self.turning_direction = turning
+        return self.turning_direction
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
@@ -70,7 +99,7 @@ class FelixBotController:
             elif not self.is_mist_coming and self.current_weapon in ['axe']:
                 path = Astar.astar(self.grid, self.position, Coords(6, 6))
                 if len(path) == 0:
-                    return characters.Action.TURN_LEFT
+                    return self.get_turning_direction(knowledge)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
                         path)
@@ -112,7 +141,7 @@ class FelixBotController:
                 for effect in tile.effects:
                     if effect.type == 'mist':
                         self.is_mist_coming = True
-                        self.action_queue = [] # reset queue since mist appeared
+                        self.action_queue = []  # reset queue since mist appeared
             if tile.type == 'menhir' and self.position == coord:
                 self.reached_menhir = True
 
@@ -155,7 +184,8 @@ class FelixBotController:
                 self.action_queue = []
 
     def __is_allowed_action(self, action):
-        return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in ['wall', 'sea'])
+        return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in [
+            'wall', 'sea'])
 
     def __get_weapon_coordinate(self, weapons_names):
         weapon_coord = None
@@ -202,4 +232,3 @@ class FelixBotController:
             current_cord = next_coord
             current_facing = desired_facing
         return queue
-
