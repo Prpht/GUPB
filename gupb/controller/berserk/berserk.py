@@ -6,6 +6,7 @@ from pathfinding.core.grid import Grid
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
+
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
 from collections import deque
@@ -22,6 +23,7 @@ WEAPONS = {
     "knife": Knife(),
     "amulet": Amulet(),
 }
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
