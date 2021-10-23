@@ -73,25 +73,17 @@ class WiseTankController(BaseMarwinController):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         ## first of all we want to be as close to the fixed menhir as possible, because this way we can avoid mist in the long run
-        '''if menhir visible: set necessary steps to go there
-            else: set path to menhir and cache it
-            if enemy in sight and in range of currently equipped weapon: attack
-            elif we see better weapon than currently equipped:
-                calculate distance to that
-                if distance is not too far from our path to menhir:
-                    correct path to the menhir so that we pick up that weapon
-        '''
         tiles = knowledge.visible_tiles
         my_position = knowledge.position
         my_character = knowledge.visible_tiles[my_position].character
-        action = characters.Action.DO_NOTHING
+
         if not self.precalculated_path:
             self.precalculated_path = self.find_path(my_position, (9,9))[1:]  # without position we're standing on
-        #else:
+
         if not self.next_move:
             self.next_move = self.precalculated_path[0]
-        # gdzie leży płytka względem mnie
 
+        # next tile location compared to where we are facing
         if self.next_move.x - my_position.x < 0: next_facing = characters.Facing.LEFT # UP
         elif self.next_move.x - my_position.x > 0: next_facing = characters.Facing.RIGHT # DOWN
         elif self.next_move.y - my_position.y < 0: next_facing = characters.Facing.UP # LEFT
@@ -102,24 +94,15 @@ class WiseTankController(BaseMarwinController):
             self.next_move = None
             del self.precalculated_path[0]
 
-        elif ( next_facing == characters.Facing.LEFT and my_character.facing == characters.Facing.UP or
-                next_facing == characters.Facing.UP and my_character.facing == characters.Facing.RIGHT or
-                next_facing == characters.Facing.RIGHT and my_character.facing == characters.Facing.DOWN or
-                next_facing == characters.Facing.DOWN and my_character.facing == characters.Facing.LEFT ):
+        elif ( next_facing == characters.Facing.RIGHT and my_character.facing == characters.Facing.UP or
+                next_facing == characters.Facing.DOWN and my_character.facing == characters.Facing.RIGHT or
+                next_facing == characters.Facing.LEFT and my_character.facing == characters.Facing.DOWN or
+                next_facing == characters.Facing.UP and my_character.facing == characters.Facing.LEFT ):
             action = characters.Action.TURN_RIGHT
         else:
             action = characters.Action.TURN_LEFT
 
         return action
-
-        # for tile_coords, tile_desc in tiles.items():
-        #     if tile_desc.type == "Menhir":
-                # calculate distance to menhir
-            #elif tile_desc.character and  tile_desc.character != my_character:  #enemy in sight
-                #calculate whether enemy in distance of currently equipped weapon
-                # if so, hit
-            #elif WEAPONS_ORDER[tile_desc.loot.name] > WEAPONS_ORDER[my_character.weapon.name]: # we see better weapon
-                # calculate path to weapon, if not long, update path to menhir
 
     def _parse_arena(self):
         with open("./resources/arenas/isolated_shrine.gupb", 'r') as f:
@@ -139,7 +122,7 @@ class WiseTankController(BaseMarwinController):
             if (tile.y, tile.x) == dst:
                 return path
             for x2, y2 in ((tile.x + 1, tile.y), (tile.x - 1, tile.y), (tile.x, tile.y + 1), (tile.x, tile.y - 1)):
-                if 0 <= x2 < width and 0 <= y2 < height and self.arena[x2][y2] not in BLOCKERS and (x2, y2) not in seen:
+                if 0 <= x2 < width and 0 <= y2 < height and self.arena[y2][x2] not in BLOCKERS and (x2, y2) not in seen:
                     queue.append(path + [Coords(x2, y2)])
                     seen.add(Coords(x2, y2))
 

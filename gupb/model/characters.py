@@ -124,11 +124,10 @@ class Champion:
 
 
 class Facing(Enum):
-    UP = coordinates.Coords(0, -1)  # lewo
-    DOWN = coordinates.Coords(0, 1) # prawo
-    LEFT = coordinates.Coords(-1, 0) # góra
-    RIGHT = coordinates.Coords(1, 0) # dół
-# if jestem LEFT a next w DOWN || if ja DOWN a next RIGHT || if ja RIGHT a next UP || if ja UP a next LEFT
+    UP = coordinates.Coords(0, -1)
+    DOWN = coordinates.Coords(0, 1)
+    LEFT = coordinates.Coords(-1, 0)
+    RIGHT = coordinates.Coords(1, 0)
     @staticmethod
     def random() -> Facing:
         return random.choice([Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT])
