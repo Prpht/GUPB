@@ -4,6 +4,15 @@ from typing import Optional
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 
+MENHIR_ISOLATED_SHRINE = coordinates.Coords(9, 9)
+
+
+def is_safe(i, j, matrix, visited):
+    if 0 <= i < len(matrix) and 0 <= j < len(matrix[0]) and matrix[i][j] == 'land' and not visited[i][j]:
+        return True
+    else:
+        return False
+
 
 class R2D2Controller:
     def __init__(self, first_name: str):
@@ -22,6 +31,13 @@ class R2D2Controller:
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         pass
+
+    def parse_map(self):
+        arena = arenas.Arena.load("isolated_shrine")
+        map_matrix = [[None for _ in range(arena.size[0])] for _ in range(arena.size[1])]
+        for coords, tile in arena.terrain.items():
+            map_matrix[coords.x][coords.y] = tile.description().type
+        return map_matrix
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update_char_info(knowledge)
@@ -42,7 +58,7 @@ class R2D2Controller:
         self.facing = char_description.facing
 
     def is_mist_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
-        for i in reversed(range(1, 5)):
+        for i in reversed(range(1, 6)):
             visible_tile = self.position
             for j in range(i):
                 visible_tile = visible_tile + self.facing.value
@@ -70,5 +86,5 @@ class R2D2Controller:
 
 
 POTENTIAL_CONTROLLERS = [
-    R2D2Controller("R2D2"),
+    R2D2Controller("R2D2")
 ]
