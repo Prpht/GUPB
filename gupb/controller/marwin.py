@@ -109,6 +109,21 @@ class EvaderController:
         return None
 
 
+def _is_tile_transparent(tile_name):
+    from gupb.model import tiles
+    tiles_cls = {
+        'wall': tiles.Wall,
+        'sea': tiles.Sea,
+        'land': tiles.Land,
+        'menhir': tiles.Menhir
+    }
+
+    for key, tile_cls in tiles_cls.items():
+        if key in tile_name.lower():
+            return tiles_cls[key].terrain_transparent()
+    return True
+
+
 def _get_cut_positions(weapon_cls, terrain, position, facing):
     cut_positions = []
     cut_position = position
@@ -117,7 +132,7 @@ def _get_cut_positions(weapon_cls, terrain, position, facing):
         if cut_position not in terrain:
             break
         cut_positions.append(cut_position)
-        if terrain[cut_position].type == 'wall':
+        if not _is_tile_transparent(terrain[cut_position].type):
             break
     return cut_positions
 
