@@ -53,6 +53,7 @@ class BerserkBot:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.probabilities = [0.4, 0.4, 0.1, 0.1]
         self.move_counter = 0
+        self.path = deque()
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.knowledge_decoder.knowledge = knowledge
