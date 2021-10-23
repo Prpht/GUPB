@@ -8,7 +8,8 @@ class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
         self._info = {}
-        # self.map = self.load_map()
+        self.arena = None
+        self.map = self.load_map('isolated_shrine')
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -25,7 +26,7 @@ class KnowledgeDecoder:
 
     def _get_weapons_in_sight(self):
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
-                if tile.loot and coords != self.knowledge.position and tile.loot.name != "knife"]
+                if tile.loot and coords != self.knowledge.position and tile.loot.name not in ["knife", "amulet", "bow"]]
 
     def _get_enemies_in_sight(self):
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
@@ -60,7 +61,10 @@ class KnowledgeDecoder:
 
     def load_map(self, map_name):
         arena = Arena.load(map_name)
+        self.arena = arena
         map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
         for cords, tile in arena.terrain.items():
-            map_matrix[cords.x][cords.y] = 0 if tile.description().type.lower() not in ['wall', 'sea'] else 1
-        return Grid(map_matrix)
+            map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
+            if tile.description().loot:
+                map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow"] else 1
+        return map_matrix

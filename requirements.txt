@@ -1,4 +1,4 @@
-bresenham==0.2.1
+pip bresenham==0.2.1
 click==7.1.2
 dataclasses-json==0.5.2
 numpy==1.21.2
