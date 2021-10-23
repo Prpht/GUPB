@@ -115,7 +115,7 @@ class Champion:
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 
         die_callable = getattr(self.controller, "die", None)
-        if die_callable:
+        if die_callable and callable(die_callable):
             die_callable()
 
     @property
