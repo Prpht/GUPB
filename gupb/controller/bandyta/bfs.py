@@ -1,51 +1,84 @@
+from __future__ import annotations
+
 from typing import List, Dict
+
+from gupb.controller.bandyta.utils import Direction, DirectedCoords, rotate_cw, rotate_cw_dc, rotate_ccw_dc, \
+    step_forward
 from gupb.model.coordinates import Coords
 
 
-def find_path(start: Coords, end: Coords, grid: Dict[int, Dict[int, str]]):
-    queue = [(start, [])]  # start point, empty path
-    #queue: Dict[Coords, List[Coords]] = {start: []}
-    visited_list: List[Coords] = []
+def find_path(start: DirectedCoords, end: DirectedCoords, grid: Dict[int, Dict[int, str]]) -> List[DirectedCoords]:
+    queue: List[DirectedCoords] = [start]
+    return_path: Dict[DirectedCoords, DirectedCoords | None] = {start: None}
+    visited_list: List[DirectedCoords] = []
+    directed_end: DirectedCoords | None = None
 
+    mark_visited(start, visited_list)
+    steps = 0
     while len(queue) > 0:
-        if len(queue) > 1000:
-            return []
+        steps += 1
+        node = queue.pop(0)
 
-        node, path = queue.pop(0)
-        path.append(node)
-        mark_visited(node, visited_list)
+        if (end.direction is not None and node == end) or \
+                (end.direction is None and node.coords == end.coords):
+            directed_end = node
+            break
 
-        if node == end:
-            return path
+        explore_neighbors(node, grid, visited_list, queue, return_path)
 
-        adj_nodes = get_neighbors(node, grid, visited_list)
-        for item in adj_nodes:
-            queue.append((item, path[:]))
-
-    return []
+    return reconstruct_path(start, directed_end, return_path)
 
 
-def mark_visited(node: Coords, visited_list: List[Coords]) -> None:
+def mark_visited(node: DirectedCoords, visited_list: List[DirectedCoords]):
     if node not in visited_list:
         visited_list.append(node)
 
 
-def get_neighbors(node: Coords, grid: Dict[int, Dict[int, str]], visited_list: List[Coords]) -> List[Coords]:
-    neighbors: List[Coords] = []
-    append_neighbor(Coords(node[0] + 1, node[1]), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0] - 1, node[1]), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0], node[1] + 1), grid, neighbors, visited_list)
-    append_neighbor(Coords(node[0], node[1] - 1), grid, neighbors, visited_list)
-    return neighbors
+def explore_neighbors(parent_node: DirectedCoords,
+                      grid: Dict[int, Dict[int, str]],
+                      visited_list: List[DirectedCoords],
+                      queue: List[DirectedCoords],
+                      return_path: Dict[DirectedCoords, DirectedCoords]):
+
+    possible_nodes: List[DirectedCoords] = [
+        step_forward(parent_node),
+        rotate_cw_dc(parent_node),
+        rotate_ccw_dc(parent_node),
+    ]
+
+    for node in possible_nodes:
+        if node.coords[0] in grid and \
+                node.coords[1] in grid[node.coords[0]] and \
+                grid[node.coords[0]][node.coords[1]] in ['land', 'menhir'] and \
+                node not in visited_list:
+            queue.append(node)
+            mark_visited(node, visited_list)
+            return_path[node] = parent_node
 
 
-def append_neighbor(
-        node: Coords,
-        grid: Dict[int, Dict[int, str]],
-        neighbor_list: List[Coords],
-        visited_list: List[Coords]) -> None:
-    if node[0] in grid and \
-            node[1] in grid[node[0]] and \
-            grid[node[0]][node[1]] == 'land' and \
-            node not in visited_list:
-        neighbor_list.append(node)
+def reconstruct_path(
+        start: DirectedCoords,
+        end: DirectedCoords,
+        return_path: Dict[DirectedCoords, DirectedCoords | None]):
+
+    if end is None:
+        return []
+
+    path: List[DirectedCoords] = []
+    iterator = end
+
+    while iterator is not None:
+        path.append(iterator)
+
+        if iterator not in return_path.keys():
+            break
+
+        iterator = return_path[iterator]
+
+    path.reverse()
+
+    if path[0] is start:
+        path.pop(0)
+        return path
+
+    return []
