@@ -180,8 +180,8 @@ def read_arena(arena_description: ArenaDescription):
                     arena[key].append(Coords(x, y))
                 x += 1
             y += 1
-        arena['x_size'] = x
-        arena['y_size'] = y
+        # arena['x_size'] = x
+        # arena['y_size'] = y
     return arena
 
 

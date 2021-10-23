@@ -11,7 +11,7 @@ from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path,
 from gupb.model import arenas
 from gupb.model import characters, tiles
 from gupb.model.characters import ChampionKnowledge
-from gupb.model.coordinates import Coords
+from gupb.model.coordinates import Coords, sub_coords
 from gupb.model.profiling import profile, print_stats
 from gupb.model.weapons import WeaponDescription
 
@@ -26,8 +26,9 @@ class Bandyta:
         self.landscape_map: Dict[int, Dict[int, str]] = {}
         self.item_map: Dict[Coords, WeaponDescription] = {}
         self.path = Path(None, [])
-        self.menhir: Coords | None = None
+        self.menhir: Coords = Coords(9, 9)
         self.arena = None
+        self.menhir_move_cycle = 0
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):
@@ -48,10 +49,10 @@ class Bandyta:
             directed_position = DirectedCoords(knowledge.position, direction)
             player = find_target_player(self.name, knowledge, self.path.dest)
             weapon = self.get_my_weapon(knowledge.visible_tiles)
-            self.menhir = find_menhir(knowledge.visible_tiles) if self.menhir is None else self.menhir
+            # self.menhir = find_menhir(knowledge.visible_tiles) if self.menhir is None else self.menhir
 
             if player is not None and \
-                    knife_attack_possible(knowledge.position, player[1]):
+                    is_attack_possible(knowledge.position, player[1], weapon):
                 self.path = Path('', [])
                 return characters.Action.ATTACK
 
@@ -64,11 +65,18 @@ class Bandyta:
                 self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
 
             if len(self.path.route) == 0 and self.menhir is not None:
-                if get_distance(self.menhir, knowledge.position) > 1:
+                if get_distance(self.menhir, knowledge.position) > 0:
                     self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),
                                                          self.landscape_map))
                 else:
                     return characters.Action.TURN_LEFT
+
+            if self.path.dest == 'menhir':
+                if self.menhir_move_cycle < 5:
+                    self.menhir_move_cycle += 1
+                    return characters.Action.TURN_LEFT
+                else:
+                    self.menhir_move_cycle = 0
 
             if len(self.path.route) == 0 and self.menhir is None:
                 self.path = Path('furthest_point',
@@ -79,11 +87,6 @@ class Bandyta:
             if len(self.path.route) != 0:
                 return self.move_on_path(directed_position)
 
-            if player is not None and \
-                    is_attack_possible(knowledge.position, player[1], weapon):
-                self.path = Path('', [])
-                return characters.Action.ATTACK
-
             return random.choice(POSSIBLE_ACTIONS)
         except Exception as e:
             print(e)
@@ -91,6 +94,16 @@ class Bandyta:
 
     def reset(self, arena_description: arenas.ArenaDescription):
         self.arena = read_arena(arena_description)
+        for sword in self.arena['sword']:
+            self.item_map[sword] = WeaponDescription('sword')
+        for axe in self.arena['axe']:
+            self.item_map[axe] = WeaponDescription('axe')
+        for bow in self.arena['bow']:
+            self.item_map[bow] = WeaponDescription('bow')
+        for amulet in self.arena['amulet']:
+            self.item_map[amulet] = WeaponDescription('amulet')
+        for knife in self.arena['knife']:
+            self.item_map[knife] = WeaponDescription('knife')
 
     def get_my_weapon(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for cords, tile in visible_tiles.items():
@@ -136,6 +149,14 @@ class Bandyta:
 
     def nearest_coord_to_attack(self, enemy_position: Coords, my_position: Coords, weapon: Weapon) -> DirectedCoords:
         possible = self.possible_attack_coords(enemy_position, weapon)
+
+        def remove_front_coords(c: DirectedCoords) -> bool:
+            return c.coords in [sub_coords(enemy_position, Direction.S.value),
+                                sub_coords(enemy_position, Direction.N.value),
+                                sub_coords(enemy_position, Direction.E.value),
+                                sub_coords(enemy_position, Direction.W.value)]
+
+        possible = list(filter(remove_front_coords, possible))
         min_distance = 10000
         best_coord = DirectedCoords(enemy_position, None)
         for p in possible:
@@ -166,7 +187,7 @@ class Bandyta:
 
     def is_valid_coords(self, coords: DirectedCoords) -> bool:
         c = coords.coords
-        return 0 < c.x <= self.arena['x_size'] and 0 < c.y <= self.arena['y_size'] and c in self.arena['land']
+        return c in self.arena['land'] or c == self.menhir
 
 
 POTENTIAL_CONTROLLERS = [
