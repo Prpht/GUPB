@@ -65,9 +65,9 @@ class BaseMarwinController:
                 return weapon
         return None
 
-class WiseTankController(BaseMarwinController):
+class EvaderController(BaseMarwinController):
     def __init__(self, first_name):
-        super(WiseTankController, self).__init__(first_name)
+        super(EvaderController, self).__init__(first_name)
         self.arena = self._parse_arena()
         self.precalculated_path = None
         self.next_move = None
@@ -186,7 +186,7 @@ class WiseTankController(BaseMarwinController):
 
 
 
-class EvaderController(BaseMarwinController):
+class OldEvaderController(BaseMarwinController):
 
     def __init__(self, first_name: str):
         super().__init__(first_name)
@@ -267,6 +267,6 @@ def _get_cut_positions(weapon_cls, terrain, position, facing):
 
 
 POTENTIAL_CONTROLLERS = [
-    WiseTankController("MarwinWise"),
-    EvaderController("Marwin"),
+    EvaderController("MarwinWise"),
+    OldEvaderController("Marwin"),
 ]
