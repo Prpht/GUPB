@@ -110,7 +110,7 @@ class Game(statemachine.StateMachine):
             self.deaths.append(death)
 
             win_callable = getattr(champion.controller, "win", None)
-            if win_callable:
+            if win_callable and callable(win_callable):
                 win_callable()
 
         if not self.champions:
