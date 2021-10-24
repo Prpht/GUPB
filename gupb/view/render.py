@@ -21,7 +21,7 @@ TILE_SIZE = 8
 HEALTH_BAR_HEIGHT = 3
 
 BLACK = pygame.Color('black')
-GAME_FONT = pygame.freetype.Font("/Library/Fonts/Arial Unicode.ttf", 24)
+GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
 
 
 def load_sprite(group: str, name: str, transparent: pygame.Color = None) -> Sprite:
