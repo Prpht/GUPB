@@ -44,6 +44,10 @@ class BaseMarwinController:
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.VIOLET
+    
+    def _get_champion(self, knowledge: characters.ChampionKnowledge) -> characters.ChampionDescription:
+        position = knowledge.position
+        return knowledge.visible_tiles[position].character
 
     @staticmethod
     def _get_weapon_for_description(weapon_description: str):
@@ -67,50 +71,79 @@ class WiseTankController(BaseMarwinController):
         self.arena = self._parse_arena()
         self.precalculated_path = None
         self.next_move = None
+        self._menhir_coords = Coords(9, 9)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        if self.precalculated_path is not None:
+            self.precalculated_path.clear()
+        self.precalculated_path = None
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         ## first of all we want to be as close to the fixed menhir as possible, because this way we can avoid mist in the long run
-        tiles = knowledge.visible_tiles
-        my_position = knowledge.position
-        my_character = knowledge.visible_tiles[my_position].character
 
-        if not self.precalculated_path:
-            self.precalculated_path = self.find_path(my_position, (9,9))[1:]  # without position we're standing on
+        my_position = knowledge.position
+        my_character = self._get_champion(knowledge)
+        action = characters.Action.DO_NOTHING
+
+        ############################## ATTACK
+
+        self._current_facing = my_character.facing  # current facing update logic should be modified and complicated
+        
+        weapon_cls = EvaderController._get_weapon_for_description(my_character.weapon.name)
+        enemies_facing_our_way = self._scan_for_enemies(knowledge)
+        if enemies_facing_our_way:
+            if self._are_enemies_in_reach(enemies_facing_our_way, weapon_cls,
+                                    knowledge.visible_tiles, knowledge.position):
+                action = characters.Action.ATTACK
+
+        ############################## ATTACK END
+
+        if self.precalculated_path is None:
+            self.precalculated_path = self.find_path(my_position, self._menhir_coords)[1:]  # without position we're standing on
+        
+        if my_position in self.precalculated_path:
+            self.precalculated_path.remove(my_position)
+
+        if my_position == self._menhir_coords:
+            return characters.Action.TURN_LEFT
 
         if not self.next_move:
             self.next_move = self.precalculated_path[0]
 
-        # next tile location compared to where we are facing
-        if self.next_move.x - my_position.x < 0: next_facing = characters.Facing.LEFT # UP
-        elif self.next_move.x - my_position.x > 0: next_facing = characters.Facing.RIGHT # DOWN
-        elif self.next_move.y - my_position.y < 0: next_facing = characters.Facing.UP # LEFT
-        else:  next_facing = characters.Facing.DOWN  # RIGHT
-
+        next_facing = self._get_next_facing(my_position, self.next_move)
         if next_facing == my_character.facing:
-            action = characters.Action.STEP_FORWARD
-            self.next_move = None
-            del self.precalculated_path[0]
-
-        elif ( next_facing == characters.Facing.RIGHT and my_character.facing == characters.Facing.UP or
-                next_facing == characters.Facing.DOWN and my_character.facing == characters.Facing.RIGHT or
-                next_facing == characters.Facing.LEFT and my_character.facing == characters.Facing.DOWN or
-                next_facing == characters.Facing.UP and my_character.facing == characters.Facing.LEFT ):
-            action = characters.Action.TURN_RIGHT
+            if not self._is_position_occupied(self.next_move, knowledge.visible_tiles):
+                action = characters.Action.STEP_FORWARD
+                # self.precalculated_path.remove(self.next_move)
+                self.next_move = None
+            else:
+                action = characters.Action.ATTACK
         else:
-            action = characters.Action.TURN_LEFT
+            action = self._get_action_for_facing(my_character.facing, next_facing)
 
         return action
 
     def _parse_arena(self):
         with open("./resources/arenas/isolated_shrine.gupb", 'r') as f:
             return [row for row in f.readlines()]
+    
+    @staticmethod
+    def _is_position_occupied(position, tiles):
+        return tiles[position].character is not None
 
-
-    def _scan_environment(self, ) :
-        pass
+    @staticmethod
+    def _get_next_facing(current_position, next_position):
+        facings = [characters.Facing.LEFT, characters.Facing.RIGHT, characters.Facing.UP, characters.Facing.DOWN]
+        for facing in facings:
+            if (current_position + facing.value) == next_position:
+                return facing
+        return characters.Facing.LEFT
+    
+    @staticmethod
+    def _get_action_for_facing(current_facing, next_facing):
+        if current_facing.turn_right() == next_facing:
+            return characters.Action.TURN_RIGHT
+        return characters.Action.TURN_LEFT
 
     def find_path(self, start, dst):
         width = height = 19
@@ -119,12 +152,39 @@ class WiseTankController(BaseMarwinController):
         while queue:
             path = queue.popleft()
             tile = path[-1]
-            if (tile.y, tile.x) == dst:
+            if tile == dst:
                 return path
             for x2, y2 in ((tile.x + 1, tile.y), (tile.x - 1, tile.y), (tile.x, tile.y + 1), (tile.x, tile.y - 1)):
-                if 0 <= x2 < width and 0 <= y2 < height and self.arena[y2][x2] not in BLOCKERS and (x2, y2) not in seen:
+                if (0 <= x2 < width) and (0 <= y2 < height) and (self.arena[y2][x2] not in BLOCKERS) and Coords(x2, y2) not in seen:
                     queue.append(path + [Coords(x2, y2)])
                     seen.add(Coords(x2, y2))
+
+    ############################## ATTACK METHODS ##############################
+    def _are_enemies_in_reach(self, enemies, weapon_cls, sight_area, position):
+        weapon_reach = self._get_cut_positions(weapon_cls, sight_area, position)
+        for enemy in enemies:
+            if enemy in weapon_reach:
+                return True
+    
+    def _get_cut_positions(self, weapon_cls, sight_area, position):
+        try:
+            weapon_reach = weapon_cls.cut_positions(sight_area, position, self._current_facing)
+        except AttributeError:
+            weapon_reach = _get_cut_positions(weapon_cls, sight_area, position, self._current_facing)
+        return weapon_reach
+
+    def _scan_for_enemies(self, knowledge: characters.ChampionKnowledge) -> Optional[NamedTuple]:
+        tiles_in_sight = knowledge.visible_tiles
+        my_character = self._get_champion(knowledge)
+        enemies_facing_our_way = []
+        for tile, tile_desc in tiles_in_sight.items():
+            if tile_desc.character and tile_desc.character != my_character:  ## enemy in sight
+                enemies_facing_our_way.append(tile)
+
+        return enemies_facing_our_way or None
+    ############################## ATTACK METHODS END ##############################
+
+
 
 class EvaderController(BaseMarwinController):
 
@@ -152,10 +212,6 @@ class EvaderController(BaseMarwinController):
         else:
             action = random.choice(POSSIBLE_ACTIONS)
         return action  # DO_NOTHING
-
-    def _get_champion(self, knowledge: characters.ChampionKnowledge) -> characters.ChampionDescription:
-        position = knowledge.position
-        return knowledge.visible_tiles[position].character
     
     def _are_enemies_in_reach(self, enemies, weapon_cls, sight_area, position):
         weapon_reach = self._get_cut_positions(weapon_cls, sight_area, position)
@@ -179,15 +235,6 @@ class EvaderController(BaseMarwinController):
                 enemies_facing_our_way.append(tile)
 
         return enemies_facing_our_way or None
-
-    def _calc_distance(self, enemies) -> float:
-        nearest = math.inf
-        for position in enemies:
-            distance = (position[0] ** 2 + position[1] ** 2) ** 0.5
-            if distance < nearest:
-                nearest = distance
-        return nearest
-
 
 
 ## Auxiliary methods
