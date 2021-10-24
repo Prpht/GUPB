@@ -130,7 +130,7 @@ class FelixBotController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.RED
+        return characters.Tabard.YELLOW
 
     def __refresh_info(self, knowledge: characters.ChampionKnowledge):
         self.position = knowledge.position

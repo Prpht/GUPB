@@ -176,7 +176,7 @@ class BB8Controller:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.BLUE
+        return characters.Tabard.ORANGE
 
 
 POTENTIAL_CONTROLLERS = [

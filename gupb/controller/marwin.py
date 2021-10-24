@@ -43,7 +43,7 @@ class BaseMarwinController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.VIOLET
+        return characters.Tabard.LIME
     
     def _get_champion(self, knowledge: characters.ChampionKnowledge) -> characters.ChampionDescription:
         position = knowledge.position
@@ -268,5 +268,4 @@ def _get_cut_positions(weapon_cls, terrain, position, facing):
 
 POTENTIAL_CONTROLLERS = [
     EvaderController("MarwinWise"),
-    OldEvaderController("Marwin"),
 ]
