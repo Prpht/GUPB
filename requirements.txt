@@ -2,6 +2,7 @@ bresenham==0.2.1
 click==7.1.2
 dataclasses-json==0.5.2
 numpy==1.21.2
+pathfinding==1.0.1
 pygame==2.0.1
 python-statemachine==0.8.0
 questionary==1.9.0
