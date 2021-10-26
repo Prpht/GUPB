@@ -54,10 +54,10 @@ class Game(statemachine.StateMachine):
     def on_enter_instants_triggered(self):
         self.arena.trigger_instants()
 
-    def score(self) -> dict[str, int]:
+    def score(self) -> dict[controller.Controller, int]:
         if not self.finished:
             raise RuntimeError("Attempted to score an unfinished game!")
-        return {death.champion.controller.name: score for death, score in zip(self.deaths, self._fibonacci())}
+        return {death.champion.controller: score for death, score in zip(self.deaths, self._fibonacci())}
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
         for controller_to_spawn in to_spawn:

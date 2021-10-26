@@ -7,6 +7,7 @@ from .astar import Astar
 from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Facing
@@ -26,7 +27,7 @@ WEAPON_RANGE = {
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class FelixBotController:
+class FelixBotController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.action_queue = []
@@ -52,6 +53,9 @@ class FelixBotController:
 
     def __hash__(self) -> int:
         return hash(self.name)
+
+    def praise(self, score: int) -> None:
+        pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.current_weapon = 'knife'

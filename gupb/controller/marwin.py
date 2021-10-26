@@ -1,5 +1,7 @@
 import math, random
+from abc import ABC
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from typing import NamedTuple, Optional
@@ -16,14 +18,15 @@ POSSIBLE_ACTIONS = [
 WEAPONS_ORDER = {  ## which weapon is better for the current map (isolated_shrine)
     "Knife": 0,
     "Bow": 2,
-    "Axe":  5,
+    "Axe": 5,
     "Amulet": 4,
     "Sword": 3,
 }
 
 BLOCKERS = ["=", "#"]
 
-class BaseMarwinController:
+
+class BaseMarwinController(controller.Controller, ABC):
     def __init__(self, first_name: str):
         self.first_name = first_name
         self._initial_health = characters.CHAMPION_STARTING_HP
@@ -41,10 +44,13 @@ class BaseMarwinController:
     def name(self) -> str:
         return f'{self.__class__.__name__}--{self.first_name}'
 
+    def praise(self, score: int) -> None:
+        pass
+
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.LIME
-    
+
     def _get_champion(self, knowledge: characters.ChampionKnowledge) -> characters.ChampionDescription:
         position = knowledge.position
         return knowledge.visible_tiles[position].character
@@ -64,6 +70,7 @@ class BaseMarwinController:
             if key in weapon_description.lower():
                 return weapon
         return None
+
 
 class EvaderController(BaseMarwinController):
     def __init__(self, first_name):
@@ -88,19 +95,20 @@ class EvaderController(BaseMarwinController):
         ############################## ATTACK
 
         self._current_facing = my_character.facing  # current facing update logic should be modified and complicated
-        
+
         weapon_cls = EvaderController._get_weapon_for_description(my_character.weapon.name)
         enemies_facing_our_way = self._scan_for_enemies(knowledge)
         if enemies_facing_our_way:
             if self._are_enemies_in_reach(enemies_facing_our_way, weapon_cls,
-                                    knowledge.visible_tiles, knowledge.position):
+                                          knowledge.visible_tiles, knowledge.position):
                 action = characters.Action.ATTACK
 
         ############################## ATTACK END
 
         if self.precalculated_path is None:
-            self.precalculated_path = self.find_path(my_position, self._menhir_coords)[1:]  # without position we're standing on
-        
+            self.precalculated_path = self.find_path(my_position, self._menhir_coords)[
+                                      1:]  # without position we're standing on
+
         if my_position in self.precalculated_path:
             self.precalculated_path.remove(my_position)
 
@@ -126,7 +134,7 @@ class EvaderController(BaseMarwinController):
     def _parse_arena(self):
         with open("./resources/arenas/isolated_shrine.gupb", 'r') as f:
             return [row for row in f.readlines()]
-    
+
     @staticmethod
     def _is_position_occupied(position, tiles):
         return tiles[position].character is not None
@@ -138,7 +146,7 @@ class EvaderController(BaseMarwinController):
             if (current_position + facing.value) == next_position:
                 return facing
         return characters.Facing.LEFT
-    
+
     @staticmethod
     def _get_action_for_facing(current_facing, next_facing):
         if current_facing.turn_right() == next_facing:
@@ -155,7 +163,8 @@ class EvaderController(BaseMarwinController):
             if tile == dst:
                 return path
             for x2, y2 in ((tile.x + 1, tile.y), (tile.x - 1, tile.y), (tile.x, tile.y + 1), (tile.x, tile.y - 1)):
-                if (0 <= x2 < width) and (0 <= y2 < height) and (self.arena[y2][x2] not in BLOCKERS) and Coords(x2, y2) not in seen:
+                if (0 <= x2 < width) and (0 <= y2 < height) and (self.arena[y2][x2] not in BLOCKERS) and Coords(x2,
+                                                                                                                y2) not in seen:
                     queue.append(path + [Coords(x2, y2)])
                     seen.add(Coords(x2, y2))
 
@@ -165,7 +174,7 @@ class EvaderController(BaseMarwinController):
         for enemy in enemies:
             if enemy in weapon_reach:
                 return True
-    
+
     def _get_cut_positions(self, weapon_cls, sight_area, position):
         try:
             weapon_reach = weapon_cls.cut_positions(sight_area, position, self._current_facing)
@@ -185,7 +194,6 @@ class EvaderController(BaseMarwinController):
     ############################## ATTACK METHODS END ##############################
 
 
-
 class OldEvaderController(BaseMarwinController):
 
     def __init__(self, first_name: str):
@@ -199,12 +207,12 @@ class OldEvaderController(BaseMarwinController):
         if self._current_facing is None:
             self._current_facing = champion.facing
         self._current_facing = champion.facing  # current facing update logic should be modified and complicated
-        
+
         weapon_cls = EvaderController._get_weapon_for_description(champion.weapon.name)
         enemies_facing_our_way = self._scan_for_enemies(knowledge)
         if enemies_facing_our_way:
             if self._are_enemies_in_reach(enemies_facing_our_way, weapon_cls,
-                                    knowledge.visible_tiles, knowledge.position):
+                                          knowledge.visible_tiles, knowledge.position):
                 action = characters.Action.ATTACK
             else:
                 action = characters.Action.TURN_LEFT
@@ -212,13 +220,13 @@ class OldEvaderController(BaseMarwinController):
         else:
             action = random.choice(POSSIBLE_ACTIONS)
         return action  # DO_NOTHING
-    
+
     def _are_enemies_in_reach(self, enemies, weapon_cls, sight_area, position):
         weapon_reach = self._get_cut_positions(weapon_cls, sight_area, position)
         for enemy in enemies:
             if enemy in weapon_reach:
                 return True
-    
+
     def _get_cut_positions(self, weapon_cls, sight_area, position):
         try:
             weapon_reach = weapon_cls.cut_positions(sight_area, position, self._current_facing)

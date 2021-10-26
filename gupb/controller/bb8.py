@@ -1,6 +1,7 @@
 import math
 import random
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -50,7 +51,7 @@ MENHIR_POSITION = 25
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BB8Controller:
+class BB8Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.position = None
@@ -69,6 +70,9 @@ class BB8Controller:
         return hash(self.first_name)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        pass
+
+    def praise(self, score: int) -> None:
         pass
 
     def calculate_distance(self, other_position: coordinates.Coords) -> int:

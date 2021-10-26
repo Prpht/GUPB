@@ -5,7 +5,9 @@ from gupb.controller import marwin
 
 CONFIGURATION = {
     'arenas': [
-        'isolated_shrine',
+        'archipelago',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
         felix_bot.FelixBotController("Felix"),

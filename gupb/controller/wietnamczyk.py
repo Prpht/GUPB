@@ -3,6 +3,7 @@ import random
 from math import atan2
 from collections import deque
 
+from gupb import controller
 from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates
 from gupb.model import characters
@@ -13,12 +14,12 @@ from gupb.model.coordinates import Coords
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class WIETnamczyk:
+class WIETnamczyk(controller.Controller):
     FIND_WEAPON = "find_weapon"
+
     # czy zarezerwowano caly przedzial dla psa?
     KRAZ_MIEDZY_SAFEPOINTAMI = "travel_to_safepoints"
     FIND_MENHIR = "find_menhir"
-
     def __init__(self):
         self.outer_places = [
             Coords(6, 6),
@@ -214,9 +215,6 @@ class WIETnamczyk:
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.arena_description = arena_description
-
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         bot_pos = knowledge.position
         self.update_knowledge(knowledge.visible_tiles, bot_pos)
@@ -243,6 +241,12 @@ class WIETnamczyk:
             return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         return random.choice(POSSIBLE_ACTIONS)
+
+    def praise(self, score: int) -> None:
+        pass
+
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.arena_description = arena_description
 
     @property
     def name(self) -> str:

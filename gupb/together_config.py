@@ -11,7 +11,9 @@ from gupb.controller import wietnamczyk
 
 CONFIGURATION = {
     'arenas': [
-        'isolated_shrine',
+        'archipelago',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
         funny.FunnyController(),

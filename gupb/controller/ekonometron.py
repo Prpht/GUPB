@@ -8,6 +8,7 @@ import random
 
 from typing import Tuple, Optional, Dict
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Facing
@@ -17,7 +18,7 @@ from gupb.model.tiles import TileDescription
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class EkonometronController:
+class EkonometronController(controller.Controller):
     line_weapons_reach = {
         "knife": 1,
         "sword": 3,
@@ -265,6 +266,7 @@ class EkonometronController:
         return characters.Action.DO_NOTHING
 
     """ Think about aggro """
+
     def _enemy_in_reach(self, knowledge: characters.ChampionKnowledge):
         """Bot checks whether the enemy is in potential area of attack"""
 
@@ -382,6 +384,9 @@ class EkonometronController:
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.BROWN
+
+    def praise(self, score: int) -> None:
+        pass
 
 
 POTENTIAL_CONTROLLERS = [

@@ -8,11 +8,15 @@ from gupb.model import characters
 class Controller(Protocol):
 
     @abstractmethod
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         raise NotImplementedError
 
     @abstractmethod
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def praise(self, score: int) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
         raise NotImplementedError
 
     @property

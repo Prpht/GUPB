@@ -1,3 +1,4 @@
+from gupb import controller
 from gupb.controller.funny.commons import *
 from gupb.controller.funny.pathing import dijkstra, create_path, get_next_move
 
@@ -9,7 +10,7 @@ SAFE_POS = [
 ]
 
 
-class FunnyController:
+class FunnyController(controller.Controller):
     START_RUNNING_FROM_MIST = 220
 
     def __init__(self):
@@ -69,6 +70,9 @@ class FunnyController:
         self.weapon = "A"
         self.opponent_pos = None
         self.weapon_drops = set()
+
+    def praise(self, score: int) -> None:
+        pass
 
     def _get_tiles_in_range(self, pos):
         if self.weapon == "K":
