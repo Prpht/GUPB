@@ -2,13 +2,14 @@ from queue import SimpleQueue
 
 import pygame
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class KeyboardController:
+class KeyboardController(controller.Controller):
     def __init__(self):
         self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
 
@@ -20,14 +21,17 @@ class KeyboardController:
     def __hash__(self) -> int:
         return 42
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
-
     def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
         if self.action_queue.empty():
             return characters.Action.DO_NOTHING
         else:
             return self.action_queue.get()
+
+    def praise(self, score: int) -> None:
+        pass
+
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        pass
 
     def register(self, key):
         if key == pygame.K_UP:
@@ -45,7 +49,7 @@ class KeyboardController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.PINK
 
 
 POTENTIAL_CONTROLLERS = [
