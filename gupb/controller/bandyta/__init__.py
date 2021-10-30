@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    Bandyta('1.0'),
+    Bandyta('2.0'),
 ]
