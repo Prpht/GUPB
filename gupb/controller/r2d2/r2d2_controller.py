@@ -4,6 +4,7 @@ from typing import Optional
 from gupb import controller
 from gupb.model import arenas, coordinates
 from gupb.model import characters
+from gupb.model.characters import Facing
 
 MENHIR_ISOLATED_SHRINE = coordinates.Coords(9, 9)
 
@@ -79,6 +80,33 @@ class R2D2Controller(controller.Controller):
             return True
         else:
             return False
+
+    def get_queue(self, path):
+        queue = []
+        coords = self.position
+        facing = self.facing
+        while len(path) > 0:
+            next_coord = path.pop(0)
+            orientation = characters.Facing(coordinates.sub_coords(next_coord, coords))
+
+            turn_right = [(Facing.RIGHT, Facing.DOWN), (Facing.DOWN, Facing.LEFT), (Facing.LEFT, Facing.UP), (Facing.UP, Facing.RIGHT)]
+            turn_left = [(Facing.RIGHT, Facing.UP), (Facing.UP, Facing.LEFT), (Facing.LEFT, Facing.DOWN), (Facing.DOWN, Facing.RIGHT)]
+            turn_back = [(Facing.RIGHT, Facing.LEFT), (Facing.UP, Facing.DOWN), (Facing.LEFT, Facing.RIGHT), (Facing.DOWN, Facing.UP)]
+
+            if (facing, orientation) in turn_right:
+                queue.append(characters.Action.TURN_RIGHT)
+
+            if (facing, orientation) in turn_left:
+                queue.append(characters.Action.TURN_LEFT)
+
+            if (facing, orientation) in turn_back:
+                queue.append(characters.Action.TURN_RIGHT)
+                queue.append(characters.Action.TURN_RIGHT)
+
+            queue.append(characters.Action.STEP_FORWARD)
+            coords = next_coord
+            facing = orientation
+        return queue
 
     @property
     def name(self) -> str:
