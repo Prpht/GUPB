@@ -18,11 +18,11 @@ class Node:
         return self.f < other.f
 
 
-def astar(maze, start, end, passable_tiles=None):
+def astar(maze, start, end, safe_tiles=None):
     """Returns a list of tuples as a path from the given start to the given end in the given maze"""
 
-    if passable_tiles is None:
-        passable_tiles = ['land', 'menhir']
+    if safe_tiles is None:
+        safe_tiles = ['land', 'menhir']
 
     # Create start and end node
     start_node = Node(None, start)
@@ -61,7 +61,7 @@ def astar(maze, start, end, passable_tiles=None):
             node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
             # Make sure walkable terrain
-            if maze.get(node_position) is None or maze[node_position].type not in passable_tiles:
+            if maze.get(node_position) is None or maze[node_position].type not in safe_tiles:
                 continue
 
             # Create new node
