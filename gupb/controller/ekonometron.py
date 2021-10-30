@@ -1,26 +1,57 @@
 # created by Michał Kędra and Jan Proniewicz
 
+"""
+It's a bit confused but it's got a spirit
+"""
+
 import random
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Facing
 from gupb.model import coordinates
+from gupb.model.tiles import TileDescription
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class EkonometronController:
+class EkonometronController(controller.Controller):
+    line_weapons_reach = {
+        "knife": 1,
+        "sword": 3,
+        "bow_loaded": 50
+    }
+
+    weapons_priorities = {
+        "knife": 1,
+        "amulet": 2,
+        "axe": 3,
+        "sword": 4,
+        "bow_unloaded": 5,
+        "bow_loaded": 5
+    }
+
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        # knowledge about the direction the controller is facing
         self.starting_coords: Optional[coordinates.Coords] = None
         self.direction: Optional[Facing] = None
         self.starting_combination = [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
-        self.run_away: Tuple[bool, int] = (False, 0)
+        # bot tries to remember the tiles it has seen thus far
+        self.tiles_memory: Dict[coordinates.Coords, TileDescription] = {}
+        # knowledge about the weapon the bot is currently holding
+        self.hold_weapon: str = "knife"
+        # the mode our bot goes into after noticing the mist
+        self.mist_incoming: bool = False
+        self.move_to_chosen_place: bool = False
+        self.actual_path: list = []
+        self.menhir_position: Optional[coordinates.Coords] = None
+        self.menhir_visited: bool = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, EkonometronController):
@@ -36,13 +67,33 @@ class EkonometronController:
         self.starting_combination = [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
-        self.run_away = (False, 0)
+        self.tiles_memory = {}
+        self.hold_weapon = "knife"
+        self.mist_incoming = False
+        self.move_to_chosen_place = False
+        self.actual_path = []
+        self.menhir_position = None
+        self.menhir_visited = False
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        # if bot holds an unloaded bow
+        if self.hold_weapon == "bow_unloaded":
+            self.hold_weapon = "bow_loaded"
+            return characters.Action.ATTACK
+        # update bot's memory, based on the visible tiles
+        visible_tiles = knowledge.visible_tiles
+        self._update_memory(visible_tiles)
+        # making graph
+        visible_graph = self.find_edges()
+        # save menhir position if visible
+        if self.menhir_position is None:
+            self.save_menhir_position_if_visible(knowledge.visible_tiles)
+
         # when bot doesn't know which direction it is facing
         if self.starting_coords is None:
             self.starting_coords = knowledge.position
-            return characters.Action.STEP_FORWARD
+            return self._forward_action(knowledge.position)
+            #return characters.Action.STEP_FORWARD
         if self.direction is None:
             if self.starting_coords != knowledge.position:
                 coords_diff = knowledge.position - self.starting_coords
@@ -56,49 +107,73 @@ class EkonometronController:
                 else:
                     self.direction = Facing.UP
             else:
-                return self.starting_combination.pop(0)
-        # when bot is aware which direction it is facing
-        if self.run_away[0]:
-            run_away_list = list(self.run_away)
-            run_away_list[1] = run_away_list[1] - 1
-            if run_away_list[1] == 0:
-                run_away_list[0] = False
-            self.run_away = tuple(run_away_list)
-        # turn if there is an obstacle in front
-        if self._obstacle_in_front(knowledge):
-            return self._take_a_turn()
-        # run away from mist or weapon cuts
-        if self._negative_effect(knowledge):
-            # entering "panic mode"
-            if not self.run_away[0]:
-                self.run_away = (True, 5)
-                return self._take_a_turn()
-            # if bot sees another negative effect after entering "panic mode", it can either turn again or move forward
-            # (so it wouldn't be stuck in the same place... theoretically)
-            else:
-                return self._make_a_move(0.35, 0.65)
-        # move towards weapons on the ground (unless those are knives)
-        if self._weapon_in_sight(knowledge):
-            # return characters.Action.STEP_FORWARD
-            return self._make_a_move(0.025, 0.975)
-        # attack another player in sight
-        if self._enemy_in_sight(knowledge):
-            # if enemy is in the area of attack
-            if self._enemy_in_reach(knowledge):
-                rand_gen = random.random()
-                if rand_gen <= 0.95:
-                    return characters.Action.ATTACK
-                else:
-                    return self._take_a_turn()
-            else:
-                return characters.Action.STEP_FORWARD
-        # if there is nothing interesting going on, bot will move however it wants (but it will favor stepping forward)
-        if self.run_away[0]:
-            return characters.Action.STEP_FORWARD
-        return self._make_a_move(0.2, 0.8)
+                return self._forward_action(knowledge.position, self.starting_combination.pop(0))
+                #return self.starting_combination.pop(0)
 
-    def _take_a_turn(self):
-        """Bot chooses, whether to turn left or right"""
+        # when bot is aware which direction it is facing
+        # identify visible enemies
+        if self._enemy_in_reach(knowledge):
+            if self.hold_weapon == "bow_loaded":
+                self.hold_weapon = "bow_unloaded"
+            return characters.Action.ATTACK
+
+        if self.menhir_visited:
+            return characters.Action.TURN_RIGHT
+
+        # if moving to menhir
+        if self.move_to_chosen_place:
+            if self.move_all(knowledge.position):
+                return self._forward_action(knowledge.position)
+                #return characters.Action.STEP_FORWARD
+            else:
+                self.direction = self.direction.turn_right()
+                return characters.Action.TURN_RIGHT
+
+        # check if mist visible
+        self._check_if_mist_visible(knowledge.visible_tiles)
+        # if mist, init run to menhir
+        if not self.move_to_chosen_place and self.mist_incoming and not self.menhir_visited:
+            self.actual_path = self.bfs_shortest_path(visible_graph, knowledge.position, self.menhir_position)
+            self.actual_path.pop(0)
+            if self.actual_path:
+                self.move_to_chosen_place = True
+                if self.move_all(knowledge.position):
+                    return self._forward_action(knowledge.position)
+                    #return characters.Action.STEP_FORWARD
+                else:
+                    self.direction = self.direction.turn_right()
+                    return characters.Action.TURN_RIGHT
+
+        # react to a weapon on the ground
+        if self._weapon_in_reach(knowledge.position):
+            action = self._react_to_weapon(knowledge.position)
+            if action != characters.Action.DO_NOTHING:
+                return action
+        # turn if there is an obstacle in front
+        if self._obstacle_in_front(knowledge.position):
+            return self._take_a_turn(knowledge.position)
+        # if there is nothing interesting going on, bot will move forward
+        rand_gen = random.random()
+        if rand_gen <= 0.75:
+            return self._forward_action(knowledge.position)
+            #return characters.Action.STEP_FORWARD
+        else:
+            return self._take_a_turn(knowledge.position)
+
+    """ Utils """
+    def _forward_action(self, position: coordinates.Coords, action=characters.Action.STEP_FORWARD):
+        if action == characters.Action.STEP_FORWARD and self.direction is not None:
+            front_coords = position + self.direction.value
+            front_tile = self.tiles_memory[front_coords]
+            if front_tile.loot is not None:
+                self.hold_weapon = front_tile.loot.name
+        return action
+
+    def _update_memory(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
+        for coords, tile_desc in visible_tiles.items():
+            self.tiles_memory[coords] = tile_desc
+
+    def _rand_turn(self):
         rand_gen = random.random()
         if rand_gen <= 0.5:
             self.direction = self.direction.turn_left()
@@ -107,78 +182,200 @@ class EkonometronController:
             self.direction = self.direction.turn_right()
             return characters.Action.TURN_RIGHT
 
-    def _make_a_move(self, bottom_threshold: float = 0.3, top_threshold: float = 0.7):
-        """Bot turns left, right or moves forward; some 'preferences' in directions may be set"""
-        rand_gen = random.random()
-        if rand_gen <= bottom_threshold:
-            self.direction = self.direction.turn_left()
-            return characters.Action.TURN_LEFT
-        elif rand_gen > top_threshold:
-            self.direction = self.direction.turn_right()
-            return characters.Action.TURN_RIGHT
+    def _take_a_turn(self, position: coordinates.Coords):
+        """Bot chooses, whether to turn left or right"""
+        left_coords = position + self.direction.turn_left().value
+        right_coords = position + self.direction.turn_right().value
+        try:
+            left_tile = self.tiles_memory[left_coords]
+            right_tile = self.tiles_memory[right_coords]
+        except KeyError:
+            return self._rand_turn()
         else:
-            return characters.Action.STEP_FORWARD
+            if left_tile.type not in ["land", "menhir"] and right_tile.type in ["land", "menhir"]:
+                self.direction = self.direction.turn_right()
+                return characters.Action.TURN_RIGHT
+            elif right_tile.type not in ["land", "menhir"] and left_tile.type in ["land", "menhir"]:
+                self.direction = self.direction.turn_left()
+                return characters.Action.TURN_LEFT
+            else:
+                return self._rand_turn()
 
-    def _obstacle_in_front(self, knowledge: characters.ChampionKnowledge):
+    def _obstacle_in_front(self, position: coordinates.Coords):
         """Bots identifies the tile right in front of it"""
-        visible_tiles = knowledge.visible_tiles
-        coords_in_front = knowledge.position + self.direction.value
-        tile_in_front = visible_tiles[coords_in_front]
-        if tile_in_front.type != "land":
+        coords_in_front = position + self.direction.value
+        tile_in_front = self.tiles_memory[coords_in_front]
+        if tile_in_front.type not in ["land", "menhir"]:
             return True
         return False
 
-    def _negative_effect(self, knowledge: characters.ChampionKnowledge):
-        """Bot checks if there is any mist or weapon cutting in its surroundings"""
-        visible_tiles = knowledge.visible_tiles
-        # getting coordinates in square around the controller
-        coords_around = []
-        for i in range(-6, 7):
-            for j in range(-6, 7):
-                coords = knowledge.position + coordinates.Coords(i, j)
-                coords_around.append(coords)
-        # getting coordinates for visible tiles that are close enough
-        close_coords = list(set(coords_around) & set(visible_tiles.keys()))
-        # checking whether or not chosen tiles display any negative effects like mist or weapon cut
-        for c in close_coords:
-            current_tile = visible_tiles[c]
-            effects = current_tile.effects
-            for e in effects:
-                if e.type == "mist" or e.type == "weaponcut":
-                    return True
-        return False
+    def _check_if_mist_visible(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
+        for coord, tile in visible_tiles.items():
+            for e in tile.effects:
+                if e.type == 'mist':
+                    self.mist_incoming = True
 
-    def _weapon_in_sight(self, knowledge: characters.ChampionKnowledge):
-        """Bot checks if it can see a potential weapon it can equip (unless it's a knife)"""
-        visible_tiles = knowledge.visible_tiles
-        for coords, tile in visible_tiles.items():
-            if tile.loot is not None and tile.loot.name != "knife":
+    def _weapon_in_reach(self, position: coordinates.Coords):
+        """Bot checks if it is next to a potential weapon it can reach"""
+        front_coords = position + self.direction.value
+        left_coords = position + self.direction.turn_left().value
+        right_coords = position + self.direction.turn_right().value
+        # front tile had to be inspected independently to right and left tiles because bot doesn't need to know
+        # neither right or left tile to pick up a weapon that is right in front of it
+        front_tile = self.tiles_memory[front_coords]
+        if front_tile.loot is not None:
+            return True
+        try:
+            left_tile = self.tiles_memory[left_coords]
+            right_tile = self.tiles_memory[right_coords]
+        except KeyError:
+            return False
+        else:
+            if left_tile.loot is not None or right_tile.loot is not None:
                 return True
-        return False
+            return False
 
-    def _enemy_in_sight(self, knowledge: characters.ChampionKnowledge):
-        """Bot checks if it can see an enemy"""
-        visible_tiles = knowledge.visible_tiles
-        for coords, tile in visible_tiles.items():
-            if tile.character is not None and coords != knowledge.position:
-                return True
-        return False
+    """ Think about weapons priorities """
+    def _react_to_weapon(self, position: coordinates.Coords):
+        """Bot picks a proper action to a weapon laying on the ground"""
+        front_coords = position + self.direction.value
+        left_coords = position + self.direction.turn_left().value
+        right_coords = position + self.direction.turn_right().value
+        front_tile = self.tiles_memory[front_coords]
+        # front tile had to be inspected independently to right and left tiles because bot doesn't need to know
+        # neither right or left tile to pick up a weapon that is right in front of it;
+        if front_tile.loot is not None:
+            if self.weapons_priorities[front_tile.loot.name] > self.weapons_priorities[self.hold_weapon]:
+                self.hold_weapon = front_tile.loot.name
+                return characters.Action.STEP_FORWARD
+        try:
+            left_tile = self.tiles_memory[left_coords]
+            right_tile = self.tiles_memory[right_coords]
+        except KeyError:
+            if front_tile.loot is not None:
+                self.hold_weapon = front_tile.loot.name
+            return characters.Action.STEP_FORWARD
+        if left_tile.loot is not None:
+            if self.weapons_priorities[left_tile.loot.name] > self.weapons_priorities[self.hold_weapon]:
+                self.direction = self.direction.turn_left()
+                return characters.Action.TURN_LEFT
+        if right_tile.loot is not None:
+            if self.weapons_priorities[right_tile.loot.name] > self.weapons_priorities[self.hold_weapon]:
+                self.direction = self.direction.turn_right()
+                return characters.Action.TURN_RIGHT
+        return characters.Action.DO_NOTHING
+
+    """ Think about aggro """
 
     def _enemy_in_reach(self, knowledge: characters.ChampionKnowledge):
         """Bot checks whether the enemy is in potential area of attack"""
-        visible_tiles = knowledge.visible_tiles
-        area_of_attack = []
-        for i in range(1, 4):
-            attack_coords = knowledge.position + self.direction.value * i
-            area_of_attack.append(attack_coords)
-            if i == 1:
+
+        def get_area_of_attack():
+            aoa = []
+            if self.hold_weapon in ["knife", "sword", "bow_loaded"]:
+                for i in range(self.line_weapons_reach[self.hold_weapon]):
+                    attack_coords = knowledge.position + self.direction.value * (i + 1)
+                    aoa.append(attack_coords)
+            else:
+                attack_coords = knowledge.position + self.direction.value
                 for turn in [self.direction.turn_left().value, self.direction.turn_right().value]:
-                    area_of_attack.append(attack_coords + turn)
+                    aoa.append(attack_coords + turn)
+                if self.hold_weapon == "axe":
+                    aoa.append(attack_coords)
+            return aoa
+
+        area_of_attack = get_area_of_attack()
+        # getting coordinates for visible tiles that bot can attack
+        area_of_attack = list(set(area_of_attack) & set(knowledge.visible_tiles.keys()))
         for coords in area_of_attack:
-            current_tile = visible_tiles[coords]
+            current_tile = knowledge.visible_tiles[coords]
             if current_tile.character is not None:
                 return True
         return False
+
+    def find_edges(self):
+        """Finding edges for vertexes"""
+        vertexes = []
+        for coord, tile in self.tiles_memory.items():
+            if tile.type == 'land' or tile.type == 'menhir':
+                vertexes.append(coord)
+
+        vertexes_edges = {}
+
+        def check_if_next_to(vertex1, vertex2):
+            if vertex1[0] == vertex2[0]:
+                if (vertex1[1] - 1 == vertex2[1]) or (vertex1[1] + 1 == vertex2[1]):
+                    return True
+            elif vertex1[1] == vertex2[1]:
+                if (vertex1[0] - 1 == vertex2[0]) or (vertex1[0] + 1 == vertex2[0]):
+                    return True
+            return False
+
+        for ver in vertexes:
+            vertex_edges = []
+            for ver2 in vertexes:
+                if ver != ver2 and check_if_next_to(ver, ver2):
+                    vertex_edges.append(ver2)
+            vertexes_edges[ver] = vertex_edges
+
+        return vertexes_edges
+
+    def bfs_shortest_path(self, graph, start, goal):
+        """For given vertex return shortest path"""
+        explored, queue = [], [[start]]
+        if start == goal:
+            return False
+        while queue:
+            path = queue.pop(0)
+            node = path[-1]
+            if node not in explored:
+                neighbours = graph[node]
+                for neighbour in neighbours:
+                    new_path = list(path)
+                    new_path.append(neighbour)
+                    queue.append(new_path)
+                    if neighbour == goal:
+                        return new_path
+                explored.append(node)
+        # no connection
+
+        return False
+
+    def move(self, start, end):
+        diff = end - start
+        if start != end:
+            if diff.x == 1:
+                if self.direction == Facing.RIGHT:
+                    # return True mean he should go forward
+                    return True
+            elif diff.x == -1:
+                if self.direction == Facing.LEFT:
+                    return True
+            elif diff.y == 1:
+                if self.direction == Facing.DOWN:
+                    return True
+            elif diff.y == -1:
+                if self.direction == Facing.UP:
+                    return True
+        return False
+
+    def move_all(self, position):
+        if position == coordinates.Coords(*self.actual_path[0]):
+            self.actual_path.pop(0)
+        actual_path_0 = coordinates.Coords(*self.actual_path[0])
+        if self.move(position, actual_path_0):
+            if len(self.actual_path) == 1:
+                self.menhir_visited = True
+                self.move_to_chosen_place = False
+            return True
+        else:
+            return False
+
+    def save_menhir_position_if_visible(self, visible_coords):
+        for v_coord in visible_coords:
+            if visible_coords[v_coord].type == 'menhir':
+                self.menhir_position = v_coord
+                break
 
     @property
     def name(self) -> str:
@@ -187,6 +384,9 @@ class EkonometronController:
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.BROWN
+
+    def praise(self, score: int) -> None:
+        pass
 
 
 POTENTIAL_CONTROLLERS = [
