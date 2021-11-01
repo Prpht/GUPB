@@ -93,6 +93,9 @@ class SpriteRepository:
             )
         }
 
+        self._sprites = self.sprites.copy()
+        self._champion_sprites = self.champion_sprites.copy()
+
     def match_sprite(self, element: Any) -> Sprite:
         if isinstance(element, characters.Champion):
             return self.champion_sprites[(element.tabard, element.facing)]
@@ -110,10 +113,10 @@ class SpriteRepository:
             self.size = (min(self.size), min(self.size))
 
         for sprite in self.sprites:
-            self.sprites[sprite] = self.scale_sprite(self.sprites[sprite], self.size)
+            self.sprites[sprite] = self.scale_sprite(self._sprites[sprite], self.size)
 
         for sprite in self.champion_sprites:
-            self.champion_sprites[sprite] = self.scale_sprite(self.champion_sprites[sprite], self.size)
+            self.champion_sprites[sprite] = self.scale_sprite(self._champion_sprites[sprite], self.size)
 
         return self.size[0] * arena_size[0], self.size[1] * arena_size[1]
 
