@@ -3,12 +3,6 @@ from __future__ import annotations
 import random
 from typing import Dict, List, Tuple
 
-from gupb.controller.bandyta.bfs import find_path
-from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
-    find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
-    get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
-    amulet_attack_coords, Direction, knife_attack_possible
-from gupb.model import arenas
 from gupb import controller
 from gupb.controller.bandyta.bfs import find_path
 from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
@@ -23,7 +17,7 @@ from gupb.model.profiling import profile, print_stats
 from gupb.model.weapons import WeaponDescription
 
 
-class Bandyta:
+class Bandyta(controller.Controller):
     """
     Dziary na pół ryja...
     """
@@ -46,11 +40,6 @@ class Bandyta:
         return hash(self.first_name)
 
     def decide(self, knowledge: ChampionKnowledge):
-        action = self.__decide(knowledge)
-        return action
-
-    @profile
-    def __decide(self, knowledge: ChampionKnowledge):
         action = self.__decide(knowledge)
         return action
 
