@@ -49,6 +49,9 @@ class SpriteRepository:
             characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
             characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
             characters.Tabard.GREY: load_sprite('characters', 'champion_grey', BLACK),
+            characters.Tabard.LIME: load_sprite('characters', 'champion_lime', BLACK),
+            characters.Tabard.ORANGE: load_sprite('characters', 'champion_orange', BLACK),
+            characters.Tabard.PINK: load_sprite('characters', 'champion_pink', BLACK),
             characters.Tabard.RED: load_sprite('characters', 'champion_red', BLACK),
             characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
@@ -70,6 +73,9 @@ class SpriteRepository:
                     characters.Tabard.BLUE,
                     characters.Tabard.BROWN,
                     characters.Tabard.GREY,
+                    characters.Tabard.LIME,
+                    characters.Tabard.ORANGE,
+                    characters.Tabard.PINK,
                     characters.Tabard.RED,
                     characters.Tabard.VIOLET,
                     characters.Tabard.WHITE,
@@ -92,7 +98,7 @@ class SpriteRepository:
 
 
 class Renderer:
-    def __init__(self, ms_per_time_unit: int = 1):
+    def __init__(self, ms_per_time_unit: int = 5):
         pygame.display.set_caption('GUPB')
         self.screen = pygame.display.set_mode((100, 100))
         self.sprite_repository = SpriteRepository()

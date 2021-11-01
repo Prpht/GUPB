@@ -9,6 +9,13 @@ from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path,
     get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
     amulet_attack_coords, Direction, knife_attack_possible
 from gupb.model import arenas
+from gupb import controller
+from gupb.controller.bandyta.bfs import find_path
+from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
+    find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
+    get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
+    amulet_attack_coords, Direction, knife_attack_possible
+from gupb.model import arenas
 from gupb.model import characters, tiles
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords, sub_coords
@@ -41,6 +48,14 @@ class Bandyta:
     def decide(self, knowledge: ChampionKnowledge):
         action = self.__decide(knowledge)
         return action
+
+    @profile
+    def __decide(self, knowledge: ChampionKnowledge):
+        action = self.__decide(knowledge)
+        return action
+
+    def praise(self, score: int) -> None:
+        pass
 
     @profile
     def __decide(self, knowledge: ChampionKnowledge):
