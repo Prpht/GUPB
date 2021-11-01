@@ -17,7 +17,7 @@ pygame.init()
 
 Sprite = TypeVar('Sprite')
 
-INIT_TILE_SIZE = 8
+INIT_TILE_SIZE = 12
 KEEP_TILE_RATIO = False
 
 HEALTH_BAR_HEIGHT = 3
@@ -29,6 +29,8 @@ GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
 def load_sprite(group: str, name: str, transparent: pygame.Color = None) -> Sprite:
     path = os.path.join('resources', 'images', group, f'{name}.png')
     sprite = pygame.image.load(path).convert()
+    if sprite.get_size() is not (INIT_TILE_SIZE, INIT_TILE_SIZE):
+        sprite = pygame.transform.scale(sprite, (INIT_TILE_SIZE, INIT_TILE_SIZE))
     if transparent:
         sprite.set_colorkey(transparent)
     return sprite
