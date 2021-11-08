@@ -1,6 +1,7 @@
 from queue import SimpleQueue
 from typing import Optional
 
+from gupb import controller
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 
@@ -14,7 +15,7 @@ def is_safe(i, j, matrix, visited):
         return False
 
 
-class R2D2Controller:
+class R2D2Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.facing: Optional[characters.Facing] = None
@@ -28,9 +29,6 @@ class R2D2Controller:
 
     def __hash__(self) -> int:
         return hash(self.first_name)
-
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
 
     def parse_map(self):
         arena = arenas.Arena.load("isolated_shrine")
@@ -51,6 +49,12 @@ class R2D2Controller:
             return characters.Action.TURN_RIGHT
         else:
             return characters.Action.TURN_RIGHT
+
+    def praise(self, score: int) -> None:
+        pass
+
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        pass
 
     def update_char_info(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position

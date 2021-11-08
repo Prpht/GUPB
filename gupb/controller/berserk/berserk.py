@@ -3,6 +3,7 @@ from math import atan2
 import numpy as np
 from pathfinding.core.grid import Grid
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
@@ -27,7 +28,7 @@ WEAPONS = {
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BerserkBot:
+class BerserkBot(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.knowledge_decoder = KnowledgeDecoder()
@@ -51,6 +52,9 @@ class BerserkBot:
 
     def __hash__(self) -> int:
         return hash(self.first_name)
+
+    def praise(self, score: int) -> None:
+        pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.probabilities = [0.4, 0.4, 0.1, 0.1]
