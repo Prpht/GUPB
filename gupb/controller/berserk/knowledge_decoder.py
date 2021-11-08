@@ -8,8 +8,7 @@ class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
         self._info = {}
-        self.arena = None
-        self.map = self.load_map('isolated_shrine')
+        self._map = None
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -23,6 +22,8 @@ class KnowledgeDecoder:
         self._info['facing'] = facing
         self._info['enemies_in_sight'] = self._get_enemies_in_sight()
         self._info['weapons_in_sight'] = self._get_weapons_in_sight()
+        self._info['mist'] = self._look_for_mist()
+        self._info['menhir_position'] = self._get_menhir_position()
 
     def _get_weapons_in_sight(self):
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
@@ -58,6 +59,21 @@ class KnowledgeDecoder:
     def knowledge(self, new_knowledge):
         self._knowledge = new_knowledge
         self.decode()
+
+    @property
+    def info(self):
+        return self._info
+
+    @property
+    def map(self):
+        return self._map
+
+    @map.setter
+    def map(self, new_map: Arena):
+        self._map = new_map
+
+    def _get_menhir_position(self):
+        return Coords(9, 9)
 
     def load_map(self, map_name):
         arena = Arena.load(map_name)

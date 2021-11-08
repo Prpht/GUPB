@@ -15,7 +15,7 @@ from gupb.model.characters import Facing
 from gupb.model import coordinates
 from gupb.controller.berserk.utilities import distance
 from gupb.model.weapons import *
-
+from gupb.model.arenas import Arena
 
 WEAPONS = {
     "bow": Bow(),
@@ -29,6 +29,8 @@ WEAPONS = {
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class BerserkBot(controller.Controller):
+    G_T_F_O_A_F_A_P = 220
+
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.knowledge_decoder = KnowledgeDecoder()
@@ -57,6 +59,7 @@ class BerserkBot(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.knowledge_decoder.map = self.knowledge_decoder.load_map(arena_description.name)
         self.probabilities = [0.4, 0.4, 0.1, 0.1]
         self.move_counter = 0
         self.path = deque()
@@ -66,25 +69,28 @@ class BerserkBot(controller.Controller):
         self.position_history.append(knowledge.position)
         self.is_goal_reached()
         self.is_moving()
-        if self.can_attack():
 
+        if self.move_counter > self.G_T_F_O_A_F_A_P:
+            self.find_menhir()
+            move = self.parse_path()
+
+        elif self.can_attack():
             move = characters.Action.ATTACK
+
         elif self.move_counter <= 2:
-
             move = self.look_around()
-        elif self.picked_up_weapon == 0 and self.knowledge_decoder._info['weapons_in_sight']:
 
+        elif self.picked_up_weapon == 0 and self.knowledge_decoder.info['weapons_in_sight']:
             self.find_weapon()
             move = self.parse_path()
+
         elif self.path:
-
             move = self.parse_path()
-        elif self.knowledge_decoder._info['enemies_in_sight']:
 
+        elif self.knowledge_decoder.info['enemies_in_sight']:
             self.find_enemy()
             move = self.parse_path()
         else:
-
             move = self.look_around()
         self.move_counter += 1
         return move
@@ -101,20 +107,17 @@ class BerserkBot(controller.Controller):
         grid = Grid(matrix=self.knowledge_decoder.map)
         start = grid.node(start.x, start.y)
         goal = grid.node(goal.x, goal.y)
-
         finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
 
         path, runs = finder.find_path(start, goal, grid)
-
         self.path.extend(path[1:])
 
     def parse_path(self):
-        facing = self.knowledge_decoder._info['facing']
+        facing = self.knowledge_decoder.info['facing']
         position = self.knowledge_decoder.knowledge.position
-
         target = self.path[0]
-
         target = coordinates.Coords(target[0], target[1])
+
         cords_sub = coordinates.sub_coords(target, position)
         needed_facing = Facing(cords_sub)
 
@@ -144,26 +147,34 @@ class BerserkBot(controller.Controller):
         return list_of_objects[np.argmin(distances)]
 
     def find_weapon(self):
+        print("find weapon")
         self.picked_up_weapon = 1
-        weapon_cords = self.choose_shorter_dist(self.knowledge_decoder._info['weapons_in_sight'])
+        weapon_cords = self.choose_shorter_dist(self.knowledge_decoder.info['weapons_in_sight'])
         position = self.knowledge_decoder.knowledge.position
         self.find_path(position, weapon_cords)
         self.goal = weapon_cords
 
-
     def find_enemy(self):
-        enemy_cords = self.choose_shorter_dist(self.knowledge_decoder._info['enemies_in_sight'])
+
+        enemy_cords = self.choose_shorter_dist(self.knowledge_decoder.info['enemies_in_sight'])
         position = self.knowledge_decoder.knowledge.position
+
         self.find_path(position, enemy_cords)
         # del self.path[-1]
         self.goal = coordinates.Coords(self.path[-1][0], self.path[-1][1])
 
+    def find_menhir(self):
+        menhir_coords = self.knowledge_decoder.info['menhir_position']
+        position = self.knowledge_decoder.knowledge.position
+        self.find_path(position, menhir_coords)
+        self.goal = menhir_coords
+
     def can_attack(self):
-        bot_weapon = self.knowledge_decoder._info['weapon']
+        bot_weapon = self.knowledge_decoder.info['weapon']
         bot_coords = self.knowledge_decoder.knowledge.position
-        bot_facing = self.knowledge_decoder._info['facing']
+        bot_facing = self.knowledge_decoder.info['facing']
         knowledge = self.knowledge_decoder.knowledge
-        if isinstance(bot_weapon,  Bow):
+        if isinstance(bot_weapon, Bow):
             if not bot_weapon.ready:
                 return True
         can_attack_enemy = any(
@@ -174,12 +185,24 @@ class BerserkBot(controller.Controller):
         )
         return can_attack_enemy
 
+    def runaway_from_mist(self):
+        pass
+
     def is_goal_reached(self):
         if self.knowledge_decoder.knowledge.position.x == self.goal.x and self.knowledge_decoder.knowledge.position.y == self.goal.y:
             self.path = deque()
 
     def is_moving(self):
-        current_position = self.knowledge_decoder.knowledge.position
-        four_moves = self.position_history[-4]
-        if four_moves.x == current_position.x and four_moves.y == current_position.y:
+        if self.is_the_same_position():
             self.path = deque()
+            self.position_history = []
+
+    def is_the_same_position(self, past: int = 5):
+        current_position = self.knowledge_decoder.knowledge.position
+        if len(self.position_history) > past + 1:
+            four_moves = self.position_history[-past]
+        else:
+            return False
+        if four_moves.x == current_position.x and four_moves.y == current_position.y:
+            return True
+        return False
