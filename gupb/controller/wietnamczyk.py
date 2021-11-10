@@ -5,7 +5,7 @@ from collections import deque
 
 from gupb import controller
 from gupb.controller.random import POSSIBLE_ACTIONS
-from gupb.model import arenas, coordinates
+from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena
 from gupb.model.characters import Facing
@@ -20,6 +20,7 @@ class WIETnamczyk(controller.Controller):
     # czy zarezerwowano caly przedzial dla psa?
     KRAZ_MIEDZY_SAFEPOINTAMI = "travel_to_safepoints"
     FIND_MENHIR = "find_menhir"
+
     def __init__(self):
         self.outer_places = [
             Coords(6, 6),
@@ -58,12 +59,30 @@ class WIETnamczyk(controller.Controller):
     def max_dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
         return max(abs(tile1[0] - tile2[0]), abs(tile1[1] - tile2[1]))
 
+    def bfs_dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
+        return len(self.find_path(tile1, tile2))
+
     def get_random_safe_place(self, current_pos: coordinates.Coords):
         places = list(sorted(map(lambda place: (place, self.dist(place, current_pos)), self.safe_places),
                              key=lambda pair: pair[1]))
         return random.choices(places, weights=self.prob)[0][0]
 
-    def should_attack(self, self_pos, knowledge):
+    def should_fight(self, self_pos: coordinates.Coords, enemy_pos: coordinates.Coords,
+                     enemy_tile: tiles.TileDescription) -> bool:
+        enemy_hp = enemy_tile.character.health
+        enemy_weapon = enemy_tile.character.weapon
+        enemy_facing = enemy_tile.character.facing
+        weapon_reach = {'sword': 3, 'axe': 1, 'knife': 1, 'bow': float('inf')}
+        if self.current_weapon.name not in ['bow', 'amulet']:
+            bfs_distance = self.bfs_dist(self_pos, enemy_pos)
+            max_dist = weapon_reach[self.current_weapon.name] + 1
+            if enemy_hp < self.hp:
+                return False
+            if bfs_distance <= max_dist:
+                return True
+        return False
+
+    def should_attack(self, self_pos: coordinates.Coords, knowledge: characters.ChampionKnowledge):
         if self.current_weapon.name == 'sword':
             for tile, description in knowledge.visible_tiles.items():
                 distance = self.dist(tile, self_pos)
@@ -117,7 +136,7 @@ class WIETnamczyk(controller.Controller):
             return None
         closest_good_weapon = \
             list(
-                sorted(map(lambda pos: (pos, len(self.find_path(pos, self.map, bot_pos))), weapons_pos),
+                sorted(map(lambda pos: (pos, len(self.find_path(pos, bot_pos))), weapons_pos),
                        key=lambda item: item[1]))
         return closest_good_weapon[0][0]
 
@@ -153,7 +172,7 @@ class WIETnamczyk(controller.Controller):
         if tile.type == 'land' or tile.type == 'menhir':
             return False
         loot = tile.loot
-        weapons_prob = {'sword': 1.0, 'axe': 1.0, 'knife': 0.4, 'amulet': 0.1, 'bow_loaded': 0.1, 'bow_unloaded': 0.05}
+        weapons_prob = {'sword': 1.0, 'axe': 1.0, 'knife': 0.4, 'amulet': 0.05, 'bow_loaded': 0.1, 'bow_unloaded': 0.05}
         if loot:
             prob = weapons_prob[loot.name]
             r = random.uniform(0, 1)
@@ -177,9 +196,9 @@ class WIETnamczyk(controller.Controller):
             map_matrix[k[0]][k[1]] = v.description()
         return map_matrix
 
-    def find_path(self, start_pos, map_matrix, dest_coord):
-        X = len(map_matrix)
-        Y = len(map_matrix[0])
+    def find_path(self, start_pos, dest_coord):
+        X = len(self.map)
+        Y = len(self.map)
         visited = [[False for _ in range(X)] for _ in range(Y)]
         parent = {start_pos: None}
         queue = deque([start_pos])
@@ -200,7 +219,9 @@ class WIETnamczyk(controller.Controller):
                     adj_x = s[0] + s_x
                     adj_y = s[1] + s_y
                     adj = (adj_x, adj_y)
-                    if 0 <= adj_x < X and 0 <= adj_y < Y and (map_matrix[adj_x][adj_y].type == 'land' or map_matrix[adj_x][adj_y].type == 'menhir')  and not \
+                    if 0 <= adj_x < X and 0 <= adj_y < Y and (
+                            self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][
+                        adj_y].type == 'menhir') and not \
                             visited[adj_x][
                                 adj_y]:
                         queue.append(adj)
@@ -227,7 +248,7 @@ class WIETnamczyk(controller.Controller):
             if not weapon_pos or self.current_weapon.name in self.good_weapons:
                 self.state = WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI
             else:
-                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map, (weapon_pos[0], weapon_pos[1]))
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (weapon_pos[0], weapon_pos[1]))
                 return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         if self.state == WIETnamczyk.KRAZ_MIEDZY_SAFEPOINTAMI:
@@ -236,8 +257,7 @@ class WIETnamczyk(controller.Controller):
                 if dest[0] == bot_pos[0] and dest[1] == bot_pos[1]:
                     return characters.Action.TURN_RIGHT
                 self.next_dest = dest
-            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), self.map,
-                                                 (self.next_dest[0], self.next_dest[1]))
+            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (self.next_dest[0], self.next_dest[1]))
             return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         return random.choice(POSSIBLE_ACTIONS)
