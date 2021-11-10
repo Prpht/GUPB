@@ -1,11 +1,11 @@
 import math
-import random
 
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.characters import Facing
+from strategy import RandomStrategy, BB8Strategy
 
 PI = 4.0 * math.atan(1.0)
 
@@ -28,8 +28,6 @@ WEAPON_SCORES = {
     "bow_unloaded": 40,
     "bow_loaded": 40
 }
-
-RANDOM_FACTOR = 0.2
 
 ROTATIONS = {
     (Facing.UP, Facing.RIGHT): characters.Action.TURN_RIGHT,
@@ -60,6 +58,7 @@ class BB8Controller(controller.Controller):
         self.weapon = "axe"
         self.weapon_range = 1
         self.facing = None
+        self.strategy = RandomStrategy()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BB8Controller):
@@ -80,7 +79,9 @@ class BB8Controller(controller.Controller):
         return int(round(distance))
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.position = knowledge.position
+        return self.strategy.decide(knowledge)
+
+        """self.position = knowledge.position
         self.visible_tiles = knowledge.visible_tiles
         self.facing = self.visible_tiles[self.position].character.facing
 
@@ -109,7 +110,7 @@ class BB8Controller(controller.Controller):
 
         return random.choices(population=list(ACTIONS_WITH_WEIGHTS.keys()),
                               weights=list(ACTIONS_WITH_WEIGHTS.values()),
-                              k=1)[0]
+                              k=1)[0]"""
 
     def __find_best_weapon(self):
         visible_weapons = {k: v for k, v in self.visible_tiles.items() if v.loot is not None}
@@ -181,6 +182,14 @@ class BB8Controller(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.ORANGE
+
+    @property
+    def strategy(self) -> BB8Strategy:
+        return self.strategy
+
+    @strategy.setter
+    def strategy(self, new_strategy: BB8Strategy):
+        self.strategy = new_strategy
 
 
 POTENTIAL_CONTROLLERS = [
