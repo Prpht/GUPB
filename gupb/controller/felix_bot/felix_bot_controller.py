@@ -6,6 +6,7 @@ from typing import Dict
 from .astar import Astar
 from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
+import random
 
 from gupb import controller
 from gupb.model import arenas
@@ -40,9 +41,11 @@ class FelixBotController(controller.Controller):
         self.is_mist_coming = False
         self.turning_direction = characters.Action.TURN_LEFT
         self.turning_state_on = False
+        self.explored_tiles = set()
+        self.reached_safe_place = False
 
-        for x_index in range(200):
-            for y_index in range(200):
+        for x_index in range(50):
+            for y_index in range(50):
                 self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
                                                                       effects=[])
 
@@ -62,6 +65,12 @@ class FelixBotController(controller.Controller):
         self.action_queue = []
         self.reached_menhir = False
         self.is_mist_coming = False
+        self.reached_safe_place = False
+        self.explored_tiles = set()
+        for x_index in range(50):
+            for y_index in range(50):
+                self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
+                                                                      effects=[])
 
     def change_turning_direction(self):
         if self.turning_direction == characters.Action.TURN_LEFT:
@@ -92,30 +101,7 @@ class FelixBotController(controller.Controller):
         if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
             return characters.Action.ATTACK
 
-        if len(self.action_queue) == 0:
-            if not self.is_mist_coming and self.current_weapon not in ['axe']:
-                weapon_coord = self.__get_weapon_coordinate(['axe'])
-                if weapon_coord is not None:
-                    path = Astar.astar(self.grid, self.position, weapon_coord)
-                    if path is not None:
-                        self.action_queue = self.__generate_queue_from_path(
-                            path)
-            elif not self.is_mist_coming and self.current_weapon in ['axe']:
-                path = Astar.astar(self.grid, self.position, Coords(6, 6))
-                if len(path) == 0:
-                    if self.facing == Facing.DOWN or self.facing == Facing.LEFT:
-                        return characters.Action.TURN_LEFT
-                    else:
-                        return characters.Action.TURN_RIGHT
-                    # return self.get_turning_direction(knowledge)
-                if path is not None:
-                    self.action_queue = self.__generate_queue_from_path(
-                        path)
-            elif self.is_mist_coming and self.menhir_coord is not None and not self.reached_menhir:
-                path = Astar.astar(self.grid, self.position, self.menhir_coord)
-                if path is not None:
-                    self.action_queue = self.__generate_queue_from_path(
-                        path)
+        self.strategy_bow()
 
         self.__validate_action_queue()
 
@@ -127,6 +113,76 @@ class FelixBotController(controller.Controller):
             return random.choice([characters.Action.TURN_LEFT,
                                   characters.Action.TURN_RIGHT,
                                   characters.Action.STEP_FORWARD])
+
+    def strategy_bow(self):
+        if self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
+            weapon_coord = self.__get_weapon_coordinate(['bow_unloaded', 'bow_loaded'])
+            if weapon_coord is not None:
+                path = Astar.astar(self.grid, self.position, weapon_coord)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+        if len(self.action_queue) == 0:
+            if self.menhir_coord is None:
+                random_coord = self.__get_random_passable_coord()
+                path = Astar.astar(self.grid, self.position, random_coord)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+            elif self.is_mist_coming and self.menhir_coord is not None:
+                coord = self.get_far_coord_orthogonal_to_menhir()
+                path = Astar.astar(self.grid, self.position, coord)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+
+
+    def get_far_coord_orthogonal_to_menhir(self):
+        coord = self.menhir_coord
+        distance = 0
+        for i in range(1, 8):
+            try:
+                new_coord = coordinates.add_coords(self.menhir_coord, Coords(i, 0))
+                if self.grid[coord].type == 'wall':
+                    break
+                if self.grid[coord].type != 'sea':
+                    distance = i
+                    coord = new_coord
+            except KeyError:
+                pass
+        for i in range(1, 8):
+            try:
+                new_coord = coordinates.sub_coords(self.menhir_coord, Coords(i, 0))
+                if self.grid[coord].type == 'wall':
+                    break
+                if i > distance and self.grid[coord].type != 'sea':
+                    distance = i
+                    coord = new_coord
+            except KeyError:
+                pass
+        for i in range(1, 8):
+            try:
+                new_coord = coordinates.add_coords(self.menhir_coord, Coords(0, i))
+                if self.grid[coord].type == 'wall' and self.grid[coord].type != 'sea':
+                    break
+                if i > distance:
+                    distance = i
+                    coord = new_coord
+            except KeyError:
+                pass
+        for i in range(1, 8):
+            try:
+                new_coord = coordinates.sub_coords(self.menhir_coord, Coords(0, i))
+                if self.grid[coord].type == 'wall' and self.grid[coord].type != 'sea':
+                    break
+                if i > distance:
+                    distance = i
+                    coord = new_coord
+            except KeyError:
+                pass
+                # kafelek nie byl widoczny
+        return coord
+
 
     @property
     def name(self) -> str:
@@ -142,6 +198,7 @@ class FelixBotController(controller.Controller):
         self.facing = character.facing
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
+        self.explored_tiles.update(set(knowledge.visible_tiles.keys()))
         self.reached_menhir = False
         for coord, tile in knowledge.visible_tiles.items():
             if self.menhir_coord is None and tile.type == 'menhir':
@@ -206,6 +263,10 @@ class FelixBotController(controller.Controller):
                     weapon_distance = distance
                     weapon_coord = coord
         return weapon_coord
+
+    def __get_random_passable_coord(self):
+        available_tiles = set([coord for coord, tile in self.grid.items() if tile.type == 'land' and 'mist' not in [effect.type for effect in tile.effects]])
+        return random.choice(tuple(available_tiles - self.explored_tiles))
 
     def __get_distance(self, coord):
         return abs(self.position[0] - coord[0]) + abs(self.position[1] - coord[1])
