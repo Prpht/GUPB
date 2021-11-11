@@ -126,6 +126,8 @@ class EvaderController(BaseMarwinController):
                 self.next_move = None
             else:
                 action = characters.Action.ATTACK
+        elif next_facing is None:
+            action = characters.Action.TURN_LEFT
         else:
             action = self._get_action_for_facing(my_character.facing, next_facing)
 
@@ -145,7 +147,7 @@ class EvaderController(BaseMarwinController):
         for facing in facings:
             if (current_position + facing.value) == next_position:
                 return facing
-        return characters.Facing.LEFT
+        return None
 
     @staticmethod
     def _get_action_for_facing(current_facing, next_facing):
