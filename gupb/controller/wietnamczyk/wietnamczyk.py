@@ -1,17 +1,16 @@
-import logging
 import random
-from math import atan2
 from collections import deque
+from math import atan2
+from typing import List, Dict
 
 from gupb import controller
 from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena
-from gupb.model.characters import Facing
+from gupb.model.characters import Facing, CHAMPION_STARTING_HP
 from gupb.model.coordinates import Coords
-
-from typing import List, Dict
+import json
 
 
 # noinspection PyUnusedLocal
@@ -20,25 +19,36 @@ class WIETnamczyk(controller.Controller):
     GET_WEAPON = "get_weapon"
     EXPLORE = "explore"
     PANIC = "panic"
+    GO_TO_MENHIR = "go_to_menhir"
+    SURROUND_MENHIR = "surrond_menhir"
+    MIST_PANIC_MODE = False
 
     def __init__(self):
         self.mist_range = 3
-        self.enemy_range = 8
-
+        self.enemy_range = 5
+        self.strategies_dict = {'OSTRICH': self.strategy_ostrich, 'BERSERKER': self.strategy_berserker,
+                                'COWARD': self.strategy_coward}
+        # These values were obtained using K-armed bandit approach :)
+        self.Q = {'OSTRICH': 30.062992125984245, 'BERSERKER': 16.33333333333334, 'COWARD': 28.972413793103446}
+        self.N = {'OSTRICH': 0, 'BERSERKER': 0, 'COWARD': 0}
+        self.strategies = list(self.Q.keys())
+        self.current_strategy = random.choice(self.strategies)
         self.menhir_pos = None
         self.good_weapons = ["sword", "axe"]
         self.first_name: str = "Adam"
-        self.map: List[List[tiles.TileDescription]] = self.parse_map()
-        self.unseen_coords = self.generate_coords()
         self.arena_description = None
         self.current_weapon = "knife"
         self.state = WIETnamczyk.GET_WEAPON
         self.next_dest = None
-        self.hp = None
+        self.hp = CHAMPION_STARTING_HP
+        self.prev_hp = CHAMPION_STARTING_HP
         self.facing = None
         self.exploration_goal = None
+        self.action_queue = []
 
     def dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
+        if not tile1 or not tile2:
+            return 0
         dist = abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
         return dist
 
@@ -62,9 +72,7 @@ class WIETnamczyk(controller.Controller):
         if self.current_weapon.name not in ['bow', 'amulet']:
             bfs_distance = self.bfs_dist(self_pos, enemy_pos)
             max_dist = weapon_reach[self.current_weapon.name] + 1
-            if enemy_hp < self.hp:
-                return False
-            if bfs_distance <= max_dist:
+            if self.hp - enemy_hp >= 3 and bfs_distance <= max_dist:
                 return True
         return False
 
@@ -129,11 +137,11 @@ class WIETnamczyk(controller.Controller):
     def find_visible_enemies(self, bot_pos, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription], ):
         enemies_list = []
         for tile, description in visible_tiles.items():
-            if description.character is not None:
+            if description.character is not None and self.dist(tile, bot_pos) > 0:
                 dist_to_enemy = len(self.find_path(bot_pos, tile))
                 if dist_to_enemy <= self.enemy_range:
-                    enemies_list.append((description, tile))
-        return enemies_list
+                    enemies_list.append((description, tile, dist_to_enemy))
+        return sorted(enemies_list, key=lambda item: item[2])
 
     def find_direction(self, path_to_destination, knowledge, bot_pos):
         if len(path_to_destination) == 0:
@@ -156,13 +164,6 @@ class WIETnamczyk(controller.Controller):
                     return characters.Action.TURN_RIGHT
         return characters.Action.TURN_RIGHT
 
-    def evaluate_mist(self, current_pos, knowledge):
-        for tile, description in knowledge.visible_tiles.items():
-            if self.max_dist(tile, current_pos) <= self.mist_range:
-                if 'mist' in list(map(lambda item: item.type, description.effects)):
-                    self.safe_places = self.inner_places
-                    self.prob = self.inner_prob
-
     def is_tile_valid(self, tile):
         if tile.type == 'land' or tile.type == 'menhir':
             return False
@@ -178,17 +179,19 @@ class WIETnamczyk(controller.Controller):
 
     def update_knowledge(self, visible_tiles, bot_pos):
         for tile, description in visible_tiles.items():
-            self.unseen_coords.remove(tile)
+            if tuple(tile) in self.unseen_coords:
+                self.unseen_coords.remove(tuple(tile))
             self.map[tile[0]][tile[1]] = description
             if description.type == 'menhir':
                 self.menhir_pos = tile
             if self.dist(tile, bot_pos) == 0:
                 self.current_weapon = description.character.weapon
+                self.prev_hp = self.hp
                 self.hp = description.character.health
                 self.facing = description.character.facing
 
-    def parse_map(self) -> List[List[tiles.TileDescription]]:
-        arena = Arena.load("isolated_shrine")
+    def parse_map(self, arena_name) -> List[List[tiles.TileDescription]]:
+        arena = Arena.load(arena_name)
         map_matrix = [[None for i in range(arena.size[0])] for j in range(arena.size[1])]
         for k, v in arena.terrain.items():
             map_matrix[k[0]][k[1]] = v.description()
@@ -199,7 +202,7 @@ class WIETnamczyk(controller.Controller):
         for i, row in enumerate(self.map):
             for j, cell in enumerate(row):
                 if cell.type in {'land', 'menhir'}:
-                    unseen_coords.add(Coords(i, j))
+                    unseen_coords.add((i, j))
         return unseen_coords
 
     def find_path(self, start_pos, dest_coord):
@@ -226,13 +229,36 @@ class WIETnamczyk(controller.Controller):
                     adj_y = s[1] + s_y
                     adj = (adj_x, adj_y)
                     if 0 <= adj_x < X and 0 <= adj_y < Y and (
-                            self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][
-                        adj_y].type == 'menhir') and not \
-                            visited[adj_x][
-                                adj_y]:
+                            self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][adj_y].type == 'menhir') \
+                            and not visited[adj_x][adj_y] and not 'mist' in self.map[adj_x][adj_y].effects:
                         queue.append(adj)
                         parent[adj] = s
         return []
+
+    def go_to_menhir(self, knowledge: characters.ChampionKnowledge, bot_pos: Coords):
+        path_to_destination = self.find_path(bot_pos, self.menhir_pos)
+        return self.find_direction(path_to_destination, knowledge, bot_pos)
+
+    def catharsis(self):
+        self.action_queue = []
+
+    def evaluate_mist(self, bot_pos: Coords, knowledge: characters.ChampionKnowledge):
+        if WIETnamczyk.MIST_PANIC_MODE and len(self.action_queue) != 0:
+            return
+        elif WIETnamczyk.MIST_PANIC_MODE:
+            WIETnamczyk.MIST_PANIC_MODE = False
+        for coords, desc in knowledge.visible_tiles.items():
+            if desc.effects and 'mist' in list(map(lambda d: d.type, desc.effects)):
+                if self.menhir_pos is not None:
+                    self.state = WIETnamczyk.GO_TO_MENHIR
+                    path_to_destination = self.find_path(bot_pos, self.menhir_pos)
+                    return self.find_direction(path_to_destination, knowledge, bot_pos)
+                else:
+                    # todo: improve this logic :)
+                    WIETnamczyk.MIST_PANIC_MODE = True
+                    self.catharsis()
+                    self.action_queue.append(characters.Action.TURN_RIGHT)
+                    self.action_queue.append(characters.Action.STEP_FORWARD)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, WIETnamczyk):
@@ -243,25 +269,75 @@ class WIETnamczyk(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        action = self.strategies_dict[self.current_strategy](knowledge)
+        return action
+
+    def set_exploration_area(self, bot_pos: Coords, max_dist_from_menhir=5):
+        possible_cells = set()
+        for i, row in enumerate(self.map):
+            for j, cell in enumerate(row):
+                if self.dist(bot_pos, Coords(i, j)) < max_dist_from_menhir:
+                    possible_cells.add((i, j))
+        self.unseen_coords = possible_cells
+        self.exploration_goal = random.choice(list(possible_cells))
+
+    def generate_enemy_avoidance_action(self):
+        goals = [(self.dist(self.exploration_goal, cell), cell) for cell in self.unseen_coords]
+        sorted_goals = sorted(goals, key=lambda item: item[0], reverse=True)
+        self.exploration_goal = sorted_goals[0][1] if len(sorted_goals) != 0 else self.menhir_pos
+
+        random_actions = random.choice(
+            [[characters.Action.TURN_RIGHT],
+             [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT],
+             [characters.Action.TURN_LEFT]])
+        random_actions.append(characters.Action.STEP_FORWARD)
+        self.action_queue.extend(random_actions)
+
+        return self.action_queue.pop(0)
+
+    def generate_panic_action(self, bot_pos: Coords, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
+        for coords, desc in visible_tiles.items():
+            if self.dist(coords, bot_pos) == 1 and desc.type in ['land', 'menhir']:
+                return characters.Action.STEP_FORWARD
+        return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
+
+    def do_not_be_tabula_rasa(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         self.update_knowledge(knowledge.visible_tiles, bot_pos)
         self.evaluate_mist(bot_pos, knowledge)
 
+    def stand_in_mist(self, visible_tiles, bot_pos):
+        for coords, desc in visible_tiles.items():
+            if self.dist(coords, bot_pos) == 0 and 'mist' in desc.effects:
+                return True
+        return False
+
+    def perform_priority_checks(self, knowledge: characters.ChampionKnowledge):
+        bot_pos = knowledge.position
         if self.should_attack(bot_pos, knowledge):
             return characters.Action.ATTACK
+        if len(self.action_queue) != 0:
+            return self.action_queue.pop(0)
+        if self.prev_hp > self.hp:
+            return self.generate_panic_action(bot_pos, knowledge.visible_tiles)
+        return None
 
-        if self.state == WIETnamczyk.EXPLORE:
-            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
-            if len(visible_enemies) > 1:
-                # TODO implement enemy avoidance
-                return characters.Action.TURN_RIGHT
-            if len(visible_enemies) == 1:
-                enemy_pos = visible_enemies[0][1]
-                enemy_tile_description = visible_enemies[0][0]
-                if self.should_fight(bot_pos, enemy_pos, enemy_tile_description):
-                    path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
-                    return self.find_direction(path_to_destination, knowledge, bot_pos)
-            return self.explore_map(bot_pos, knowledge)
+    def strategy_ostrich(self, knowledge: characters.ChampionKnowledge):
+        """
+        This version of the bot keeps looking for menhir unless it sees some weaker enemy, then it tries to kill it.
+        """
+        bot_pos = knowledge.position
+        self.do_not_be_tabula_rasa(knowledge)
+        priority_action = self.perform_priority_checks(knowledge)
+        if priority_action:
+            return priority_action
+
+        if self.state == WIETnamczyk.GO_TO_MENHIR:
+            if self.dist(bot_pos, self.menhir_pos) < 3:
+                self.set_exploration_area(bot_pos)
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                return self.go_to_menhir(knowledge, bot_pos)
 
         if self.state == WIETnamczyk.GET_WEAPON:
             weapon_pos = self.find_good_weapon(bot_pos)
@@ -271,19 +347,113 @@ class WIETnamczyk(controller.Controller):
                 path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (weapon_pos[0], weapon_pos[1]))
                 return self.find_direction(path_to_destination, knowledge, bot_pos)
 
+        if self.state == WIETnamczyk.EXPLORE:
+            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+            if len(visible_enemies) > 1:
+                return self.generate_enemy_avoidance_action()
+            if len(visible_enemies) == 1:
+                enemy_pos = visible_enemies[0][1]
+                enemy_tile_description = visible_enemies[0][0]
+                if self.should_fight(bot_pos, enemy_pos, enemy_tile_description):
+                    path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
+                    return self.find_direction(path_to_destination, knowledge, bot_pos)
+                return self.generate_enemy_avoidance_action()
+            if len(self.unseen_coords) == 0:
+                self.state = WIETnamczyk.GO_TO_MENHIR
+                return random.choice(POSSIBLE_ACTIONS)
+            return self.explore_map(bot_pos, knowledge)
+
+        return random.choice(POSSIBLE_ACTIONS)
+
+    def strategy_berserker(self, knowledge: characters.ChampionKnowledge):
+        """
+        Whenever the bot sees an enemy he immediately starts following him. Otherwise, it just explores the map and
+        looks for the menhir.
+        """
+        bot_pos = knowledge.position
+        self.do_not_be_tabula_rasa(knowledge)
+        priority_action = self.perform_priority_checks(knowledge)
+        if priority_action:
+            return priority_action
+
+        if self.state == WIETnamczyk.GET_WEAPON:
+            weapon_pos = self.find_good_weapon(bot_pos)
+            if not weapon_pos or self.current_weapon.name in self.good_weapons:
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (weapon_pos[0], weapon_pos[1]))
+                return self.find_direction(path_to_destination, knowledge, bot_pos)
+
+        if self.state == WIETnamczyk.EXPLORE:
+            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+            if len(visible_enemies) > 0:
+                enemy_pos = visible_enemies[0][1]
+                enemy_tile_description = visible_enemies[0][0]
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
+                return self.find_direction(path_to_destination, knowledge, bot_pos)
+            if len(self.unseen_coords) == 0:
+                self.state = WIETnamczyk.GO_TO_MENHIR
+                return random.choice(POSSIBLE_ACTIONS)
+            return self.explore_map(bot_pos, knowledge)
+
+        if self.state == WIETnamczyk.GO_TO_MENHIR:
+            if self.dist(bot_pos, self.menhir_pos) < 3:
+                self.set_exploration_area(bot_pos)
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                return self.go_to_menhir(knowledge, bot_pos)
+
+        return random.choice(POSSIBLE_ACTIONS)
+
+    def strategy_coward(self, knowledge: characters.ChampionKnowledge):
+        bot_pos = knowledge.position
+        self.do_not_be_tabula_rasa(knowledge)
+        priority_action = self.perform_priority_checks(knowledge)
+        if priority_action:
+            return priority_action
+
+        if self.state in (WIETnamczyk.EXPLORE, WIETnamczyk.GET_WEAPON):
+            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+            if len(visible_enemies) > 0:
+                return self.generate_enemy_avoidance_action()
+            if len(self.unseen_coords) == 0:
+                self.state = WIETnamczyk.GO_TO_MENHIR
+                return random.choice(POSSIBLE_ACTIONS)
+            return self.explore_map(bot_pos, knowledge)
+
+        if self.state == WIETnamczyk.GO_TO_MENHIR:
+            if self.dist(bot_pos, self.menhir_pos) < 3:
+                self.set_exploration_area(bot_pos)
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                return self.go_to_menhir(knowledge, bot_pos)
         return random.choice(POSSIBLE_ACTIONS)
 
     def explore_map(self, current_position, knowledge):
         if self.exploration_goal is None or self.exploration_goal not in self.unseen_coords:
-            self.exploration_goal = random.choice(self.unseen_coords)
+            self.exploration_goal = random.choice(list(self.unseen_coords))
         path_to_destination = self.find_path(current_position, self.exploration_goal)
-        return self.find_direction(path_to_destination, knowledge, current_position)
+        action = self.find_direction(path_to_destination, knowledge, current_position)
+        return action
 
     def praise(self, score: int) -> None:
-        pass
+        self.N[self.current_strategy] += 1
+        n = self.N[self.current_strategy]
+        q = self.Q[self.current_strategy]
+        self.Q[self.current_strategy] += (1 / n * (score - q))
+        # only for tests
+        # with open('wietnamczyk_q.json', 'w') as fp:
+        #     json.dump(self.Q, fp)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.map: List[List[tiles.TileDescription]] = self.parse_map(arena_description.name)
+        self.unseen_coords = self.generate_coords()
+
         self.arena_description = arena_description
+        rand = random.uniform(0, 1)
+        epsilon = 0.2
+        self.current_strategy = random.choice(self.strategies) if rand < epsilon else max(self.Q, key=self.Q.get)
+        print(self.Q)
 
     @property
     def name(self) -> str:
