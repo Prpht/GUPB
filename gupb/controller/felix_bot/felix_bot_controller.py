@@ -7,6 +7,7 @@ from .astar import Astar
 from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
 import random
+from gupb.model.weapons import WeaponDescription
 
 from gupb import controller
 from gupb.model import arenas
@@ -43,6 +44,8 @@ class FelixBotController(controller.Controller):
         self.turning_state_on = False
         self.explored_tiles = set()
         self.reached_safe_place = False
+        self.banned_coords = []
+        self.safe_place = None
 
         for x_index in range(50):
             for y_index in range(50):
@@ -67,74 +70,80 @@ class FelixBotController(controller.Controller):
         self.is_mist_coming = False
         self.reached_safe_place = False
         self.explored_tiles = set()
+        self.menhir_coord = None
+        self.safe_place = None
         for x_index in range(50):
             for y_index in range(50):
                 self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
                                                                       effects=[])
 
-    def change_turning_direction(self):
-        if self.turning_direction == characters.Action.TURN_LEFT:
-            return characters.Action.TURN_RIGHT
-        else:
-            return characters.Action.TURN_LEFT
-
-    def get_turning_direction(self, knowledge):
-        # look for field with distance 1.0 -> field bot is looking at
-        for i in knowledge.visible_tiles:
-            x_diff = i[0] - knowledge.position[0]
-            y_diff = i[1] - knowledge.position[1]
-            distance = math.sqrt(x_diff * x_diff + y_diff * y_diff)
-            if distance >= 0.9 and distance < 1.1:
-                field_front_of_bot = knowledge.visible_tiles[i][0]
-                if field_front_of_bot == "land":
-                    # turn on turning state
-                    self.turning_state_on = True
-                if field_front_of_bot == "wall" and self.turning_state_on:
-                    # change turning direction if bot see wall
-                    turning = self.change_turning_direction()
-                    self.turning_direction = turning
-        return self.turning_direction
+    # def change_turning_direction(self):
+    #     if self.turning_direction == characters.Action.TURN_LEFT:
+    #         return characters.Action.TURN_RIGHT
+    #     else:
+    #         return characters.Action.TURN_LEFT
+    #
+    # def get_turning_direction(self, knowledge):
+    #     # look for field with distance 1.0 -> field bot is looking at
+    #     for i in knowledge.visible_tiles:
+    #         x_diff = i[0] - knowledge.position[0]
+    #         y_diff = i[1] - knowledge.position[1]
+    #         distance = math.sqrt(x_diff * x_diff + y_diff * y_diff)
+    #         if distance >= 0.9 and distance < 1.1:
+    #             field_front_of_bot = knowledge.visible_tiles[i][0]
+    #             if field_front_of_bot == "land":
+    #                 # turn on turning state
+    #                 self.turning_state_on = True
+    #             if field_front_of_bot == "wall" and self.turning_state_on:
+    #                 # change turning direction if bot see wall
+    #                 turning = self.change_turning_direction()
+    #                 self.turning_direction = turning
+    #     return self.turning_direction
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
+        return self.strategy_bow(knowledge)
 
+    def strategy_bow(self, knowledge):
         if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
             return characters.Action.ATTACK
 
-        self.strategy_bow()
-
-        self.__validate_action_queue()
-
-        if len(self.action_queue) > 0:
-            return self.action_queue.pop(0)
-        elif self.reached_menhir and self.is_mist_coming:
-            return characters.Action.TURN_LEFT
-        else:
-            return random.choice([characters.Action.TURN_LEFT,
-                                  characters.Action.TURN_RIGHT,
-                                  characters.Action.STEP_FORWARD])
-
-    def strategy_bow(self):
-        if self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
-            weapon_coord = self.__get_weapon_coordinate(['bow_unloaded', 'bow_loaded'])
-            if weapon_coord is not None:
-                path = Astar.astar(self.grid, self.position, weapon_coord)
-                if path is not None:
-                    self.action_queue = self.__generate_queue_from_path(
-                        path)
         if len(self.action_queue) == 0:
-            if self.menhir_coord is None:
+            if self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
+                weapon_coord = self.__get_weapon_coordinate(['bow_unloaded', 'bow_loaded'])
+                if weapon_coord is not None:
+                    path = Astar.astar(self.grid, self.position, weapon_coord)
+                    if path is not None:
+                        self.action_queue = self.__generate_queue_from_path(
+                            path)
+                        if len(self.action_queue) > 0:
+                            return self.action_queue.pop(0)
+                    else:
+                        self.banned_coords.append(weapon_coord)
+
+            if self.menhir_coord is None or self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
                 random_coord = self.__get_random_passable_coord()
                 path = Astar.astar(self.grid, self.position, random_coord)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                coord = self.get_far_coord_orthogonal_to_menhir()
-                path = Astar.astar(self.grid, self.position, coord)
+                self.safe_place = self.get_far_coord_orthogonal_to_menhir()
+                path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
                         path)
+
+        self.__validate_action_queue()
+
+        if len(self.action_queue) > 0:
+            return self.action_queue.pop(0)
+        elif self.position == self.safe_place and self.is_mist_coming:
+            return characters.Action.TURN_LEFT
+        else:
+            return random.choice([characters.Action.TURN_LEFT,
+                                  characters.Action.TURN_RIGHT,
+                                  characters.Action.STEP_FORWARD])
 
 
     def get_far_coord_orthogonal_to_menhir(self):
@@ -143,9 +152,9 @@ class FelixBotController(controller.Controller):
         for i in range(1, 8):
             try:
                 new_coord = coordinates.add_coords(self.menhir_coord, Coords(i, 0))
-                if self.grid[coord].type == 'wall':
+                if self.grid[new_coord].type == 'wall':
                     break
-                if self.grid[coord].type != 'sea':
+                if self.grid[new_coord].type == 'land':
                     distance = i
                     coord = new_coord
             except KeyError:
@@ -153,9 +162,9 @@ class FelixBotController(controller.Controller):
         for i in range(1, 8):
             try:
                 new_coord = coordinates.sub_coords(self.menhir_coord, Coords(i, 0))
-                if self.grid[coord].type == 'wall':
+                if self.grid[new_coord].type == 'wall':
                     break
-                if i > distance and self.grid[coord].type != 'sea':
+                if i > distance and self.grid[new_coord].type == 'land':
                     distance = i
                     coord = new_coord
             except KeyError:
@@ -163,9 +172,9 @@ class FelixBotController(controller.Controller):
         for i in range(1, 8):
             try:
                 new_coord = coordinates.add_coords(self.menhir_coord, Coords(0, i))
-                if self.grid[coord].type == 'wall' and self.grid[coord].type != 'sea':
+                if self.grid[new_coord].type == 'wall':
                     break
-                if i > distance:
+                if i > distance  and self.grid[new_coord].type == 'land':
                     distance = i
                     coord = new_coord
             except KeyError:
@@ -173,9 +182,9 @@ class FelixBotController(controller.Controller):
         for i in range(1, 8):
             try:
                 new_coord = coordinates.sub_coords(self.menhir_coord, Coords(0, i))
-                if self.grid[coord].type == 'wall' and self.grid[coord].type != 'sea':
+                if self.grid[new_coord].type == 'wall':
                     break
-                if i > distance:
+                if i > distance and self.grid[new_coord].type == 'land':
                     distance = i
                     coord = new_coord
             except KeyError:
@@ -196,6 +205,10 @@ class FelixBotController(controller.Controller):
         self.position = knowledge.position
         character = knowledge.visible_tiles[self.position].character
         self.facing = character.facing
+        if self.current_weapon != character.weapon.name:
+            self.action_queue = []
+            self.safe_place = None
+            self.grid[self.position].loot = WeaponDescription(name='bow_loaded')
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
         self.explored_tiles.update(set(knowledge.visible_tiles.keys()))
@@ -257,7 +270,7 @@ class FelixBotController(controller.Controller):
         weapon_coord = None
         weapon_distance = 10000000
         for coord, tile in self.grid.items():
-            if tile.loot is not None and tile.loot.name in weapons_names:
+            if tile.loot is not None and tile.loot.name in weapons_names and coord not in self.banned_coords:
                 distance = self.__get_distance(coord)
                 if distance < weapon_distance:
                     weapon_distance = distance
