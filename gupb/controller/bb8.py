@@ -1,9 +1,13 @@
 import math
 import random
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
+from gupb.model.characters import Facing
+
+PI = 4.0 * math.atan(1.0)
 
 ACTIONS_WITH_WEIGHTS = {
     characters.Action.TURN_LEFT: 0.2,
@@ -16,12 +20,46 @@ TABARD_ASSIGNMENT = {
     "BB8": characters.Tabard.WHITE
 }
 
+WEAPON_SCORES = {
+    "axe": 10,
+    "sword": 40,
+    "knife": 10,
+    "amulet": 30,
+    "bow_unloaded": 40,
+    "bow_loaded": 40
+}
+
+RANDOM_FACTOR = 0.2
+
+ROTATIONS = {
+    (Facing.UP, Facing.RIGHT): characters.Action.TURN_RIGHT,
+    (Facing.UP, Facing.DOWN): characters.Action.TURN_RIGHT,
+    (Facing.UP, Facing.LEFT): characters.Action.TURN_LEFT,
+    (Facing.RIGHT, Facing.UP): characters.Action.TURN_LEFT,
+    (Facing.RIGHT, Facing.DOWN): characters.Action.TURN_RIGHT,
+    (Facing.RIGHT, Facing.LEFT): characters.Action.TURN_RIGHT,
+    (Facing.DOWN, Facing.UP): characters.Action.TURN_LEFT,
+    (Facing.DOWN, Facing.RIGHT): characters.Action.TURN_LEFT,
+    (Facing.DOWN, Facing.LEFT): characters.Action.TURN_RIGHT,
+    (Facing.LEFT, Facing.UP): characters.Action.TURN_RIGHT,
+    (Facing.LEFT, Facing.RIGHT): characters.Action.TURN_RIGHT,
+    (Facing.LEFT, Facing.DOWN): characters.Action.TURN_LEFT
+}
+
+MENHIR_POSITION = 25
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BB8Controller:
+class BB8Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        self.position = None
+        self.enemy_nearby = False
+        self.visible_tiles = {}
+        self.weapon = "axe"
+        self.weapon_range = 1
+        self.facing = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BB8Controller):
@@ -34,37 +72,107 @@ class BB8Controller:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         pass
 
-    def calculate_distance(self, self_position: coordinates.Coords, other_position: coordinates.Coords) -> int:
-        distance = math.sqrt((self_position.x - other_position.x) ** 2 + (self_position.y - other_position.y) ** 2)
+    def praise(self, score: int) -> None:
+        pass
+
+    def calculate_distance(self, other_position: coordinates.Coords) -> int:
+        distance = math.sqrt((self.position.x - other_position.x) ** 2 + (self.position.y - other_position.y) ** 2)
         return int(round(distance))
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        position = knowledge.position
-        visible_tiles = knowledge.visible_tiles
-        enemy_nearby = False
-        nearest_enemy_distance = 35000
-        nearest_enemy_position = None
+        self.position = knowledge.position
+        self.visible_tiles = knowledge.visible_tiles
+        self.facing = self.visible_tiles[self.position].character.facing
 
-        for visible_position in visible_tiles.keys():
-            if visible_tiles[visible_position].character is not None \
-                    and visible_tiles[visible_position].character.controller_name != self.first_name:
-                enemy_nearby = True
-                nearest_enemy_distance = min(nearest_enemy_distance,
-                                             self.calculate_distance(position, visible_position))
-                nearest_enemy_position = visible_position
+        random_decision = random.random()
+        if random_decision <= RANDOM_FACTOR:
+            # return random action considering probability distribution
+            return random.choices(population=list(ACTIONS_WITH_WEIGHTS.keys()),
+                                  weights=list(ACTIONS_WITH_WEIGHTS.values()),
+                                  k=1)[0]
 
-        self_description = visible_tiles[position].character
-        if self_description is not None:
-            health = self_description.health
-            facing = self_description.facing
+        if self.__is_mist_coming():
+            return self.__go_to_direction(coordinates.Coords(MENHIR_POSITION, MENHIR_POSITION))
 
-            if health >= characters.CHAMPION_STARTING_HP * 0.25 and nearest_enemy_distance == 1:
+        best_weapon_coordinates = self.__find_best_weapon()
+        enemy_in_range_coordinates = self.__get_enemy_in_range_coordinates()
+
+        if best_weapon_coordinates is not None:
+            return self.__go_to_direction(best_weapon_coordinates)
+
+        if enemy_in_range_coordinates is not None:
+            desired_facing = self.__get_desired_facing(enemy_in_range_coordinates)
+            if desired_facing == self.facing:
                 return characters.Action.ATTACK
+            else:
+                return self.__rotate_to_desired_facing(enemy_in_range_coordinates)
 
-        # return random action considering probability distribution
         return random.choices(population=list(ACTIONS_WITH_WEIGHTS.keys()),
                               weights=list(ACTIONS_WITH_WEIGHTS.values()),
                               k=1)[0]
+
+    def __find_best_weapon(self):
+        visible_weapons = {k: v for k, v in self.visible_tiles.items() if v.loot is not None}
+        best_score = 0
+        best_coordinates = None
+
+        for weapon_position in visible_weapons.keys():
+            weapon_coordinates = coordinates.Coords(weapon_position[0], weapon_position[1])
+            distance = self.calculate_distance(weapon_coordinates)
+            weapon_name = visible_weapons[weapon_position].loot.name
+            weapon_score = WEAPON_SCORES[weapon_name]
+            real_score = weapon_score if weapon_score > WEAPON_SCORES[self.weapon] else 0
+
+            score = 0.5 * real_score / (0.3 * distance)
+
+            if score > best_score:
+                best_score = score
+                best_coordinates = weapon_coordinates
+
+        return best_coordinates if best_score > 0 else None
+
+    def __get_enemy_in_range_coordinates(self):
+        visible_enemies = {k: v for k, v in self.visible_tiles.items() if
+                           v.character is not None and v.character.controller_name != self.first_name}
+
+        for enemy_position in visible_enemies.keys():
+            enemy_coordinates = coordinates.Coords(enemy_position[0], enemy_position[1])
+            if self.calculate_distance(enemy_coordinates) <= self.weapon_range:
+                return enemy_coordinates
+
+        return None
+
+    def __is_mist_coming(self):
+        mist_tiles = {k: v for k, v in self.visible_tiles.items() if v.effects}
+        return True if mist_tiles else False
+
+    def __get_desired_facing(self, destination_coordinates):
+        r_vect = coordinates.Coords(destination_coordinates.x - self.position.x,
+                                    destination_coordinates.y - self.position.y)
+        angle = math.atan2(r_vect.y, r_vect.x)
+
+        desired_facing = self.facing
+        if PI / 4.0 < angle <= 3.0 * PI / 4.0:
+            desired_facing = Facing.UP
+        elif -1.0 * PI / 4.0 < angle <= PI / 4.0:
+            desired_facing = Facing.RIGHT
+        elif -3.0 * PI / 4.0 < angle <= -1.0 * PI / 4.0:
+            desired_facing = Facing.DOWN
+        else:
+            desired_facing = Facing.LEFT
+
+        return desired_facing
+
+    def __rotate_to_desired_facing(self, desired_facing):
+        return ROTATIONS[(self.facing, desired_facing)]
+
+    def __go_to_direction(self, destination_coordinates):
+        desired_facing = self.__get_desired_facing(destination_coordinates)
+
+        if self.facing == desired_facing:
+            return characters.Action.STEP_FORWARD
+        else:
+            return self.__rotate_to_desired_facing(desired_facing)
 
     @property
     def name(self) -> str:
@@ -72,7 +180,7 @@ class BB8Controller:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.ORANGE
 
 
 POTENTIAL_CONTROLLERS = [
