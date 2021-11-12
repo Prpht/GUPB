@@ -102,7 +102,7 @@ class FelixBotController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__refresh_info(knowledge)
-        return self.strategy_bow(knowledge)
+        return self.strategy_sword(knowledge)
 
     def strategy_bow(self, knowledge):
         if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
@@ -111,7 +111,7 @@ class FelixBotController(controller.Controller):
         if len(self.action_queue) == 0:
             if self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
                 weapon_coord = self.__get_weapon_coordinate(['bow_unloaded', 'bow_loaded'])
-                if weapon_coord is not None:
+                if weapon_coord is not None and weapon_coord not in self.banned_coords:
                     path = Astar.astar(self.grid, self.position, weapon_coord)
                     if path is not None:
                         self.action_queue = self.__generate_queue_from_path(
@@ -121,14 +121,14 @@ class FelixBotController(controller.Controller):
                     else:
                         self.banned_coords.append(weapon_coord)
 
-            if self.menhir_coord is None or self.current_weapon not in ['bow_unloaded', 'bow_loaded']:
+            if self.menhir_coord is None or (self.current_weapon not in ['bow_unloaded', 'bow_loaded'] and not self.is_mist_coming):
                 random_coord = self.__get_random_passable_coord()
                 path = Astar.astar(self.grid, self.position, random_coord)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                self.safe_place = self.get_far_coord_orthogonal_to_menhir()
+                self.safe_place = self.get_far_coord_orthogonal_to_menhir(8)
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
                     self.action_queue = self.__generate_queue_from_path(
@@ -146,10 +146,52 @@ class FelixBotController(controller.Controller):
                                   characters.Action.STEP_FORWARD])
 
 
-    def get_far_coord_orthogonal_to_menhir(self):
+    def strategy_sword(self, knowledge):
+        if self.__can_attack(knowledge.visible_tiles) or self.__should_reload():
+            return characters.Action.ATTACK
+
+        if len(self.action_queue) == 0:
+            if self.current_weapon not in ['sword']:
+                weapon_coord = self.__get_weapon_coordinate(['sword'])
+                if weapon_coord is not None and weapon_coord not in self.banned_coords:
+                    path = Astar.astar(self.grid, self.position, weapon_coord)
+                    if path is not None:
+                        self.action_queue = self.__generate_queue_from_path(
+                            path)
+                        if len(self.action_queue) > 0:
+                            return self.action_queue.pop(0)
+                    else:
+                        self.banned_coords.append(weapon_coord)
+
+            if self.menhir_coord is None or (self.current_weapon not in ['sword'] and not self.is_mist_coming):
+                random_coord = self.__get_random_passable_coord()
+                path = Astar.astar(self.grid, self.position, random_coord)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+            elif self.is_mist_coming and self.menhir_coord is not None:
+                self.safe_place = self.get_far_coord_orthogonal_to_menhir(3)
+                path = Astar.astar(self.grid, self.position, self.safe_place)
+                if path is not None:
+                    self.action_queue = self.__generate_queue_from_path(
+                        path)
+
+        self.__validate_action_queue()
+
+        if len(self.action_queue) > 0:
+            return self.action_queue.pop(0)
+        elif self.position == self.safe_place and self.is_mist_coming:
+            return characters.Action.TURN_LEFT
+        else:
+            return random.choice([characters.Action.TURN_LEFT,
+                                  characters.Action.TURN_RIGHT,
+                                  characters.Action.STEP_FORWARD])
+
+
+    def get_far_coord_orthogonal_to_menhir(self, max_distance):
         coord = self.menhir_coord
         distance = 0
-        for i in range(1, 8):
+        for i in range(1, max_distance):
             try:
                 new_coord = coordinates.add_coords(self.menhir_coord, Coords(i, 0))
                 if self.grid[new_coord].type == 'wall':
@@ -159,7 +201,7 @@ class FelixBotController(controller.Controller):
                     coord = new_coord
             except KeyError:
                 pass
-        for i in range(1, 8):
+        for i in range(1, max_distance):
             try:
                 new_coord = coordinates.sub_coords(self.menhir_coord, Coords(i, 0))
                 if self.grid[new_coord].type == 'wall':
@@ -169,7 +211,7 @@ class FelixBotController(controller.Controller):
                     coord = new_coord
             except KeyError:
                 pass
-        for i in range(1, 8):
+        for i in range(1, max_distance):
             try:
                 new_coord = coordinates.add_coords(self.menhir_coord, Coords(0, i))
                 if self.grid[new_coord].type == 'wall':
@@ -179,7 +221,7 @@ class FelixBotController(controller.Controller):
                     coord = new_coord
             except KeyError:
                 pass
-        for i in range(1, 8):
+        for i in range(1, max_distance):
             try:
                 new_coord = coordinates.sub_coords(self.menhir_coord, Coords(0, i))
                 if self.grid[new_coord].type == 'wall':
@@ -208,7 +250,7 @@ class FelixBotController(controller.Controller):
         if self.current_weapon != character.weapon.name:
             self.action_queue = []
             self.safe_place = None
-            self.grid[self.position].loot = WeaponDescription(name='bow_loaded')
+            # self.grid[self.position].loot = WeaponDescription(name=self.current_weapon)
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
         self.explored_tiles.update(set(knowledge.visible_tiles.keys()))
