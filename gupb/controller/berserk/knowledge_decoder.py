@@ -9,6 +9,8 @@ class KnowledgeDecoder:
         self._knowledge = knowledge
         self._info = {}
         self._map = None
+        self._info['menhir_position'] = None
+        self.arena = None
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -23,7 +25,8 @@ class KnowledgeDecoder:
         self._info['enemies_in_sight'] = self._get_enemies_in_sight()
         self._info['weapons_in_sight'] = self._get_weapons_in_sight()
         self._info['mist'] = self._look_for_mist()
-        self._info['menhir_position'] = self._get_menhir_position()
+
+        self._get_menhir_position()
 
     def _get_weapons_in_sight(self):
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
@@ -73,7 +76,10 @@ class KnowledgeDecoder:
         self._map = new_map
 
     def _get_menhir_position(self):
-        return Coords(9, 9)
+        if self.info['menhir_position'] is None:
+            for coords, tile in self.knowledge.visible_tiles.items():
+                if tile.type == 'menhir':
+                    self.info['menhir_position'] = Coords(*coords)
 
     def load_map(self, map_name):
         arena = Arena.load(map_name)

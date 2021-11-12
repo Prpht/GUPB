@@ -19,6 +19,8 @@ from gupb.model.arenas import Arena
 
 WEAPONS = {
     "bow": Bow(),
+    "bow_unloaded": Bow(),
+    "bow_loaded": Bow(),
     "axe": Axe(),
     "sword": Sword(),
     "knife": Knife(),
@@ -40,7 +42,7 @@ class BerserkBot(controller.Controller):
             characters.Action.STEP_FORWARD,
             characters.Action.ATTACK,
         ]
-        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.probabilities = [0.1, 0.1, 0.8, 0]
         self.move_counter = 0
         self.path = deque()
         self.picked_up_weapon = 0
@@ -60,7 +62,7 @@ class BerserkBot(controller.Controller):
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.knowledge_decoder.map = self.knowledge_decoder.load_map(arena_description.name)
-        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.probabilities = [0.1, 0.1, 0.8, 0]
         self.move_counter = 0
         self.path = deque()
 
@@ -91,7 +93,7 @@ class BerserkBot(controller.Controller):
             self.find_enemy()
             move = self.parse_path()
         else:
-            move = self.look_around()
+            move = self.walk_around()
         self.move_counter += 1
         return move
 
@@ -116,13 +118,22 @@ class BerserkBot(controller.Controller):
         facing = self.knowledge_decoder.info['facing']
         position = self.knowledge_decoder.knowledge.position
         target = self.path[0]
+
         target = coordinates.Coords(target[0], target[1])
 
         cords_sub = coordinates.sub_coords(target, position)
-        needed_facing = Facing(cords_sub)
+        sub_max = max([abs(cords_sub.x), abs(cords_sub.y)])
+        if sub_max == 0:
+            print("T: ", target, " P: ", position)
+            print(self.path)
+
+        cords_facing = coordinates.Coords(cords_sub.x/sub_max, cords_sub.y/sub_max)
+        # print('Cords_for_facing: ', cords_facing)
+
+        needed_facing = Facing(cords_facing)
 
         if facing == needed_facing:
-            del self.path[0]
+            self.path.popleft()
             return characters.Action.STEP_FORWARD
         else:
             # cords_dict = {
@@ -141,13 +152,16 @@ class BerserkBot(controller.Controller):
     def look_around(self):
         return characters.Action.TURN_RIGHT
 
+    def walk_around(self):
+        return np.random.choice(self._possible_actions, 1, self.probabilities)[0]
+
     def choose_shorter_dist(self, list_of_objects):
         position = self.knowledge_decoder.knowledge.position
         distances = [distance(position, object_pos) for object_pos in list_of_objects]
         return list_of_objects[np.argmin(distances)]
 
     def find_weapon(self):
-        print("find weapon")
+        # print("find weapon")
         self.picked_up_weapon = 1
         weapon_cords = self.choose_shorter_dist(self.knowledge_decoder.info['weapons_in_sight'])
         position = self.knowledge_decoder.knowledge.position
@@ -174,9 +188,8 @@ class BerserkBot(controller.Controller):
         bot_coords = self.knowledge_decoder.knowledge.position
         bot_facing = self.knowledge_decoder.info['facing']
         knowledge = self.knowledge_decoder.knowledge
-        if isinstance(bot_weapon, Bow):
-            if not bot_weapon.ready:
-                return True
+        if bot_weapon == 'bow_unloaded':
+            return True
         can_attack_enemy = any(
             coord
             for coord in
