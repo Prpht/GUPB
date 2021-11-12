@@ -8,7 +8,7 @@ from gupb.controller.bandyta.bfs import find_path
 from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
     find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
     get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
-    amulet_attack_coords, Direction, knife_attack_possible
+    amulet_attack_coords, Direction, knife_attack_possible, safe_attack_possible, safe_find_target_player
 from gupb.model import arenas
 from gupb.model import characters, tiles
 from gupb.model.characters import ChampionKnowledge
@@ -30,6 +30,7 @@ class Bandyta(controller.Controller):
         self.menhir: Coords = Coords(9, 9)
         self.arena = None
         self.menhir_move_cycle = 0
+        self.axes_isoleted_shrine = []
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):
@@ -49,10 +50,52 @@ class Bandyta(controller.Controller):
     @profile
     def __decide(self, knowledge: ChampionKnowledge):
         try:
-            return self.aggressive_tactic(knowledge)
+            return self.passive_tactic(knowledge)
         except Exception as e:
             print(e)
             return random.choice(POSSIBLE_ACTIONS)
+
+    def isolated_shrine_tactic(self, knowledge: ChampionKnowledge):
+        while knowledge.position not in self.axes:
+            pass
+
+    def passive_tactic(self, knowledge: ChampionKnowledge):
+        self.memorize_landscape(knowledge)
+        direction = get_direction(knowledge)
+        directed_position = DirectedCoords(knowledge.position, direction)
+        player: Tuple[str, Coords] = safe_find_target_player(self.name, knowledge, self.path.dest)
+        weapon: Weapon = self.get_my_weapon(knowledge.visible_tiles)
+        if player is not None and \
+                safe_attack_possible(knowledge, weapon, self.name):
+            self.path = Path('', [])
+            return characters.Action.ATTACK
+
+        if weapon in [Weapon.knife, Weapon.amulet] and self.path.dest != 'weapon':
+            possible_path: Path = self.get_weapon_path(directed_position)
+            self.path = possible_path if len(possible_path.route) > 0 else self.path
+
+        if player is not None and (len(self.path.route) == 0 or self.path.dest is player[0]):
+            position_to_attack = self.nearest_coord_to_attack(player[1], directed_position.coords,
+                                                              Weapon.from_string(weapon.name))
+            self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
+
+        if len(self.path.route) == 0 and self.menhir is not None:
+            if get_distance(self.menhir, knowledge.position) > 0:
+                self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),
+                                                     self.landscape_map))
+            else:
+                return characters.Action.TURN_LEFT
+
+        if len(self.path.route) == 0 and self.menhir is None:
+            self.path = Path('furthest_point',
+                             find_path(directed_position,
+                                       DirectedCoords(find_furthest_point(knowledge), None),
+                                       self.landscape_map))
+
+        if len(self.path.route) != 0:
+            return self.move_on_path(directed_position)
+
+        return random.choice(POSSIBLE_ACTIONS)
 
     def aggressive_tactic(self, knowledge: ChampionKnowledge):
         self.memorize_landscape(knowledge)
