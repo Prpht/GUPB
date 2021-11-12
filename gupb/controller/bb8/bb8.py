@@ -1,7 +1,9 @@
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
-from gupb.controller.bb8.strategy import RandomStrategy, BB8Strategy, FindBestWeaponStrategy, EscapeToMenhirStrategy
+from gupb.controller.bb8.strategy import (RLStrategy, RandomStrategy, 
+                                          BB8Strategy, FindBestWeaponStrategy, 
+                                          EscapeToMenhirStrategy)
 
 
 # noinspection PyUnusedLocal

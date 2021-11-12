@@ -1,6 +1,7 @@
 import math
 import random
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -10,6 +11,8 @@ from pathfinding.finder.a_star import AStarFinder
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.characters import Facing
+from gupb.controller.bb8.qlearning import (calculate_state, learn_actions, 
+                                           QAction, update_q_values)
 
 PI = 4.0 * math.atan(1.0)
 
@@ -240,3 +243,81 @@ class FindBestWeaponStrategy(BB8Strategy):
                 return self.rotate_to_desired_facing(enemy_in_range_coordinates)
 
         return self.behave_randomly()
+    
+class RLStrategy(BB8Strategy):
+    def __init__(self):
+        super().__init__()
+        self.round_health = None
+        self.q_learning_state = None
+        self.sight_range = 2000
+        self.long_seq = 6
+        
+    def update_bot(self, knowledge: characters.ChampionKnowledge):
+        self.bot_position = knowledge.position
+        character         = knowledge.visible_tiles[self.bot_position].character
+        self.weapon       = character.weapon.name
+        self.facing       = character.facing
+        self.last_round_health = self.round_health
+        self.round_health = character.health
+        
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        try:
+            self.update_bot(knowledge)
+            return self.choose_next_step(knowledge)
+        except Exception as e:
+            return self.behave_randomly()
+        
+    def has_next_defined(self):
+        return len(self.queue) > 0
+    
+    def choose_next_step(self, knowledge: characters.ChampionKnowledge) -> None:
+        # Choose action based on Q learning
+        self.find_vector_to_nearest_mist_tile(knowledge)
+        state = calculate_state(self.last_observed_mist_vec)
+        (state, action) = learn_actions(state)
+        if self.last_round_health is not None and self.q_learning_state is not None:
+            # q-values update
+            (old_state, old_action) = self.q_learning_state
+            reward = 0
+            if self.last_round_health == self.round_health:
+                reward += 0.5
+            else:
+                reward += -50
+            if old_action == QAction.RUN_AWAY:
+                reward+=-1
+            update_q_values(old_state, old_action, reward, state)
+
+        self.q_learning_state = (state, action)
+
+        # Perform chosen action
+        if action == QAction.RUN_AWAY:
+            return self.go_to_direction(self.menhir_position) 
+        elif action == QAction.IGNORE:
+            return characters.Action.DO_NOTHING
+
+    def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
+        g_distance = lambda my_p, ref_p: ((ref_p[0] - my_p[0]) ** 2 + (ref_p[1] - my_p[1]) ** 2)
+        g_distance_vec = lambda vec: ((vec[0]) ** 2 + (vec[1]) ** 2)
+        
+        mist_tiles: dict[coordinates.Coords, int] = defaultdict(int) #dict for storing distance to each mist tile from current bot position
+        visible_tiles = knowledge.visible_tiles
+
+        for coord in visible_tiles.keys():
+            if g_distance(self.bot_position, coord) <= self.sight_range:
+                dist = g_distance(self.bot_position, coord)
+                mist_tiles[coord] = dist
+
+        if len(mist_tiles) > 0:
+            min_dist_tuple = min(mist_tiles, key=mist_tiles.get)
+            min_dist_coord = coordinates.Coords(min_dist_tuple[0], min_dist_tuple[1])
+            min_dist_vec = (min_dist_coord - self.bot_position)
+            if self.last_observed_mist_vec is None:
+                self.last_observed_mist_vec = min_dist_vec
+                self.run_seq_step = 1
+            elif g_distance_vec(min_dist_vec) < g_distance_vec(self.last_observed_mist_vec):
+                self.last_observed_mist_vec = min_dist_vec
+                if self.run_seq_step == self.long_seq:
+                    self.run_seq_step = 1
+
+        return self.last_observed_mist_vec
+  
