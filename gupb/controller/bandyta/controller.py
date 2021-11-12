@@ -49,54 +49,56 @@ class Bandyta(controller.Controller):
     @profile
     def __decide(self, knowledge: ChampionKnowledge):
         try:
-            self.memorize_landscape(knowledge)
-            direction = get_direction(knowledge)
-            directed_position = DirectedCoords(knowledge.position, direction)
-            player: Tuple[str, Coords] = find_target_player(self.name, knowledge, self.path.dest)
-            weapon: Weapon = self.get_my_weapon(knowledge.visible_tiles)
-            # self.menhir = find_menhir(knowledge.visible_tiles) if self.menhir is None else self.menhir
-
-            if player is not None and \
-                    is_attack_possible(knowledge, weapon, self.name):
-                self.path = Path('', [])
-                return characters.Action.ATTACK
-
-            if weapon in [Weapon.knife, Weapon.amulet] and self.path.dest != 'weapon':
-                possible_path: Path = self.get_weapon_path(directed_position)
-                self.path = possible_path if len(possible_path.route) > 0 else self.path
-
-            if player is not None and (len(self.path.route) == 0 or self.path.dest is player[0]):
-                position_to_attack = self.nearest_coord_to_attack(player[1], directed_position.coords,
-                                                                  Weapon.from_string(weapon.name))
-                self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
-
-            if len(self.path.route) == 0 and self.menhir is not None:
-                if get_distance(self.menhir, knowledge.position) > 0:
-                    self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),
-                                                         self.landscape_map))
-                else:
-                    return characters.Action.TURN_LEFT
-
-            # if self.path.dest == 'menhir':
-            #     if self.menhir_move_cycle < 5:
-            #         self.menhir_move_cycle += 1
-            #         return characters.Action.TURN_LEFT
-            #     else:
-            #         self.menhir_move_cycle = 0
-
-            if len(self.path.route) == 0 and self.menhir is None:
-                self.path = Path('furthest_point',
-                                 find_path(directed_position,
-                                           DirectedCoords(find_furthest_point(knowledge), None),
-                                           self.landscape_map))
-
-            if len(self.path.route) != 0:
-                return self.move_on_path(directed_position)
-
-            return random.choice(POSSIBLE_ACTIONS)
+            return self.aggressive_tactic(knowledge)
         except Exception as e:
             print(e)
             return random.choice(POSSIBLE_ACTIONS)
+
+    def aggressive_tactic(self, knowledge: ChampionKnowledge):
+        self.memorize_landscape(knowledge)
+        direction = get_direction(knowledge)
+        directed_position = DirectedCoords(knowledge.position, direction)
+        player: Tuple[str, Coords] = find_target_player(self.name, knowledge, self.path.dest)
+        weapon: Weapon = self.get_my_weapon(knowledge.visible_tiles)
+        # self.menhir = find_menhir(knowledge.visible_tiles) if self.menhir is None else self.menhir
+        if player is not None and \
+                is_attack_possible(knowledge, weapon, self.name):
+            self.path = Path('', [])
+            return characters.Action.ATTACK
+
+        if weapon in [Weapon.knife, Weapon.amulet] and self.path.dest != 'weapon':
+            possible_path: Path = self.get_weapon_path(directed_position)
+            self.path = possible_path if len(possible_path.route) > 0 else self.path
+
+        if player is not None and (len(self.path.route) == 0 or self.path.dest is player[0]):
+            position_to_attack = self.nearest_coord_to_attack(player[1], directed_position.coords,
+                                                              Weapon.from_string(weapon.name))
+            self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
+
+        if len(self.path.route) == 0 and self.menhir is not None:
+            if get_distance(self.menhir, knowledge.position) > 0:
+                self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),
+                                                     self.landscape_map))
+            else:
+                return characters.Action.TURN_LEFT
+
+        # if self.path.dest == 'menhir':
+        #     if self.menhir_move_cycle < 5:
+        #         self.menhir_move_cycle += 1
+        #         return characters.Action.TURN_LEFT
+        #     else:
+        #         self.menhir_move_cycle = 0
+
+        if len(self.path.route) == 0 and self.menhir is None:
+            self.path = Path('furthest_point',
+                             find_path(directed_position,
+                                       DirectedCoords(find_furthest_point(knowledge), None),
+                                       self.landscape_map))
+
+        if len(self.path.route) != 0:
+            return self.move_on_path(directed_position)
+
+        return random.choice(POSSIBLE_ACTIONS)
 
     def reset(self, arena_description: arenas.ArenaDescription):
         self.arena = read_arena(arena_description)
