@@ -60,8 +60,8 @@ class EkonometronController(controller.Controller):
         self.turns = 0
         self.only_attack = False
         # strategies
-        # strategy1 - bot 'tries their best'; it moves however, it picks up whatever weapon it can and attacks enemies in sight
-        # strategy2 - bot has an axe as a bigger priority; it tries to avoid worse weapons
+        # strategy1 - bot 'tries their best'; it moves however it wants, it picks up whatever weapon it can and attacks enemies in sight
+        # strategy2 - bot is looking for a specific spot that is surrounded by water or wall from the three sides; when it finds it, it remains there and keeps attacking one spot
         # strategy3 - bot has a bow as a bigger priority; tries to avoid worse weapons; it checks for the enemies on the side so it can take them down faster
         self.strategy_rewards = {
             "strategy1": [],
@@ -111,8 +111,8 @@ class EkonometronController(controller.Controller):
                                       np.std(self.strategy_rewards["strategy3"]))
             strat_id = np.argmax([prob_1, prob_2, prob_3]) + 1
             self.chosen_strategy = "strategy" + str(strat_id)
-        print(self.strategy_rewards)
-        print(self.chosen_strategy)
+        #print(self.strategy_rewards)
+        #print(self.chosen_strategy)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         # if bot holds an unloaded bow
