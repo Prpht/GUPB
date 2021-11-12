@@ -34,6 +34,9 @@ class Tabard(Enum):
     BLUE = 'Blue'
     BROWN = 'Brown'
     GREY = 'Grey'
+    LIME = 'Lime'
+    ORANGE = 'Orange'
+    PINK = 'Pink'
     RED = 'Red'
     VIOLET = 'Violet'
     WHITE = 'White'
@@ -115,7 +118,7 @@ class Champion:
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 
         die_callable = getattr(self.controller, "die", None)
-        if die_callable:
+        if die_callable and callable(die_callable):
             die_callable()
 
     @property
@@ -128,7 +131,6 @@ class Facing(Enum):
     DOWN = coordinates.Coords(0, 1)
     LEFT = coordinates.Coords(-1, 0)
     RIGHT = coordinates.Coords(1, 0)
-
     @staticmethod
     def random() -> Facing:
         return random.choice([Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT])
