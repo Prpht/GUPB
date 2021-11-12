@@ -22,6 +22,7 @@ class WIETnamczyk(controller.Controller):
     GO_TO_MENHIR = "go_to_menhir"
     SURROUND_MENHIR = "surrond_menhir"
     MIST_PANIC_MODE = False
+    EPSILON = 0.2
 
     def __init__(self):
         self.mist_range = 3
@@ -32,7 +33,11 @@ class WIETnamczyk(controller.Controller):
         self.Q = {'OSTRICH': 30.062992125984245, 'BERSERKER': 16.33333333333334, 'COWARD': 28.972413793103446}
         self.N = {'OSTRICH': 0, 'BERSERKER': 0, 'COWARD': 0}
         self.strategies = list(self.Q.keys())
-        self.current_strategy = random.choice(self.strategies)
+
+        rand = random.uniform(0, 1)
+        self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
+                                                                                                      key=self.Q.get)
+
         self.menhir_pos = None
         self.good_weapons = ["sword", "axe"]
         self.first_name: str = "Adam"
@@ -132,6 +137,9 @@ class WIETnamczyk(controller.Controller):
             list(
                 sorted(map(lambda pos: (pos, len(self.find_path(pos, bot_pos))), weapons_pos),
                        key=lambda item: item[1]))
+        closest_good_weapon = [w for w in closest_good_weapon if w[1] > 0]
+        if len(closest_good_weapon) == 0:
+            return None
         return closest_good_weapon[0][0]
 
     def find_visible_enemies(self, bot_pos, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription], ):
@@ -451,9 +459,9 @@ class WIETnamczyk(controller.Controller):
 
         self.arena_description = arena_description
         rand = random.uniform(0, 1)
-        epsilon = 0.2
-        self.current_strategy = random.choice(self.strategies) if rand < epsilon else max(self.Q, key=self.Q.get)
-        print(self.Q)
+        self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
+                                                                                                      key=self.Q.get)
+        # print(self.Q)
 
     @property
     def name(self) -> str:
