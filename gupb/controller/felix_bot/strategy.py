@@ -66,7 +66,7 @@ class Strategy:
         if self.current_weapon != character.weapon.name:
             self.action_queue = []
             self.safe_place = None
-            # self.grid[self.position].loot = WeaponDescription(name=self.current_weapon)
+            self.grid[self.position] = TileDescription(type='land', loot=WeaponDescription(name=self.current_weapon), character=character, effects=[])
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
         self.explored_tiles.update(set(knowledge.visible_tiles.keys()))
