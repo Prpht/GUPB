@@ -184,7 +184,7 @@ class Strategy:
 
     def __is_allowed_action(self, action):
         return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in [
-            'wall', 'sea'])
+            'wall', 'sea'] and 'mist' not in [effect.type for effect in self.grid[self.position + self.facing.value].effects])
 
     def get_weapon_coordinate(self, weapons_names):
         weapon_coord = None
