@@ -36,6 +36,13 @@ WEAPON_PRIORITY = {
         "K": 2,
         "M": 1
     },
+    'isolated_shrine': {
+            "A": 5,
+            "S": 4,
+            "B": 3,
+            "K": 2,
+            "M": 1
+        },
 }
 
 SAFE_POS = {

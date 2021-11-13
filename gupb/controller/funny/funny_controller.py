@@ -5,13 +5,21 @@ from gupb.model import weapons
 from gupb.model.arenas import Arena
 from gupb.model.characters import CHAMPION_STARTING_HP
 from gupb.model.effects import Mist
+import random
 
 
 class FunnyController(controller.Controller):
     START_RUNNING_FROM_MIST = 220
 
     def __init__(self):
-        pass
+        self.strategies = {
+            'original_funny_controller': self.original_funny_controller_strategy,
+            'second_strategy': self.second_strategy,
+            'third_one': self.third_strategy
+        }
+        self.Q = {strategy: 20.0 for strategy in self.strategies}
+        self.N = {strategy: 0 for strategy in self.strategies}
+        self.epsilon = 0.1
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, FunnyController):
@@ -52,6 +60,8 @@ class FunnyController(controller.Controller):
                 if self.arena[y][x] == '.':
                     self.to_check_if_menhir_tiles.add((x, y))
 
+        self.current_strategy = random.choice(list(self.strategies.keys())) if random.random() < self.epsilon \
+            else max(self.Q, key=self.Q.get)
         self.misted_tiles = set()
         self.hp = CHAMPION_STARTING_HP
         self.ep_it = 0
@@ -65,9 +75,13 @@ class FunnyController(controller.Controller):
         self.weapon = "K"
         self.opponent_pos = None
         self.weapon_drops = set()
+        print(self.current_strategy)
+        print(self.Q)
+        print(self.N)
 
     def praise(self, score: int) -> None:
-        pass
+        self.N[self.current_strategy] += 1
+        self.Q[self.current_strategy] += 1.0/self.N[self.current_strategy] * (score - self.Q[self.current_strategy])
 
     def _get_weaponable_tiles(self, pos, facing, weapon):
         if weapon == 'K':
@@ -107,7 +121,7 @@ class FunnyController(controller.Controller):
         return create_path(pos, weapon, parents)
 
     def _find_menhir(self, pos):
-        distances, parents = dijkstra(self.arena, pos, self.facing)
+        distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
         distance_map = {pos: distances[r(pos)] for pos in self.to_check_if_menhir_tiles}
         tile = min(distance_map, key=distance_map.get)
 
@@ -181,10 +195,10 @@ class FunnyController(controller.Controller):
         distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
         if self.menhir_pos is None:
             # misted_tiles_coords = [coords for coords, _ in self.misted_tiles]
-            self.menhir_pos = Coords(25, 25)
+            self.menhir_pos = Coords(9, 9)#Coords(25, 25)
         return create_path(pos, self.menhir_pos, parents)
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self_knowledge = knowledge.visible_tiles.get(knowledge.position).character
         if self.menhir_pos is None and self.strategy_iter > 2:
             self.strategy_iter = 2
@@ -193,7 +207,7 @@ class FunnyController(controller.Controller):
         self.weapon = WEAPON_CODING[self_knowledge.weapon.name]
         # if self_knowledge.health < self.hp:
         #     self.hp = self_knowledge.health
-            ### ogarnac kto bije, reakcja
+        ### ogarnac kto bije, reakcja
         pos = knowledge.position
 
         self.ep_it += 1
@@ -218,8 +232,8 @@ class FunnyController(controller.Controller):
                     print("found it!")
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
-                if character is not None: ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
-                                            # mam wystarczajaco duzo zycia
+                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
+                    # mam wystarczajaco duzo zycia
                     print("attack")
                     if character.health <= 2:
                         try:
@@ -295,6 +309,15 @@ class FunnyController(controller.Controller):
             self.facing = self.facing.turn_left()
 
         return action
+
+    def second_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        return characters.Action.STEP_FORWARD
+
+    def third_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        return characters.Action.STEP_FORWARD
+
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        return self.strategies[self.current_strategy](knowledge)
 
     @property
     def name(self) -> str:
