@@ -7,8 +7,12 @@ from pathfinding.core.grid import Grid
 class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
-        self._info = {}
+        self._info = dict()
         self._map = None
+        self.arena = None
+        self._info['temp_safe_spot'] = None
+        self._info['menhir_position'] = None
+        self._info['map_size'] = None
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -23,7 +27,8 @@ class KnowledgeDecoder:
         self._info['enemies_in_sight'] = self._get_enemies_in_sight()
         self._info['weapons_in_sight'] = self._get_weapons_in_sight()
         self._info['mist'] = self._look_for_mist()
-        self._info['menhir_position'] = self._get_menhir_position()
+
+        self._get_menhir_position()
 
     def _get_weapons_in_sight(self):
         return [Coords(*coords) for coords, tile in self.knowledge.visible_tiles.items()
@@ -73,14 +78,29 @@ class KnowledgeDecoder:
         self._map = new_map
 
     def _get_menhir_position(self):
-        return Coords(9, 9)
+        if self.info['menhir_position'] is None:
+            for coords, tile in self.knowledge.visible_tiles.items():
+                if tile.type == 'menhir':
+                    # print('Got Menhir position!!!')
+                    self.info['menhir_position'] = Coords(*coords)
 
     def load_map(self, map_name):
         arena = Arena.load(map_name)
         self.arena = arena
         map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
+        self._info['map_size'] = (arena.size[0], arena.size[1])
+        self._info['temp_safe_spot'] = Coords(round(arena.size[0]/2), round(arena.size[1]/2))
         for cords, tile in arena.terrain.items():
             map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
             if tile.description().loot:
                 map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow"] else 1
         return map_matrix
+
+    def reset(self, knowledge: characters.ChampionKnowledge = None):
+        self._knowledge = knowledge
+        self._info = dict()
+        self._map = None
+        self.arena = None
+        self._info['temp_safe_spot'] = None
+        self._info['menhir_position'] = None
+        self._info['map_size'] = None

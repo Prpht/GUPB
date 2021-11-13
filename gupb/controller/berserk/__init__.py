@@ -6,12 +6,14 @@ POTENTIAL_CONTROLLERS = [
 
 """
 TO DO 'RL':
-[ ] Stworzenie możliwych strategii:
-    [ ] Agresja względem przeciwników
-    [ ] Szybkie zdobycie menhira
-    [ ] Zdobycie menhira z dobrą bronią
-    [ ] Trzymanie się na dystans
+[x] Stworzenie możliwych strategii:
+    [x] Agresja względem przeciwników
+    [x] Szybkie zdobycie menhira
+    [x] Zdobycie menhira z dobrą bronią
+    [x] Trzymanie się na dystans
 [ ] System nagród i kar 
-[ ] Wybór strategii na początku rundy 
+[x] Wybór strategii na początku rundy 
+[ ] Zarządzanie zdrowiem
+
 
 """
