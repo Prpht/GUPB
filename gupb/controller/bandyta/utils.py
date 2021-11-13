@@ -109,7 +109,8 @@ def is_attack_possible(knowledge: ChampionKnowledge, weapon: Weapon, my_name: st
         sub = sub_coords(knowledge.position, enemy_coord)
         if weapon == Weapon.sword and ((fabs(sub.x) <= 3 and sub.y == 0) or (fabs(sub.y) <= 3 and sub.x == 0)):
             return True
-        elif weapon in [Weapon.bow_unloaded, Weapon.bow_loaded] and ((fabs(sub.x) <= 50 and sub.y == 0) or (fabs(sub.y) <= 50 and sub.x == 0)):
+        elif weapon in [Weapon.bow_unloaded, Weapon.bow_loaded] and (
+                (fabs(sub.x) <= 50 and sub.y == 0) or (fabs(sub.y) <= 50 and sub.x == 0)):
             return True
         elif weapon == Weapon.axe and (fabs(sub.x) <= 1 and fabs(sub.y) <= 1):
             return True
@@ -123,13 +124,31 @@ def is_attack_possible(knowledge: ChampionKnowledge, weapon: Weapon, my_name: st
     return False
 
 
-def find_players(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]):
-    players: Dict[str, Coords] = {}
+def safe_attack_possible(knowledge: ChampionKnowledge, weapon: Weapon, my_name: str) -> bool:
+    return is_attack_possible(knowledge, weapon, my_name) and weapon not in [Weapon.knife, Weapon.amulet]
+
+
+def find_players_with_health(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]):
+    players: Dict[str, (Coords, int)] = {}
     for cords, tile in visible_tiles.items():
         if (tile.character is not None and
                 tile.character.controller_name != name):
-            players[tile.character.controller_name] = Coords(cords[0], cords[1])
+            players[tile.character.controller_name] = (Coords(cords[0], cords[1]), tile.character.health)
     return players
+
+
+def get_my_health(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]) -> int:
+    for cords, tile in visible_tiles.items():
+        if tile.character is not None and tile.character.controller_name != name:
+            return tile.character.health
+
+
+def find_players(name: str, visible_tiles: Dict[Coords, tiles.TileDescription]) -> Dict[str, Coords]:
+    players: Dict[str, Coords] = find_players_with_health(name, visible_tiles)
+    players_without_health: Dict[str, Coords] = {}
+    for key, value in players.items():
+        players_without_health[key] = value[0]
+    return players_without_health
 
 
 def find_closest_player(name: str, knowledge: ChampionKnowledge):
@@ -149,6 +168,13 @@ def find_target_player(name: str, knowledge: ChampionKnowledge, target: str) -> 
     players = find_players(name, knowledge.visible_tiles)
     return (target, players[target]) if target in players.keys() else \
         (list(players.keys())[0], list(players.values())[0]) if len(players) > 0 else None
+
+
+def safe_find_target_player(name: str, knowledge: ChampionKnowledge, target: str) -> Tuple[str, Coords]:
+    players = find_players_with_health(name, knowledge.visible_tiles)
+    my_health = get_my_health(name, knowledge.visible_tiles)
+    return (target, players[target][0]) if target in players.keys() and players[target][1] <= my_health else \
+        (list(players.keys())[0], list(players.values())[0][0]) if len(players) > 0 else None
 
 
 def find_menhir(visible_tiles: Dict[Coords, tiles.TileDescription]):
@@ -208,7 +234,7 @@ def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function
         Direction.W: True
     }
 
-    #start = 2 if reach_number > 1 else 1
+    # start = 2 if reach_number > 1 else 1
 
     for i in range(1, reach_number):
         for direction, do_search in do_search_map.items():
