@@ -65,7 +65,12 @@ class Strategy:
                                                                       effects=[])
         for coord, tile in Arena.load(arena_description.name).terrain.items():
             if tile.loot is not None:
-                self.grid[coord] = TileDescription(type='land', loot=WeaponDescription(name=tile.loot.description().name), character=None, effects=[])
+                self.grid[coord] = TileDescription(type=tile.__class__.__name__.lower(), loot=WeaponDescription(name=tile.loot.description().name), character=None, effects=[])
+                # print(tile.loot.description().name)
+            else:
+                self.grid[coord] = TileDescription(type=tile.__class__.__name__.lower(),
+                                                   loot=None,
+                                                   character=None, effects=[])
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         pass
