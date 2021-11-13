@@ -46,11 +46,11 @@ class FunnyController(controller.Controller):
             self.arena = f.read().split("\n")[:-1]
         self.safe_pos = SAFE_POS[arena_description.name]
         self.weapon_priority = WEAPON_PRIORITY[arena_description.name]
-        self.not_menhir_tiles = set()
+        self.to_check_if_menhir_tiles = set()
         for y in range(len(self.arena)):
             for x in range(len(self.arena[0])):
                 if self.arena[y][x] == '.':
-                    self.not_menhir_tiles.add((x, y))
+                    self.to_check_if_menhir_tiles.add((x, y))
 
         self.misted_tiles = set()
         self.hp = CHAMPION_STARTING_HP
@@ -92,9 +92,9 @@ class FunnyController(controller.Controller):
         menhir_tile = list(filter(lambda x: visible_tiles[x].type == 'menhir', visible_tiles))
         if menhir_tile:
             self.menhir_pos = menhir_tile[0]
-            self.not_menhir_tiles = set()
         else:
-            self.not_menhir_tiles -= self.misted_tiles
+            self.to_check_if_menhir_tiles -= set(visible_tiles.keys())
+            self.to_check_if_menhir_tiles -= self.misted_tiles
 
     def _find_weapon(self, pos):
         weapon_types = [weapon for weapon, priority in self.weapon_priority.items() if priority == 5]
@@ -108,7 +108,7 @@ class FunnyController(controller.Controller):
 
     def _find_menhir(self, pos):
         distances, parents = dijkstra(self.arena, pos, self.facing)
-        distance_map = {pos: distances[r(pos)] for pos in self.not_menhir_tiles}
+        distance_map = {pos: distances[r(pos)] for pos in self.to_check_if_menhir_tiles}
         tile = min(distance_map, key=distance_map.get)
 
         return create_path(pos, tile, parents)
