@@ -6,7 +6,6 @@ from gupb.model import arenas, characters, coordinates
 from gupb.model.characters import Facing
 from gupb import controller
 
-import math
 import random
 import numpy as np
 
@@ -17,12 +16,7 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-FACING_COORDS = {
-    Facing.UP: (0, -1),
-    Facing.DOWN: (0, 1),
-    Facing.LEFT: (-1, 0),
-    Facing.RIGHT: (1, 0)
-}
+EXPLORE_COEF = 0.2
 
 
 class R2D2Controller(controller.Controller):
@@ -64,9 +58,14 @@ class R2D2Controller(controller.Controller):
                 return characters.Action.TURN_LEFT
             if (self.facing, orientation) in turn_back:
                 return characters.Action.TURN_RIGHT
-
         else:
-            return self.explore()
+            if random.random() < EXPLORE_COEF:
+                return characters.Action.TURN_RIGHT
+            next_step = [self.position.x + self.facing.value[0],
+                         self.position.y + self.facing.value[1]]
+            if self.map[next_step[0], next_step[1]]:
+                return characters.Action.STEP_FORWARD
+            return characters.Action.TURN_RIGHT
 
     def update_knowledge(self, knowledge: characters.ChampionKnowledge):
         self.position = knowledge.position
@@ -81,14 +80,6 @@ class R2D2Controller(controller.Controller):
                 self.map[position[0], position[1]] = 1
                 self.menhir_position = coordinates.Coords(position[0], position[1])
 
-    def explore(self):
-        if random.random() < 0.1:
-            return characters.Action.TURN_RIGHT
-        next_step = [self.position.x + FACING_COORDS[self.facing][0], self.position.y + FACING_COORDS[self.facing][1]]
-        if self.map[next_step[0], next_step[1]]:
-            return characters.Action.STEP_FORWARD
-        return characters.Action.TURN_RIGHT
-
     def is_enemy_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
         visible_tile = self.position + self.facing.value
         if knowledge.visible_tiles[visible_tile].character:
@@ -96,28 +87,32 @@ class R2D2Controller(controller.Controller):
         else:
             return False
 
-    def get_distance(self, other_position: coordinates.Coords):
-        return int(
-            round(math.sqrt((self.position.x - other_position.x) ** 2 + (self.position.y - other_position.y) ** 2)))
-
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update_knowledge(knowledge)
 
-        if not self.on_menchir:
-            if self.is_enemy_ahead(knowledge):
-                return characters.Action.ATTACK
-            if self.menhir_position is not None:
-                if self.get_distance(self.menhir_position) == 0:
-                    self.on_menchir = True
-                return self.follow_the_path(self.menhir_position)
-            else:
-                return self.explore()
-        else:
+        if self.on_menchir:
             if self.is_enemy_ahead(knowledge):
                 return characters.Action.ATTACK
             else:
                 return characters.Action.TURN_RIGHT
-        return random.choice(POSSIBLE_ACTIONS)
+
+        else:
+            if self.is_enemy_ahead(knowledge):
+                return characters.Action.ATTACK
+            if self.menhir_position is not None:
+                if (self.position.x - self.menhir_position.x, self.position.y - self.menhir_position.y) == (0, 0):
+                    self.on_menchir = True
+                    pass
+                else:
+                    return self.follow_the_path(self.menhir_position)
+            else:
+                if random.random() < EXPLORE_COEF:
+                    return characters.Action.TURN_RIGHT
+                next_step = [self.position.x + self.facing.value[0],
+                             self.position.y + self.facing.value[1]]
+                if self.map[next_step[0], next_step[1]]:
+                    return characters.Action.STEP_FORWARD
+                return characters.Action.TURN_RIGHT
 
     def praise(self, score: int) -> None:
         pass
