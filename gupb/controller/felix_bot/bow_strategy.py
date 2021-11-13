@@ -36,6 +36,10 @@ class BowStrategy(Strategy):
                             path)
                         if len(self.action_queue) > 0:
                             return self.action_queue.pop(0)
+                        else:
+                            return random.choice([characters.Action.TURN_LEFT,
+                                                  characters.Action.TURN_RIGHT,
+                                                  characters.Action.STEP_FORWARD])
                     else:
                         self.banned_coords.append(weapon_coord)
 

@@ -5,6 +5,8 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 
+import numpy as np
+
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
@@ -24,6 +26,8 @@ class FelixBotController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.current_strategy = SwordStrategy()
+        self.strategies = [SwordStrategy(), BowStrategy()]
+        self.epsilon = 0.04
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, FelixBotController):
@@ -37,7 +41,8 @@ class FelixBotController(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.current_strategy.reset(arena_description)
+        for strategy in self.strategies:
+            strategy.reset(arena_description)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.current_strategy.decide(knowledge)
@@ -49,4 +54,10 @@ class FelixBotController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.YELLOW
+
+    # def choose_bandit(self):
+
+
+    def get_random_strategy(self):
+        return np.random.choice(self.strategies)
 
