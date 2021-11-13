@@ -1,5 +1,5 @@
 from gupb.controller import keyboard
-from gupb.controller import random, bandyta
+from gupb.controller import random
 
 
 CONFIGURATION = {
@@ -9,15 +9,15 @@ CONFIGURATION = {
         'fisher_island',
     ],
     'controllers': [
-        random.RandomController("Bobsd"),
-        bandyta.Bandyta('k'),
+        keyboard.KeyboardController(),
+        random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius")
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 10,
+    'runs_no': 1,
     'profiling_metrics': [],  # possible metrics ['all', 'total', 'avg']
 }
