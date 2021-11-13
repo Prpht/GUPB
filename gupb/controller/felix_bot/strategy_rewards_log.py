@@ -6,7 +6,7 @@ class StrategyRewardsLog:
         self.total_actions = 0
         self.total_rewards = 0
         self.all_rewards = []
-        self.record = defaultdict(lambda: dict(actions=1, reward=55)) # reward is 55, because that's the highest reward in 9 bots game
+        self.record = defaultdict(lambda: dict(actions=1, reward=100))
 
     def record_action(self, strategy, reward):
         self.total_actions += 1

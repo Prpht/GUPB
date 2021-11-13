@@ -18,7 +18,7 @@ class FelixBotController(controller.Controller):
         self.first_name: str = first_name
         self.current_strategy = None
         self.strategies = [SwordStrategy(), BowStrategy(), AxeStrategy()]
-        self.epsilon = 0.04
+        self.epsilon = 0.1
         self.rewards_log = StrategyRewardsLog()
 
     def __eq__(self, other: object) -> bool:
