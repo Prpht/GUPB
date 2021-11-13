@@ -47,7 +47,7 @@ class FunnyController(controller.Controller):
     def reset(self, arena_description) -> None:
         arena = Arena.load(arena_description.name)
         self.terrain = arena.terrain
-        self.menhir_pos = arena.menhir_position #Coords(9, 9)
+        self.menhir_pos = arena.menhir_position
         self.weapon_tiles = {coords: WEAPON_CODING[tile.loot.description().name]
                                  for coords, tile in self.terrain.items() if tile.loot is not None}
         with open(f"resources/arenas/{arena_description.name}.gupb", "r") as f:
@@ -75,9 +75,9 @@ class FunnyController(controller.Controller):
         self.weapon = "knife"
         self.opponent_pos = None
         self.weapon_drops = set()
-        print(self.current_strategy)
-        print(self.Q)
-        print(self.N)
+        #print(self.current_strategy)
+        #print(self.Q)
+        #print(self.N)
 
     def praise(self, score: int) -> None:
         self.N[self.current_strategy] += 1
@@ -207,7 +207,6 @@ class FunnyController(controller.Controller):
 
         weak_spots = list(filter(lambda x: self.arena[x[1]][x[0]] not in ['=', '#'], weak_spots))
         if not weak_spots:
-            # print("no weak spots")
             return []
         else:
             closest_weak_spot = sorted(weak_spots, key=lambda p: distances[r(p)])[0]
@@ -218,7 +217,7 @@ class FunnyController(controller.Controller):
         distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
         if self.menhir_pos is None:
             # misted_tiles_coords = [coords for coords, _ in self.misted_tiles]
-            self.menhir_pos = Coords(25, 25) #Coords(9, 9)#
+            self.menhir_pos = Coords(25, 25)
         return create_path(pos, self.menhir_pos, parents)
 
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -241,54 +240,38 @@ class FunnyController(controller.Controller):
 
         self.ep_it += 1
         if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
-            print("change strategy iter to 4")
             self.strategy_iter = 4
 
         # TODO uwaga na to, czasochłonne
         # self._update_misted_tiles(visible_tiles)
         for tile in self.weapon_tiles:
             if tile in visible_tiles and not visible_tiles[tile].character:
-                try:
-                    self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
-                except Exception as e:
-                    print(e, "a")
+                self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
 
         tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
         for tile in tiles_in_range:
             try:
                 tile_knowledge = knowledge.visible_tiles[tile]
                 if tile_knowledge.loot and tile not in self.weapon_tiles:
-                    print("found it!")
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
                 if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
                     # mam wystarczajaco duzo zycia
-                    print("attack")
                     if character.health <= 2:
-                        try:
-                            self._update_weapons_knowledge(tile, character.weapon.name)
-                            print("added " + character.weapon.name)
-                        except Exception as e:
-                            print(e)
+                        self._update_weapons_knowledge(tile, character.weapon.name)
                         self.weapon_drops.add(tile)
                     return characters.Action.ATTACK
             except KeyError:
                 pass
-        print(f"Path len: {len(self.path)}, strategy iter: {self.strategy_iter}")
         if len(self.path) == 0:
             if self.strategy_iter == 0:
-                print("Find weapon")
                 self.path = self._find_weapon(pos)
             elif self.strategy_iter == 1:
-                print("Find menhir")
                 self._update_menhir_knowledge(visible_tiles)
                 self.path = self._find_menhir(pos)
-
             elif self.strategy_iter == 2:
-                print("Hide")
                 self.path = self._hide(pos)
             elif self.strategy_iter == 4:
-                print("Menhir go")
                 self.path = self._go_to_menhir(pos)
 
         if self.strategy_iter != 3:
@@ -307,21 +290,14 @@ class FunnyController(controller.Controller):
 
                 for tile in self.path:
                     if tile in danger_tiles:
-                        print("Fight")
                         self.opponent_pos = opponent
                         self.path = self._fight(pos, danger_tiles)
                         break
 
         if len(self.path) == 0:
-            # if self.strategy_iter < 4 and self.weapon_priority[self.weapon] < 4:
-            #     print("Find weapon cause bad weapon")
-            #     self.path = self._find_weapon(pos)
-            # else:
-            print("Hold pos")
             action = self._hold_pos(knowledge)
         else:
             action = get_next_move(pos, self.facing, self.path[-1])
-            print("action: ", action)
             if action == characters.Action.STEP_FORWARD:
                 self.path.pop()
                 if len(self.path) == 0:
@@ -356,51 +332,36 @@ class FunnyController(controller.Controller):
 
         self.ep_it += 1
         if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
-            print("change strategy iter to 3")
             self.strategy_iter = 3
 
-        # TODO uwaga na to, czasochłonne
         # self._update_misted_tiles(visible_tiles)
         for tile in self.weapon_tiles:
             if tile in visible_tiles and not visible_tiles[tile].character:
-                try:
-                    self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
-                except Exception as e:
-                    print(e, "a")
+                self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
 
         tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
         for tile in tiles_in_range:
             try:
                 tile_knowledge = knowledge.visible_tiles[tile]
                 if tile_knowledge.loot and tile not in self.weapon_tiles:
-                    print("found it!")
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
                 if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
                     # mam wystarczajaco duzo zycia
-                    print("attack")
                     if character.health <= 2:
-                        try:
-                            self._update_weapons_knowledge(tile, character.weapon.name)
-                            print("added " + character.weapon.name)
-                        except Exception as e:
-                            print(e)
+                        self._update_weapons_knowledge(tile, character.weapon.name)
                         self.weapon_drops.add(tile)
                     return characters.Action.ATTACK
             except KeyError:
                 pass
-        print(f"Path len: {len(self.path)}, strategy iter: {self.strategy_iter}")
         if len(self.path) == 0:
             if self.strategy_iter == 0:
-                print("Find weapon")
                 self.path = self._find_weapon(pos)
             elif self.strategy_iter < 3 and self.menhir_pos is None:
                 self.strategy_iter = 1
-                print("Find menhir")
                 self._update_menhir_knowledge(visible_tiles)
                 self.path = self._find_menhir(pos)
             elif self.strategy_iter == 3 or self.strategy_iter < 3 and self.menhir_pos is not None:
-                print("Menhir go")
                 self.path = self._go_to_menhir(pos)
 
         opposing_characters_pos = []
@@ -414,18 +375,14 @@ class FunnyController(controller.Controller):
             danger_tiles = set()
             for opponent in opposing_characters_pos:
                 danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
-            print(danger_tiles)
 
             if pos in danger_tiles:
-                print("RUNAWAY")
                 self.path = self._run_away(pos, danger_tiles)
 
         if len(self.path) == 0:
-            print("Hold pos")
             action = self._hold_pos(knowledge)
         else:
             action = get_next_move(pos, self.facing, self.path[-1])
-            print("action: ", action)
             if action == characters.Action.STEP_FORWARD:
                 self.path.pop()
                 if len(self.path) == 0:
@@ -461,44 +418,31 @@ class FunnyController(controller.Controller):
         # self._update_misted_tiles(visible_tiles)
         for tile in self.weapon_tiles:
             if tile in visible_tiles and not visible_tiles[tile].character:
-                try:
-                    self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
-                except Exception as e:
-                    print(e, "a")
+                self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
 
         tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
         for tile in tiles_in_range:
             try:
                 tile_knowledge = knowledge.visible_tiles[tile]
                 if tile_knowledge.loot and tile not in self.weapon_tiles:
-                    print("found it!")
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
                 if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
                     # mam wystarczajaco duzo zycia
-                    print("attack")
                     if character.health <= 2:
-                        try:
-                            self._update_weapons_knowledge(tile, character.weapon.name)
-                            print("added " + character.weapon.name)
-                        except Exception as e:
-                            print(e)
+                        self._update_weapons_knowledge(tile, character.weapon.name)
                         self.weapon_drops.add(tile)
                     return characters.Action.ATTACK
             except KeyError:
                 pass
-        print(f"Path len: {len(self.path)}, strategy iter: {self.strategy_iter}")
         if len(self.path) == 0:
             if self.strategy_iter == 0:
-                print("Find weapon")
                 self._update_menhir_knowledge(visible_tiles)
                 self.path = self._find_weapon(pos)
             elif self.strategy_iter == 1:
                 if self.menhir_pos is not None:
-                    print("go to menhir")
                     self.path = self._go_to_menhir(pos)
                 else:
-                    print("Hide")
                     self.path = self._hide(pos)
 
         opposing_characters_pos = []
@@ -514,15 +458,12 @@ class FunnyController(controller.Controller):
                 danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
 
             if pos in danger_tiles:
-                print("RUNAWAY")
                 self.path = self._run_away(pos, danger_tiles)
 
         if len(self.path) == 0:
-            print("Hold pos")
             action = self._hold_pos(knowledge)
         else:
             action = get_next_move(pos, self.facing, self.path[-1])
-            print("action: ", action)
             if action == characters.Action.STEP_FORWARD:
                 self.path.pop()
                 if len(self.path) == 0:
