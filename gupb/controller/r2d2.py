@@ -102,9 +102,7 @@ class R2D2Controller(controller.Controller):
             else:
                 if random.random() < EXPLORE_COEF:
                     return characters.Action.TURN_RIGHT
-                next_step = [self.position.x + self.facing.value[0],
-                             self.position.y + self.facing.value[1]]
-                if self.map[next_step[0], next_step[1]]:
+                if self.map[self.position.x + self.facing.value[0], self.position.y + self.facing.value[1]]:
                     return characters.Action.STEP_FORWARD
                 return characters.Action.TURN_RIGHT
 
