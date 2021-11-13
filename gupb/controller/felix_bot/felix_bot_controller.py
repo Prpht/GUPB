@@ -1,5 +1,6 @@
 from .bow_strategy import BowStrategy
 from .sword_strategy import SwordStrategy
+from .axe_strategy import AxeStrategy
 
 from gupb import controller
 from gupb.model import arenas
@@ -26,7 +27,7 @@ class FelixBotController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.current_strategy = SwordStrategy()
-        self.strategies = [SwordStrategy(), BowStrategy()]
+        self.strategies = [SwordStrategy(), BowStrategy(), AxeStrategy()]
         self.epsilon = 0.04
 
     def __eq__(self, other: object) -> bool:
