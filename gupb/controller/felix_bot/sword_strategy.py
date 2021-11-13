@@ -60,7 +60,7 @@ class SwordStrategy(Strategy):
 
         if len(self.action_queue) > 0:
             return self.action_queue.pop(0)
-        elif self.position == self.safe_place and self.is_mist_coming:
+        elif self.position == self.safe_place:
             return characters.Action.TURN_LEFT
         else:
             return random.choice([characters.Action.TURN_LEFT,

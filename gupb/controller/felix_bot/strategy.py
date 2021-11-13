@@ -13,11 +13,19 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Facing
+from gupb.model.arenas import Arena
+
 
 WEAPON_RANGE = {
     'bow_loaded': 50,
     'sword': 3,
     'knife': 1
+}
+
+SAFE_PLACES = {
+                'fisher_island': Coords(4, 31),
+                'archipelago': Coords(41, 44),
+                'dungeon': Coords(48, 48)
 }
 
 
@@ -50,11 +58,14 @@ class Strategy:
         self.reached_safe_place = False
         self.explored_tiles = set()
         self.menhir_coord = None
-        self.safe_place = None
+        # self.safe_place = SAFE_PLACES[arena_description.name]
         for x_index in range(50):
             for y_index in range(50):
                 self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
                                                                       effects=[])
+        for coord, tile in Arena.load(arena_description.name).terrain.items():
+            if tile.loot is not None:
+                self.grid[coord] = TileDescription(type='land', loot=WeaponDescription(name=tile.loot.description().name), character=None, effects=[])
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         pass

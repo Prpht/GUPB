@@ -1,6 +1,7 @@
 from .bow_strategy import BowStrategy
 from .sword_strategy import SwordStrategy
 from .axe_strategy import AxeStrategy
+from gupb.model.arenas import Arena
 
 from .strategy_rewards_log import StrategyRewardsLog
 
@@ -17,9 +18,16 @@ class FelixBotController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.current_strategy = None
-        self.strategies = [SwordStrategy(), BowStrategy(), AxeStrategy()]
+        self.map_strategies = {'fisher_island': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'archipelago': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'dungeon': [SwordStrategy(), BowStrategy(), AxeStrategy()]}
         self.epsilon = 0.1
-        self.rewards_log = StrategyRewardsLog()
+        self.rewards_log = {'fisher_island': StrategyRewardsLog(),
+                            'archipelago': StrategyRewardsLog(),
+                            'dungeon': StrategyRewardsLog()}
+
+        self.current_rewards_log = None
+        self.current_strategies = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, FelixBotController):
@@ -30,10 +38,12 @@ class FelixBotController(controller.Controller):
         return hash(self.name)
 
     def praise(self, score: int) -> None:
-        self.rewards_log.record_action(self.current_strategy, score)
+        self.current_rewards_log.record_action(self.current_strategy, score)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        for strategy in self.strategies:
+        self.current_strategies = self.map_strategies[arena_description.name]
+        self.current_rewards_log = self.rewards_log[arena_description.name]
+        for strategy in self.current_strategies:
             strategy.reset(arena_description)
         self.current_strategy = self.choose_strategy()
 
@@ -52,18 +62,17 @@ class FelixBotController(controller.Controller):
         if np.random.uniform(0, 1, 1) < self.epsilon:
             strategy = self.get_random_strategy()
         else:
-            strategy= self.get_current_best_strategy()
+            strategy = self.get_current_best_strategy()
 
         return strategy
 
     def get_current_best_strategy(self):
         estimates = []
-        for strategy in self.strategies:
-            strategy_record = self.rewards_log[strategy]
+        for strategy in self.current_strategies:
+            strategy_record = self.current_rewards_log[strategy]
             estimates.append(strategy_record['reward'] / strategy_record['actions'])
 
-        return self.strategies[np.argmax(estimates)]
+        return self.current_strategies[np.argmax(estimates)]
 
     def get_random_strategy(self):
-        return np.random.choice(self.strategies)
-
+        return np.random.choice(self.current_strategies)
