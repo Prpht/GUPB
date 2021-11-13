@@ -13,9 +13,9 @@ class FunnyController(controller.Controller):
 
     def __init__(self):
         self.strategies = {
-            #'original_funny_controller': self.original_funny_controller_strategy,
-            'second_strategy': self.second_strategy,
-            #'third_one': self.third_strategy
+            'original_funny_controller_strategy': self.original_funny_controller_strategy,
+            'menhir_camping_strategy': self.menhir_camping_strategy,
+            'hide_in_safe_spot_strategy': self.hide_in_safe_spot_strategy
         }
         self.Q = {strategy: 100.0 for strategy in self.strategies}
         self.N = {strategy: 0 for strategy in self.strategies}
@@ -85,6 +85,7 @@ class FunnyController(controller.Controller):
 
     def _get_weaponable_tiles(self, pos, facing, weapon_name):
         weapon = WEAPON_CODING[weapon_name]
+        pos = Coords(x=pos[0], y=pos[1])
         if weapon == 'K':
             weaponable_tiles = weapons.Knife.cut_positions(self.terrain, pos, facing)
         elif weapon == 'S':
@@ -140,7 +141,7 @@ class FunnyController(controller.Controller):
         pos = knowledge.position
 
         self.surrounding_walls[self.facing] = \
-            -1 if self.arena[pos.y + self.facing.value.y][pos.x + self.facing.value.x] != '.' else 1
+            -1 if self.arena[pos.y + self.facing.value.y][pos.x + self.facing.value.x] not in ['.', '='] else 1
 
         turn = characters.Action.TURN_RIGHT
         if (self.facing == characters.Facing.UP and self.surrounding_walls[characters.Facing.LEFT] != -1) or \
@@ -162,6 +163,7 @@ class FunnyController(controller.Controller):
         distances, parents = dijkstra(self.arena, pos, self.facing, danger_tiles)
         surrounding_tiles = [(pos[0]+i, pos[1]+j) for i in range(-4, 5) for j in range(-4, 5)
                              if 0 <= pos[0]+i < len(self.arena[0]) and 0 <= pos[1]+j < len(self.arena)]
+        surrounding_tiles.remove(pos)
         surrounding_tiles = list(filter(lambda x: self.arena[x[1]][x[0]] not in ['=', '#'], surrounding_tiles))
 
         distances_map = {hideout: distances[r(hideout)] for hideout in surrounding_tiles}
@@ -337,7 +339,7 @@ class FunnyController(controller.Controller):
 
         return action
 
-    def second_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def menhir_camping_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         """take bow or axe, run away from enemies, find menhir and stay there"""
         # 0-find weapon, 1-find menhir, 3-go to menhir
         pos = knowledge.position
@@ -409,10 +411,10 @@ class FunnyController(controller.Controller):
                 opposing_characters_pos.append(tile)
 
         if len(opposing_characters_pos) > 0:
-            print("opponent!")
             danger_tiles = set()
             for opponent in opposing_characters_pos:
                 danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
+            print(danger_tiles)
 
             if pos in danger_tiles:
                 print("RUNAWAY")
@@ -438,7 +440,7 @@ class FunnyController(controller.Controller):
 
         return action
 
-    def third_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def hide_in_safe_spot_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         """take bow or axe (to think if necessary), run away from enemies, go to safe place and stay there"""
         # 0-find weapon, 1-go to safe place
         pos = knowledge.position
