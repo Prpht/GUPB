@@ -9,15 +9,15 @@ import random
 
 
 class FunnyController(controller.Controller):
-    START_RUNNING_FROM_MIST = 220
+    START_RUNNING_FROM_MIST = 550
 
     def __init__(self):
         self.strategies = {
             #'original_funny_controller': self.original_funny_controller_strategy,
-            #'second_strategy': self.second_strategy,
-            'third_one': self.third_strategy
+            'second_strategy': self.second_strategy,
+            #'third_one': self.third_strategy
         }
-        self.Q = {strategy: 20.0 for strategy in self.strategies}
+        self.Q = {strategy: 100.0 for strategy in self.strategies}
         self.N = {strategy: 0 for strategy in self.strategies}
         self.epsilon = 0.1
 
@@ -188,11 +188,24 @@ class FunnyController(controller.Controller):
         # danger_tiles_set.update(self.weapon_drops)
         danger_tiles_set.update(self._worse_weapon_tiles())
         distances, parents = dijkstra(self.arena, pos, self.facing, danger_tiles_set)
-        weak_spots = [s(self.opponent_pos, t) for t in
-                      [(-1, -1), (-1, 1), (1, -1), (1, 1)]]
+
+        if WEAPON_CODING[self.weapon] in ['A', 'M']:
+            weak_spots = [s(self.opponent_pos, t) for t in
+                          [(-1, -1), (-1, 1), (1, -1), (1, 1)]]
+        elif WEAPON_CODING[self.weapon] == 'S':
+            weak_spots = [s(self.opponent_pos, t) for t in
+                          [(-3, 0), (-2, 0), (3, 0), (2, 0), (0, -3), (0, -2), (0, 3), (0, 2)]]
+        elif WEAPON_CODING[self.weapon] == 'B':
+            ranged = [[(-i, 0), (i, 0), (0, -i), (0, i)] for i in range(4, 8)]
+            ranged = [x for l in ranged for x in l]
+            weak_spots = [s(self.opponent_pos, t) for t in ranged]
+        else:
+            weak_spots = [s(self.opponent_pos, t) for t in
+                          [(-1, 0), (1, 0), (0, -1), (0, 1)]]
+
         weak_spots = list(filter(lambda x: self.arena[x[1]][x[0]] not in ['=', '#'], weak_spots))
         if not weak_spots:
-            print("no weak spots")
+            # print("no weak spots")
             return []
         else:
             closest_weak_spot = sorted(weak_spots, key=lambda p: distances[r(p)])[0]
@@ -203,7 +216,7 @@ class FunnyController(controller.Controller):
         distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
         if self.menhir_pos is None:
             # misted_tiles_coords = [coords for coords, _ in self.misted_tiles]
-            self.menhir_pos = Coords(9, 9)#Coords(25, 25)
+            self.menhir_pos = Coords(25, 25) #Coords(9, 9)#
         return create_path(pos, self.menhir_pos, parents)
 
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -325,7 +338,7 @@ class FunnyController(controller.Controller):
         return action
 
     def second_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        """take bow or axe (to think if necessary), run away from enemies, find menhir and stay there"""
+        """take bow or axe, run away from enemies, find menhir and stay there"""
         # 0-find weapon, 1-find menhir, 3-go to menhir
         pos = knowledge.position
         visible_tiles = knowledge.visible_tiles
@@ -388,24 +401,22 @@ class FunnyController(controller.Controller):
                 print("Menhir go")
                 self.path = self._go_to_menhir(pos)
 
-        if self.strategy_iter != 2:
-            opposing_characters_pos = []
-            for delta in FunnyController.FACING_DELTAS[self.facing]:
-                try:
-                    curr_pos = s(pos, delta)
-                    if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None:
-                        opposing_characters_pos.append(curr_pos)
-                except KeyError:
-                    pass
+        opposing_characters_pos = []
+        for tile in visible_tiles:
+            if tile == pos:
+                continue
+            if visible_tiles[tile].character is not None:
+                opposing_characters_pos.append(tile)
 
-            if len(opposing_characters_pos) > 0:
-                danger_tiles = set()
-                for opponent in opposing_characters_pos:
-                    danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
+        if len(opposing_characters_pos) > 0:
+            print("opponent!")
+            danger_tiles = set()
+            for opponent in opposing_characters_pos:
+                danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
 
-                if pos in danger_tiles:
-                    print("RUNAWAY")
-                    self.path = self._run_away(pos, danger_tiles)
+            if pos in danger_tiles:
+                print("RUNAWAY")
+                self.path = self._run_away(pos, danger_tiles)
 
         if len(self.path) == 0:
             print("Hold pos")
@@ -489,13 +500,11 @@ class FunnyController(controller.Controller):
                     self.path = self._hide(pos)
 
         opposing_characters_pos = []
-        for delta in FunnyController.FACING_DELTAS[self.facing]:
-            try:
-                curr_pos = s(pos, delta)
-                if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None:
-                    opposing_characters_pos.append(curr_pos)
-            except KeyError:
-                pass
+        for tile in visible_tiles:
+            if tile == pos:
+                continue
+            if visible_tiles[tile].character is not None:
+                opposing_characters_pos.append(tile)
 
         if len(opposing_characters_pos) > 0:
             danger_tiles = set()
