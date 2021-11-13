@@ -13,8 +13,8 @@ class FunnyController(controller.Controller):
 
     def __init__(self):
         self.strategies = {
-            'original_funny_controller': self.original_funny_controller_strategy,
-            'second_strategy': self.second_strategy,
+            #'original_funny_controller': self.original_funny_controller_strategy,
+            #'second_strategy': self.second_strategy,
             'third_one': self.third_strategy
         }
         self.Q = {strategy: 20.0 for strategy in self.strategies}
@@ -159,7 +159,14 @@ class FunnyController(controller.Controller):
         return danger_tiles
 
     def _run_away(self, pos, danger_tiles):
-        return []
+        distances, parents = dijkstra(self.arena, pos, self.facing, danger_tiles)
+        surrounding_tiles = [(pos[0]+i, pos[1]+j) for i in range(-4, 5) for j in range(-4, 5)
+                             if 0 <= pos[0]+i < len(self.arena[0]) and 0 <= pos[1]+j < len(self.arena)]
+        surrounding_tiles = list(filter(lambda x: self.arena[x[1]][x[0]] not in ['=', '#'], surrounding_tiles))
+
+        distances_map = {hideout: distances[r(hideout)] for hideout in surrounding_tiles}
+        hideout = min(distances_map, key=distances_map.get)
+        return create_path(pos, hideout, parents)
 
     def _worse_weapon_tiles(self):
         worse_weapon_tiles = set()
@@ -209,8 +216,8 @@ class FunnyController(controller.Controller):
             self._update_weapons_knowledge(pos, tile.loot.name)
         self.weapon = self_knowledge.weapon.name
 
-        if self.menhir_pos is None and self.strategy_iter > 2:
-            self.strategy_iter = 2
+        if self.menhir_pos is None and self.strategy_iter > 1:
+            self.strategy_iter = 1
         if self.facing is None:
             self.facing = self_knowledge.facing
         # if self_knowledge.health < self.hp:
@@ -318,10 +325,206 @@ class FunnyController(controller.Controller):
         return action
 
     def second_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return characters.Action.STEP_FORWARD
+        """take bow or axe (to think if necessary), run away from enemies, find menhir and stay there"""
+        # 0-find weapon, 1-find menhir, 3-go to menhir
+        pos = knowledge.position
+        visible_tiles = knowledge.visible_tiles
+        tile = knowledge.visible_tiles[pos]
+        self_knowledge = tile.character
+
+        if tile.loot:
+            self._update_weapons_knowledge(pos, tile.loot.name)
+        self.weapon = self_knowledge.weapon.name
+
+        if self.facing is None:
+            self.facing = self_knowledge.facing
+
+        self.ep_it += 1
+        if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
+            print("change strategy iter to 3")
+            self.strategy_iter = 3
+
+        # TODO uwaga na to, czasochłonne
+        # self._update_misted_tiles(visible_tiles)
+        for tile in self.weapon_tiles:
+            if tile in visible_tiles and not visible_tiles[tile].character:
+                try:
+                    self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
+                except Exception as e:
+                    print(e, "a")
+
+        tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
+        for tile in tiles_in_range:
+            try:
+                tile_knowledge = knowledge.visible_tiles[tile]
+                if tile_knowledge.loot and tile not in self.weapon_tiles:
+                    print("found it!")
+                    self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
+                character = tile_knowledge.character
+                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
+                    # mam wystarczajaco duzo zycia
+                    print("attack")
+                    if character.health <= 2:
+                        try:
+                            self._update_weapons_knowledge(tile, character.weapon.name)
+                            print("added " + character.weapon.name)
+                        except Exception as e:
+                            print(e)
+                        self.weapon_drops.add(tile)
+                    return characters.Action.ATTACK
+            except KeyError:
+                pass
+        print(f"Path len: {len(self.path)}, strategy iter: {self.strategy_iter}")
+        if len(self.path) == 0:
+            if self.strategy_iter == 0:
+                print("Find weapon")
+                self.path = self._find_weapon(pos)
+            elif self.strategy_iter < 3 and self.menhir_pos is None:
+                self.strategy_iter = 1
+                print("Find menhir")
+                self._update_menhir_knowledge(visible_tiles)
+                self.path = self._find_menhir(pos)
+            elif self.strategy_iter == 3 or self.strategy_iter < 3 and self.menhir_pos is not None:
+                print("Menhir go")
+                self.path = self._go_to_menhir(pos)
+
+        if self.strategy_iter != 2:
+            opposing_characters_pos = []
+            for delta in FunnyController.FACING_DELTAS[self.facing]:
+                try:
+                    curr_pos = s(pos, delta)
+                    if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None:
+                        opposing_characters_pos.append(curr_pos)
+                except KeyError:
+                    pass
+
+            if len(opposing_characters_pos) > 0:
+                danger_tiles = set()
+                for opponent in opposing_characters_pos:
+                    danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
+
+                if pos in danger_tiles:
+                    print("RUNAWAY")
+                    self.path = self._run_away(pos, danger_tiles)
+
+        if len(self.path) == 0:
+            print("Hold pos")
+            action = self._hold_pos(knowledge)
+        else:
+            action = get_next_move(pos, self.facing, self.path[-1])
+            print("action: ", action)
+            if action == characters.Action.STEP_FORWARD:
+                self.path.pop()
+                if len(self.path) == 0:
+                    self.strategy_iter += 1
+
+        if action == characters.Action.STEP_FORWARD:
+            self._reset_surrounding_walls()
+        elif action == characters.Action.TURN_RIGHT:
+            self.facing = self.facing.turn_right()
+        elif action == characters.Action.TURN_LEFT:
+            self.facing = self.facing.turn_left()
+
+        return action
 
     def third_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return characters.Action.STEP_FORWARD
+        """take bow or axe (to think if necessary), run away from enemies, go to safe place and stay there"""
+        # 0-find weapon, 1-go to safe place
+        pos = knowledge.position
+        visible_tiles = knowledge.visible_tiles
+        tile = knowledge.visible_tiles[pos]
+        self_knowledge = tile.character
+
+        if tile.loot:
+            self._update_weapons_knowledge(pos, tile.loot.name)
+        self.weapon = self_knowledge.weapon.name
+
+        if self.facing is None:
+            self.facing = self_knowledge.facing
+
+        self.ep_it += 1
+
+        # TODO uwaga na to, czasochłonne
+        # self._update_misted_tiles(visible_tiles)
+        for tile in self.weapon_tiles:
+            if tile in visible_tiles and not visible_tiles[tile].character:
+                try:
+                    self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
+                except Exception as e:
+                    print(e, "a")
+
+        tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
+        for tile in tiles_in_range:
+            try:
+                tile_knowledge = knowledge.visible_tiles[tile]
+                if tile_knowledge.loot and tile not in self.weapon_tiles:
+                    print("found it!")
+                    self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
+                character = tile_knowledge.character
+                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
+                    # mam wystarczajaco duzo zycia
+                    print("attack")
+                    if character.health <= 2:
+                        try:
+                            self._update_weapons_knowledge(tile, character.weapon.name)
+                            print("added " + character.weapon.name)
+                        except Exception as e:
+                            print(e)
+                        self.weapon_drops.add(tile)
+                    return characters.Action.ATTACK
+            except KeyError:
+                pass
+        print(f"Path len: {len(self.path)}, strategy iter: {self.strategy_iter}")
+        if len(self.path) == 0:
+            if self.strategy_iter == 0:
+                print("Find weapon")
+                self._update_menhir_knowledge(visible_tiles)
+                self.path = self._find_weapon(pos)
+            elif self.strategy_iter == 1:
+                if self.menhir_pos is not None:
+                    print("go to menhir")
+                    self.path = self._go_to_menhir(pos)
+                else:
+                    print("Hide")
+                    self.path = self._hide(pos)
+
+        opposing_characters_pos = []
+        for delta in FunnyController.FACING_DELTAS[self.facing]:
+            try:
+                curr_pos = s(pos, delta)
+                if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None:
+                    opposing_characters_pos.append(curr_pos)
+            except KeyError:
+                pass
+
+        if len(opposing_characters_pos) > 0:
+            danger_tiles = set()
+            for opponent in opposing_characters_pos:
+                danger_tiles.update(set(self._get_dangerous_fields(opponent, knowledge)))
+
+            if pos in danger_tiles:
+                print("RUNAWAY")
+                self.path = self._run_away(pos, danger_tiles)
+
+        if len(self.path) == 0:
+            print("Hold pos")
+            action = self._hold_pos(knowledge)
+        else:
+            action = get_next_move(pos, self.facing, self.path[-1])
+            print("action: ", action)
+            if action == characters.Action.STEP_FORWARD:
+                self.path.pop()
+                if len(self.path) == 0:
+                    self.strategy_iter += 1
+
+        if action == characters.Action.STEP_FORWARD:
+            self._reset_surrounding_walls()
+        elif action == characters.Action.TURN_RIGHT:
+            self.facing = self.facing.turn_right()
+        elif action == characters.Action.TURN_LEFT:
+            self.facing = self.facing.turn_left()
+
+        return action
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.strategies[self.current_strategy](knowledge)

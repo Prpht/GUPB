@@ -24,8 +24,8 @@ WEAPON_PRIORITY = {
     },
     'fisher_island': {
         "A": 5,
-        "S": 4,
-        "B": 3,
+        "B": 4,
+        "S": 3,
         "K": 2,
         "M": 1
     },
@@ -37,12 +37,12 @@ WEAPON_PRIORITY = {
         "M": 1
     },
     'isolated_shrine': {
-            "A": 5,
-            "S": 4,
-            "B": 3,
-            "K": 2,
-            "M": 1
-        },
+        "A": 5,
+        "S": 4,
+        "B": 3,
+        "K": 2,
+        "M": 1
+    },
 }
 
 SAFE_POS = {
