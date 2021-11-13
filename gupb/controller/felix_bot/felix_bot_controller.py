@@ -43,9 +43,8 @@ class FelixBotController(controller.Controller):
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.current_strategies = self.map_strategies[arena_description.name]
         self.current_rewards_log = self.rewards_log[arena_description.name]
-        for strategy in self.current_strategies:
-            strategy.reset(arena_description)
         self.current_strategy = self.choose_strategy()
+        self.current_strategy.reset(arena_description)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.current_strategy.decide(knowledge)
