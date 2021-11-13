@@ -16,6 +16,7 @@ TURNAROUND_LIMIT = 3
 class DeterministicMarwinController(BaseMarwinController):
     def __init__(self, first_name):
         super(DeterministicMarwinController, self).__init__(first_name)
+        self._arena_description = None
         self._arena = None
         self._menhir_coords = None
         self._current_path = None
@@ -33,6 +34,7 @@ class DeterministicMarwinController(BaseMarwinController):
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         if self._current_path is not None:
             self._current_path.clear()
+        self._arena_description = arena_description
         self._found_turns.clear()
         self._previously_found_turns.clear()
         self._dead_ends.clear()
@@ -51,9 +53,9 @@ class DeterministicMarwinController(BaseMarwinController):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             return self._decide(knowledge)
-        except:
-            self.reset()
-            raise
+        except Exception as e:
+            self.reset(self._arena_description)
+            raise e
 
     def _decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         my_position = knowledge.position
@@ -150,7 +152,7 @@ class DeterministicMarwinController(BaseMarwinController):
                 self._turnaround_turns = 0
         elif self._current_state in (utils.GOING_TO_TURN, utils.GOING_TO_MENHIR, utils.GOING_FOR_WEAPON) and action == characters.Action.DO_NOTHING:
             target_position = self._current_path[-1]
-            if target_position == my_position:
+            if target_position[0] == my_position.x and target_position[1] == my_position.y:
                 if self._current_state != utils.GOING_TO_MENHIR:
                     self._current_state = utils.TURN_AROUND
                 else:
@@ -158,9 +160,8 @@ class DeterministicMarwinController(BaseMarwinController):
                 action = characters.Action.TURN_LEFT
                 self._turnaround_turns = 0
             else:
-                # if self._i >= len(self._current_path):
-                self._next_move = self._current_path[self._i]
-                self._i += 1
+                self._i = self._current_path.index(my_position)
+                self._next_move = self._current_path[self._i + 1]
                 next_facing = self._get_next_facing(my_position, self._next_move)
                 if next_facing is None:
                     action = characters.Action.TURN_LEFT
