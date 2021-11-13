@@ -72,7 +72,7 @@ class FunnyController(controller.Controller):
         self.curr_target = None
         self.path = []
 
-        self.weapon = "K"
+        self.weapon = "knife"
         self.opponent_pos = None
         self.weapon_drops = set()
         print(self.current_strategy)
@@ -83,7 +83,8 @@ class FunnyController(controller.Controller):
         self.N[self.current_strategy] += 1
         self.Q[self.current_strategy] += 1.0/self.N[self.current_strategy] * (score - self.Q[self.current_strategy])
 
-    def _get_weaponable_tiles(self, pos, facing, weapon):
+    def _get_weaponable_tiles(self, pos, facing, weapon_name):
+        weapon = WEAPON_CODING[weapon_name]
         if weapon == 'K':
             weaponable_tiles = weapons.Knife.cut_positions(self.terrain, pos, facing)
         elif weapon == 'S':
@@ -154,7 +155,7 @@ class FunnyController(controller.Controller):
         danger_tiles = [enemy_pos]
 
         enemy = knowledge.visible_tiles[enemy_pos].character
-        danger_tiles.extend(self._get_weaponable_tiles(enemy_pos, enemy.facing, enemy.weapon))
+        danger_tiles.extend(self._get_weaponable_tiles(enemy_pos, enemy.facing, enemy.weapon.name))
         return danger_tiles
 
     def _run_away(self, pos, danger_tiles):
@@ -162,7 +163,7 @@ class FunnyController(controller.Controller):
 
     def _worse_weapon_tiles(self):
         worse_weapon_tiles = set()
-        current_weapon_priority = self.weapon_priority[self.weapon]
+        current_weapon_priority = self.weapon_priority[WEAPON_CODING[self.weapon]]
         for tile, weapon in self.weapon_tiles.items():
             if self.weapon_priority[weapon] < current_weapon_priority:
                 worse_weapon_tiles.add(tile)
@@ -199,22 +200,28 @@ class FunnyController(controller.Controller):
         return create_path(pos, self.menhir_pos, parents)
 
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self_knowledge = knowledge.visible_tiles.get(knowledge.position).character
+        pos = knowledge.position
+        visible_tiles = knowledge.visible_tiles
+        tile = knowledge.visible_tiles[pos]
+        self_knowledge = tile.character
+
+        if tile.loot:
+            self._update_weapons_knowledge(pos, tile.loot.name)
+        self.weapon = self_knowledge.weapon.name
+
         if self.menhir_pos is None and self.strategy_iter > 2:
             self.strategy_iter = 2
         if self.facing is None:
             self.facing = self_knowledge.facing
-        self.weapon = WEAPON_CODING[self_knowledge.weapon.name]
         # if self_knowledge.health < self.hp:
         #     self.hp = self_knowledge.health
         ### ogarnac kto bije, reakcja
-        pos = knowledge.position
 
         self.ep_it += 1
         if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
             print("change strategy iter to 4")
             self.strategy_iter = 4
-        visible_tiles = knowledge.visible_tiles
+
         # TODO uwaga na to, czasochłonne
         # self._update_misted_tiles(visible_tiles)
         for tile in self.weapon_tiles:
