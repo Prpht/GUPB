@@ -129,12 +129,14 @@ class DeterministicMarwinController(BaseMarwinController):
                 final_turns = set.union(self._found_turns, scanned_tiles[utils.TURN])
                 if len(final_turns.difference(self._previously_found_turns)):
                     self._dead_ends.add(my_position)
+                self._previously_found_turns.update(self._found_turns)
                 
                 self._previously_found_turns.difference_update(self._dead_ends)
 
                 calculated_path = None
                 while calculated_path is None:
-                    new_turn_to_go = np.random.choice(list(self._previously_found_turns))
+                    turn_index = np.random.choice(len(self._previously_found_turns))
+                    new_turn_to_go = list(self._previously_found_turns)[turn_index]
                     target_coords = Coords(x=new_turn_to_go[0], y=new_turn_to_go[1])
                     calculated_path = utils.find_path_to_target(self._arena, my_position, target_coords) or None
                 
@@ -213,7 +215,9 @@ class DeterministicMarwinController(BaseMarwinController):
 
     @staticmethod
     def _get_action_for_facing(current_facing, next_facing):
-        if current_facing.turn_right() == next_facing:
+        if current_facing == next_facing:
+            return characters.Action.STEP_FORWARD
+        elif current_facing.turn_right() == next_facing:
             return characters.Action.TURN_RIGHT
         return characters.Action.TURN_LEFT
 
