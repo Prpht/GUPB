@@ -5,6 +5,7 @@ from gupb.model import weapons
 from gupb.model.arenas import Arena
 from gupb.model.characters import CHAMPION_STARTING_HP
 from gupb.model.effects import Mist
+from gupb.model.profiling import profile
 import random
 
 
@@ -478,6 +479,7 @@ class FunnyController(controller.Controller):
 
         return action
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.strategies[self.current_strategy](knowledge)
 

@@ -10,6 +10,7 @@ from gupb.model import characters
 from gupb.model.arenas import Arena
 from gupb.model.characters import Facing, CHAMPION_STARTING_HP
 from gupb.model.coordinates import Coords
+from gupb.model.profiling import profile
 import json
 
 
@@ -276,6 +277,7 @@ class WIETnamczyk(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         action = self.strategies_dict[self.current_strategy](knowledge)
         return action

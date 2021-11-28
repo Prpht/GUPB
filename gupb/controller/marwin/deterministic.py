@@ -4,6 +4,7 @@ from gupb.model import arenas
 from gupb.model import characters
 from typing import NamedTuple, Optional
 from gupb.model.coordinates import Coords
+from gupb.model.profiling import profile
 from collections import deque
 
 from gupb.controller.marwin.base import BaseMarwinController
@@ -49,7 +50,8 @@ class DeterministicMarwinController(BaseMarwinController):
         self._current_weapon = None
         self._last_position = None
         self._i = 0
-    
+
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             return self._decide(knowledge)

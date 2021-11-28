@@ -6,6 +6,7 @@ from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
 from gupb.controller.berserk.strategies import AggressiveStrategy, FastMenhirStrategy, GoodWeaponMenhirStrategy, RunawayStrategy
 from gupb.model.weapons import *
 from gupb.controller.berserk.utilities import epsilon_desc
+from gupb.model.profiling import profile
 
 
 POSSIBLE_STRATEGY = {
@@ -61,6 +62,7 @@ class BerserkBot(controller.Controller):
         self.strategy_counter[self.strategy.name()] += 1
         # print("\nPicked up strategy: ", self.strategy.name())
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             self.knowledge_decoder.knowledge = knowledge

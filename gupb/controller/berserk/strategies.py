@@ -10,7 +10,7 @@ from gupb.model import coordinates
 from gupb.controller.berserk.utilities import distance
 from gupb.model.weapons import *
 from gupb.model.arenas import Arena
-from gupb.controller.bb8 import ROTATIONS
+from gupb.controller.bb8.strategy import ROTATIONS
 
 WEAPONS = {
     "bow": Bow(),

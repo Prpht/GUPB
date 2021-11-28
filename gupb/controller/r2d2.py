@@ -4,6 +4,7 @@ from pathfinding.finder.a_star import AStarFinder
 
 from gupb.model import arenas, characters, coordinates
 from gupb.model.characters import Facing
+from gupb.model.profiling import profile
 from gupb import controller
 
 import random
@@ -81,6 +82,7 @@ class R2D2Controller(controller.Controller):
         else:
             return False
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update_knowledge(knowledge)
 
