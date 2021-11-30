@@ -17,10 +17,11 @@ pygame.init()
 
 Sprite = TypeVar('Sprite')
 
-INIT_TILE_SIZE = 12
+INIT_TILE_SIZE = 16
 KEEP_TILE_RATIO = False
 
-HEALTH_BAR_HEIGHT = 3
+HEALTH_BAR_HEIGHT = 4
+HEALTH_BAR_UNIT_WIDTH = 2
 
 BLACK = pygame.Color('black')
 GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
@@ -195,7 +196,7 @@ class Renderer:
                 return pygame.Rect(
                     blit_destination[0],
                     blit_destination[1] - HEALTH_BAR_HEIGHT - 1,
-                    health,
+                    health * HEALTH_BAR_UNIT_WIDTH,
                     HEALTH_BAR_HEIGHT
                 )
 

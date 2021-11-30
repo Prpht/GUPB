@@ -1,5 +1,5 @@
 from gupb.controller import keyboard
-from gupb.controller import random
+from gupb.controller import random, bandyta
 
 
 CONFIGURATION = {
@@ -10,7 +10,7 @@ CONFIGURATION = {
     ],
     'controllers': [
         keyboard.KeyboardController(),
-        random.RandomController("Alice"),
+        bandyta.Bandyta("test"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius")
