@@ -51,13 +51,17 @@ class Weapon(Enum):
                 return weapon
         raise KeyError("Not known weapon with name ", string)
 
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_
+
 
 DirectedCoords = NamedTuple('DirectedCoords', [('coords', Coords), ('direction', Optional[Direction])])
 Path = NamedTuple('Path', [('dest', Optional[str]), ('route', List[DirectedCoords])])
 
 
 def get_rank_weapons() -> List[Weapon]:
-    return [Weapon.bow_unloaded, Weapon.bow_loaded, Weapon.sword, Weapon.axe, Weapon.amulet]
+    return [Weapon.bow, Weapon.bow_unloaded, Weapon.bow_loaded, Weapon.sword, Weapon.axe, Weapon.amulet]
 
 
 def rotate_cw(direction: Direction) -> Direction:
@@ -184,13 +188,15 @@ def find_menhir(visible_tiles: Dict[Coords, tiles.TileDescription]):
     return None
 
 
-def find_furthest_point(knowledge: ChampionKnowledge):
-    furthest_point = knowledge.position
-    for tile, desc in knowledge.visible_tiles.items():
-        furthest_point = tile if \
-            desc == 'land' and get_distance(knowledge.position, tile) > get_distance(knowledge.position,
-                                                                                     furthest_point) else \
-            furthest_point
+def find_furthest_point(landscape_map: Dict[int, Dict[int, str]], position: Coords):
+    furthest_point = position
+    for x, x_map in landscape_map.items():
+        for y, tile_name in x_map.items():
+            tile = Coords(x, y)
+            furthest_point = (
+                tile if
+                tile_name == 'land' and get_distance(position, tile) > get_distance(position, furthest_point) else
+                furthest_point)
     return furthest_point
 
 
@@ -218,6 +224,8 @@ def read_arena(arena_description: ArenaDescription):
                     key = Weapon.amulet.value
                 if key is not None:
                     arena[key].append(Coords(x, y))
+                    if Weapon.has_value(key):
+                        arena['land'].append(Coords(x, y))
                 x += 1
             y += 1
         # arena['x_size'] = x
@@ -239,7 +247,8 @@ def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function
     for i in range(1, reach_number):
         for direction, do_search in do_search_map.items():
             if do_search:
-                c = target + i * direction.value
+                test = Coords(i * direction.value.x, i * direction.value.y)
+                c = target + Coords(i * direction.value.x, i * direction.value.y)
                 if is_wall(c):
                     do_search_map[direction] = False
                 else:
