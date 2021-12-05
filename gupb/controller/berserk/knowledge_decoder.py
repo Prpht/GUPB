@@ -7,8 +7,12 @@ from pathfinding.core.grid import Grid
 class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
-        self._info = {}
+        self._info = dict()
         self._map = None
+        self.arena = None
+        self._info['temp_safe_spot'] = None
+        self._info['menhir_position'] = None
+        self._info['map_size'] = None
         self._info['menhir_position'] = None
         self.arena = None
 
@@ -85,8 +89,19 @@ class KnowledgeDecoder:
         arena = Arena.load(map_name)
         self.arena = arena
         map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
+        self._info['map_size'] = (arena.size[0], arena.size[1])
+        self._info['temp_safe_spot'] = Coords(round(arena.size[0]/2), round(arena.size[1]/2))
         for cords, tile in arena.terrain.items():
             map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
             if tile.description().loot:
                 map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow"] else 1
         return map_matrix
+
+    def reset(self, knowledge: characters.ChampionKnowledge = None):
+        self._knowledge = knowledge
+        self._info = dict()
+        self._map = None
+        self.arena = None
+        self._info['temp_safe_spot'] = None
+        self._info['menhir_position'] = None
+        self._info['map_size'] = None
