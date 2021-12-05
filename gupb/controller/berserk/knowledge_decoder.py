@@ -81,7 +81,6 @@ class KnowledgeDecoder:
         if self.info['menhir_position'] is None:
             for coords, tile in self.knowledge.visible_tiles.items():
                 if tile.type == 'menhir':
-                    # print('Got Menhir position!!!')
                     self.info['menhir_position'] = Coords(*coords)
 
     def load_map(self, map_name):

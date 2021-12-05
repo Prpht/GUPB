@@ -14,6 +14,12 @@ POSSIBLE_STRATEGY = {
     'aggressivestrategy': AggressiveStrategy,
     'fastmenhirstrategy': FastMenhirStrategy,
     'goodweaponmenhirstrategy': GoodWeaponMenhirStrategy
+
+POSSIBLE_STRATEGY = {
+    'runawaystrategy': RunawayStrategy,
+    'aggressivestrategy': AggressiveStrategy,
+    'fastmenhirstrategy': FastMenhirStrategy,
+    'goodweaponmenhirstrategy': GoodWeaponMenhirStrategy
 }
 
 
