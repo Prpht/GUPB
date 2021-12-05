@@ -13,8 +13,6 @@ class KnowledgeDecoder:
         self._info['temp_safe_spot'] = None
         self._info['menhir_position'] = None
         self._info['map_size'] = None
-        self._info['menhir_position'] = None
-        self.arena = None
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
