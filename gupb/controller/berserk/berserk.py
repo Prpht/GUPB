@@ -8,11 +8,13 @@ from gupb.model.weapons import *
 from gupb.controller.berserk.utilities import epsilon_desc
 
 
+
 POSSIBLE_STRATEGY = {
     'runawaystrategy': RunawayStrategy,
     'aggressivestrategy': AggressiveStrategy,
     'fastmenhirstrategy': FastMenhirStrategy,
     'goodweaponmenhirstrategy': GoodWeaponMenhirStrategy
+
 }
 
 
@@ -23,6 +25,7 @@ class BerserkBot(controller.Controller):
         self.first_name: str = first_name
         self.knowledge_decoder = KnowledgeDecoder()
         self.strategy = None
+
         self.move_counter = 0
         self.round_id = 0
         self.knowledge_base = dict()

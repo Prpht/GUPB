@@ -13,6 +13,8 @@ class KnowledgeDecoder:
         self._info['temp_safe_spot'] = None
         self._info['menhir_position'] = None
         self._info['map_size'] = None
+        self._info['menhir_position'] = None
+        self.arena = None
 
     def decode(self):
         tile = self.knowledge.visible_tiles.get(self.knowledge.position)
@@ -81,7 +83,6 @@ class KnowledgeDecoder:
         if self.info['menhir_position'] is None:
             for coords, tile in self.knowledge.visible_tiles.items():
                 if tile.type == 'menhir':
-                    # print('Got Menhir position!!!')
                     self.info['menhir_position'] = Coords(*coords)
 
     def load_map(self, map_name):
