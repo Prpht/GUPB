@@ -15,6 +15,7 @@ from gupb.model import characters
 from gupb.model.characters import Facing
 from gupb.model import coordinates
 from gupb.model.tiles import TileDescription
+from gupb.model.profiling import profile
 
 
 # noinspection PyUnusedLocal
@@ -114,6 +115,7 @@ class EkonometronController(controller.Controller):
         #print(self.strategy_rewards)
         #print(self.chosen_strategy)
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         # if bot holds an unloaded bow
         if self.hold_weapon == "bow_unloaded":
