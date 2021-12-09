@@ -15,7 +15,7 @@ from gupb.model import coordinates
 
 verbose_logger = logging.getLogger('verbose')
 
-MIST_TTH_PER_CHAMPION: int = 5
+MIST_TTH_PER_CHAMPION: int = 1
 
 ChampionDeath = NamedTuple('ChampionDeath', [('champion', characters.Champion), ('episode', int)])
 
@@ -54,10 +54,10 @@ class Game(statemachine.StateMachine):
     def on_enter_instants_triggered(self):
         self.arena.trigger_instants()
 
-    def score(self) -> dict[str, int]:
+    def score(self) -> dict[controller.Controller, int]:
         if not self.finished:
             raise RuntimeError("Attempted to score an unfinished game!")
-        return {death.champion.controller.name: score for death, score in zip(self.deaths, self._fibonacci())}
+        return {death.champion.controller: score for death, score in zip(self.deaths, self._fibonacci())}
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
         for controller_to_spawn in to_spawn:
@@ -110,7 +110,7 @@ class Game(statemachine.StateMachine):
             self.deaths.append(death)
 
             win_callable = getattr(champion.controller, "win", None)
-            if win_callable:
+            if win_callable and callable(win_callable):
                 win_callable()
 
         if not self.champions:

@@ -5,13 +5,15 @@ POTENTIAL_CONTROLLERS = [
 ]
 
 """
-TO DO:
-[X] Pathfinding
-[ ] Wydobywanie informacji o broni i mgle
-[X] Poluj
-[X] Rozglądaj się 
-[X] Idź do...
-[X] Sprawdzić informacje o stanie zdrowia 
-[ ] Sposób na zarządzania bronią 
+TO DO 'RL':
+[x] Stworzenie możliwych strategii:
+    [x] Agresja względem przeciwników
+    [x] Szybkie zdobycie menhira
+    [x] Zdobycie menhira z dobrą bronią
+    [x] Trzymanie się na dystans
+[ ] System nagród i kar 
+[x] Wybór strategii na początku rundy 
+[ ] Zarządzanie zdrowiem
+
 
 """

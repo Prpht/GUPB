@@ -1,14 +1,16 @@
 from gupb.controller import keyboard
-from gupb.controller import random
+from gupb.controller import random, bandyta
 
 
 CONFIGURATION = {
     'arenas': [
-        'isolated_shrine',
+        'archipelago',
+        'dungeon',
+        'fisher_island',
     ],
     'controllers': [
         keyboard.KeyboardController(),
-        random.RandomController("Alice"),
+        bandyta.Bandyta("test"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius")

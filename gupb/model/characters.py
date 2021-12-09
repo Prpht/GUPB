@@ -34,6 +34,9 @@ class Tabard(Enum):
     BLUE = 'Blue'
     BROWN = 'Brown'
     GREY = 'Grey'
+    LIME = 'Lime'
+    ORANGE = 'Orange'
+    PINK = 'Pink'
     RED = 'Red'
     VIOLET = 'Violet'
     WHITE = 'White'
@@ -60,8 +63,9 @@ class Champion:
     def act(self) -> None:
         if self.alive:
             action = self.pick_action()
-            verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
-            ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
+            name = self.controller.name if self.controller else "NULL_CONTROLLER"
+            verbose_logger.debug(f"Champion {name} picked action {action}.")
+            ChampionPickedActionReport(name, action.name).log(logging.DEBUG)
             action(self)
             self.arena.stay(self)
 
@@ -71,7 +75,12 @@ class Champion:
             visible_tiles = self.arena.visible_tiles(self)
             knowledge = ChampionKnowledge(self.position, visible_tiles)
             try:
-                return self.controller.decide(knowledge)
+                action = self.controller.decide(knowledge)
+                if action is None:
+                    verbose_logger.warning(f"Controller {self.controller.name} returned a non-action.")
+                    ControllerExceptionReport(self.controller.name, "a non-action returned").log(logging.WARN)
+                    return Action.DO_NOTHING
+                return action
             except Exception as e:
                 verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
                 ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)
@@ -115,7 +124,7 @@ class Champion:
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 
         die_callable = getattr(self.controller, "die", None)
-        if die_callable:
+        if die_callable and callable(die_callable):
             die_callable()
 
     @property
@@ -128,7 +137,6 @@ class Facing(Enum):
     DOWN = coordinates.Coords(0, 1)
     LEFT = coordinates.Coords(-1, 0)
     RIGHT = coordinates.Coords(1, 0)
-
     @staticmethod
     def random() -> Facing:
         return random.choice([Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT])

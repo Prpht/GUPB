@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
+from gupb import controller
 from gupb.controller.bandyta.bfs import find_path
+from gupb.controller.bandyta.tactics import passive_tactic, archer_tactic, Tactics, aggressive_tactic
 from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
     find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
     get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
-    amulet_attack_coords, Direction, knife_attack_possible
+    amulet_attack_coords, Direction, knife_attack_possible, safe_attack_possible, safe_find_target_player
 from gupb.model import arenas
 from gupb.model import characters, tiles
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords, sub_coords
 from gupb.model.profiling import profile, print_stats
+from functools import reduce
 from gupb.model.weapons import WeaponDescription
 
 
-class Bandyta:
+class Bandyta(controller.Controller):
     """
     Dziary na pół ryja...
     """
@@ -26,9 +29,15 @@ class Bandyta:
         self.landscape_map: Dict[int, Dict[int, str]] = {}
         self.item_map: Dict[Coords, Weapon] = {}
         self.path = Path(None, [])
-        self.menhir: Coords = Coords(9, 9)
+        self.menhir: Optional[Coords] = None
         self.arena = None
         self.menhir_move_cycle = 0
+        self.axes_isolated_shrine = []
+
+        self.bandit_Q = {tactic: 0 for tactic in Tactics}
+        self.bandit_N = {tactic: 0 for tactic in Tactics}
+        self.bandit_EPS = 0.1
+        self.bandit_ACTION: Optional[Tactics] = None
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):
@@ -42,57 +51,24 @@ class Bandyta:
         action = self.__decide(knowledge)
         return action
 
+    def praise(self, score: int) -> None:
+        self.bandit_N[self.bandit_ACTION] += 1
+        Q, N = self.bandit_Q[self.bandit_ACTION], self.bandit_N[self.bandit_ACTION]
+        self.bandit_Q[self.bandit_ACTION] = Q + (1/N) * (score - Q)
+
     @profile
     def __decide(self, knowledge: ChampionKnowledge):
         try:
-            self.memorize_landscape(knowledge)
-            direction = get_direction(knowledge)
-            directed_position = DirectedCoords(knowledge.position, direction)
-            player: Tuple[str, Coords] = find_target_player(self.name, knowledge, self.path.dest)
-            weapon: Weapon = self.get_my_weapon(knowledge.visible_tiles)
-            # self.menhir = find_menhir(knowledge.visible_tiles) if self.menhir is None else self.menhir
-
-            if player is not None and \
-                    is_attack_possible(knowledge, weapon, self.name):
-                self.path = Path('', [])
-                return characters.Action.ATTACK
-
-            if weapon in [Weapon.knife, Weapon.amulet] and self.path.dest != 'weapon':
-                possible_path: Path = self.get_weapon_path(directed_position)
-                self.path = possible_path if len(possible_path.route) > 0 else self.path
-
-            if player is not None and (len(self.path.route) == 0 or self.path.dest is player[0]):
-                position_to_attack = self.nearest_coord_to_attack(player[1], directed_position.coords,
-                                                                  Weapon.from_string(weapon.name))
-                self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
-
-            if len(self.path.route) == 0 and self.menhir is not None:
-                if get_distance(self.menhir, knowledge.position) > 0:
-                    self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),
-                                                         self.landscape_map))
-                else:
-                    return characters.Action.TURN_LEFT
-
-            # if self.path.dest == 'menhir':
-            #     if self.menhir_move_cycle < 5:
-            #         self.menhir_move_cycle += 1
-            #         return characters.Action.TURN_LEFT
-            #     else:
-            #         self.menhir_move_cycle = 0
-
-            if len(self.path.route) == 0 and self.menhir is None:
-                self.path = Path('furthest_point',
-                                 find_path(directed_position,
-                                           DirectedCoords(find_furthest_point(knowledge), None),
-                                           self.landscape_map))
-
-            if len(self.path.route) != 0:
-                return self.move_on_path(directed_position)
-
-            return random.choice(POSSIBLE_ACTIONS)
+            return (archer_tactic(self, knowledge) if self.bandit_ACTION is Tactics.ARCHER else
+                    aggressive_tactic(self, knowledge) if self.bandit_ACTION is Tactics.AGGRESSIVE else
+                    passive_tactic(self, knowledge))
         except Exception as e:
-            print(e)
+            # print(e)
             return random.choice(POSSIBLE_ACTIONS)
+
+    def isolated_shrine_tactic(self, knowledge: ChampionKnowledge):
+        while knowledge.position not in self.axes:
+            pass
 
     def reset(self, arena_description: arenas.ArenaDescription):
         self.arena = read_arena(arena_description)
@@ -110,6 +86,15 @@ class Bandyta:
             if land[0] not in self.landscape_map:
                 self.landscape_map[land[0]] = {}
             self.landscape_map[land[0]][land[1]] = 'land'
+
+        best_action = max(self.bandit_Q, key=self.bandit_Q.get)
+        not_checked_actions = [action for action, value in self.bandit_Q.items() if value == 0]
+        preferred_actions = [best_action, *not_checked_actions]
+
+        self.bandit_ACTION = (
+            random.choice(preferred_actions)
+            if random.choices([True, False], weights=[1 - self.bandit_EPS, self.bandit_EPS], k=1) else
+            random.choice(Tactics.list()))
 
     def get_my_weapon(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for cords, tile in visible_tiles.items():
@@ -160,18 +145,21 @@ class Bandyta:
         else:
             return characters.Action.STEP_FORWARD
 
-    def nearest_coord_to_attack(self, enemy_position: Coords, my_position: Coords, weapon: Weapon) -> DirectedCoords:
-        possible = self.possible_attack_coords(enemy_position, weapon)
+    def nearest_coord_to_attack(self, enemies_positions: List[Coords], my_position: Coords,
+                                weapon: Weapon) -> DirectedCoords:
+        possible = self.possible_attack_coords(enemies_positions, weapon)
 
         def remove_front_coords(c: DirectedCoords) -> bool:
-            return c.coords in [sub_coords(enemy_position, Direction.S.value),
-                                sub_coords(enemy_position, Direction.N.value),
-                                sub_coords(enemy_position, Direction.E.value),
-                                sub_coords(enemy_position, Direction.W.value)]
+            return c.coords in reduce(list.__add__, [
+                [sub_coords(enemy_position, Direction.S.value),
+                 sub_coords(enemy_position, Direction.N.value),
+                 sub_coords(enemy_position, Direction.E.value),
+                 sub_coords(enemy_position, Direction.W.value)]
+                for enemy_position in enemies_positions])
 
         possible = list(filter(remove_front_coords, possible))
         min_distance = 10000
-        best_coord = DirectedCoords(enemy_position, None)
+        best_coord = None
         for p in possible:
             distance = get_distance(my_position, p.coords)
             if distance < min_distance:
@@ -181,19 +169,22 @@ class Bandyta:
             best_coord = DirectedCoords(best_coord.coords, Direction.random())  # maybe better tactic for amulet
         return best_coord
 
-    def possible_attack_coords(self, enemy_position: Coords, weapon: Weapon) -> List[DirectedCoords]:
-        if weapon == Weapon.knife:
-            return line_weapon_attack_coords(enemy_position, 1, self.is_valid_coords, self.is_wall)
-        elif weapon in [Weapon.bow, Weapon.bow_unloaded, Weapon.bow_loaded]:
-            return line_weapon_attack_coords(enemy_position, 50, self.is_valid_coords, self.is_wall)
-        elif weapon == Weapon.sword:
-            return line_weapon_attack_coords(enemy_position, 3, self.is_valid_coords, self.is_wall)
-        elif weapon == Weapon.axe:
-            return axe_attack_coords(enemy_position, self.is_valid_coords)
-        elif weapon == Weapon.amulet:
-            return amulet_attack_coords(enemy_position, self.is_valid_coords)
-        else:
-            raise KeyError(f"Not known weapon {weapon.name}.")
+    def possible_attack_coords(self, enemies_positions: List[Coords], weapon: Weapon) -> List[DirectedCoords]:
+        coords2attack: List[List[DirectedCoords]] = []
+        for enemy_position in enemies_positions:
+            if weapon == Weapon.knife:
+                coords2attack.append(line_weapon_attack_coords(enemy_position, 1, self.is_valid_coords, self.is_wall))
+            elif weapon in [Weapon.bow, Weapon.bow_unloaded, Weapon.bow_loaded]:
+                coords2attack.append(line_weapon_attack_coords(enemy_position, 50, self.is_valid_coords, self.is_wall))
+            elif weapon == Weapon.sword:
+                coords2attack.append(line_weapon_attack_coords(enemy_position, 3, self.is_valid_coords, self.is_wall))
+            elif weapon == Weapon.axe:
+                coords2attack.append(axe_attack_coords(enemy_position, self.is_valid_coords))
+            elif weapon == Weapon.amulet:
+                coords2attack.append(amulet_attack_coords(enemy_position, self.is_valid_coords))
+            else:
+                raise KeyError(f"Not known weapon {weapon.name}.")
+        return reduce(list.__add__, coords2attack)
 
     def is_wall(self, coords: Coords) -> bool:
         return coords in self.arena['wall']

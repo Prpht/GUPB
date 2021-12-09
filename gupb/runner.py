@@ -64,10 +64,11 @@ class Runner:
             self.renderer.run(game, show_sight, self.keyboard_controller)
         else:
             self.run_in_memory(game)
-        for name, score in game.score().items():
-            logging.info(f"Controller {name} scored {score} points.")
-            ControllerScoreReport(name, score).log(logging.DEBUG)
-            self.scores[name] += score
+        for dead_controller, score in game.score().items():
+            logging.info(f"Controller {dead_controller.name} scored {score} points.")
+            ControllerScoreReport(dead_controller.name, score).log(logging.DEBUG)
+            dead_controller.praise(score)
+            self.scores[dead_controller.name] += score
 
     def print_scores(self) -> None:
         verbose_logger.info(f"Final scores.")
