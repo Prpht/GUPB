@@ -74,7 +74,7 @@ def move_all(controller, position):
     if position == coordinates.Coords(*controller.actual_path[0]):
         controller.actual_path.pop(0)
     actual_path_0 = coordinates.Coords(*controller.actual_path[0])
-    if controller.move(position, actual_path_0):
+    if move(controller, position, actual_path_0):
         if len(controller.actual_path) == 1:
             controller.menhir_visited = True
             controller.move_to_chosen_place = False

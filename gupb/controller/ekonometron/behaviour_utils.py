@@ -138,8 +138,8 @@ def get_area_of_attack(controller, position, direction):
 
 def enemy_to_the_side(controller, position):
     """ Bots tries to remember if there were any enemies on their left or right """
-    area_left = controller.get_area_of_attack(position, controller.direction.turn_left())
-    area_right = controller.get_area_of_attack(position, controller.direction.turn_right())
+    area_left = get_area_of_attack(controller, position, controller.direction.turn_left())
+    area_right = get_area_of_attack(controller, position, controller.direction.turn_right())
     left_out_of_reach = False
     right_out_of_reach = False
     for i in range(len(area_left)):
@@ -172,7 +172,7 @@ def enemy_to_the_side(controller, position):
 
 def enemy_in_reach(controller, knowledge: characters.ChampionKnowledge):
     """Bot checks whether the enemy is in potential area of attack"""
-    area_of_attack = controller.get_area_of_attack(knowledge.position, controller.direction)
+    area_of_attack = get_area_of_attack(controller, knowledge.position, controller.direction)
     # getting coordinates for visible tiles that bot can attack
     area_of_attack = list(set(area_of_attack) & set(knowledge.visible_tiles.keys()))
     for coords in area_of_attack:
