@@ -57,11 +57,12 @@ def obstacle_in_front(controller, position: coordinates.Coords):
     return False
 
 
-def check_if_mist_visible(controller, visible_tiles: Dict[coordinates.Coords, TileDescription]):
+def check_if_mist_visible(visible_tiles: Dict[coordinates.Coords, TileDescription]):
     for coord, tile in visible_tiles.items():
         for e in tile.effects:
             if e.type == 'mist':
-                controller.mist_incoming = True
+                return True
+    return False
 
 
 def weapon_in_reach(controller, position: coordinates.Coords):

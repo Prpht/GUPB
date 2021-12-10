@@ -2,39 +2,9 @@ from gupb.model.characters import Facing
 from gupb.model import coordinates
 
 
-def find_edges(controller):
-    """Finding edges for vertexes"""
-    vertexes = []
-    for coord, tile in controller.tiles_memory.items():
-        if tile.type == 'land' or tile.type == 'menhir':
-            vertexes.append(coord)
-
-    vertexes_edges = {}
-
-    def check_if_next_to(vertex1, vertex2):
-        if vertex1[0] == vertex2[0]:
-            if (vertex1[1] - 1 == vertex2[1]) or (vertex1[1] + 1 == vertex2[1]):
-                return True
-        elif vertex1[1] == vertex2[1]:
-            if (vertex1[0] - 1 == vertex2[0]) or (vertex1[0] + 1 == vertex2[0]):
-                return True
-        return False
-
-    for ver in vertexes:
-        vertex_edges = []
-        for ver2 in vertexes:
-            if ver != ver2 and check_if_next_to(ver, ver2):
-                vertex_edges.append(ver2)
-        vertexes_edges[ver] = vertex_edges
-
-    return vertexes_edges
-
-
 def bfs_shortest_path(graph, start, goal):
     """For given vertex return shortest path"""
     explored, queue = [], [[start]]
-    if start == goal:
-        return False
     while queue:
         path = queue.pop(0)
         node = path[-1]
@@ -47,8 +17,6 @@ def bfs_shortest_path(graph, start, goal):
                 if neighbour == goal:
                     return new_path
             explored.append(node)
-    # no connection
-    return False
 
 
 def move(controller, start, end):

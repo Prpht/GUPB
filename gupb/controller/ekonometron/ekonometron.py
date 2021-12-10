@@ -6,7 +6,7 @@ It's a bit confused but it's got a spirit
 
 import random
 import numpy as np
-
+import time
 from typing import Tuple, Optional, Dict
 
 from gupb import controller
@@ -18,7 +18,7 @@ from gupb.model.tiles import TileDescription
 from gupb.model.profiling import profile
 from .behaviour_utils import *
 from .draw_paths import *
-from .strategies import TryingMyBest, LetsHide, KillThemAll
+from .specific_strategies import TryingMyBest, LetsHide, KillThemAll
 
 
 # noinspection PyUnusedLocal
@@ -49,31 +49,18 @@ class EkonometronController(controller.Controller):
         self.starting_combination = [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
-        # bot tries to remember the tiles it has seen thus far
+        # arena data
         self.tiles_memory: Dict[coordinates.Coords, TileDescription] = {}
+        self.map_graphs = {}
+        self.current_graph = None
         # knowledge about the weapon the bot is currently holding
         self.hold_weapon: str = "knife"
-        # the mode our bot goes into after noticing the mist
-        self.mist_incoming: bool = False
-        self.move_to_chosen_place: bool = False
-        self.actual_path: list = []
-        self.menhir_position: Optional[coordinates.Coords] = None
+        # the path to destination our bot is supposed to follow after it's been found
+        self.current_path: list = []
+        self.destination: Optional[coordinates.Coords] = None
         self.menhir_visited: bool = False
-        # looking for a place to camp in
-        self.move_to_hide = False
-        self.camp_visited = False
-        self.camp_position = False
-        self.turns = 0
-        self.only_attack = False
         # strategies
-        # trying_my_best - bot freely explores the map, it picks up whatever weapon it can and attacks enemies in sight
-        # lets_hide - bot is looking for a specific spot on the map where it can 'camp' from
-        # kill_them_all - bot checks for the enemies on the side so it can take them down faster
-        self.map_strategies = {
-            "archipelago": [TryingMyBest(self), LetsHide(self), KillThemAll(self)],
-            "dungeon": [TryingMyBest(self), LetsHide(self), KillThemAll(self)],
-            "fisher_island": [TryingMyBest(self), LetsHide(self), KillThemAll(self)]
-        }
+        self.map_strategies = {}
         self.chosen_strategy = None
 
     def __eq__(self, other: object) -> bool:
@@ -90,19 +77,20 @@ class EkonometronController(controller.Controller):
         self.starting_combination = [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD,
                                      characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
-        self.tiles_memory = {}
+        # getting arena map
+        arena = arenas.Arena.load(arena_description.name)
+        for k, v in arena.terrain.items():
+            self.tiles_memory[k] = v.description()
+        if arena_description.name not in self.map_graphs:
+            self.map_graphs[arena_description.name] = self.find_edges()
+        self.current_graph = self.map_graphs[arena_description.name]
         self.hold_weapon = "knife"
-        self.mist_incoming = False
-        self.move_to_chosen_place = False
-        self.actual_path = []
-        self.menhir_position = None
+        self.current_path = []
+        self.destination = None
         self.menhir_visited = False
-        self.move_to_hide = False
-        self.camp_visited = False
-        self.camp_position = False
-        self.turns = 0
-        self.only_attack = False
         # choosing the strategy
+        if arena_description.name not in self.map_strategies:
+            self.map_strategies[arena_description.name] = [TryingMyBest(self), LetsHide(self), KillThemAll(self)]
         strategies_list = self.map_strategies[arena_description.name]
         random_no = random.uniform(0, 1)
         if random_no > self.epsilon:
@@ -123,17 +111,13 @@ class EkonometronController(controller.Controller):
     #     # update bot's memory, based on the visible tiles
     #     visible_tiles = knowledge.visible_tiles
     #     self.update_memory(visible_tiles)
-    #     # making graph
-    #     visible_graph = find_edges(self)
     #     # save menhir position if visible
-    #     if self.menhir_position is None:
+    #     if self.destination is None:
     #         save_menhir_position_if_visible(self, knowledge.visible_tiles)
-    #
     #     # when bot doesn't know which direction it is facing
     #     if self.starting_coords is None:
     #         self.starting_coords = knowledge.position
     #         return forward_action(self, knowledge.position)
-    #         #return characters.Action.STEP_FORWARD
     #     if self.direction is None:
     #         if self.starting_coords != knowledge.position:
     #             coords_diff = knowledge.position - self.starting_coords
@@ -148,7 +132,6 @@ class EkonometronController(controller.Controller):
     #                 self.direction = Facing.UP
     #         else:
     #             return forward_action(self, knowledge.position, self.starting_combination.pop(0))
-    #             #return self.starting_combination.pop(0)
     #
     #     # when bot is aware which direction it is facing
     #     # identify visible enemies
@@ -156,7 +139,6 @@ class EkonometronController(controller.Controller):
     #         if self.hold_weapon == "bow_loaded":
     #             self.hold_weapon = "bow_unloaded"
     #         return characters.Action.ATTACK
-    #
     #     if self.menhir_visited:
     #         return characters.Action.TURN_RIGHT
     #
@@ -164,51 +146,23 @@ class EkonometronController(controller.Controller):
     #     if self.move_to_chosen_place:
     #         if move_all(self, knowledge.position):
     #             return forward_action(self, knowledge.position)
-    #             #return characters.Action.STEP_FORWARD
     #         else:
     #             self.direction = self.direction.turn_right()
     #             return characters.Action.TURN_RIGHT
     #
     #     # check if mist visible
-    #     check_if_mist_visible(self, knowledge.visible_tiles)
+    #     mist_incoming = check_if_mist_visible(knowledge.visible_tiles)
     #     # if mist, init run to menhir
-    #     if not self.move_to_chosen_place and self.mist_incoming and not self.menhir_visited:
-    #         self.actual_path = bfs_shortest_path(visible_graph, knowledge.position, self.menhir_position)
-    #         if self.actual_path:
-    #             self.actual_path.pop(0)
+    #     if not self.move_to_chosen_place and mist_incoming and not self.menhir_visited:
+    #         self.current_path = bfs_shortest_path(self.current_graph, knowledge.position, self.destination)
+    #         if self.current_path:
+    #             self.current_path.pop(0)
     #             self.move_to_chosen_place = True
     #             if move_all(self, knowledge.position):
     #                 return forward_action(self, knowledge.position)
-    #                 #return characters.Action.STEP_FORWARD
     #             else:
     #                 self.direction = self.direction.turn_right()
     #                 return characters.Action.TURN_RIGHT
-    #
-    #     if self.chosen_strategy == "strategy2":
-    #         if not self.camp_position:
-    #             save_camp_position_if_visible(self, knowledge.visible_tiles)
-    #         if self.move_to_hide:
-    #             if move_all_hide(self, knowledge.position):
-    #                 return forward_action(self, knowledge.position)
-    #             else:
-    #                 self.direction = self.direction.turn_right()
-    #                 return characters.Action.TURN_RIGHT
-    #         if not self.move_to_hide and not self.camp_visited and self.camp_position:
-    #             self.actual_path = bfs_shortest_path(visible_graph, knowledge.position, self.camp_position)
-    #             if self.actual_path:
-    #                 self.actual_path.pop(0)
-    #                 self.move_to_hide = True
-    #                 if move_all_hide(self, knowledge.position):
-    #                     return forward_action(self, knowledge.position)
-    #                 else:
-    #                     self.direction = self.direction.turn_right()
-    #                     return characters.Action.TURN_RIGHT
-    #         if self.turns > 0 and self.only_attack:
-    #             self.turns -= 1
-    #             self.direction = self.direction.turn_right()
-    #             return characters.Action.TURN_RIGHT
-    #         if self.only_attack:
-    #             return characters.Action.ATTACK
     #
     #     # if bot uses the strategy3, try to remember if there were any enemies to your side
     #     if self.chosen_strategy == "strategy3":
@@ -227,9 +181,35 @@ class EkonometronController(controller.Controller):
     #     rand_gen = random.random()
     #     if rand_gen <= 0.9:
     #         return forward_action(self, knowledge.position)
-    #         #return characters.Action.STEP_FORWARD
     #     else:
     #         return take_a_turn(self, knowledge.position)
+
+    def find_edges(self):
+        """Finding edges for vertexes"""
+        vertexes = []
+        for coord, tile in self.tiles_memory.items():
+            if tile.type == 'land' or tile.type == 'menhir':
+                vertexes.append(coord)
+
+        vertexes_edges = {}
+
+        def check_if_next_to(vertex1, vertex2):
+            if vertex1[0] == vertex2[0]:
+                if (vertex1[1] - 1 == vertex2[1]) or (vertex1[1] + 1 == vertex2[1]):
+                    return True
+            elif vertex1[1] == vertex2[1]:
+                if (vertex1[0] - 1 == vertex2[0]) or (vertex1[0] + 1 == vertex2[0]):
+                    return True
+            return False
+
+        for ver in vertexes:
+            vertex_edges = []
+            for ver2 in vertexes:
+                if ver != ver2 and check_if_next_to(ver, ver2):
+                    vertex_edges.append(ver2)
+            vertexes_edges[ver] = vertex_edges
+
+        return vertexes_edges
 
     def update_memory(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
         for coords, tile_desc in visible_tiles.items():
