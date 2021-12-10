@@ -130,11 +130,6 @@ def archer_tactic(self: Bandyta, knowledge: ChampionKnowledge):
         possible_path: Path = self.get_weapon_path(directed_position)
         self.path = possible_path if len(possible_path.route) > 0 else self.path
 
-    if players and (len(self.path.route) == 0 or self.path.dest in ['furthest_point', *list(players.keys()), 'menhir']):
-        position_to_attack = self.nearest_coord_to_attack(list(players.values()), directed_position.coords,
-                                                          Weapon.from_string(weapon.name))
-        self.path = Path(player[0], find_path(directed_position, position_to_attack, self.landscape_map))
-
     if len(self.path.route) == 0 and self.menhir is not None:
         if get_distance(self.menhir, knowledge.position) > 0:
             self.path = Path('menhir', find_path(directed_position, DirectedCoords(self.menhir, None),

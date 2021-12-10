@@ -26,8 +26,9 @@ class Bandyta(controller.Controller):
 
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.landscape_map: Dict[int, Dict[int, str]] = {}
-        self.item_map: Dict[Coords, Weapon] = {}
+        self.landscape_map: Dict[int, Dict[int, str]] = dict()
+        self.item_map: Dict[Coords, Weapon] = dict()
+        self.not_reachable_items: List[Coords] = list()
         self.path = Path(None, [])
         self.menhir: Optional[Coords] = None
         self.arena = None
@@ -72,6 +73,11 @@ class Bandyta(controller.Controller):
 
     def reset(self, arena_description: arenas.ArenaDescription):
         self.arena = read_arena(arena_description)
+        self.not_reachable_items = []
+        self.item_map = dict()
+        self.menhir = None
+        self.landscape_map = dict()
+
         for sword in self.arena['sword']:
             self.item_map[sword] = Weapon.sword
         for axe in self.arena['axe']:
@@ -106,12 +112,17 @@ class Bandyta(controller.Controller):
             weapon_list: List[Tuple[Coords, int]] = []
 
             for coords, weapon in self.item_map.items():
-                if weapon.name == ranked_weapon.name:
+                if weapon.name == ranked_weapon.name and coords not in self.not_reachable_items:
                     weapon_list.append((coords, get_distance(dc.coords, coords)))
 
             if len(weapon_list) > 0:
                 sorted_by_distance = sorted(weapon_list, key=lambda tup: tup[1])
-                return Path('weapon', find_path(dc, DirectedCoords(sorted_by_distance[0][0], None), self.landscape_map))
+                for coords, distance in sorted_by_distance:
+                    path = find_path(dc, DirectedCoords(coords, None), self.landscape_map)
+                    if len(path) > 0:
+                        return Path('weapon', path)
+                    else:
+                        self.not_reachable_items.append(coords)
         return Path('', [])
 
     @property
