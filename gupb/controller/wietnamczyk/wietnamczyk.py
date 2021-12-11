@@ -23,7 +23,7 @@ class WIETnamczyk(controller.Controller):
     GO_TO_MENHIR = "go_to_menhir"
     SURROUND_MENHIR = "surrond_menhir"
     MIST_PANIC_MODE = False
-    EPSILON = 0.2
+    EPSILON = 0.1
 
     def __init__(self):
         self.mist_range = 3
@@ -186,18 +186,44 @@ class WIETnamczyk(controller.Controller):
             return False
         return True
 
+    def is_smaller(self, a, b):
+        return a < b
+
+    def is_greater(self, a, b):
+        return a > b
+
     def update_knowledge(self, visible_tiles, bot_pos):
         for tile, description in visible_tiles.items():
             if tuple(tile) in self.unseen_coords:
                 self.unseen_coords.remove(tuple(tile))
             self.map[tile[0]][tile[1]] = description
             if description.type == 'menhir':
+                if WIETnamczyk.MIST_PANIC_MODE:
+                    WIETnamczyk.MIST_PANIC_MODE = False
+                    self.state = WIETnamczyk.GO_TO_MENHIR
                 self.menhir_pos = tile
             if self.dist(tile, bot_pos) == 0:
                 self.current_weapon = description.character.weapon
                 self.prev_hp = self.hp
                 self.hp = description.character.health
                 self.facing = description.character.facing
+            if 'mist' in description.effects:
+                def signum(a):
+                    if a > 0:
+                        return 1
+                    if a == 0:
+                        return 0
+                    return -1
+
+                sgn_bot_x = signum(bot_pos.x - tile.x)
+                sgn_bot_y = signum(bot_pos.y - tile.y)
+                to_remove = set()
+                for unseen in self.unseen_coords:
+                    sgn_uns_x = signum(tile.x - unseen[0])
+                    sgn_uns_y = signum(tile.y - unseen[1])
+                    if sgn_bot_x == sgn_uns_x and sgn_bot_y == sgn_uns_y:
+                        to_remove.add(unseen)
+                self.unseen_coords -= to_remove
 
     def parse_map(self, arena_name) -> List[List[tiles.TileDescription]]:
         arena = Arena.load(arena_name)
@@ -252,10 +278,8 @@ class WIETnamczyk(controller.Controller):
         self.action_queue = []
 
     def evaluate_mist(self, bot_pos: Coords, knowledge: characters.ChampionKnowledge):
-        if WIETnamczyk.MIST_PANIC_MODE and len(self.action_queue) != 0:
+        if WIETnamczyk.MIST_PANIC_MODE and self.find_path(bot_pos, self.exploration_goal) != []:
             return
-        elif WIETnamczyk.MIST_PANIC_MODE:
-            WIETnamczyk.MIST_PANIC_MODE = False
         for coords, desc in knowledge.visible_tiles.items():
             if desc.effects and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 if self.menhir_pos is not None:
@@ -265,9 +289,9 @@ class WIETnamczyk(controller.Controller):
                 else:
                     # todo: improve this logic :)
                     WIETnamczyk.MIST_PANIC_MODE = True
+                    self.state = WIETnamczyk.EXPLORE
                     self.catharsis()
-                    self.action_queue.append(characters.Action.TURN_RIGHT)
-                    self.action_queue.append(characters.Action.STEP_FORWARD)
+                    self.exploration_goal = random.choice(self.unseen_coords)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, WIETnamczyk):
@@ -441,6 +465,8 @@ class WIETnamczyk(controller.Controller):
 
     def explore_map(self, current_position, knowledge):
         if self.exploration_goal is None or self.exploration_goal not in self.unseen_coords:
+            if WIETnamczyk.MIST_PANIC_MODE:
+                WIETnamczyk.MIST_PANIC_MODE = False
             self.exploration_goal = random.choice(list(self.unseen_coords))
         path_to_destination = self.find_path(current_position, self.exploration_goal)
         action = self.find_direction(path_to_destination, knowledge, current_position)
