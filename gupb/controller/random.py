@@ -1,5 +1,6 @@
 import random
 
+from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 
@@ -13,7 +14,7 @@ POSSIBLE_ACTIONS = [
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class RandomController:
+class RandomController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
 
@@ -25,11 +26,14 @@ class RandomController:
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
-
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
+
+    def praise(self, score: int) -> None:
+        pass
+
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        pass
 
     @property
     def name(self) -> str:
@@ -37,7 +41,7 @@ class RandomController:
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.PINK
 
 
 POTENTIAL_CONTROLLERS = [
