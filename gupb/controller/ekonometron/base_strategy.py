@@ -2,9 +2,8 @@ import random
 
 from typing import Tuple, Optional, Dict
 
-from gupb.model import arenas
+from .outer_utils import *
 from gupb.model import characters
-from gupb.model.characters import Facing
 from gupb.model import coordinates
 from gupb.model.tiles import TileDescription
 
@@ -16,6 +15,7 @@ class Strategy:
         self.name = name
         self.value = 0.0
         self.n = 0
+        self.current_mode = None
 
     def proceed(self, knowledge):
         """ Picks an action for the controller or changes some of its variables """
@@ -26,14 +26,17 @@ class Strategy:
         self.n += 1
         self.value += (reward - self.value) / self.n
 
+    def reset_mode(self):
+        pass
+
     """ Utils """
-    def forward_action(self, position: coordinates.Coords, action=characters.Action.STEP_FORWARD):
-        if action == characters.Action.STEP_FORWARD and self.controller.direction is not None:
-            front_coords = position + self.controller.direction.value
-            front_tile = self.controller.tiles_memory[front_coords]
-            if front_tile.loot is not None:
-                self.controller.hold_weapon = front_tile.loot.name
-        return action
+    # def forward_action(self, position: coordinates.Coords, action=characters.Action.STEP_FORWARD):
+    #     if action == characters.Action.STEP_FORWARD and self.controller.direction is not None:
+    #         front_coords = position + self.controller.direction.value
+    #         front_tile = self.controller.tiles_memory[front_coords]
+    #         if front_tile.loot is not None:
+    #             self.controller.hold_weapon = front_tile.loot.name
+    #     return action
 
     def check_if_mist_visible(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
         for coord, tile in visible_tiles.items():
@@ -45,7 +48,7 @@ class Strategy:
     def get_area_of_attack(self, position, direction):
         aoa = []
         if self.controller.hold_weapon in ["knife", "sword", "bow_loaded"]:
-            for i in range(self.controller.line_weapons_reach[self.controller.hold_weapon]):
+            for i in range(LINE_WEAPONS_REACH[self.controller.hold_weapon]):
                 attack_coords = position + direction.value * (i + 1)
                 aoa.append(attack_coords)
         else:
@@ -70,6 +73,8 @@ class Strategy:
     def bfs_shortest_path(self, start, goal):
         """For given vertex return shortest path"""
         explored, queue = [], [[start]]
+        if start == goal:
+            return [start]
         while queue:
             path = queue.pop(0)
             node = path[-1]
@@ -86,14 +91,30 @@ class Strategy:
     def move_to_next_step(self, start, end):
         diff = end - start
         if diff == self.controller.direction.value:
-            return self.forward_action(start)
+            return forward_action(self.controller, start)
         elif diff == self.controller.direction.turn_left().value:
-            return characters.Action.TURN_LEFT
+            return left_action(self.controller)
         else:
-            return characters.Action.TURN_RIGHT
+            return right_action(self.controller)
 
     def move(self, position):
-        if position == coordinates.Coords(*self.controller.actual_path[0]):
-            self.controller.actual_path.pop(0)
-        next_step = coordinates.Coords(*self.controller.actual_path[0])
+        if position == coordinates.Coords(*self.controller.current_path[0]):
+            self.controller.current_path.pop(0)
+        if len(self.controller.current_path) == 0:
+            self.controller.destination = None
+            return None
+        next_step = coordinates.Coords(*self.controller.current_path[0])
         return self.move_to_next_step(position, next_step)
+
+    def get_menhir_position(self):
+        for coords in self.controller.tiles_memory:
+            if self.controller.tiles_memory[coords].type == 'menhir':
+                self.controller.destination = coords
+                return True
+        return False
+
+    def get_random_land_position(self):
+        land_tiles = [coords for coords in self.controller.tiles_memory if
+                      (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
+                      (self.controller.tiles_memory[coords].loot is None)]
+        return random.choice(land_tiles)
