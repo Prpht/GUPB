@@ -10,6 +10,7 @@ class KnowledgeDecoder:
         self._info = dict()
         self._map = None
         self.arena = None
+        self.map_name = None
         self._info['temp_safe_spot'] = None
         self._info['menhir_position'] = None
         self._info['map_size'] = None
@@ -84,6 +85,7 @@ class KnowledgeDecoder:
                     self.info['menhir_position'] = Coords(*coords)
 
     def load_map(self, map_name):
+        self.map_name = map_name
         arena = Arena.load(map_name)
         self.arena = arena
         map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
