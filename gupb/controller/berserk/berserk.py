@@ -1,24 +1,33 @@
-import numpy as np
-
-from gupb.model import arenas
-from gupb.model import characters
+import random
+from collections import Counter
+from gupb import controller
 from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
+
+from gupb.controller.berserk.strategies import AggressiveStrategy, FastMenhirStrategy, GoodWeaponMenhirStrategy, RunawayStrategy
+from gupb.model.weapons import *
+from gupb.controller.berserk.utilities import epsilon_desc
+
+
+POSSIBLE_STRATEGY = {
+    'runawaystrategy': RunawayStrategy,
+    'aggressivestrategy': AggressiveStrategy,
+    'fastmenhirstrategy': FastMenhirStrategy,
+    'goodweaponmenhirstrategy': GoodWeaponMenhirStrategy
+}
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class BerserkBot:
+class BerserkBot(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.knowledge_decoder = KnowledgeDecoder()
-        self._possible_actions = [
-            characters.Action.TURN_LEFT,
-            characters.Action.TURN_RIGHT,
-            characters.Action.STEP_FORWARD,
-            characters.Action.ATTACK,
-        ]
-        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.strategy = None
         self.move_counter = 0
+        self.round_id = 0
+        self.knowledge_base = dict()
+        self.epsilon = self.get_epsilon()
+        self.strategy_counter = Counter()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BerserkBot):
@@ -28,16 +37,38 @@ class BerserkBot:
     def __hash__(self) -> int:
         return hash(self.first_name)
 
+    def praise(self, score: int) -> None:
+        reward = score * 10 + self.move_counter * 0.5
+        if self.strategy.name() in self.knowledge_base.keys():
+            runs_no = self.strategy_counter[self.strategy.name()]
+            old_reward = self.knowledge_base[self.strategy.name()]
+            self.knowledge_base[self.strategy.name()] = (reward + old_reward * (runs_no - 1))/runs_no
+        else:
+            self.knowledge_base[self.strategy.name()] = reward
+
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.probabilities = [0.4, 0.4, 0.1, 0.1]
+        self.knowledge_decoder.reset()
+        self.knowledge_decoder.map = self.knowledge_decoder.load_map(arena_description.name)
         self.move_counter = 0
+        self.round_id += 1
+        self.epsilon = self.get_epsilon()
+        if random.random() <= self.epsilon:
+            strategy_name = random.choice(list(POSSIBLE_STRATEGY.keys()))
+        else:
+            sorted_results = sorted(self.knowledge_base.items(), key=lambda tup: tup[1])[::-1]
+            strategy_name = sorted_results[0][0]
+        self.strategy = POSSIBLE_STRATEGY[strategy_name](self.knowledge_decoder)
+        self.strategy_counter[self.strategy.name()] += 1
+        # print("\nPicked up strategy: ", self.strategy.name())
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.knowledge_decoder.knowledge = knowledge
-        enemies_in_sight, cords, *rest = self.knowledge_decoder.decode()
-        self.update_probabilities(enemies_in_sight)
-        self.move_counter += 1
-        return np.random.choice(self._possible_actions, 1, p=self.probabilities)[0]
+        try:
+            self.knowledge_decoder.knowledge = knowledge
+            return self.strategy.pick_action()
+        except Exception as e:
+            # print(e)
+            # print(self.knowledge_decoder.knowledge.position)
+            return characters.Action.TURN_RIGHT
 
     @property
     def name(self) -> str:
@@ -47,15 +78,5 @@ class BerserkBot:
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.RED
 
-    def update_probabilities(self, enemies_in_sight: list) -> None:
-        enemies = len(enemies_in_sight)
-        if enemies == 1:
-            self.probabilities = [0.2, 0.2, 0.2, 0.4]
-        elif enemies > 1:
-            self.probabilities = [0.05, 0.05, 0.1, 0.8]
-        elif enemies == 0 and self.move_counter >= 10:
-            self.probabilities = [0.25, 0.25, 0.4, 0.1]
-        else:
-            self.probabilities = [0.4, 0.4, 0.1, 0.1]
-
-
+    def get_epsilon(self):
+        return epsilon_desc(self.round_id)
