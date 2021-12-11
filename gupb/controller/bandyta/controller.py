@@ -1,26 +1,18 @@
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Tuple, Optional
 
 from gupb import controller
 from gupb.controller.bandyta.k_bandit import K_Bandit
 from gupb.controller.bandyta.tactics import passive_tactic, archer_tactic, Tactics, aggressive_tactic
-from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, Path, \
-    find_target_player, is_attack_possible, find_furthest_point, find_menhir, DirectedCoords, rotate_cw_dc, \
-    get_distance, Weapon, get_rank_weapons, read_arena, line_weapon_attack_coords, axe_attack_coords, \
-    amulet_attack_coords, Direction, knife_attack_possible, safe_attack_possible, safe_find_target_player, parse_arena, \
+from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, find_menhir, DirectedCoords, read_arena, \
+    Direction, parse_arena, \
     is_mist_coming, get_my_weapon, update_item_map, State
 from gupb.model import arenas
-from gupb.model import characters, tiles
+from gupb.model import characters
 from gupb.model.characters import ChampionKnowledge
-from gupb.model.coordinates import Coords, sub_coords
-from gupb.model.profiling import profile, print_stats
-from functools import reduce
-import logging
-import json
+from gupb.model.profiling import profile
 
-json_logger = logging.getLogger('json')
 
 class Bandyta(controller.Controller):
     """
@@ -31,11 +23,6 @@ class Bandyta(controller.Controller):
         self.first_name: str = first_name
         self.state = State(self.name)
         self.k_bandit = K_Bandit()
-
-
-    def set_action(self, tactics):
-        json_logger.log(msg=json.dumps({'changed_tactic': tactics}), extra={'event_type': self.__class__.__name__})
-        self.bandit_ACTION = tactics
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):

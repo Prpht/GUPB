@@ -1,8 +1,8 @@
+import random
 from enum import Enum
 from functools import reduce
 from math import fabs
 from typing import NamedTuple, List, Optional, Dict, Tuple
-import random
 
 import gupb.controller.bandyta.bfs as bfs
 from gupb.model import characters, tiles
