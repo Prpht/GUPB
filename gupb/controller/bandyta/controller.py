@@ -16,8 +16,10 @@ from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords, sub_coords
 from gupb.model.profiling import profile, print_stats
 from functools import reduce
-from gupb.model.weapons import WeaponDescription
+import logging
+import json
 
+json_logger = logging.getLogger('json')
 
 class Bandyta(controller.Controller):
     """
@@ -39,6 +41,11 @@ class Bandyta(controller.Controller):
         self.bandit_N = {tactic: 0 for tactic in Tactics}
         self.bandit_EPS = 0.1
         self.bandit_ACTION: Optional[Tactics] = None
+
+
+    def set_action(self, tactics):
+        json_logger.log(msg=json.dumps({'changed_tactic': tactics}), extra={'event_type': self.__class__.__name__})
+        self.bandit_ACTION = tactics
 
     def __eq__(self, other: object):
         if isinstance(other, Bandyta):
