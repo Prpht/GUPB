@@ -240,8 +240,7 @@ class LetsHide(Strategy):
 
     def find_hiding_spot(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
-                      (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
-                      (self.controller.tiles_memory[coords].loot is None)]
+                      self.controller.tiles_memory[coords].type in ["land", "menhir"]]
 
         def at_least_two_walls(coords, tiles_memory):
             place_next_to = (coords[0] + 0, coords[1] + 1)
