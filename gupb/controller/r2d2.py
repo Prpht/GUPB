@@ -95,7 +95,6 @@ class R2D2Controller(controller.Controller):
                 self.map[position[0], position[1]] = 1
                 self.menhir_position = coordinates.Coords(position[0], position[1])
 
-
     def is_enemy_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
         visible_tile = self.position + self.facing.value
         if knowledge.visible_tiles[visible_tile].character:
@@ -136,7 +135,6 @@ class R2D2Controller(controller.Controller):
         nodes = np.asarray(nodes)
         dist_2 = np.sum((nodes - node) ** 2, axis=1)
         return np.argmin(dist_2)
-
 
     def praise(self, score: int) -> None:
         pass
