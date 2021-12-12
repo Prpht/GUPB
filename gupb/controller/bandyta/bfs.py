@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import List, Dict
 
-from gupb.controller.bandyta.utils import Direction, DirectedCoords, rotate_cw, rotate_cw_dc, rotate_ccw_dc, \
+from gupb.controller.bandyta.utils import DirectedCoords, rotate_cw_dc, rotate_ccw_dc, \
     step_forward
-from gupb.model.coordinates import Coords
 
 
 def find_path(start: DirectedCoords, end: DirectedCoords, grid: Dict[int, Dict[int, str]]) -> List[DirectedCoords]:
@@ -39,7 +38,6 @@ def explore_neighbors(parent_node: DirectedCoords,
                       visited_list: List[DirectedCoords],
                       queue: List[DirectedCoords],
                       return_path: Dict[DirectedCoords, DirectedCoords]):
-
     possible_nodes: List[DirectedCoords] = [
         step_forward(parent_node),
         rotate_cw_dc(parent_node),
@@ -60,7 +58,6 @@ def reconstruct_path(
         start: DirectedCoords,
         end: DirectedCoords,
         return_path: Dict[DirectedCoords, DirectedCoords | None]):
-
     if end is None:
         return []
 
