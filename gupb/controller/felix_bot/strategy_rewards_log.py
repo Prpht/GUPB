@@ -6,7 +6,7 @@ class StrategyRewardsLog:
         self.total_actions = 0
         self.total_rewards = 0
         self.all_rewards = []
-        self.record = defaultdict(lambda: dict(actions=1, reward=55))
+        self.record = defaultdict(lambda: dict(actions=1, reward=110))
 
     def record_action(self, strategy, reward):
         self.total_actions += 1
