@@ -38,7 +38,7 @@ def passive_tactic(state: State, knowledge: ChampionKnowledge):
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
@@ -80,7 +80,7 @@ def aggressive_tactic(state: State, knowledge: ChampionKnowledge):
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
@@ -122,7 +122,7 @@ def archer_tactic(state: State, knowledge: ChampionKnowledge):
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
