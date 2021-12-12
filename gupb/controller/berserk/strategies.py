@@ -12,6 +12,7 @@ from gupb.model.weapons import *
 from gupb.model.arenas import Arena
 from gupb.controller.bb8.strategy import ROTATIONS
 
+
 WEAPONS = {
     "bow": Bow(),
     "bow_unloaded": Bow(),
