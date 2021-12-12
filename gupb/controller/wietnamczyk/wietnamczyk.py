@@ -23,7 +23,7 @@ class WIETnamczyk(controller.Controller):
     GO_TO_MENHIR = "go_to_menhir"
     SURROUND_MENHIR = "surrond_menhir"
     MIST_PANIC_MODE = False
-    EPSILON = 0.2
+    EPSILON = 0.1
 
     def __init__(self):
         self.mist_range = 3
@@ -31,7 +31,9 @@ class WIETnamczyk(controller.Controller):
         self.strategies_dict = {'OSTRICH': self.strategy_ostrich, 'BERSERKER': self.strategy_berserker,
                                 'COWARD': self.strategy_coward}
         # These values were obtained using K-armed bandit approach :)
-        self.Q = {'OSTRICH': 30.062992125984245, 'BERSERKER': 16.33333333333334, 'COWARD': 28.972413793103446}
+        self.Q = {'BERSERKER': 7.138888888888888,
+                  'COWARD': 10.453237410071942,
+                  'OSTRICH': 10.596923076923078}
         self.N = {'OSTRICH': 0, 'BERSERKER': 0, 'COWARD': 0}
         self.strategies = list(self.Q.keys())
 
@@ -40,7 +42,7 @@ class WIETnamczyk(controller.Controller):
                                                                                                       key=self.Q.get)
 
         self.menhir_pos = None
-        self.good_weapons = ["sword", "axe"]
+        self.good_weapons = ["sword", "axe", "bow_unloaded", "bow_loaded"]
         self.first_name: str = "Adam"
         self.arena_description = None
         self.current_weapon = "knife"
@@ -74,8 +76,8 @@ class WIETnamczyk(controller.Controller):
         enemy_hp = enemy_tile.character.health
         enemy_weapon = enemy_tile.character.weapon
         enemy_facing = enemy_tile.character.facing
-        weapon_reach = {'sword': 3, 'axe': 1, 'knife': 1, 'bow': float('inf')}
-        if self.current_weapon.name not in ['bow', 'amulet']:
+        weapon_reach = {'sword': 3, 'axe': 1, 'knife': 1}
+        if self.current_weapon.name not in ['bow_loaded', 'bow_unloaded', 'amulet']:
             bfs_distance = self.bfs_dist(self_pos, enemy_pos)
             max_dist = weapon_reach[self.current_weapon.name] + 1
             if self.hp - enemy_hp >= 3 and bfs_distance <= max_dist:
@@ -104,7 +106,7 @@ class WIETnamczyk(controller.Controller):
                     continue
                 if description.character is not None and self.dist(tile, self_pos) == 2:
                     return True
-        if self.current_weapon.name == 'bow':
+        if 'bow' in self.current_weapon.name:
             for tile, description in knowledge.visible_tiles.items():
                 distance = self.dist(tile, self_pos)
                 if distance == 0 or description.character is None:
@@ -186,18 +188,50 @@ class WIETnamczyk(controller.Controller):
             return False
         return True
 
+    def is_smaller(self, a, b):
+        return a < b
+
+    def is_greater(self, a, b):
+        return a > b
+
     def update_knowledge(self, visible_tiles, bot_pos):
+        # print(self.state, bot_pos, self.exploration_goal, self.current_strategy)
         for tile, description in visible_tiles.items():
+            self.map[tile[0]][tile[1]] = description
+
             if tuple(tile) in self.unseen_coords:
                 self.unseen_coords.remove(tuple(tile))
-            self.map[tile[0]][tile[1]] = description
             if description.type == 'menhir':
+                if WIETnamczyk.MIST_PANIC_MODE:
+                    WIETnamczyk.MIST_PANIC_MODE = False
+                    self.state = WIETnamczyk.GO_TO_MENHIR
                 self.menhir_pos = tile
             if self.dist(tile, bot_pos) == 0:
                 self.current_weapon = description.character.weapon
+                if self.current_weapon == 'unloaded_bow':
+                    self.action_queue.append(characters.Action.ATTACK)
                 self.prev_hp = self.hp
                 self.hp = description.character.health
                 self.facing = description.character.facing
+            if 'mist' in list(map(lambda d: d.type, description.effects)):
+                def signum(a):
+                    if a > 0:
+                        return 1
+                    if a == 0:
+                        return 0
+                    return -1
+
+                sgn_bot_x = signum(bot_pos[0] - tile[0])
+                sgn_bot_y = signum(bot_pos[1] - tile[1])
+                to_remove = set()
+                for unseen in self.unseen_coords:
+                    sgn_uns_x = signum(tile[0] - unseen[0])
+                    sgn_uns_y = signum(tile[1] - unseen[1])
+                    if sgn_bot_x == sgn_uns_x and sgn_bot_y == sgn_uns_y:
+                        to_remove.add(unseen)
+                for u in to_remove:
+                    self.unseen_coords.remove(u)
+                # self.unseen_coords -= to_remove
 
     def parse_map(self, arena_name) -> List[List[tiles.TileDescription]]:
         arena = Arena.load(arena_name)
@@ -237,12 +271,21 @@ class WIETnamczyk(controller.Controller):
                     adj_x = s[0] + s_x
                     adj_y = s[1] + s_y
                     adj = (adj_x, adj_y)
-                    if 0 <= adj_x < X and 0 <= adj_y < Y and (
-                            self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][adj_y].type == 'menhir') \
-                            and not visited[adj_x][adj_y] and not 'mist' in self.map[adj_x][adj_y].effects:
+                    if self.can_pass(X, Y, adj_x, adj_y, visited):
                         queue.append(adj)
                         parent[adj] = s
         return []
+
+    def can_pass(self, X, Y, adj_x, adj_y, visited):
+        can_pass = 0 <= adj_x < X and 0 <= adj_y < Y and (
+                self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][adj_y].type == 'menhir') \
+                   and not visited[adj_x][adj_y] and not (
+                'mist' in list(map(lambda d: d.type, self.map[adj_x][adj_y].effects)))
+        if can_pass and not WIETnamczyk.MIST_PANIC_MODE:
+            if not self.map[adj_x][adj_y].loot:
+                return can_pass
+            return self.map[adj_x][adj_y].loot.name not in ['knife', 'amulet']
+        return can_pass
 
     def go_to_menhir(self, knowledge: characters.ChampionKnowledge, bot_pos: Coords):
         path_to_destination = self.find_path(bot_pos, self.menhir_pos)
@@ -252,10 +295,9 @@ class WIETnamczyk(controller.Controller):
         self.action_queue = []
 
     def evaluate_mist(self, bot_pos: Coords, knowledge: characters.ChampionKnowledge):
-        if WIETnamczyk.MIST_PANIC_MODE and len(self.action_queue) != 0:
+        if WIETnamczyk.MIST_PANIC_MODE and self.find_path(bot_pos, self.exploration_goal) != []:
+            # print("panic mode and I know what I need to do!")
             return
-        elif WIETnamczyk.MIST_PANIC_MODE:
-            WIETnamczyk.MIST_PANIC_MODE = False
         for coords, desc in knowledge.visible_tiles.items():
             if desc.effects and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 if self.menhir_pos is not None:
@@ -264,10 +306,11 @@ class WIETnamczyk(controller.Controller):
                     return self.find_direction(path_to_destination, knowledge, bot_pos)
                 else:
                     # todo: improve this logic :)
+                    # print("I noticed mist and I am planning my next step, don't worry I am an adult!")
                     WIETnamczyk.MIST_PANIC_MODE = True
+                    self.state = WIETnamczyk.EXPLORE
                     self.catharsis()
-                    self.action_queue.append(characters.Action.TURN_RIGHT)
-                    self.action_queue.append(characters.Action.STEP_FORWARD)
+                    self.exploration_goal = random.choice(list(self.unseen_coords))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, WIETnamczyk):
@@ -318,7 +361,7 @@ class WIETnamczyk(controller.Controller):
 
     def stand_in_mist(self, visible_tiles, bot_pos):
         for coords, desc in visible_tiles.items():
-            if self.dist(coords, bot_pos) == 0 and 'mist' in desc.effects:
+            if self.dist(coords, bot_pos) == 0 and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 return True
         return False
 
@@ -440,8 +483,13 @@ class WIETnamczyk(controller.Controller):
         return random.choice(POSSIBLE_ACTIONS)
 
     def explore_map(self, current_position, knowledge):
-        if self.exploration_goal is None or self.exploration_goal not in self.unseen_coords:
+        attempts = 5
+        while self.exploration_goal is None or self.exploration_goal not in self.unseen_coords or \
+                self.find_path(current_position, self.exploration_goal) == [] and attempts != 0:
+            if WIETnamczyk.MIST_PANIC_MODE:
+                WIETnamczyk.MIST_PANIC_MODE = False
             self.exploration_goal = random.choice(list(self.unseen_coords))
+            attempts -= 1
         path_to_destination = self.find_path(current_position, self.exploration_goal)
         action = self.find_direction(path_to_destination, knowledge, current_position)
         return action
