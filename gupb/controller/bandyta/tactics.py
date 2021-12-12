@@ -7,7 +7,7 @@ from typing import Tuple
 from gupb.controller.bandyta.bfs import find_path
 from gupb.controller.bandyta.utils import DirectedCoords, safe_find_target_player, Weapon, \
     safe_attack_possible, Path, get_distance, find_furthest_point, POSSIBLE_ACTIONS, find_target_player, \
-    is_attack_possible, find_players, get_weapon_path, State, move_on_path, \
+    is_attack_possible, find_players, get_weapon_path, State, move_on_path, extract_pytagorian_nearest, \
     nearest_coord_to_attack
 from gupb.model import characters
 from gupb.model.characters import ChampionKnowledge
@@ -37,6 +37,10 @@ def passive_tactic(state: State, knowledge: ChampionKnowledge):
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
+
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+        exploration_checkpoint = extract_pytagorian_nearest(state)
+        state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
     if player is not None and not state.mist_coming and (len(state.path.route) == 0 or state.path.dest is player[0]):
         position_to_attack = nearest_coord_to_attack(state, [player[1]], state.directed_position.coords,
@@ -76,6 +80,10 @@ def aggressive_tactic(state: State, knowledge: ChampionKnowledge):
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+        exploration_checkpoint = extract_pytagorian_nearest(state)
+        state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
+
     if player is not None and (len(state.path.route) == 0 or state.path.dest is player[0]):
         position_to_attack = nearest_coord_to_attack(state, [player[1]], state.directed_position.coords,
                                                      Weapon.from_string(state.weapon.name))
@@ -113,6 +121,10 @@ def archer_tactic(state: State, knowledge: ChampionKnowledge):
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
+
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0:
+        exploration_checkpoint = extract_pytagorian_nearest(state)
+        state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
     if (len(state.path.route) == 0 or (state.mist_coming and state.path.dest != 'menhir')) and state.menhir is not None:
         if get_distance(state.menhir, knowledge.position) > 0:

@@ -69,6 +69,7 @@ class State:
         self.directed_position: Optional[DirectedCoords] = None
         self.weapon: Optional[Weapon] = None
         self.mist_coming: bool = False
+        self.exploration_points: List[Tuple[int, int]] = []
 
     def reset(self):
         self.not_reachable_items = []
@@ -276,6 +277,22 @@ def parse_arena(arena):
         landscape_map[land[0]][land[1]] = 'land'
 
     return item_map, landscape_map
+
+
+def extract_pytagorian_nearest(state: State) -> DirectedCoords:
+    my_position = state.directed_position.coords
+
+    def square_dist(x: Tuple[int, int]):
+        return (x[0] - my_position.x) ** 2 + (x[1] - my_position.y) ** 2
+
+    nearest = state.exploration_points[0]
+    for point in state.exploration_points:
+        if square_dist(nearest) > square_dist(point):
+            nearest = point
+
+    state.exploration_points.remove(nearest)
+
+    return DirectedCoords(Coords(nearest[0], nearest[1]), None)
 
 
 def nearest_coord_to_attack(

@@ -56,6 +56,11 @@ class Bandyta(controller.Controller):
         self.state.reset()
 
         self.state.arena = read_arena(arena_description)
+        self.state.exploration_points = {
+            'archipelago': [(7, 8), (33, 8), (43, 21), (9, 30), (30, 38)],
+            'dungeon': [(47, 5), (5, 15), (43, 15), (4, 24), (8, 31), (25, 32), (43, 45), (27, 48)],
+            'fisher_island': [(14, 3), (36, 12), (8, 16), (43, 24), (11, 36), (24, 47)]
+        }[arena_description.name]
         self.state.item_map, self.state.landscape_map = parse_arena(self.state.arena)
 
     def update_state(self, knowledge: ChampionKnowledge):
