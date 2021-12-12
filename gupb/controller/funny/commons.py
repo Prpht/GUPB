@@ -90,6 +90,12 @@ SAFE_POS = {
     ]
 }
 
+START_RUNNING_FROM_MIST = {
+    'fisher_island': 300,
+    'isolated_shrine': 550,
+    'archipelago': 300,
+    'dungeon': 300
+}
 
 def r(x):
     return tuple(reversed(x))
