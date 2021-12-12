@@ -12,7 +12,7 @@ from gupb.controller.bb8.strategy import (RLStrategy, RandomStrategy,
 class BB8Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.strategy = EscapeToMenhirStrategy()
+        self.strategy = FindBestWeaponStrategy()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BB8Controller):

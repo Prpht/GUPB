@@ -69,6 +69,9 @@ class BB8Strategy(ABC):
         self.map = np.zeros((MAP_SIZE, MAP_SIZE))
         self.weapon_positions = {}
         self.menhir_position = None
+        self.visited_passages = []
+        self.going_to_passage = False
+        self.destination = None
 
     @abstractmethod
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -107,6 +110,8 @@ class BB8Strategy(ABC):
             if score > best_score:
                 best_score = score
                 best_coordinates = weapon_coordinates
+                if self.weapon == weapon_name:
+                    best_coordinates = None
 
         return best_coordinates if best_score > 0 else None
 
@@ -184,6 +189,58 @@ class BB8Strategy(ABC):
         self.first_name = self.visible_tiles[self.position].character.controller_name
         self.facing = self.visible_tiles[self.position].character.facing
 
+    def find_passage(self):
+        best_passage_coords = None
+        min_distance = 10000
+
+        for i in range(MAP_SIZE):
+            blocked_count = 0
+            pass_count = 0
+            for j in range(MAP_SIZE):
+                if self.map[i, j] == 0:
+                    blocked_count += 1
+                    if pass_count == 1:
+                        pass_count = 0
+                        passage_coords = coordinates.Coords(i, j)
+                        if self.calculate_distance(passage_coords) < min_distance and passage_coords not in self.visited_passages:
+                            best_passage_coords = passage_coords
+                            min_distance = self.calculate_distance(best_passage_coords)
+                else:
+                    pass_count += 1
+        for i in range(MAP_SIZE):
+            blocked_count = 0
+            pass_count = 0
+            for j in range(MAP_SIZE):
+                if self.map[j, i] == 0:
+                    blocked_count += 1
+                    if pass_count == 1:
+                        pass_count = 0
+                        passage_coords = coordinates.Coords(i, j)
+                        if self.calculate_distance(passage_coords) < min_distance and passage_coords not in self.visited_passages:
+                            best_passage_coords = passage_coords
+                            min_distance = self.calculate_distance(best_passage_coords)
+                else:
+                    pass_count += 1
+
+        return best_passage_coords
+
+    def explore(self):
+        best_passage_coords = self.find_passage()
+        if best_passage_coords is not None:
+            self.destination = best_passage_coords
+            self.visited_passages.append(best_passage_coords)
+            return self.go_to_direction(best_passage_coords)
+
+        return self.go_forward()
+
+    def go_to_destination_if_exists(self):
+        if self.destination is not None:
+            if self.position == self.destination:
+                self.destination = None
+            else:
+                return self.go_to_direction(self.destination)
+        return None
+
 
 class RandomStrategy(BB8Strategy):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -199,10 +256,15 @@ class EscapeToMenhirStrategy(BB8Strategy):
         self.parse_knowledge(knowledge)
         self.study_map()
 
+        go_to_destination_action = self.go_to_destination_if_exists()
+        if go_to_destination_action is not None:
+            return go_to_destination_action
+
         if not self.is_at_menhir:
             if self.menhir_position is not None:
                 if self.calculate_distance(self.menhir_position) == 1:
                     self.is_at_menhir = True
+                self.destination = self.menhir_position
                 return self.go_to_direction(self.menhir_position)
             else:
                 return self.go_forward()
@@ -226,13 +288,21 @@ class FindBestWeaponStrategy(BB8Strategy):
         self.parse_knowledge(knowledge)
         self.study_map()
 
+        go_to_destination_action = self.go_to_destination_if_exists()
+        if go_to_destination_action is not None:
+            return go_to_destination_action
+
         if self.is_mist_coming() and self.menhir_position is not None:
+            self.destination = self.menhir_position
             return self.go_to_direction(self.menhir_position)
+        elif self.is_mist_coming():
+            self.go_forward()
 
         best_weapon_coordinates = self.find_best_weapon()
         enemy_in_range_coordinates = self.get_enemy_in_range_coordinates()
 
         if best_weapon_coordinates is not None:
+            self.destination = best_weapon_coordinates
             return self.go_to_direction(best_weapon_coordinates)
 
         if enemy_in_range_coordinates is not None:
