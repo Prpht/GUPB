@@ -79,6 +79,7 @@ class WIETnamczyk(controller.Controller):
                              key=lambda pair: pair[1]))
         return random.choices(places, weights=self.prob)[0][0]
 
+    # @profile(name="should_fight_WIETnamczyk")
     def should_fight(self, self_pos: coordinates.Coords, enemy_pos: coordinates.Coords,
                      enemy_tile: tiles.TileDescription) -> bool:
         enemy_hp = enemy_tile.character.health
@@ -92,6 +93,7 @@ class WIETnamczyk(controller.Controller):
                 return True
         return False
 
+    # @profile(name="should_attack_WIETnamczyk")
     def should_attack(self, self_pos: coordinates.Coords, knowledge: characters.ChampionKnowledge):
         if self.current_weapon.name == 'sword':
             for tile, description in knowledge.visible_tiles.items():
@@ -133,7 +135,7 @@ class WIETnamczyk(controller.Controller):
                 if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
                     return True
         return False
-
+    # @profile(name="find_good_weapon_WIETnamczyk")
     def find_good_weapon(self, bot_pos):
         weapons_pos = []
         for i in range(len(self.map)):
@@ -153,6 +155,7 @@ class WIETnamczyk(controller.Controller):
             return None
         return closest_good_weapon[0][0]
 
+    # @profile(name="find_visible_enemies_WIETnamczyk")
     def find_visible_enemies(self, bot_pos, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription], ):
         enemies_list = []
         for tile, description in visible_tiles.items():
@@ -162,6 +165,7 @@ class WIETnamczyk(controller.Controller):
                     enemies_list.append((description, tile, dist_to_enemy))
         return list(sorted(enemies_list, key=lambda item: item[2]))
 
+    # @profile(name="find_direction_WIETnamczyk")
     def find_direction(self, path_to_destination, knowledge, bot_pos):
         if len(path_to_destination) == 0:
             return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
@@ -208,6 +212,7 @@ class WIETnamczyk(controller.Controller):
     def is_greater(self, a, b):
         return a > b
 
+    # @profile(name="update_knowledge_WIETnamczyk")
     def update_knowledge(self, visible_tiles, bot_pos):
         for tile, description in visible_tiles.items():
             self.map[tile[0]][tile[1]] = description
@@ -261,6 +266,7 @@ class WIETnamczyk(controller.Controller):
                     unseen_coords.add((i, j))
         return unseen_coords
 
+    # @profile(name="find_path_WIETnamczyk")
     def find_path(self, start_pos, dest_coord):
         X = len(self.map)
         Y = len(self.map)
@@ -289,6 +295,7 @@ class WIETnamczyk(controller.Controller):
                         parent[adj] = s
         return []
 
+    # @profile(name="can_pass_WIETnamczyk")
     def can_pass(self, X, Y, adj_x, adj_y, visited):
         can_pass = 0 <= adj_x < X and 0 <= adj_y < Y and (
                 self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][adj_y].type == 'menhir') \
@@ -300,6 +307,7 @@ class WIETnamczyk(controller.Controller):
             return self.map[adj_x][adj_y].loot.name not in ['knife', 'amulet']
         return can_pass
 
+    # @profile(name="go_to_menhir_WIETnamczyk")
     def go_to_menhir(self, knowledge: characters.ChampionKnowledge, bot_pos: Coords):
         path_to_destination = self.find_path(bot_pos, self.menhir_pos)
         return self.find_direction(path_to_destination, knowledge, bot_pos)
@@ -307,6 +315,7 @@ class WIETnamczyk(controller.Controller):
     def catharsis(self):
         self.action_queue = []
 
+    # @profile(name="evaluate_mist_WIETnamczyk")
     def evaluate_mist(self, bot_pos: Coords, knowledge: characters.ChampionKnowledge):
         if WIETnamczyk.MIST_PANIC_MODE and self.find_path(bot_pos, self.exploration_goal) != []:
             return
@@ -339,11 +348,12 @@ class WIETnamczyk(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    @profile
+    # @profile(name="decide_WIETnamczyk")
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         action = self.strategies_dict[self.current_strategy](knowledge)
         return action
 
+    # @profile(name="set_exploration_area_WIETnamczyk")
     def set_exploration_area(self, bot_pos: Coords, max_dist_from_menhir=5):
         possible_cells = self.get_cooords_in_neibourhood(bot_pos, max_dist_from_menhir)
         self.unseen_coords = possible_cells
@@ -357,6 +367,7 @@ class WIETnamczyk(controller.Controller):
                     possible_cells.add((i, j))
         return possible_cells
 
+    # @profile(name="generate_enemy_avoidance_action_WIETnamczyk")
     def generate_enemy_avoidance_action(self):
         goals = [(self.dist(self.exploration_goal, cell), cell) for cell in self.unseen_coords]
         sorted_goals = sorted(goals, key=lambda item: item[0], reverse=True)
@@ -371,23 +382,27 @@ class WIETnamczyk(controller.Controller):
 
         return self.action_queue.pop(0)
 
+    # @profile(name="generate_panic_action_WIETnamczyk")
     def generate_panic_action(self, bot_pos: Coords, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, desc in visible_tiles.items():
             if self.dist(coords, bot_pos) == 1 and desc.type in ['land', 'menhir']:
                 return characters.Action.STEP_FORWARD
         return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
 
+    # @profile(name="do_not_be_tabula_rasa_WIETnamczyk")
     def do_not_be_tabula_rasa(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         self.update_knowledge(knowledge.visible_tiles, bot_pos)
         self.evaluate_mist(bot_pos, knowledge)
 
+    # @profile(name="stand_in_mist_WIETnamczyk")
     def stand_in_mist(self, visible_tiles, bot_pos):
         for coords, desc in visible_tiles.items():
             if self.dist(coords, bot_pos) == 0 and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 return True
         return False
 
+    # @profile(name="perform_priority_checks_WIETnamczyk")
     def perform_priority_checks(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         if self.should_attack(bot_pos, knowledge):
@@ -398,6 +413,7 @@ class WIETnamczyk(controller.Controller):
             return self.generate_panic_action(bot_pos, knowledge.visible_tiles)
         return None
 
+    # @profile(name="ostrich_explore_WIETnamczyk")
     def ostrich_explore(self, bot_pos, knowledge):
         visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
         if len(visible_enemies) > 1:
@@ -414,6 +430,7 @@ class WIETnamczyk(controller.Controller):
             return random.choice(POSSIBLE_ACTIONS)
         return self.explore_map(bot_pos, knowledge)
 
+    # @profile(name="fight_near_menhir_WIETnamczyk")
     def fight_near_menhir(self, bot_pos, knowledge):
         if self.dist(bot_pos, self.menhir_pos) > 3:
             return self.go_to_menhir(knowledge, bot_pos)
@@ -431,6 +448,7 @@ class WIETnamczyk(controller.Controller):
                 path = self.find_path(bot_pos, self.exploration_goal)
                 return self.find_direction(path, knowledge, bot_pos)
 
+    # @profile(name="strategy_ostrich_WIETnamczyk")
     def strategy_ostrich(self, knowledge: characters.ChampionKnowledge):
         """
         This version of the bot keeps looking for menhir unless it sees some weaker enemy, then it tries to kill it.
@@ -464,6 +482,7 @@ class WIETnamczyk(controller.Controller):
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="strategy_berserker_WIETnamczyk")
     def strategy_berserker(self, knowledge: characters.ChampionKnowledge):
         """
         Whenever the bot sees an enemy he immediately starts following him. Otherwise, it just explores the map and
@@ -498,6 +517,7 @@ class WIETnamczyk(controller.Controller):
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="berserker_explore_WIETnamczyk")
     def berserker_explore(self, bot_pos, knowledge):
         visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
         if len(visible_enemies) > 0:
@@ -510,6 +530,7 @@ class WIETnamczyk(controller.Controller):
             return random.choice(POSSIBLE_ACTIONS)
         return self.explore_map(bot_pos, knowledge)
 
+    # @profile(name="strategy_coward_WIETnamczyk")
     def strategy_coward(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         self.do_not_be_tabula_rasa(knowledge)
@@ -538,6 +559,7 @@ class WIETnamczyk(controller.Controller):
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="explore_map_WIETnamczyk")
     def explore_map(self, current_position, knowledge):
         attempts = 5
         while self.exploration_goal is None or self.exploration_goal not in self.unseen_coords or \
@@ -550,6 +572,7 @@ class WIETnamczyk(controller.Controller):
         action = self.find_direction(path_to_destination, knowledge, current_position)
         return action
 
+    # @profile(name="praise_WIETnamczyk")
     def praise(self, score: int) -> None:
         self.N[self.current_strategy] += 1
         n = self.N[self.current_strategy]
