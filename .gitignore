@@ -7,3 +7,4 @@ results/
 *.DS_STORE
 gupb/controller/botelka_ml/tmp/
 .vscode/
+gupb/our.py

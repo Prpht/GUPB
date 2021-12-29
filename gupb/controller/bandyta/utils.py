@@ -1,13 +1,14 @@
+import random
 from enum import Enum
+from functools import reduce
 from math import fabs
 from typing import NamedTuple, List, Optional, Dict, Tuple
-import random
 
+import gupb.controller.bandyta.bfs as bfs
 from gupb.model import characters, tiles
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords, sub_coords
-from gupb.model.weapons import WeaponDescription
 
 
 class Direction(Enum):
@@ -54,6 +55,32 @@ class Weapon(Enum):
     @classmethod
     def has_value(cls, value):
         return value in cls._value2member_map_
+
+
+class State:
+    def __init__(self, name: str):
+        self.name: str = name
+        self.landscape_map: Dict[int, Dict[int, str]] = dict()
+        self.item_map: Dict[Coords, Weapon] = dict()
+        self.not_reachable_items: List[Coords] = list()
+        self.path = Path(None, [])
+        self.menhir: Optional[Coords] = None
+        self.arena = None
+        self.directed_position: Optional[DirectedCoords] = None
+        self.weapon: Optional[Weapon] = None
+        self.mist_coming: bool = False
+        self.exploration_points: List[Tuple[int, int]] = []
+
+    def reset(self):
+        self.not_reachable_items = []
+        self.menhir = None
+        self.directed_position = None
+        self.weapon = None
+        self.mist_coming = False
+        self.landscape_map = dict()
+        self.arena = None
+        self.item_map = dict()
+        self.path = Path(None, [])
 
 
 DirectedCoords = NamedTuple('DirectedCoords', [('coords', Coords), ('direction', Optional[Direction])])
@@ -228,12 +255,102 @@ def read_arena(arena_description: ArenaDescription):
                         arena['land'].append(Coords(x, y))
                 x += 1
             y += 1
-        # arena['x_size'] = x
-        # arena['y_size'] = y
     return arena
 
 
-def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function, is_wall) -> List[DirectedCoords]:
+def parse_arena(arena):
+    item_map = dict()
+    landscape_map = dict()
+    for sword in arena['sword']:
+        item_map[sword] = Weapon.sword
+    for axe in arena['axe']:
+        item_map[axe] = Weapon.axe
+    for bow in arena['bow']:
+        item_map[bow] = Weapon.bow
+    for amulet in arena['amulet']:
+        item_map[amulet] = Weapon.amulet
+    for knife in arena['knife']:
+        item_map[knife] = Weapon.knife
+    for land in arena['land']:
+        if land[0] not in landscape_map:
+            landscape_map[land[0]] = {}
+        landscape_map[land[0]][land[1]] = 'land'
+
+    return item_map, landscape_map
+
+
+def extract_pytagorian_nearest(state: State) -> DirectedCoords:
+    my_position = state.directed_position.coords
+
+    def square_dist(x: Tuple[int, int]):
+        return (x[0] - my_position.x) ** 2 + (x[1] - my_position.y) ** 2
+
+    nearest = state.exploration_points[0]
+    for point in state.exploration_points:
+        if square_dist(nearest) > square_dist(point):
+            nearest = point
+
+    state.exploration_points.remove(nearest)
+
+    return DirectedCoords(Coords(nearest[0], nearest[1]), None)
+
+
+def nearest_coord_to_attack(
+        state: State,
+        enemies_positions: List[Coords],
+        my_position: Coords,
+        weapon: Weapon) -> DirectedCoords:
+    possible = possible_attack_coords(enemies_positions, weapon, state)
+
+    def remove_front_coords(c: DirectedCoords) -> bool:
+        return c.coords in reduce(list.__add__, [
+            [sub_coords(enemy_position, Direction.S.value),
+             sub_coords(enemy_position, Direction.N.value),
+             sub_coords(enemy_position, Direction.E.value),
+             sub_coords(enemy_position, Direction.W.value)]
+            for enemy_position in enemies_positions])
+
+    possible = list(filter(remove_front_coords, possible))
+    min_distance = 10000
+    best_coord = None
+    for p in possible:
+        distance = get_distance(my_position, p.coords)
+        if distance < min_distance:
+            min_distance = distance
+            best_coord = p
+    if best_coord.direction is None:
+        best_coord = DirectedCoords(best_coord.coords, Direction.random())  # maybe better tactic for amulet
+    return best_coord
+
+
+def possible_attack_coords(enemies_positions: List[Coords], weapon: Weapon, state: State) -> List[DirectedCoords]:
+    coords2attack: List[List[DirectedCoords]] = []
+    for enemy_position in enemies_positions:
+        if weapon == Weapon.knife:
+            coords2attack.append(line_weapon_attack_coords(enemy_position, 1, state))
+        elif weapon in [Weapon.bow, Weapon.bow_unloaded, Weapon.bow_loaded]:
+            coords2attack.append(line_weapon_attack_coords(enemy_position, 50, state))
+        elif weapon == Weapon.sword:
+            coords2attack.append(line_weapon_attack_coords(enemy_position, 3, state))
+        elif weapon == Weapon.axe:
+            coords2attack.append(axe_attack_coords(enemy_position, state))
+        elif weapon == Weapon.amulet:
+            coords2attack.append(amulet_attack_coords(enemy_position, state))
+        else:
+            raise KeyError(f"Not known weapon {weapon.name}.")
+    return reduce(list.__add__, coords2attack)
+
+
+def is_wall(state: State, coords: Coords) -> bool:
+    return coords in state.arena['wall']
+
+
+def is_valid_coords(state: State, coords: DirectedCoords) -> bool:
+    c = coords.coords
+    return c in state.arena['land'] or c == state.menhir
+
+
+def line_weapon_attack_coords(target: Coords, reach_number: int, state: State) -> List[DirectedCoords]:
     possible: List[DirectedCoords] = []
     do_search_map: Dict[Direction, bool] = {
         Direction.S: True,
@@ -247,17 +364,16 @@ def line_weapon_attack_coords(target: Coords, reach_number: int, filter_function
     for i in range(1, reach_number):
         for direction, do_search in do_search_map.items():
             if do_search:
-                test = Coords(i * direction.value.x, i * direction.value.y)
                 c = target + Coords(i * direction.value.x, i * direction.value.y)
-                if is_wall(c):
+                if is_wall(state, c):
                     do_search_map[direction] = False
                 else:
                     possible.append(DirectedCoords(c, direction))
 
-    return list(filter(filter_function, possible))
+    return list(filter(lambda coords: is_valid_coords(state, coords), possible))
 
 
-def axe_attack_coords(target: Coords, filter_function) -> List[DirectedCoords]:
+def axe_attack_coords(target: Coords, state: State) -> List[DirectedCoords]:
     possible = []
     x = target.x
     y = target.y
@@ -266,10 +382,10 @@ def axe_attack_coords(target: Coords, filter_function) -> List[DirectedCoords]:
         possible.append(DirectedCoords(Coords(x - 1 + i, y - 1), Direction.S))
         possible.append(DirectedCoords(Coords(x + 1, y - 1 + i), Direction.W))
         possible.append(DirectedCoords(Coords(x - 1 + i, y + 1), Direction.N))
-    return list(filter(filter_function, possible))
+    return list(filter(lambda coords: is_valid_coords(state, coords), possible))
 
 
-def amulet_attack_coords(target: Coords, filter_function) -> List[DirectedCoords]:
+def amulet_attack_coords(target: Coords, state: State) -> List[DirectedCoords]:
     x = target.x
     y = target.y
     possible = [
@@ -278,7 +394,69 @@ def amulet_attack_coords(target: Coords, filter_function) -> List[DirectedCoords
         DirectedCoords(Coords(x + 1, y - 1), None),
         DirectedCoords(Coords(x + 1, y + 1), None)
     ]
-    return list(filter(filter_function, possible))
+    return list(filter(lambda coords: is_valid_coords(state, coords), possible))
+
+
+def is_mist_coming(knowledge: ChampionKnowledge):
+    for cords, tile in knowledge.visible_tiles.items():
+        for effect in tile.effects:
+            if effect.type == 'mist':
+                return True
+    return False
+
+
+def get_my_weapon(visible_tiles: Dict[Coords, tiles.TileDescription], name: str):
+    for cords, tile in visible_tiles.items():
+        if tile.character is not None and tile.character.controller_name == name:
+            return Weapon.from_string(tile.character.weapon.name)
+
+
+def update_item_map(knowledge: ChampionKnowledge, item_map: Dict[Coords, Weapon]) -> Dict[Coords, Weapon]:
+    item_map = item_map.copy()
+
+    for cords, tile in knowledge.visible_tiles.items():
+        if tile.loot is not None:
+            item_map[cords] = Weapon.from_string(tile.loot.name)
+
+        if tile.loot is None and cords in item_map:
+            del item_map[cords]
+
+    return item_map
+
+
+def get_weapon_path(
+        dc: DirectedCoords,
+        item_map: Dict[Coords, Weapon],
+        not_reachable_items: List[Coords],
+        landscape_map: Dict[int, Dict[int, str]],
+        preferred_weapons: List[Weapon]):
+    for ranked_weapon in preferred_weapons:
+        weapon_list: List[Tuple[Coords, int]] = []
+
+        for coords, weapon in item_map.items():
+            if weapon.name == ranked_weapon.name and coords not in not_reachable_items:
+                weapon_list.append((coords, get_distance(dc.coords, coords)))
+
+        if len(weapon_list) > 0:
+            sorted_by_distance = sorted(weapon_list, key=lambda tup: tup[1])
+            for coords, distance in sorted_by_distance:
+                path = bfs.find_path(dc, DirectedCoords(coords, None), landscape_map)
+                if len(path) > 0:
+                    return Path('weapon', path)
+                else:
+                    not_reachable_items.append(coords)
+    return Path('', [])
+
+
+def move_on_path(state: State, dc: DirectedCoords) -> characters.Action:
+    next_node = state.path.route.pop(0)
+
+    if dc.direction is not next_node.direction:
+        return characters.Action.TURN_RIGHT if \
+            rotate_cw_dc(dc).direction is next_node.direction else \
+            characters.Action.TURN_LEFT
+    else:
+        return characters.Action.STEP_FORWARD
 
 
 POSSIBLE_ACTIONS = [
