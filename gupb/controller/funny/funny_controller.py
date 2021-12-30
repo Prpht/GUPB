@@ -79,10 +79,12 @@ class FunnyController(controller.Controller):
         #print(self.Q)
         #print(self.N)
 
+    @profile(name='Funny praise')
     def praise(self, score: int) -> None:
         self.N[self.current_strategy] += 1
         self.Q[self.current_strategy] += 1.0/self.N[self.current_strategy] * (score - self.Q[self.current_strategy])
 
+    @profile(name='Funny _get_weaponable_tiles')
     def _get_weaponable_tiles(self, pos, facing, weapon_name):
         weapon = WEAPON_CODING[weapon_name]
         pos = Coords(x=pos[0], y=pos[1])
@@ -98,12 +100,14 @@ class FunnyController(controller.Controller):
             weaponable_tiles = weapons.Axe.cut_positions(self.terrain, pos, facing)
         return weaponable_tiles
 
+    @profile(name='Funny _update_misted_tiles')
     def _update_misted_tiles(self, visible_tiles: characters.ChampionKnowledge.visible_tiles):
         misted_tiles = set(filter(lambda x: visible_tiles[x].effects and Mist in visible_tiles[x].effects,
                                    visible_tiles))
         ### zupdatować płytki które są też na pewno zamglone na podst widocznych mgieł
         self.misted_tiles.update(misted_tiles)
 
+    @profile(name='Funny _update_menhir_knowledge')
     def _update_menhir_knowledge(self, visible_tiles: characters.ChampionKnowledge.visible_tiles):
         menhir_tile = list(filter(lambda x: visible_tiles[x].type == 'menhir', visible_tiles))
         if menhir_tile:
@@ -112,6 +116,7 @@ class FunnyController(controller.Controller):
             self.to_check_if_menhir_tiles -= set(visible_tiles.keys())
             self.to_check_if_menhir_tiles -= self.misted_tiles
 
+    @profile(name='Funny _find_weapon')
     def _find_weapon(self, pos):
         weapon_types = [weapon for weapon, priority in self.weapon_priority.items() if priority == 5]
         weapons = list(filter(lambda x: self.weapon_tiles[x] in weapon_types, self.weapon_tiles))
@@ -122,6 +127,7 @@ class FunnyController(controller.Controller):
 
         return create_path(pos, weapon, parents)
 
+    @profile(name='Funny _find_menhir')
     def _find_menhir(self, pos):
         distances, parents = dijkstra(self.arena, pos, self.facing)
         distance_map = {pos: distances[r(pos)] for pos in self.to_check_if_menhir_tiles}
@@ -129,6 +135,7 @@ class FunnyController(controller.Controller):
 
         return create_path(pos, tile, parents)
 
+    @profile(name='Funny _hide')
     def _hide(self, pos):
         #distances, parents = dijkstra(self.arena, pos, self.facing, self.weapon_drops)
         distances, parents = dijkstra(self.arena, pos, self.facing)
@@ -137,6 +144,7 @@ class FunnyController(controller.Controller):
 
         return create_path(pos, hideout, parents)
 
+    @profile(name='Funny _hold_pos')
     def _hold_pos(self, knowledge: characters.ChampionKnowledge):
         pos = knowledge.position
 
@@ -152,6 +160,7 @@ class FunnyController(controller.Controller):
 
         return turn
 
+    @profile(name='Funny _get_dangerous_fields')
     def _get_dangerous_fields(self, enemy_pos, knowledge):
         danger_tiles = [enemy_pos]
 
@@ -159,6 +168,7 @@ class FunnyController(controller.Controller):
         danger_tiles.extend(self._get_weaponable_tiles(enemy_pos, enemy.facing, enemy.weapon.name))
         return danger_tiles
 
+    @profile(name='Funny _run_away')
     def _run_away(self, pos, danger_tiles):
         distances, parents = dijkstra(self.arena, pos, self.facing, danger_tiles)
         surrounding_tiles = [(pos[0]+i, pos[1]+j) for i in range(-4, 5) for j in range(-4, 5)
@@ -170,6 +180,7 @@ class FunnyController(controller.Controller):
         hideout = min(distances_map, key=distances_map.get)
         return create_path(pos, hideout, parents)
 
+    @profile(name='Funny _worse_weapon_tiles')
     def _worse_weapon_tiles(self):
         worse_weapon_tiles = set()
         current_weapon_priority = self.weapon_priority[WEAPON_CODING[self.weapon]]
@@ -178,6 +189,7 @@ class FunnyController(controller.Controller):
                 worse_weapon_tiles.add(tile)
         return worse_weapon_tiles
 
+    @profile(name='Funny _update_weapons_knowledge')
     def _update_weapons_knowledge(self, tile, weapon_name):
         code = WEAPON_CODING[weapon_name]
         self.weapon_tiles[tile] = code
@@ -185,6 +197,7 @@ class FunnyController(controller.Controller):
                               code + \
                               self.arena[tile[1]][tile[0] + 1:]
 
+    @profile(name='Funny _fight')
     def _fight(self, pos, danger_tiles):
         danger_tiles_set = set(danger_tiles)
         # danger_tiles_set.update(self.weapon_drops)
@@ -212,6 +225,7 @@ class FunnyController(controller.Controller):
             closest_weak_spot = sorted(weak_spots, key=lambda p: distances[r(p)])[0]
             return create_path(pos, closest_weak_spot, parents)
 
+    @profile(name='Funny _go_to_menhir')
     def _go_to_menhir(self, pos):
         #distances, parents = dijkstra(self.arena, pos, self.facing, self.weapon_drops)
         distances, parents = dijkstra(self.arena, pos, self.facing)
@@ -220,6 +234,7 @@ class FunnyController(controller.Controller):
             self.menhir_pos = Coords(25, 25)
         return create_path(pos, self.menhir_pos, parents)
 
+    @profile(name='Funny original_funny_controller_strategy')
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
 
         self.ep_it += 1
@@ -340,6 +355,7 @@ class FunnyController(controller.Controller):
 
         return action
 
+    @profile(name='Funny menhir_camping_strategy')
     def menhir_camping_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         """take bow or axe, run away from enemies, find menhir and stay there"""
         # 0-find weapon, 1-find menhir, 3-go to menhir
@@ -422,6 +438,7 @@ class FunnyController(controller.Controller):
 
         return action
 
+    @profile(name='Funny hide_in_safe_spot_strategy')
     def hide_in_safe_spot_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         """take bow or axe (to think if necessary), run away from enemies, go to safe place and stay there"""
         # 0-find weapon, 1-go to safe place
@@ -503,7 +520,7 @@ class FunnyController(controller.Controller):
 
         return action
 
-    @profile
+    @profile(name='Funny decide')
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.strategies[self.current_strategy](knowledge)
 
