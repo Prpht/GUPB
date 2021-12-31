@@ -48,12 +48,12 @@ class SwordStrategy(Strategy):
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                self.safe_place = self.get_far_coord_orthogonal_to_tile(self.menhir_coord, 4)
-                path = Astar.astar(self.grid, self.position, self.safe_place)
+                target_coord = self.get_far_coord_orthogonal_to_tile(self.menhir_coord, 4)
+                path = Astar.astar(self.grid, self.position, target_coord)
                 if path is not None:
                     self.action_queue = self.generate_queue_from_path(
                         path)
-            else:
+            elif not self.is_mist_coming and self.menhir_coord and self.safe_place is not None:
                 self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
@@ -64,7 +64,5 @@ class SwordStrategy(Strategy):
 
         if len(self.action_queue) > 0:
             return self.action_queue.pop(0)
-        elif self.position == self.safe_place:
-            return characters.Action.TURN_LEFT
         else:
             return characters.Action.TURN_LEFT

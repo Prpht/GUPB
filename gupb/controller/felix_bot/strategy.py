@@ -96,6 +96,7 @@ class Strategy:
         self.menhir_coord = None
         self.visible_tile_enemies = []
         self.arena_description = arena_description.name
+        self.safe_place = None
         # self.safe_place = SAFE_PLACES[arena_description.name]
         for x_index in range(50):
             for y_index in range(50):
