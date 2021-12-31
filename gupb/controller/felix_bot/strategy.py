@@ -25,9 +25,9 @@ WEAPON_RANGE = {
 
 SAFE_POS = {
     'fisher_island': [
-        Coords(39, 12),
-        Coords(4, 30),
-        Coords(7, 9)
+        Coords(12, 39),
+        Coords(30, 4),
+        Coords(9, 7)
     ],
     'isolated_shrine': [
         Coords(6, 6),
@@ -36,10 +36,10 @@ SAFE_POS = {
         Coords(12, 12)
     ],
     'archipelago': [
-        Coords(40, 7),
-        Coords(42, 30),
-        Coords(23, 45),
-        Coords(8, 31)
+        Coords(7, 40),
+        Coords(30, 42),
+        Coords(45, 23),
+        Coords(31, 8)
     ],
     'dungeon': [
         Coords(27, 24),
@@ -57,12 +57,12 @@ SAFE_POS = {
         Coords(10, 12)
     ],
     'wasteland': [
-        Coords(13, 25),
-        Coords(13, 27),
-        Coords(33, 36),
-        Coords(5, 6),
-        Coords(5, 43),
-        Coords(46, 44)
+        Coords(25, 13),
+        Coords(27, 13),
+        Coords(36, 33),
+        Coords(6, 5),
+        Coords(43, 5),
+        Coords(44, 46)
     ]
 }
 
@@ -269,6 +269,7 @@ class Strategy:
         if len(self.action_queue) > 0:
             if not self.__is_allowed_action(self.action_queue[0]):
                 self.action_queue = []
+                self.safe_place = None
 
     def __is_allowed_action(self, action):
         return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in [

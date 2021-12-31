@@ -53,7 +53,7 @@ class AxeStrategy(Strategy):
                 if path is not None:
                     self.action_queue = self.generate_queue_from_path(
                         path)
-            elif not self.is_mist_coming and self.menhir_coord and self.safe_place is not None:
+            elif self.safe_place is None:
                 self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
