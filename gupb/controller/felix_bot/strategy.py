@@ -136,12 +136,9 @@ class Strategy:
 
     def random_action_choice(self):
         if self.__is_allowed_action(characters.Action.STEP_FORWARD):
-            return random.choice([characters.Action.TURN_LEFT,
-                                  characters.Action.TURN_RIGHT,
-                                  characters.Action.STEP_FORWARD])
+            return characters.Action.STEP_FORWARD
         else:
-            return random.choice([characters.Action.TURN_LEFT,
-                                  characters.Action.TURN_RIGHT,])
+            return characters.Action.TURN_LEFT
 
     def refresh_info(self, knowledge: characters.ChampionKnowledge):
         self.position = knowledge.position
