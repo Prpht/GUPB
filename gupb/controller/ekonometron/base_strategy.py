@@ -30,14 +30,6 @@ class Strategy:
         pass
 
     """ Utils """
-    # def forward_action(self, position: coordinates.Coords, action=characters.Action.STEP_FORWARD):
-    #     if action == characters.Action.STEP_FORWARD and self.controller.direction is not None:
-    #         front_coords = position + self.controller.direction.value
-    #         front_tile = self.controller.tiles_memory[front_coords]
-    #         if front_tile.loot is not None:
-    #             self.controller.hold_weapon = front_tile.loot.name
-    #     return action
-
     def check_if_mist_visible(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
         for coord, tile in visible_tiles.items():
             for e in tile.effects:
