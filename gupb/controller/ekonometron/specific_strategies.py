@@ -45,20 +45,27 @@ class TryingMyBest(Strategy):
                     self.controller.current_path = self.bfs_shortest_path(knowledge.position, self.controller.destination)
                     self.current_mode = "Go to menhir"
                     return right_action(self.controller)
-            # react to a weapon on the ground
-            if self.weapon_in_reach(knowledge.position):
-                action = self.react_to_weapon(knowledge.position)
-                if action != characters.Action.DO_NOTHING:
-                    return action
-            # turn if there is an obstacle in front
-            if self.obstacle_in_front(knowledge.position):
-                return self.take_a_turn(knowledge.position)
-            # if there is nothing interesting going on, bot will move forward
-            rand_gen = random.random()
-            if rand_gen <= 0.9:
-                return forward_action(self.controller, knowledge.position)
+            if self.controller.destination is None:
+                weapon_coords = self.return_good_weapon_coords(knowledge)
+                if weapon_coords is not None:
+                    self.controller.destination = weapon_coords
+                    self.controller.current_path = self.bfs_shortest_path(knowledge.position, self.controller.destination)
+                    return left_action(self.controller)
+                # turn if there is an obstacle in front
+                if self.obstacle_in_front(knowledge.position):
+                    return self.take_a_turn(knowledge.position)
+                # if there is nothing interesting going on, bot will move forward
+                rand_gen = random.random()
+                if rand_gen <= 0.9:
+                    return forward_action(self.controller, knowledge.position)
+                else:
+                    return self.take_a_turn(knowledge.position)
             else:
-                return self.take_a_turn(knowledge.position)
+                next_step = self.move(knowledge.position)
+                if next_step is not None:
+                    return next_step
+                else:
+                    return right_action(self.controller)
 
     def weapon_in_reach(self, position: coordinates.Coords):
         """Bot checks if it is next to a potential weapon it can reach"""
@@ -231,13 +238,6 @@ class LetsHide(Strategy):
             if (tile.character is not None) and (tile.character.controller_name != self.controller.name):
                 return True
         return False
-
-    def return_good_weapon_coords(self, knowledge):
-        for coord, tile in knowledge.visible_tiles.items():
-            if (tile.loot is not None) and (WEAPONS_PRIORITIES[tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon])\
-                    and (coord != knowledge.position):
-                return coord
-        return None
 
     def find_hiding_spot(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
