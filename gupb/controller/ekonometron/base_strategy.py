@@ -16,6 +16,7 @@ class Strategy:
         self.value = 0.0
         self.n = 0
         self.current_mode = None
+        self.watch_back = False
 
     def proceed(self, knowledge):
         """ Picks an action for the controller or changes some of its variables """
@@ -27,7 +28,7 @@ class Strategy:
         self.value += (reward - self.value) / self.n
 
     def reset_mode(self):
-        pass
+        self.watch_back = False
 
     """ Utils """
     def check_if_mist_visible(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
