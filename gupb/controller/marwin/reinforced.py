@@ -1,4 +1,5 @@
 import random
+import typing
 
 import numpy as np
 
@@ -21,8 +22,6 @@ class ReinforcedMarwin(BaseMarwinController):
 		# initially all politics are of the same worth and are used 0 times
 		self.Q = {pol: 1 for pol in self.policies.keys()}
 		self.N = {pol: 0 for pol in self.policies.keys()}
-		self.current_policy = random.choice(self.policies) if random.uniform(0, 1) < ReinforcedMarwin.EPS else \
-			max(self.Q.items(), key= lambda it: it[1])[0]
 		self._arena = np.zeros(utils.ARENA_SIZE, dtype=int)
 		self.weapons_to_take = None
 
@@ -59,6 +58,8 @@ class ReinforcedMarwin(BaseMarwinController):
 		self._current_weapon = None
 		self._last_position = None
 		self._i = 0
+		self.current_policy = random.choice(list(self.policies)) if random.uniform(0, 1) < ReinforcedMarwin.EPS else \
+			max(self.Q.items(), key= lambda it: it[1])[0]
 
 	def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
 		return self.policies[self.current_policy](knowledge)
@@ -69,7 +70,8 @@ class ReinforcedMarwin(BaseMarwinController):
 		q = self.Q[self.current_policy]
 		self.Q[self.current_policy] += (1 / n * (score - q))
 
-	def _init_round(self, knowledge):
+	def _init_round(self, knowledge: characters.ChampionKnowledge) -> typing.Tuple[Coords, characters.ChampionDescription,
+	characters.Action, characters.Facing, typing.Dict[str, typing.List]]:
 		my_position = knowledge.position
 		my_character = self._get_champion(knowledge)
 		action = characters.Action.DO_NOTHING
