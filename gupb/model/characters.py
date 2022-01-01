@@ -63,8 +63,9 @@ class Champion:
     def act(self) -> None:
         if self.alive:
             action = self.pick_action()
-            verbose_logger.debug(f"Champion {self.controller.name} picked action {action}.")
-            ChampionPickedActionReport(self.controller.name, action.name).log(logging.DEBUG)
+            name = self.controller.name if self.controller else "NULL_CONTROLLER"
+            verbose_logger.debug(f"Champion {name} picked action {action}.")
+            ChampionPickedActionReport(name, action.name).log(logging.DEBUG)
             action(self)
             self.arena.stay(self)
 
@@ -74,7 +75,12 @@ class Champion:
             visible_tiles = self.arena.visible_tiles(self)
             knowledge = ChampionKnowledge(self.position, visible_tiles)
             try:
-                return self.controller.decide(knowledge)
+                action = self.controller.decide(knowledge)
+                if action is None:
+                    verbose_logger.warning(f"Controller {self.controller.name} returned a non-action.")
+                    ControllerExceptionReport(self.controller.name, "a non-action returned").log(logging.WARN)
+                    return Action.DO_NOTHING
+                return action
             except Exception as e:
                 verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
                 ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)

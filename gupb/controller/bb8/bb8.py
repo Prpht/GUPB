@@ -1,6 +1,7 @@
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
+from gupb.model.profiling import profile
 from gupb.controller.bb8.strategy import (RLStrategy, RandomStrategy, 
                                           BB8Strategy, FindBestWeaponStrategy, 
                                           EscapeToMenhirStrategy)
@@ -11,7 +12,7 @@ from gupb.controller.bb8.strategy import (RLStrategy, RandomStrategy,
 class BB8Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.strategy = EscapeToMenhirStrategy()
+        self.strategy = FindBestWeaponStrategy()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BB8Controller):
@@ -27,6 +28,7 @@ class BB8Controller(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.strategy.decide(knowledge)
 
@@ -36,7 +38,7 @@ class BB8Controller(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.ORANGE
 
 
 POTENTIAL_CONTROLLERS = [

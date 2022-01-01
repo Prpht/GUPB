@@ -8,6 +8,7 @@ from .strategy_rewards_log import StrategyRewardsLog
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
+from gupb.model.profiling import profile
 
 import numpy as np
 
@@ -46,6 +47,7 @@ class FelixBotController(controller.Controller):
         self.current_strategy = self.choose_strategy()
         self.current_strategy.reset(arena_description)
 
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.current_strategy.decide(knowledge)
 
