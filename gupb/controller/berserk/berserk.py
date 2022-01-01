@@ -70,7 +70,7 @@ class BerserkBot(controller.Controller):
         except Exception as e:
             # print(e)
             # print(self.knowledge_decoder.knowledge.position)
-            return characters.Action.TURN_RIGHT
+            return characters.Action.STEP_FORWARD
 
     @property
     def name(self) -> str:
