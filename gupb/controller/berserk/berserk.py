@@ -1,5 +1,5 @@
 import random
-from collections import Counter
+from collections import Counter, defaultdict
 from gupb import controller
 from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
 
@@ -26,7 +26,7 @@ class BerserkBot(controller.Controller):
         self.strategy = None
         self.move_counter = 0
         self.round_id = 0
-        self.knowledge_base = dict()
+        self.knowledge_base = defaultdict(lambda: dict())
         self.epsilon = self.get_epsilon()
         self.strategy_counter = Counter()
 
@@ -39,13 +39,13 @@ class BerserkBot(controller.Controller):
         return hash(self.first_name)
 
     def praise(self, score: int) -> None:
-        reward = score * 10 + self.move_counter * 0.5
-        if self.strategy.name() in self.knowledge_base.keys():
+        reward = score * 5 + self.move_counter * 1
+        if self.strategy.name() in self.knowledge_base[self.knowledge_decoder.map_name].keys():
             runs_no = self.strategy_counter[self.strategy.name()]
-            old_reward = self.knowledge_base[self.strategy.name()]
-            self.knowledge_base[self.strategy.name()] = (reward + old_reward * (runs_no - 1))/runs_no
+            old_reward = self.knowledge_base[self.knowledge_decoder.map_name][self.strategy.name()]
+            self.knowledge_base[self.knowledge_decoder.map_name][self.strategy.name()] = (reward + old_reward * (runs_no - 1))/runs_no
         else:
-            self.knowledge_base[self.strategy.name()] = reward
+            self.knowledge_base[self.knowledge_decoder.map_name][self.strategy.name()] = reward
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.knowledge_decoder.reset()
@@ -56,7 +56,7 @@ class BerserkBot(controller.Controller):
         if random.random() <= self.epsilon:
             strategy_name = random.choice(list(POSSIBLE_STRATEGY.keys()))
         else:
-            sorted_results = sorted(self.knowledge_base.items(), key=lambda tup: tup[1])[::-1]
+            sorted_results = sorted(self.knowledge_base[self.knowledge_decoder.map_name].items(), key=lambda tup: tup[1])[::-1]
             strategy_name = sorted_results[0][0]
         self.strategy = POSSIBLE_STRATEGY[strategy_name](self.knowledge_decoder)
         self.strategy_counter[self.strategy.name()] += 1

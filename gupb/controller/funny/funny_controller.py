@@ -10,8 +10,6 @@ import random
 
 
 class FunnyController(controller.Controller):
-    START_RUNNING_FROM_MIST = 550
-
     def __init__(self):
         self.strategies = {
             'original_funny_controller_strategy': self.original_funny_controller_strategy,
@@ -56,6 +54,7 @@ class FunnyController(controller.Controller):
         self.safe_pos = SAFE_POS[arena_description.name]
         self.weapon_priority = WEAPON_PRIORITY[arena_description.name]
         self.to_check_if_menhir_tiles = set()
+        self.start_running_from_mist = START_RUNNING_FROM_MIST[arena_description.name]
         for y in range(len(self.arena)):
             for x in range(len(self.arena[0])):
                 if self.arena[y][x] == '.':
@@ -67,10 +66,10 @@ class FunnyController(controller.Controller):
         self.hp = CHAMPION_STARTING_HP
         self.ep_it = 0
         self.facing = None
-        self.strategy_iter = 0  # 0-find weapon, 1-find menhir, 2-hide, 4-go to menhir
+        self.strategy_iter = 0  # 0-find weapon, 1-find menhir, 2-hide, 4-go to menhir, 6-fight
+        self.last_strategy_iter = None
         self._reset_surrounding_walls()
 
-        self.curr_target = None
         self.path = []
 
         self.weapon = "knife"
@@ -124,7 +123,7 @@ class FunnyController(controller.Controller):
         return create_path(pos, weapon, parents)
 
     def _find_menhir(self, pos):
-        distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
+        distances, parents = dijkstra(self.arena, pos, self.facing)
         distance_map = {pos: distances[r(pos)] for pos in self.to_check_if_menhir_tiles}
         tile = min(distance_map, key=distance_map.get)
 
@@ -132,9 +131,9 @@ class FunnyController(controller.Controller):
 
     def _hide(self, pos):
         #distances, parents = dijkstra(self.arena, pos, self.facing, self.weapon_drops)
-        distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
+        distances, parents = dijkstra(self.arena, pos, self.facing)
         distances_map = {hideout: distances[r(hideout)] for hideout in self.safe_pos}
-        hideout = min(distances_map, key=distances_map.get)
+        hideout = min(distances_map, key=lambda t: dist(t, self.menhir_pos))
 
         return create_path(pos, hideout, parents)
 
@@ -189,7 +188,7 @@ class FunnyController(controller.Controller):
     def _fight(self, pos, danger_tiles):
         danger_tiles_set = set(danger_tiles)
         # danger_tiles_set.update(self.weapon_drops)
-        danger_tiles_set.update(self._worse_weapon_tiles())
+        # danger_tiles_set.update(self._worse_weapon_tiles())
         distances, parents = dijkstra(self.arena, pos, self.facing, danger_tiles_set)
 
         if WEAPON_CODING[self.weapon] in ['A', 'M']:
@@ -208,28 +207,37 @@ class FunnyController(controller.Controller):
 
         weak_spots = list(filter(lambda x: self.arena[x[1]][x[0]] not in ['=', '#'], weak_spots))
         if not weak_spots:
-            return []
+            return create_path(pos, self.opponent_pos, parents)
         else:
             closest_weak_spot = sorted(weak_spots, key=lambda p: distances[r(p)])[0]
             return create_path(pos, closest_weak_spot, parents)
 
     def _go_to_menhir(self, pos):
         #distances, parents = dijkstra(self.arena, pos, self.facing, self.weapon_drops)
-        distances, parents = dijkstra(self.arena, pos, self.facing, self._worse_weapon_tiles())
+        distances, parents = dijkstra(self.arena, pos, self.facing)
         if self.menhir_pos is None:
             # misted_tiles_coords = [coords for coords, _ in self.misted_tiles]
             self.menhir_pos = Coords(25, 25)
         return create_path(pos, self.menhir_pos, parents)
 
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+
+        self.ep_it += 1
+
         pos = knowledge.position
         visible_tiles = knowledge.visible_tiles
         tile = knowledge.visible_tiles[pos]
         self_knowledge = tile.character
 
+        if self.menhir_pos is None:
+            self._update_menhir_knowledge(visible_tiles)
+
         if tile.loot:
             self._update_weapons_knowledge(pos, tile.loot.name)
+
         self.weapon = self_knowledge.weapon.name
+        if self.weapon == 'bow_unloaded':
+            return characters.Action.ATTACK
 
         if self.menhir_pos is None and self.strategy_iter > 1:
             self.strategy_iter = 1
@@ -239,8 +247,8 @@ class FunnyController(controller.Controller):
         #     self.hp = self_knowledge.health
         ### ogarnac kto bije, reakcja
 
-        self.ep_it += 1
-        if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
+        if self.ep_it > self.start_running_from_mist:
+            self.path = []
             self.strategy_iter = 4
 
         # TODO uwaga na to, czasochłonne
@@ -258,22 +266,28 @@ class FunnyController(controller.Controller):
                 character = tile_knowledge.character
                 if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
                     # mam wystarczajaco duzo zycia
-                    if character.health <= 2:
-                        self._update_weapons_knowledge(tile, character.weapon.name)
-                        self.weapon_drops.add(tile)
+                    self.path = []
                     return characters.Action.ATTACK
+
             except KeyError:
                 pass
-        if len(self.path) == 0:
-            if self.strategy_iter == 0:
-                self.path = self._find_weapon(pos)
-            elif self.strategy_iter == 1:
-                self._update_menhir_knowledge(visible_tiles)
-                self.path = self._find_menhir(pos)
-            elif self.strategy_iter == 2:
-                self.path = self._hide(pos)
-            elif self.strategy_iter == 4:
-                self.path = self._go_to_menhir(pos)
+
+        while len(self.path) == 0:
+            if self.strategy_iter != 6:
+                if self.strategy_iter == 0:
+                    self.path = self._find_weapon(pos)
+                elif self.strategy_iter == 1:
+                    # self._update_menhir_knowledge(visible_tiles)
+                    self.path = self._find_menhir(pos)
+                elif self.strategy_iter == 2:
+                    self.path = self._hide(pos)
+                elif self.strategy_iter == 4:
+                    self.path = self._go_to_menhir(pos)
+
+                break
+
+            else:
+                self.strategy_iter, self.last_strategy_iter = self.last_strategy_iter, None
 
         if self.strategy_iter != 3:
             opposing_characters_pos = []
@@ -293,6 +307,7 @@ class FunnyController(controller.Controller):
                     if tile in danger_tiles:
                         self.opponent_pos = opponent
                         self.path = self._fight(pos, danger_tiles)
+                        self.last_strategy_iter, self.strategy_iter = self.strategy_iter, 6
                         break
 
         if len(self.path) == 0:
@@ -301,11 +316,20 @@ class FunnyController(controller.Controller):
             action = get_next_move(pos, self.facing, self.path[-1])
             if action == characters.Action.STEP_FORWARD:
                 self.path.pop()
+
+                next_pos = s(pos, self.facing.value)
+                next_tile = visible_tiles[next_pos]
+                try:
+                    weapon_drop = WEAPON_CODING[next_tile.loot.name]
+                    current_weapon_priority = self.weapon_priority[WEAPON_CODING[self.weapon]]
+
+                    if self.weapon_priority[weapon_drop] < current_weapon_priority:
+                        self.path.extend([next_pos, pos])
+                except AttributeError:
+                    pass
+
                 if len(self.path) == 0:
-                    if self.opponent_pos is not None:
-                        self.opponent_pos = None
-                    else:
-                        self.strategy_iter += 1
+                    self.strategy_iter += 1
 
         if action == characters.Action.STEP_FORWARD:
             self._reset_surrounding_walls()
