@@ -55,10 +55,20 @@ class FunnyController(controller.Controller):
         self.weapon_priority = WEAPON_PRIORITY[arena_description.name]
         self.to_check_if_menhir_tiles = set()
         self.start_running_from_mist = START_RUNNING_FROM_MIST[arena_description.name]
+
+        mid_y, mid_x = len(self.arena) // 2, len(self.arena[0]) // 2
+        curr_closest_mid_distance = mid_y * 2
+
         for y in range(len(self.arena)):
             for x in range(len(self.arena[0])):
                 if self.arena[y][x] == '.':
                     self.to_check_if_menhir_tiles.add((x, y))
+
+                    mid_distance = dist((x, y), (mid_x, mid_y))
+                    if mid_distance < curr_closest_mid_distance:
+                        self.default_menhir_position = Coords(x, y)
+                        curr_closest_mid_distance = mid_distance
+
 
         self.current_strategy = random.choice(list(self.strategies.keys())) if random.random() < self.epsilon \
             else max(self.Q, key=self.Q.get)
@@ -231,7 +241,7 @@ class FunnyController(controller.Controller):
         distances, parents = dijkstra(self.arena, pos, self.facing)
         if self.menhir_pos is None:
             # misted_tiles_coords = [coords for coords, _ in self.misted_tiles]
-            self.menhir_pos = Coords(25, 25)
+            self.menhir_pos = self.default_menhir_position
         return create_path(pos, self.menhir_pos, parents)
 
     @profile(name='Funny original_funny_controller_strategy')
@@ -372,7 +382,7 @@ class FunnyController(controller.Controller):
             self.facing = self_knowledge.facing
 
         self.ep_it += 1
-        if self.ep_it > FunnyController.START_RUNNING_FROM_MIST:
+        if self.ep_it > self.start_running_from_mist:
             self.strategy_iter = 3
 
         # self._update_misted_tiles(visible_tiles)
@@ -485,6 +495,7 @@ class FunnyController(controller.Controller):
                 if self.menhir_pos is not None:
                     self.path = self._go_to_menhir(pos)
                 else:
+                    self.menhir_pos = self.default_menhir_position
                     self.path = self._hide(pos)
 
         opposing_characters_pos = []
