@@ -24,7 +24,7 @@ CONFIGURATION = {
         felix_bot.FelixBotController("Felix"),
         bb8.BB8Controller("BB8"),
         ekonometron.EkonometronController("Johnathan"),
-        marwin.deterministic.DeterministicMarwinController("Marwin"),
+        marwin.reinforced.ReinforcedMarwin("Marwin"),
     ],
     'start_balancing': False,
     'visualise': False,
