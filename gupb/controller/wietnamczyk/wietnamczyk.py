@@ -12,11 +12,14 @@ from gupb.model.characters import Facing, CHAMPION_STARTING_HP
 from gupb.model.coordinates import Coords
 from gupb.model.profiling import profile
 import json
+from math import pi as M_PI
+from math import sqrt
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class WIETnamczyk(controller.Controller):
+    FIGHT_NEAR_MENHIR = "fight_near_menhir"
     GET_WEAPON = "get_weapon"
     EXPLORE = "explore"
     PANIC = "panic"
@@ -40,7 +43,6 @@ class WIETnamczyk(controller.Controller):
         rand = random.uniform(0, 1)
         self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
                                                                                                       key=self.Q.get)
-
         self.menhir_pos = None
         self.good_weapons = ["sword", "axe", "bow_unloaded", "bow_loaded"]
         self.first_name: str = "Adam"
@@ -60,6 +62,12 @@ class WIETnamczyk(controller.Controller):
         dist = abs(tile1[0] - tile2[0]) + abs(tile1[1] - tile2[1])
         return dist
 
+    def euclidean_dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
+        if not tile1 or not tile2:
+            return 0
+        dist = abs(tile1[0] - tile2[0]) ** 2 + abs(tile1[1] - tile2[1]) ** 2
+        return sqrt(dist)
+
     def max_dist(self, tile1: coordinates.Coords, tile2: coordinates.Coords):
         return max(abs(tile1[0] - tile2[0]), abs(tile1[1] - tile2[1]))
 
@@ -71,6 +79,7 @@ class WIETnamczyk(controller.Controller):
                              key=lambda pair: pair[1]))
         return random.choices(places, weights=self.prob)[0][0]
 
+    # @profile(name="should_fight_WIETnamczyk")
     def should_fight(self, self_pos: coordinates.Coords, enemy_pos: coordinates.Coords,
                      enemy_tile: tiles.TileDescription) -> bool:
         enemy_hp = enemy_tile.character.health
@@ -84,6 +93,7 @@ class WIETnamczyk(controller.Controller):
                 return True
         return False
 
+    # @profile(name="should_attack_WIETnamczyk")
     def should_attack(self, self_pos: coordinates.Coords, knowledge: characters.ChampionKnowledge):
         if self.current_weapon.name == 'sword':
             for tile, description in knowledge.visible_tiles.items():
@@ -125,7 +135,7 @@ class WIETnamczyk(controller.Controller):
                 if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
                     return True
         return False
-
+    # @profile(name="find_good_weapon_WIETnamczyk")
     def find_good_weapon(self, bot_pos):
         weapons_pos = []
         for i in range(len(self.map)):
@@ -145,6 +155,7 @@ class WIETnamczyk(controller.Controller):
             return None
         return closest_good_weapon[0][0]
 
+    # @profile(name="find_visible_enemies_WIETnamczyk")
     def find_visible_enemies(self, bot_pos, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription], ):
         enemies_list = []
         for tile, description in visible_tiles.items():
@@ -152,11 +163,13 @@ class WIETnamczyk(controller.Controller):
                 dist_to_enemy = len(self.find_path(bot_pos, tile))
                 if dist_to_enemy <= self.enemy_range:
                     enemies_list.append((description, tile, dist_to_enemy))
-        return sorted(enemies_list, key=lambda item: item[2])
+        return list(sorted(enemies_list, key=lambda item: item[2]))
 
+    # @profile(name="find_direction_WIETnamczyk")
     def find_direction(self, path_to_destination, knowledge, bot_pos):
         if len(path_to_destination) == 0:
             return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
+
         for tile, description in knowledge.visible_tiles.items():
             distance = self.dist(bot_pos, tile)
             if distance == 1:
@@ -169,10 +182,15 @@ class WIETnamczyk(controller.Controller):
                 x2 = current_tile[0] - bot_pos[0]
                 y2 = current_tile[1] - bot_pos[1]
                 angle = atan2(y2, x2) - atan2(y1, x1)
+                if angle > M_PI:
+                    angle -= 2 * M_PI
+                elif angle <= -1 * M_PI:
+                    angle += 2 * M_PI
                 if angle > 0:
                     return characters.Action.TURN_LEFT
                 else:
                     return characters.Action.TURN_RIGHT
+
         return characters.Action.TURN_RIGHT
 
     def is_tile_valid(self, tile):
@@ -194,8 +212,8 @@ class WIETnamczyk(controller.Controller):
     def is_greater(self, a, b):
         return a > b
 
+    # @profile(name="update_knowledge_WIETnamczyk")
     def update_knowledge(self, visible_tiles, bot_pos):
-        # print(self.state, bot_pos, self.exploration_goal, self.current_strategy)
         for tile, description in visible_tiles.items():
             self.map[tile[0]][tile[1]] = description
 
@@ -248,6 +266,7 @@ class WIETnamczyk(controller.Controller):
                     unseen_coords.add((i, j))
         return unseen_coords
 
+    # @profile(name="find_path_WIETnamczyk")
     def find_path(self, start_pos, dest_coord):
         X = len(self.map)
         Y = len(self.map)
@@ -276,6 +295,7 @@ class WIETnamczyk(controller.Controller):
                         parent[adj] = s
         return []
 
+    # @profile(name="can_pass_WIETnamczyk")
     def can_pass(self, X, Y, adj_x, adj_y, visited):
         can_pass = 0 <= adj_x < X and 0 <= adj_y < Y and (
                 self.map[adj_x][adj_y].type == 'land' or self.map[adj_x][adj_y].type == 'menhir') \
@@ -287,6 +307,7 @@ class WIETnamczyk(controller.Controller):
             return self.map[adj_x][adj_y].loot.name not in ['knife', 'amulet']
         return can_pass
 
+    # @profile(name="go_to_menhir_WIETnamczyk")
     def go_to_menhir(self, knowledge: characters.ChampionKnowledge, bot_pos: Coords):
         path_to_destination = self.find_path(bot_pos, self.menhir_pos)
         return self.find_direction(path_to_destination, knowledge, bot_pos)
@@ -294,23 +315,30 @@ class WIETnamczyk(controller.Controller):
     def catharsis(self):
         self.action_queue = []
 
+    # @profile(name="evaluate_mist_WIETnamczyk")
     def evaluate_mist(self, bot_pos: Coords, knowledge: characters.ChampionKnowledge):
         if WIETnamczyk.MIST_PANIC_MODE and self.find_path(bot_pos, self.exploration_goal) != []:
-            # print("panic mode and I know what I need to do!")
             return
+        dist_mist_to_menhir = float('inf')
         for coords, desc in knowledge.visible_tiles.items():
             if desc.effects and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 if self.menhir_pos is not None:
                     self.state = WIETnamczyk.GO_TO_MENHIR
-                    path_to_destination = self.find_path(bot_pos, self.menhir_pos)
-                    return self.find_direction(path_to_destination, knowledge, bot_pos)
+                    dist_mist_to_menhir = min(dist_mist_to_menhir, self.euclidean_dist(coords, self.menhir_pos))
                 else:
                     # todo: improve this logic :)
-                    # print("I noticed mist and I am planning my next step, don't worry I am an adult!")
                     WIETnamczyk.MIST_PANIC_MODE = True
                     self.state = WIETnamczyk.EXPLORE
                     self.catharsis()
                     self.exploration_goal = random.choice(list(self.unseen_coords))
+                    break
+
+        if self.state != WIETnamczyk.EXPLORE:
+            if dist_mist_to_menhir < .25 * min(len(self.map), len(self.map[0])):
+                self.state = WIETnamczyk.FIGHT_NEAR_MENHIR
+            path_to_destination = self.find_path(bot_pos, self.menhir_pos)
+            self.exploration_goal = self.menhir_pos
+            return self.find_direction(path_to_destination, knowledge, bot_pos)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, WIETnamczyk):
@@ -320,20 +348,26 @@ class WIETnamczyk(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    @profile
+    # @profile(name="decide_WIETnamczyk")
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         action = self.strategies_dict[self.current_strategy](knowledge)
         return action
 
+    # @profile(name="set_exploration_area_WIETnamczyk")
     def set_exploration_area(self, bot_pos: Coords, max_dist_from_menhir=5):
+        possible_cells = self.get_cooords_in_neibourhood(bot_pos, max_dist_from_menhir)
+        self.unseen_coords = possible_cells
+        self.exploration_goal = random.choice(list(possible_cells))
+
+    def get_cooords_in_neibourhood(self, bot_pos, max_dist_from_menhir):
         possible_cells = set()
         for i, row in enumerate(self.map):
             for j, cell in enumerate(row):
                 if self.dist(bot_pos, Coords(i, j)) < max_dist_from_menhir:
                     possible_cells.add((i, j))
-        self.unseen_coords = possible_cells
-        self.exploration_goal = random.choice(list(possible_cells))
+        return possible_cells
 
+    # @profile(name="generate_enemy_avoidance_action_WIETnamczyk")
     def generate_enemy_avoidance_action(self):
         goals = [(self.dist(self.exploration_goal, cell), cell) for cell in self.unseen_coords]
         sorted_goals = sorted(goals, key=lambda item: item[0], reverse=True)
@@ -348,23 +382,27 @@ class WIETnamczyk(controller.Controller):
 
         return self.action_queue.pop(0)
 
+    # @profile(name="generate_panic_action_WIETnamczyk")
     def generate_panic_action(self, bot_pos: Coords, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, desc in visible_tiles.items():
             if self.dist(coords, bot_pos) == 1 and desc.type in ['land', 'menhir']:
                 return characters.Action.STEP_FORWARD
         return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
 
+    # @profile(name="do_not_be_tabula_rasa_WIETnamczyk")
     def do_not_be_tabula_rasa(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         self.update_knowledge(knowledge.visible_tiles, bot_pos)
         self.evaluate_mist(bot_pos, knowledge)
 
+    # @profile(name="stand_in_mist_WIETnamczyk")
     def stand_in_mist(self, visible_tiles, bot_pos):
         for coords, desc in visible_tiles.items():
             if self.dist(coords, bot_pos) == 0 and 'mist' in list(map(lambda d: d.type, desc.effects)):
                 return True
         return False
 
+    # @profile(name="perform_priority_checks_WIETnamczyk")
     def perform_priority_checks(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         if self.should_attack(bot_pos, knowledge):
@@ -375,6 +413,42 @@ class WIETnamczyk(controller.Controller):
             return self.generate_panic_action(bot_pos, knowledge.visible_tiles)
         return None
 
+    # @profile(name="ostrich_explore_WIETnamczyk")
+    def ostrich_explore(self, bot_pos, knowledge):
+        visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+        if len(visible_enemies) > 1:
+            return self.generate_enemy_avoidance_action()
+        if len(visible_enemies) == 1:
+            enemy_pos = visible_enemies[0][1]
+            enemy_tile_description = visible_enemies[0][0]
+            if self.should_fight(bot_pos, enemy_pos, enemy_tile_description):
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
+                return self.find_direction(path_to_destination, knowledge, bot_pos)
+            return self.generate_enemy_avoidance_action()
+        if len(self.unseen_coords) == 0:
+            self.state = WIETnamczyk.GO_TO_MENHIR
+            return random.choice(POSSIBLE_ACTIONS)
+        return self.explore_map(bot_pos, knowledge)
+
+    # @profile(name="fight_near_menhir_WIETnamczyk")
+    def fight_near_menhir(self, bot_pos, knowledge):
+        if self.dist(bot_pos, self.menhir_pos) > 3:
+            return self.go_to_menhir(knowledge, bot_pos)
+        else:
+            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+            if len(visible_enemies) >= 1:
+                enemy_pos = visible_enemies[0][1]
+                enemy_tile_description = visible_enemies[0][0]
+                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
+                return self.find_direction(path_to_destination, knowledge, bot_pos)
+            else:
+                if self.euclidean_dist(bot_pos, self.exploration_goal) == 0:
+                    possible_cells = self.get_cooords_in_neibourhood(self.menhir_pos, 2)
+                    self.exploration_goal = random.choice(list(possible_cells))
+                path = self.find_path(bot_pos, self.exploration_goal)
+                return self.find_direction(path, knowledge, bot_pos)
+
+    # @profile(name="strategy_ostrich_WIETnamczyk")
     def strategy_ostrich(self, knowledge: characters.ChampionKnowledge):
         """
         This version of the bot keeps looking for menhir unless it sees some weaker enemy, then it tries to kill it.
@@ -387,10 +461,13 @@ class WIETnamczyk(controller.Controller):
 
         if self.state == WIETnamczyk.GO_TO_MENHIR:
             if self.dist(bot_pos, self.menhir_pos) < 3:
-                self.set_exploration_area(bot_pos)
+                self.set_exploration_area(self.menhir_pos)
                 self.state = WIETnamczyk.EXPLORE
             else:
                 return self.go_to_menhir(knowledge, bot_pos)
+
+        if self.state == WIETnamczyk.FIGHT_NEAR_MENHIR:
+            return self.fight_near_menhir(bot_pos, knowledge)
 
         if self.state == WIETnamczyk.GET_WEAPON:
             weapon_pos = self.find_good_weapon(bot_pos)
@@ -401,23 +478,11 @@ class WIETnamczyk(controller.Controller):
                 return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         if self.state == WIETnamczyk.EXPLORE:
-            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
-            if len(visible_enemies) > 1:
-                return self.generate_enemy_avoidance_action()
-            if len(visible_enemies) == 1:
-                enemy_pos = visible_enemies[0][1]
-                enemy_tile_description = visible_enemies[0][0]
-                if self.should_fight(bot_pos, enemy_pos, enemy_tile_description):
-                    path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
-                    return self.find_direction(path_to_destination, knowledge, bot_pos)
-                return self.generate_enemy_avoidance_action()
-            if len(self.unseen_coords) == 0:
-                self.state = WIETnamczyk.GO_TO_MENHIR
-                return random.choice(POSSIBLE_ACTIONS)
-            return self.explore_map(bot_pos, knowledge)
+            return self.ostrich_explore(bot_pos, knowledge)
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="strategy_berserker_WIETnamczyk")
     def strategy_berserker(self, knowledge: characters.ChampionKnowledge):
         """
         Whenever the bot sees an enemy he immediately starts following him. Otherwise, it just explores the map and
@@ -429,6 +494,16 @@ class WIETnamczyk(controller.Controller):
         if priority_action:
             return priority_action
 
+        if self.state == WIETnamczyk.GO_TO_MENHIR:
+            if self.dist(bot_pos, self.menhir_pos) < 3:
+                self.set_exploration_area(self.menhir_pos)
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                return self.go_to_menhir(knowledge, bot_pos)
+
+        if self.state == WIETnamczyk.FIGHT_NEAR_MENHIR:
+            return self.fight_near_menhir(bot_pos, knowledge)
+
         if self.state == WIETnamczyk.GET_WEAPON:
             weapon_pos = self.find_good_weapon(bot_pos)
             if not weapon_pos or self.current_weapon.name in self.good_weapons:
@@ -438,32 +513,40 @@ class WIETnamczyk(controller.Controller):
                 return self.find_direction(path_to_destination, knowledge, bot_pos)
 
         if self.state == WIETnamczyk.EXPLORE:
-            visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
-            if len(visible_enemies) > 0:
-                enemy_pos = visible_enemies[0][1]
-                enemy_tile_description = visible_enemies[0][0]
-                path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
-                return self.find_direction(path_to_destination, knowledge, bot_pos)
-            if len(self.unseen_coords) == 0:
-                self.state = WIETnamczyk.GO_TO_MENHIR
-                return random.choice(POSSIBLE_ACTIONS)
-            return self.explore_map(bot_pos, knowledge)
-
-        if self.state == WIETnamczyk.GO_TO_MENHIR:
-            if self.dist(bot_pos, self.menhir_pos) < 3:
-                self.set_exploration_area(bot_pos)
-                self.state = WIETnamczyk.EXPLORE
-            else:
-                return self.go_to_menhir(knowledge, bot_pos)
+            return self.berserker_explore(bot_pos, knowledge)
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="berserker_explore_WIETnamczyk")
+    def berserker_explore(self, bot_pos, knowledge):
+        visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
+        if len(visible_enemies) > 0:
+            enemy_pos = visible_enemies[0][1]
+            enemy_tile_description = visible_enemies[0][0]
+            path_to_destination = self.find_path((bot_pos[0], bot_pos[1]), (enemy_pos[0], enemy_pos[1]))
+            return self.find_direction(path_to_destination, knowledge, bot_pos)
+        if len(self.unseen_coords) == 0:
+            self.state = WIETnamczyk.GO_TO_MENHIR
+            return random.choice(POSSIBLE_ACTIONS)
+        return self.explore_map(bot_pos, knowledge)
+
+    # @profile(name="strategy_coward_WIETnamczyk")
     def strategy_coward(self, knowledge: characters.ChampionKnowledge):
         bot_pos = knowledge.position
         self.do_not_be_tabula_rasa(knowledge)
         priority_action = self.perform_priority_checks(knowledge)
         if priority_action:
             return priority_action
+
+        if self.state == WIETnamczyk.GO_TO_MENHIR:
+            if self.dist(bot_pos, self.menhir_pos) < 3:
+                self.set_exploration_area(self.menhir_pos)
+                self.state = WIETnamczyk.EXPLORE
+            else:
+                return self.go_to_menhir(knowledge, bot_pos)
+
+        if self.state == WIETnamczyk.FIGHT_NEAR_MENHIR:
+            return self.fight_near_menhir(bot_pos, knowledge)
 
         if self.state in (WIETnamczyk.EXPLORE, WIETnamczyk.GET_WEAPON):
             visible_enemies = self.find_visible_enemies(bot_pos, knowledge.visible_tiles)
@@ -474,14 +557,9 @@ class WIETnamczyk(controller.Controller):
                 return random.choice(POSSIBLE_ACTIONS)
             return self.explore_map(bot_pos, knowledge)
 
-        if self.state == WIETnamczyk.GO_TO_MENHIR:
-            if self.dist(bot_pos, self.menhir_pos) < 3:
-                self.set_exploration_area(bot_pos)
-                self.state = WIETnamczyk.EXPLORE
-            else:
-                return self.go_to_menhir(knowledge, bot_pos)
         return random.choice(POSSIBLE_ACTIONS)
 
+    # @profile(name="explore_map_WIETnamczyk")
     def explore_map(self, current_position, knowledge):
         attempts = 5
         while self.exploration_goal is None or self.exploration_goal not in self.unseen_coords or \
@@ -494,6 +572,7 @@ class WIETnamczyk(controller.Controller):
         action = self.find_direction(path_to_destination, knowledge, current_position)
         return action
 
+    # @profile(name="praise_WIETnamczyk")
     def praise(self, score: int) -> None:
         self.N[self.current_strategy] += 1
         n = self.N[self.current_strategy]
@@ -506,13 +585,11 @@ class WIETnamczyk(controller.Controller):
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.map: List[List[tiles.TileDescription]] = self.parse_map(arena_description.name)
         self.unseen_coords = self.generate_coords()
-
+        self.menhir_pos = None
         self.arena_description = arena_description
         rand = random.uniform(0, 1)
         self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
                                                                                                       key=self.Q.get)
-        # print(self.Q)
-
     @property
     def name(self) -> str:
         return f'WIETnamczyk{self.first_name}'
