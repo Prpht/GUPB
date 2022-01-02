@@ -109,12 +109,13 @@ class Strategy:
     def return_good_weapon_coords(self, knowledge):
         for coord, tile in knowledge.visible_tiles.items():
             if (tile.loot is not None) and (WEAPONS_PRIORITIES[tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon])\
-                    and (coord != knowledge.position):
+                    and (coord != knowledge.position) and ("mist" not in tile.effects):
                 return coord
         return None
 
     def get_random_land_position(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
                       (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
-                      (self.controller.tiles_memory[coords].loot is None)]
+                      (self.controller.tiles_memory[coords].loot is None) and
+                      ("mist" not in self.controller.tiles_memory[coords].effects)]
         return random.choice(land_tiles)

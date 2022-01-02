@@ -242,13 +242,15 @@ class LetsHide(Strategy):
 
     def check_if_enemy_in_sight(self, visible_tiles):
         for coord, tile in visible_tiles.items():
-            if (tile.character is not None) and (tile.character.controller_name != self.controller.name):
+            if (tile.character is not None) and (tile.character.controller_name != self.controller.name) and \
+                    ("mist" not in tile.effects):
                 return True
         return False
 
     def find_hiding_spot(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
-                      self.controller.tiles_memory[coords].type in ["land", "menhir"]]
+                      (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
+                      ("mist" not in self.controller.tiles_memory[coords].effects)]
 
         def at_least_two_walls(coords, tiles_memory):
             place_next_to = (coords[0] + 0, coords[1] + 1)
@@ -391,11 +393,12 @@ class KillThemAll(Strategy):
 
     def find_best_weapon(self, weapon_name):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].loot is not None)
-                and (self.controller.tiles_memory[coords].loot.name == weapon_name)]
+                and (self.controller.tiles_memory[coords].loot.name == weapon_name) and ("mist" not in self.controller.tiles_memory[coords].effects)]
 
     def find_enemies_locations(self):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].character is not None)
-                and (self.controller.tiles_memory[coords].character.controller_name != self.controller.name)]
+                and (self.controller.tiles_memory[coords].character.controller_name != self.controller.name) and
+                ("mist" not in self.controller.tiles_memory[coords].effects)]
 
     def enemy_to_the_side(self, position):
         """ Bots tries to remember if there were any enemies on their left or right """
