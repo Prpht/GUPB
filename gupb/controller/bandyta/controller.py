@@ -60,7 +60,7 @@ class Bandyta(controller.Controller):
             'archipelago': [(7, 8), (33, 8), (43, 21), (9, 30), (30, 38)],
             'dungeon': [(47, 5), (5, 15), (43, 15), (4, 24), (8, 31), (25, 32), (43, 45), (27, 48)],
             'fisher_island': [(14, 3), (36, 12), (8, 16), (43, 24), (11, 36), (24, 47)],
-            'wasteland': []
+            'wasteland': [(5, 2), (23, 2), (42, 2), (24, 10), (40, 19), (7, 20), (6, 33), (42, 35), (30, 41), (21, 46), (3, 48), (42, 48)]
         }[arena_description.name]
         self.state.item_map, self.state.landscape_map = parse_arena(self.state.arena)
 
