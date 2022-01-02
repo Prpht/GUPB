@@ -81,7 +81,7 @@ class EkonometronController(controller.Controller):
         self.camp_init = False
         # choosing the strategy
         if arena_description.name not in self.map_strategies:
-            self.map_strategies[arena_description.name] = [LetsHide(self)]
+            self.map_strategies[arena_description.name] = [TryingMyBest(self), LetsHide(self), KillThemAll(self)]
         strategies_list = self.map_strategies[arena_description.name]
         random_no = random.uniform(0, 1)
         if random_no > self.epsilon:
