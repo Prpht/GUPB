@@ -21,10 +21,18 @@ class FelixBotController(controller.Controller):
         self.current_strategy = None
         self.map_strategies = {'fisher_island': [SwordStrategy(), BowStrategy(), AxeStrategy()],
                                'archipelago': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'wasteland': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'island': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'isolated_shrine': [SwordStrategy(), BowStrategy(), AxeStrategy()],
+                               'mini': [SwordStrategy(), BowStrategy(), AxeStrategy()],
                                'dungeon': [SwordStrategy(), BowStrategy(), AxeStrategy()]}
         self.epsilon = 0.1
         self.rewards_log = {'fisher_island': StrategyRewardsLog(),
                             'archipelago': StrategyRewardsLog(),
+                            'wasteland': StrategyRewardsLog(),
+                            'island': StrategyRewardsLog(),
+                            'isolated_shrine': StrategyRewardsLog(),
+                            'mini': StrategyRewardsLog(),
                             'dungeon': StrategyRewardsLog()}
 
         self.current_rewards_log = None
