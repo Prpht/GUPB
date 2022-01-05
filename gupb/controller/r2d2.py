@@ -20,7 +20,6 @@ POSSIBLE_ACTIONS = [
 
 EXPLORE_COEF = 0.2
 
-
 class R2D2Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name

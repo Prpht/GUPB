@@ -16,6 +16,7 @@ class Strategy:
         self.value = 0.0
         self.n = 0
         self.current_mode = None
+        self.watch_back = False
 
     def proceed(self, knowledge):
         """ Picks an action for the controller or changes some of its variables """
@@ -27,17 +28,9 @@ class Strategy:
         self.value += (reward - self.value) / self.n
 
     def reset_mode(self):
-        pass
+        self.watch_back = False
 
     """ Utils """
-    # def forward_action(self, position: coordinates.Coords, action=characters.Action.STEP_FORWARD):
-    #     if action == characters.Action.STEP_FORWARD and self.controller.direction is not None:
-    #         front_coords = position + self.controller.direction.value
-    #         front_tile = self.controller.tiles_memory[front_coords]
-    #         if front_tile.loot is not None:
-    #             self.controller.hold_weapon = front_tile.loot.name
-    #     return action
-
     def check_if_mist_visible(self, visible_tiles: Dict[coordinates.Coords, TileDescription]):
         for coord, tile in visible_tiles.items():
             for e in tile.effects:
@@ -113,8 +106,16 @@ class Strategy:
                 return True
         return False
 
+    def return_good_weapon_coords(self, knowledge):
+        for coord, tile in knowledge.visible_tiles.items():
+            if (tile.loot is not None) and (WEAPONS_PRIORITIES[tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon])\
+                    and (coord != knowledge.position) and ("mist" not in tile.effects):
+                return coord
+        return None
+
     def get_random_land_position(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
                       (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
-                      (self.controller.tiles_memory[coords].loot is None)]
+                      (self.controller.tiles_memory[coords].loot is None) and
+                      ("mist" not in self.controller.tiles_memory[coords].effects)]
         return random.choice(land_tiles)

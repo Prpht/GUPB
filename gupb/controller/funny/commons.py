@@ -43,6 +43,13 @@ WEAPON_PRIORITY = {
         "K": 2,
         "M": 1
     },
+    'wasteland': {
+        "A": 5,
+        "B": 4,
+        "S": 3,
+        "K": 2,
+        "M": 1
+    }
 }
 
 SAFE_POS = {
@@ -87,14 +94,26 @@ SAFE_POS = {
         Coords(14, 9),
         Coords(14, 12),
         Coords(10, 12)
-    ]
+    ],
+    'wasteland': [
+        Coords(43, 5),
+        Coords(25, 13),
+        Coords(27, 13),
+        Coords(5, 5),
+        Coords(12, 24),
+        Coords(2, 43),
+        Coords(44, 46),
+        Coords(32, 24),
+        Coords(36, 33)
+    ],
 }
 
 START_RUNNING_FROM_MIST = {
     'fisher_island': 300,
     'isolated_shrine': 550,
     'archipelago': 300,
-    'dungeon': 300
+    'dungeon': 300,
+    'wasteland': 300
 }
 
 def r(x):
