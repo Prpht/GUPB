@@ -37,9 +37,7 @@ class AxeStrategy(Strategy):
                         if len(self.action_queue) > 0:
                             return self.action_queue.pop(0)
                         else:
-                            return random.choice([characters.Action.TURN_LEFT,
-                                                  characters.Action.TURN_RIGHT,
-                                                  characters.Action.STEP_FORWARD])
+                            return self.random_action_choice()
                     else:
                         self.banned_coords.append(weapon_coord)
 
@@ -50,7 +48,13 @@ class AxeStrategy(Strategy):
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                self.safe_place = self.get_coord_near_menhir()
+                target_coord = self.get_coord_near_tile(self.menhir_coord)
+                path = Astar.astar(self.grid, self.position, target_coord)
+                if path is not None:
+                    self.action_queue = self.generate_queue_from_path(
+                        path)
+            elif self.safe_place is None:
+                self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
                     self.action_queue = self.generate_queue_from_path(
@@ -63,36 +67,42 @@ class AxeStrategy(Strategy):
         elif self.position == self.safe_place:
             return characters.Action.TURN_LEFT
         else:
-            return random.choice([characters.Action.TURN_LEFT,
-                                  characters.Action.TURN_RIGHT,
-                                  characters.Action.STEP_FORWARD])
+            return characters.Action.TURN_LEFT
 
-    def get_coord_near_menhir(self):
-        coord = self.menhir_coord
+    def get_coord_near_tile(self, tile_coord):
+        coords = []
         try:
-            new_coord = coordinates.add_coords(self.menhir_coord, Coords(1, 1))
+            new_coord = coordinates.add_coords(tile_coord, Coords(1, 1))
             if self.grid[new_coord].type == 'land':
-                return new_coord
+                coords.append(new_coord)
         except KeyError:
             pass
         try:
-            new_coord = coordinates.add_coords(self.menhir_coord, Coords(1, -1))
+            new_coord = coordinates.add_coords(tile_coord, Coords(1, -1))
             if self.grid[new_coord].type == 'land':
-                return new_coord
+                coords.append(new_coord)
         except KeyError:
             pass
         try:
-            new_coord = coordinates.add_coords(self.menhir_coord, Coords(-1, 1))
+            new_coord = coordinates.add_coords(tile_coord, Coords(-1, 1))
             if self.grid[new_coord].type == 'land':
-                return new_coord
+                coords.append(new_coord)
         except KeyError:
             pass
         try:
-            new_coord = coordinates.add_coords(self.menhir_coord, Coords(-1, -1))
+            new_coord = coordinates.add_coords(tile_coord, Coords(-1, -1))
             if self.grid[new_coord].type == 'land':
-                return new_coord
+                coords.append(new_coord)
         except KeyError:
             pass
-        return coord
+
+        smallest_distance = 1000
+        for coord in coords:
+            distance = self.get_distance(coord)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                tile_coord = coord
+        return tile_coord
+
 
 

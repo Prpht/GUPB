@@ -1,4 +1,6 @@
+from collections import defaultdict
 import random
+import typing
 
 import numpy as np
 
@@ -13,16 +15,21 @@ import gupb.controller.marwin.utils as utils
 class ReinforcedMarwin(BaseMarwinController):
 	TURNAROUND_LIMIT = 3
 	EPS = 0.15
+	HEALTH_LOSS_PENALTY_RATIO = -3
+	DEATH_REWARD = -15
+	WIN_REWARD = 15
 
 	def __init__(self, name):
 		super(ReinforcedMarwin, self).__init__(name)
-		self.policies = {"StandGround": self.standGroundPolicy, "Arm": self.armYourselfOrAttackfPolicy, }
+		self._strategies = {
+			"StandGround": self._stand_ground_strategy,
+			"Arm": self._arm_yourself_or_attack_strategy,
+			"Wander": self._wander_strategy
+		}
 #"Order66": ExecuteOrder66Politics}
 		# initially all politics are of the same worth and are used 0 times
-		self.Q = {pol: 1 for pol in self.policies.keys()}
-		self.N = {pol: 0 for pol in self.policies.keys()}
-		self.current_policy = random.choice(self.policies) if random.uniform(0, 1) < ReinforcedMarwin.EPS else \
-			max(self.Q.items(), key= lambda it: it[1])[0]
+		self._map_Q = dict()
+		self._map_N = dict()
 		self._arena = np.zeros(utils.ARENA_SIZE, dtype=int)
 		self.weapons_to_take = None
 
@@ -40,10 +47,13 @@ class ReinforcedMarwin(BaseMarwinController):
 		self._previously_found_turns = set()
 		self._dead_ends = set()
 		self._i = 0
+		self._current_health = characters.CHAMPION_STARTING_HP
+		self._round_rewards = defaultdict(list)
 
 	def reset(self, arena_description: arenas.ArenaDescription) -> None:
 		if self._current_path is not None:
 			self._current_path.clear()
+		self._round_rewards.clear()
 		self._arena_description = arena_description
 		self._found_turns.clear()
 		self._previously_found_turns.clear()
@@ -55,21 +65,46 @@ class ReinforcedMarwin(BaseMarwinController):
 		self._current_state = utils.TURN_AROUND
 		self._next_move = None
 		self._turnaround_turns = 0
+		self._current_health = characters.CHAMPION_STARTING_HP
 		self._last_action = characters.Action.DO_NOTHING
 		self._current_weapon = None
 		self._last_position = None
+		self._current_policy = None
 		self._i = 0
+		if arena_description.name not in self._map_Q:
+			self._map_Q[arena_description.name] = {st: 1 for st in self._strategies.keys()}
+			self._map_N[arena_description.name] = {st: 0 for st in self._strategies.keys()}
 
 	def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-		return self.policies[self.current_policy](knowledge)
+		if self._current_policy is not None:
+			champion = self._get_champion(knowledge)
+			if champion.health < self._current_health:
+				self._round_rewards[self._current_policy].append(self.HEALTH_LOSS_PENALTY_RATIO *\
+					(self._current_health - champion.health))
+				self._current_health = champion.health
+			else:
+				self._round_rewards[self._current_policy].append(0)
+		self._current_policy = random.choice(list(self._strategies)) if random.uniform(0, 1) < ReinforcedMarwin.EPS else \
+			max(self._map_Q[self._arena_description.name].items(), key= lambda it: it[1])[0]
+		self._map_N[self._arena_description.name][self._current_policy] += 1
+		return self._strategies[self._current_policy](knowledge)
 
 	def praise(self, score: int) -> None:
-		self.N[self.current_policy] += 1
-		n = self.N[self.current_policy]
-		q = self.Q[self.current_policy]
-		self.Q[self.current_policy] += (1 / n * (score - q))
+		# print('In praise')
+		arena_name = self._arena_description.name
+		for strat in self._strategies:
+			n = self._map_N[arena_name][strat]
+			q = self._map_Q[arena_name][strat]
+			self._map_Q[arena_name][strat] += (1 / n * (score - q))
+	
+	def die(self):
+		self._round_rewards[self._current_policy].append(self.DEATH_REWARD)
 
-	def _init_round(self, knowledge):
+	def win(self):
+		self._round_rewards[self._current_policy].append(self.WIN_REWARD)
+
+	def _init_round(self, knowledge: characters.ChampionKnowledge) -> typing.Tuple[Coords, characters.ChampionDescription,
+	characters.Action, characters.Facing, typing.Dict[str, typing.List]]:
 		my_position = knowledge.position
 		my_character = self._get_champion(knowledge)
 		action = characters.Action.DO_NOTHING
@@ -115,7 +150,7 @@ class ReinforcedMarwin(BaseMarwinController):
 				result.append(coords)
 		return sorted(result, key=lambda x: utils.get_distance(x, my_position))
 
-	def standGroundPolicy(self, knowledge: characters.ChampionKnowledge):
+	def _stand_ground_strategy(self, knowledge: characters.ChampionKnowledge):
 		my_position, my_character, action, current_facing, scanned_tiles = self._init_round(knowledge)
 		if self._current_state in (utils.GOING_TO_TURN, utils.GOING_TO_MENHIR, utils.GOING_FOR_WEAPON) and action == characters.Action.DO_NOTHING:
 			target_position = self._current_path[-1]
@@ -128,6 +163,9 @@ class ReinforcedMarwin(BaseMarwinController):
 				self._turnaround_turns = 0
 				return action
 			else:
+				if my_position not in self._current_path:
+					target_coords = Coords(x=target_position[0], y=target_position[1])
+					self._current_path = utils.find_path_to_target(self._arena, my_position, target_coords)
 				self._i = self._current_path.index(my_position)
 				self._next_move = self._current_path[self._i + 1]
 				next_facing = self._get_next_facing(my_position, self._next_move)
@@ -141,10 +179,10 @@ class ReinforcedMarwin(BaseMarwinController):
 			action = characters.Action.TURN_LEFT
 			return action
 
-		return random.choice(POSSIBLE_ACTIONS)
+		return random.choice(POSSIBLE_ACTIONS + [characters.Action.DO_NOTHING,])
 
 
-	def armYourselfOrAttackfPolicy(self, knowledge: characters.ChampionKnowledge):
+	def _arm_yourself_or_attack_strategy(self, knowledge: characters.ChampionKnowledge):
 		my_position, my_character, action, current_facing, scanned_tiles = self._init_round(knowledge)
 		if utils.able_to_attack(scanned_tiles[utils.ENEMY], knowledge.visible_tiles, my_position,
 		                        current_facing, my_character.weapon):
@@ -171,14 +209,14 @@ class ReinforcedMarwin(BaseMarwinController):
 				self._turnaround_turns = 0
 			return action
 
-		return random.choice(POSSIBLE_ACTIONS)
+		return random.choice(POSSIBLE_ACTIONS + [characters.Action.DO_NOTHING,])
 
-	def wanderPolicy(self, knowledge: characters.ChampionKnowledge):
+	def _wander_strategy(self, knowledge: characters.ChampionKnowledge):
 		my_position, my_character, action, current_facing, scanned_tiles = self._init_round(knowledge)
 		if self._menhir_coords is not None and action == characters.Action.DO_NOTHING:
 			menhir_coords = Coords(x=self._menhir_coords[0], y=self._menhir_coords[1])
 			menhir_path = utils.find_path_to_target(self._arena, my_position, menhir_coords)
-			if menhir_path:
+			if menhir_path and len(menhir_path) > 1:
 				self._i = 1
 				self._current_path = menhir_path
 				self._next_move = menhir_path[self._i]
@@ -207,7 +245,10 @@ class ReinforcedMarwin(BaseMarwinController):
 
 			calculated_path = None
 			while calculated_path is None:
-				turn_index = np.random.choice(len(self._previously_found_turns))
+				try:
+					turn_index = np.random.choice(len(self._previously_found_turns))
+				except:
+					turn_index = 0
 				new_turn_to_go = list(self._previously_found_turns)[turn_index]
 				target_coords = Coords(x=new_turn_to_go[0], y=new_turn_to_go[1])
 				calculated_path = utils.find_path_to_target(self._arena, my_position, target_coords) or None
@@ -225,7 +266,7 @@ class ReinforcedMarwin(BaseMarwinController):
 			self._turnaround_turns = 0
 			return action
 
-		return random.choice(POSSIBLE_ACTIONS)
+		return random.choice(POSSIBLE_ACTIONS + [characters.Action.DO_NOTHING,])
 
 	def ExecuteOrder66Policy(self, knowledge: characters.ChampionKnowledge):  ## will be done for the next round
 		pass

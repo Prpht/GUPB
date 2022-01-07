@@ -37,9 +37,7 @@ class SwordStrategy(Strategy):
                         if len(self.action_queue) > 0:
                             return self.action_queue.pop(0)
                         else:
-                            return random.choice([characters.Action.TURN_LEFT,
-                                                  characters.Action.TURN_RIGHT,
-                                                  characters.Action.STEP_FORWARD])
+                            return self.random_action_choice()
                     else:
                         self.banned_coords.append(weapon_coord)
 
@@ -50,7 +48,13 @@ class SwordStrategy(Strategy):
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                self.safe_place = self.get_far_coord_orthogonal_to_menhir(4)
+                target_coord = self.get_far_coord_orthogonal_to_tile(self.menhir_coord, 4)
+                path = Astar.astar(self.grid, self.position, target_coord)
+                if path is not None:
+                    self.action_queue = self.generate_queue_from_path(
+                        path)
+            elif self.safe_place is None:
+                self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
                     self.action_queue = self.generate_queue_from_path(
@@ -60,9 +64,5 @@ class SwordStrategy(Strategy):
 
         if len(self.action_queue) > 0:
             return self.action_queue.pop(0)
-        elif self.position == self.safe_place:
-            return characters.Action.TURN_LEFT
         else:
-            return random.choice([characters.Action.TURN_LEFT,
-                                  characters.Action.TURN_RIGHT,
-                                  characters.Action.STEP_FORWARD])
+            return characters.Action.TURN_LEFT

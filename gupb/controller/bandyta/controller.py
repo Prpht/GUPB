@@ -59,7 +59,8 @@ class Bandyta(controller.Controller):
         self.state.exploration_points = {
             'archipelago': [(7, 8), (33, 8), (43, 21), (9, 30), (30, 38)],
             'dungeon': [(47, 5), (5, 15), (43, 15), (4, 24), (8, 31), (25, 32), (43, 45), (27, 48)],
-            'fisher_island': [(14, 3), (36, 12), (8, 16), (43, 24), (11, 36), (24, 47)]
+            'fisher_island': [(14, 3), (36, 12), (8, 16), (43, 24), (11, 36), (24, 47)],
+            'wasteland': [(5, 2), (23, 2), (42, 2), (24, 10), (40, 19), (7, 20), (6, 33), (42, 35), (30, 41), (21, 46), (3, 48), (42, 48)]
         }[arena_description.name]
         self.state.item_map, self.state.landscape_map = parse_arena(self.state.arena)
 
@@ -67,6 +68,7 @@ class Bandyta(controller.Controller):
         self.state.item_map = update_item_map(knowledge, self.state.item_map)
         direction: Direction = get_direction(knowledge)
         self.state.directed_position = DirectedCoords(knowledge.position, direction)
+        self.state.prev_weapon = self.state.weapon
         self.state.weapon = get_my_weapon(knowledge.visible_tiles, self.name)
         self.state.menhir = find_menhir(knowledge.visible_tiles) if self.state.menhir is None else self.state.menhir
         self.state.mist_coming = self.state.mist_coming if self.state.mist_coming else is_mist_coming(knowledge)
