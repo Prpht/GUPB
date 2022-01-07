@@ -41,6 +41,7 @@ class Runner:
             GameStartReport(i + 1).log(logging.INFO)
             self.run_game(i)
 
+    # noinspection PyBroadException
     def run_game(self, game_no: int) -> None:
         arena = random.choice(self.arenas)
         verbose_logger.debug(f"Randomly picked arena: {arena}.")
@@ -67,7 +68,10 @@ class Runner:
         for dead_controller, score in game.score().items():
             logging.info(f"Controller {dead_controller.name} scored {score} points.")
             ControllerScoreReport(dead_controller.name, score).log(logging.DEBUG)
-            dead_controller.praise(score)
+            try:
+                dead_controller.praise(score)
+            except Exception:
+                logging.info(f"Controller {dead_controller.name} failed at being praised!.")
             self.scores[dead_controller.name] += score
 
     def print_scores(self) -> None:
