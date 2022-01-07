@@ -14,7 +14,8 @@ WEAPONS_PRIORITIES = {
         "axe": 3,
         "sword": 4,
         "bow_unloaded": 5,
-        "bow_loaded": 5
+        "bow_loaded": 5,
+        "bow": 5
     }
 
 
@@ -29,7 +30,10 @@ FORBIDDEN_COORDS = {
         coordinates.Coords(x=7, y=37)
     ],
     'fisher_island': [coordinates.Coords(x=37, y=24), coordinates.Coords(x=9, y=10)],
-    'wasteland': []
+    'wasteland': [],
+    'island': [],
+    'mini': [],
+    'isolated_shrine': []
 }
 
 

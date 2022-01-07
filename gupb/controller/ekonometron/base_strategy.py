@@ -107,10 +107,12 @@ class Strategy:
         return False
 
     def return_good_weapon_coords(self, knowledge):
-        for coord, tile in knowledge.visible_tiles.items():
+        for coord, tile in reversed(knowledge.visible_tiles.items()):
             if (tile.loot is not None) and (WEAPONS_PRIORITIES[tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon])\
                     and (coord != knowledge.position) and ("mist" not in tile.effects):
-                return coord
+                # avoiding the situation when bot takes into account a forbidden tile
+                if coord in self.controller.tiles_memory:
+                    return coord
         return None
 
     def get_random_land_position(self):
@@ -119,3 +121,18 @@ class Strategy:
                       (self.controller.tiles_memory[coords].loot is None) and
                       ("mist" not in self.controller.tiles_memory[coords].effects)]
         return random.choice(land_tiles)
+
+    def better_weapon_behind(self, position):
+        coord_front = position + self.controller.direction.value
+        coord_behind = position - self.controller.direction.value
+        tile_front = self.controller.tiles_memory[coord_front]
+        tile_behind = self.controller.tiles_memory[coord_behind]
+        if (tile_behind.loot is not None) and (WEAPONS_PRIORITIES[tile_behind.loot.name] >
+                                               WEAPONS_PRIORITIES[self.controller.hold_weapon]) and \
+                ("mist" not in tile_behind.effects):
+            if tile_front.loot is not None:
+                if WEAPONS_PRIORITIES[tile_behind.loot.name] > WEAPONS_PRIORITIES[tile_front.loot.name]:
+                    return True
+            else:
+                return True
+        return False
