@@ -28,7 +28,7 @@ CONFIGURATION = {
         marwin.reinforced.ReinforcedMarwin("Marwin"),
     ],
     'start_balancing': False,
-    'visualise': True,
+    'visualise': False,
     'show_sight': None,
     'runs_no': 500,
 }

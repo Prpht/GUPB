@@ -66,12 +66,13 @@ class Runner:
         else:
             self.run_in_memory(game)
         for dead_controller, score in game.score().items():
-            logging.info(f"Controller {dead_controller.name} scored {score} points.")
-            ControllerScoreReport(dead_controller.name, score).log(logging.DEBUG)
+            verbose_logger.info(f"Controller {dead_controller.name} scored {score} points.")
+            ControllerScoreReport(dead_controller.name, score).log(logging.INFO)
             try:
                 dead_controller.praise(score)
-            except Exception:
-                logging.info(f"Controller {dead_controller.name} failed at being praised!.")
+            except Exception as e:
+                verbose_logger.warning(f"Controller {dead_controller.name} throw an unexpected exception: {repr(e)}.")
+                controller.ControllerExceptionReport(dead_controller.name, repr(e)).log(logging.WARN)
             self.scores[dead_controller.name] += score
 
     def print_scores(self) -> None:
