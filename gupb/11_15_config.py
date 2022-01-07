@@ -12,7 +12,7 @@ CONFIGURATION = {
     'controllers': [
         felix_bot.FelixBotController("Felix"),
         bb8.BB8Controller("BB8"),
-        ekonometron.EkonometronController("Johnathan"),
+        ekonometron.EkonometronController("Ekonometron"),
         marwin.deterministic.DeterministicMarwinController("Marwin"),
     ],
     'start_balancing': False,
