@@ -28,7 +28,8 @@ FORBIDDEN_COORDS = {
         coordinates.Coords(x=1, y=10),
         coordinates.Coords(x=7, y=37)
     ],
-    'fisher_island': [coordinates.Coords(x=37, y=24), coordinates.Coords(x=9, y=10)]
+    'fisher_island': [coordinates.Coords(x=37, y=24), coordinates.Coords(x=9, y=10)],
+    'wasteland': []
 }
 
 

@@ -130,7 +130,7 @@ class Strategy:
             goal = self.knowledge_decoder.info['temp_safe_spot']
         position = self.knowledge_decoder.knowledge.position
         self.find_path(position, goal)
-        self.goal = menhir_coords
+        self.goal = goal
 
     def can_attack(self):
         bot_weapon = self.knowledge_decoder.info['weapon']
@@ -152,16 +152,12 @@ class Strategy:
         if mist:
             nearest_mist = self.choose_shorter_dist(self.knowledge_decoder.info['mist'])
             mist_dist = distance(self.knowledge_decoder.knowledge.position, nearest_mist)
-            if mist_dist <= 3:
-                runaway_moves = [
-                    characters.Action.TURN_RIGHT,
-                    characters.Action.TURN_RIGHT,
-                    characters.Action.STEP_FORWARD,
-                    characters.Action.STEP_FORWARD
-                    ]
+            if mist_dist <= 5:
                 self.path = deque()
-                self.important_moves = deque()
-                self.important_moves.extend(runaway_moves)
+                self.find_menhir()
+                list_path = list(self.path)
+                if len(list_path) > 7:
+                    self.path = deque(list_path[:6])
 
     def is_goal_reached(self):
         if self.goal:
@@ -205,6 +201,20 @@ class Strategy:
                 # print('Resetting path, ns: ', next_step, ' pos: ', position)
                 self.path = deque()
                 self.important_moves.extend([characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT])
+
+    def low_health(self):
+        if self.knowledge_decoder.info['health'] <= 2 and self.knowledge_decoder.info['enemies_in_sight']:
+            nearest_enemy = self.choose_shorter_dist(self.knowledge_decoder.info['enemies_in_sight'])
+            enemy_dist = distance(self.knowledge_decoder.knowledge.position, nearest_enemy)
+            if enemy_dist <= 3:
+                self.path = deque()
+                self.important_moves = deque()
+                self.important_moves.extend([
+                    characters.Action.TURN_RIGHT,
+                    characters.Action.TURN_RIGHT,
+                    characters.Action.STEP_FORWARD,
+                    characters.Action.STEP_FORWARD
+                ])
 
 
 class AggressiveStrategy(Strategy):

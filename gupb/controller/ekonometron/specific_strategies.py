@@ -18,6 +18,7 @@ class TryingMyBest(Strategy):
         self.current_mode = "Casual"
 
     def reset_mode(self):
+        super().reset_mode()
         self.current_mode = "Casual"
 
     def proceed(self, knowledge):
@@ -30,6 +31,12 @@ class TryingMyBest(Strategy):
         if self.current_mode == "Go to menhir":
             if self.controller.camp_init:
                 return right_action(self.controller)
+            if self.watch_back:
+                self.watch_back = False
+                return left_action(self.controller)
+            if random.random() <= 0.1:
+                self.watch_back = True
+                return left_action(self.controller)
             next_step = self.move(knowledge.position)
             if next_step is not None:
                 return next_step
@@ -90,17 +97,16 @@ class TryingMyBest(Strategy):
         # neither right or left tile to pick up a weapon that is right in front of it;
         if front_tile.loot is not None:
             if WEAPONS_PRIORITIES[front_tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]:
-                self.controller.hold_weapon = front_tile.loot.name
-                return characters.Action.STEP_FORWARD
+                return forward_action(self.controller, position)
             else:
+                if random.random() <= 0.2:
+                    return forward_action(self.controller, position)
                 return self.take_a_turn(position)
         try:
             left_tile = self.controller.tiles_memory[left_coords]
             right_tile = self.controller.tiles_memory[right_coords]
         except KeyError:
-            if front_tile.loot is not None:
-                self.controller.hold_weapon = front_tile.loot.name
-            return characters.Action.STEP_FORWARD
+            return forward_action(self.controller, position)
         if left_tile.loot is not None:
             if WEAPONS_PRIORITIES[left_tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]:
                 return left_action(self.controller)
@@ -153,6 +159,7 @@ class LetsHide(Strategy):
         self.camping_countdown = 0
 
     def reset_mode(self):
+        super().reset_mode()
         self.current_mode = "Explore"
         self.camping_countdown = 0
 
@@ -166,6 +173,12 @@ class LetsHide(Strategy):
         if self.current_mode == "Go to menhir":
             if self.controller.camp_init:
                 return right_action(self.controller)
+            if self.watch_back:
+                self.watch_back = False
+                return left_action(self.controller)
+            if random.random() <= 0.1:
+                self.watch_back = True
+                return left_action(self.controller)
             next_step = self.move(knowledge.position)
             if next_step is not None:
                 return next_step
@@ -177,6 +190,7 @@ class LetsHide(Strategy):
             if self.check_if_mist_visible(knowledge.visible_tiles):
                 menhir_found = self.get_menhir_position()
                 if menhir_found:
+                    self.controller.camp_init = False
                     self.controller.current_path = self.bfs_shortest_path(knowledge.position,
                                                                           self.controller.destination)
                     self.current_mode = "Go to menhir"
@@ -212,7 +226,7 @@ class LetsHide(Strategy):
                 return right_action(self.controller)
             else:
                 if self.controller.destination is None:
-                    weapon_coords = self.return_good_weapon_coords(knowledge.visible_tiles)
+                    weapon_coords = self.return_good_weapon_coords(knowledge)
                     if weapon_coords is not None:
                         self.controller.destination = weapon_coords
                     else:
@@ -228,19 +242,15 @@ class LetsHide(Strategy):
 
     def check_if_enemy_in_sight(self, visible_tiles):
         for coord, tile in visible_tiles.items():
-            if (tile.character is not None) and (tile.character.controller_name != self.controller.name):
+            if (tile.character is not None) and (tile.character.controller_name != self.controller.name) and \
+                    ("mist" not in tile.effects):
                 return True
         return False
 
-    def return_good_weapon_coords(self, visible_tiles):
-        for coord, tile in visible_tiles.items():
-            if (tile.loot is not None) and (WEAPONS_PRIORITIES[tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]):
-                return coord
-        return None
-
     def find_hiding_spot(self):
         land_tiles = [coords for coords in self.controller.tiles_memory if
-                      self.controller.tiles_memory[coords].type in ["land", "menhir"]]
+                      (self.controller.tiles_memory[coords].type in ["land", "menhir"]) and
+                      ("mist" not in self.controller.tiles_memory[coords].effects)]
 
         def at_least_two_walls(coords, tiles_memory):
             place_next_to = (coords[0] + 0, coords[1] + 1)
@@ -267,7 +277,7 @@ class LetsHide(Strategy):
 class KillThemAll(Strategy):
     """ Offensive strategy; bot tries to find the best weapon and then - it goes after enemies to take them down;
      it is not concerned about finding the menhir unless the mist comes too close """
-    MODES_LIST = ["Find best weapon", "Hunting"]
+    MODES_LIST = ["Find best weapon", "Hunting", "Go to menhir"]
 
     def __init__(self, controller):
         super().__init__(controller, "kill_them_all")
@@ -276,6 +286,7 @@ class KillThemAll(Strategy):
         self.hunting_countdown = 0
 
     def reset_mode(self):
+        super().reset_mode()
         self.current_mode = "Find best weapon"
         self.best_weapon = None
         self.hunting_countdown = 0
@@ -286,8 +297,32 @@ class KillThemAll(Strategy):
             if self.controller.hold_weapon == "bow_loaded":
                 self.controller.hold_weapon = "bow_unloaded"
             return characters.Action.ATTACK
+        # if moving to menhir
+        if self.current_mode == "Go to menhir":
+            if self.controller.camp_init:
+                return right_action(self.controller)
+            if self.watch_back:
+                self.watch_back = False
+                return left_action(self.controller)
+            if random.random() <= 0.1:
+                self.watch_back = True
+                return left_action(self.controller)
+            next_step = self.move(knowledge.position)
+            if next_step is not None:
+                return next_step
+            else:
+                self.controller.camp_init = True
+                return right_action(self.controller)
         # looking for a bow or a sword
-        if self.current_mode == "Find best weapon":
+        elif self.current_mode == "Find best weapon":
+            # draw a path to the menhir if mist visible
+            if self.check_if_mist_visible(knowledge.visible_tiles):
+                menhir_found = self.get_menhir_position()
+                if menhir_found:
+                    self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                          self.controller.destination)
+                    self.current_mode = "Go to menhir"
+                    return right_action(self.controller)
             if self.controller.destination is None:
                 for w in list(reversed(list(WEAPONS_PRIORITIES.keys())))[:3]:
                     if self.controller.hold_weapon == w:
@@ -320,6 +355,14 @@ class KillThemAll(Strategy):
                     return right_action(self.controller)
         # killing everyone we see
         else:
+            # draw a path to the menhir if mist visible
+            if self.check_if_mist_visible(knowledge.visible_tiles):
+                menhir_found = self.get_menhir_position()
+                if menhir_found:
+                    self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                          self.controller.destination)
+                    self.current_mode = "Go to menhir"
+                    return right_action(self.controller)
             self.hunting_countdown -= 1
             if self.hunting_countdown == 0:
                 self.current_mode = "Find best weapon"
@@ -350,11 +393,12 @@ class KillThemAll(Strategy):
 
     def find_best_weapon(self, weapon_name):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].loot is not None)
-                and (self.controller.tiles_memory[coords].loot.name == weapon_name)]
+                and (self.controller.tiles_memory[coords].loot.name == weapon_name) and ("mist" not in self.controller.tiles_memory[coords].effects)]
 
     def find_enemies_locations(self):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].character is not None)
-                and (self.controller.tiles_memory[coords].character.controller_name != self.controller.name)]
+                and (self.controller.tiles_memory[coords].character.controller_name != self.controller.name) and
+                ("mist" not in self.controller.tiles_memory[coords].effects)]
 
     def enemy_to_the_side(self, position):
         """ Bots tries to remember if there were any enemies on their left or right """
