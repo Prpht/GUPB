@@ -14,10 +14,11 @@ CONFIGURATION = {
         'archipelago',
         'dungeon',
         'fisher_island',
+        'wasteland',
     ],
     'controllers': [
         funny.FunnyController(),
-        # bandyta.Bandyta("1.0"),
+        bandyta.Bandyta("1.0"),
         wietnamczyk.WIETnamczyk(),
         berserk.BerserkBot("Ragnar"),
         r2d2.R2D2Controller("R2D2"),
