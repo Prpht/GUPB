@@ -13,8 +13,8 @@ class FunnyController(controller.Controller):
     def __init__(self):
         self.strategies = {
             'original_funny_controller_strategy': self.original_funny_controller_strategy,
-            'menhir_camping_strategy': self.menhir_camping_strategy,
-            'hide_in_safe_spot_strategy': self.hide_in_safe_spot_strategy
+            # 'menhir_camping_strategy': self.menhir_camping_strategy,
+            # 'hide_in_safe_spot_strategy': self.hide_in_safe_spot_strategy
         }
         self.Q = {strategy: 100.0 for strategy in self.strategies}
         self.N = {strategy: 0 for strategy in self.strategies}
@@ -78,6 +78,7 @@ class FunnyController(controller.Controller):
         self.facing = None
         self.strategy_iter = 0  # 0-find weapon, 1-find menhir, 2-hide, 4-go to menhir, 6-fight
         self.last_strategy_iter = None
+        self.runaway = False
         self._reset_surrounding_walls()
 
         self.path = []
@@ -246,13 +247,14 @@ class FunnyController(controller.Controller):
 
     @profile(name='Funny original_funny_controller_strategy')
     def original_funny_controller_strategy(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-
         self.ep_it += 1
 
         pos = knowledge.position
         visible_tiles = knowledge.visible_tiles
         tile = knowledge.visible_tiles[pos]
         self_knowledge = tile.character
+
+        # print(self.strategy_iter, self.ep_it, pos)
 
         if self.menhir_pos is None:
             self._update_menhir_knowledge(visible_tiles)
@@ -264,17 +266,30 @@ class FunnyController(controller.Controller):
         if self.weapon == 'bow_unloaded':
             return characters.Action.ATTACK
 
-        if self.menhir_pos is None and self.strategy_iter > 1:
+        if self.menhir_pos is None and self.strategy_iter > 1 and self.strategy_iter != 6:
             self.strategy_iter = 1
         if self.facing is None:
             self.facing = self_knowledge.facing
-        # if self_knowledge.health < self.hp:
-        #     self.hp = self_knowledge.health
-        ### ogarnac kto bije, reakcja
 
-        if self.ep_it > self.start_running_from_mist:
+        if self.ep_it > self.start_running_from_mist and self.menhir_pos is not None \
+                and self.strategy_iter not in [4, 5] and not self.runaway:
             self.path = []
             self.strategy_iter = 4
+
+        tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
+
+        if self_knowledge.health < self.hp and not self.runaway:
+            for tile in visible_tiles:
+                tile_knowledge = knowledge.visible_tiles[tile]
+                character = tile_knowledge.character
+                if character is not None:
+                    enemy_weaponable_tiles = self._get_dangerous_fields(tile, knowledge)
+                    if pos in enemy_weaponable_tiles and tile not in tiles_in_range:
+                        self.runaway = True
+                        self.path = self._run_away(pos, enemy_weaponable_tiles)
+                        # print("uciekam bo biją!!", pos, self.path, enemy_weaponable_tiles)
+
+        self.hp = self_knowledge.health
 
         # TODO uwaga na to, czasochłonne
         # self._update_misted_tiles(visible_tiles)
@@ -282,23 +297,29 @@ class FunnyController(controller.Controller):
             if tile in visible_tiles and not visible_tiles[tile].character:
                 self._update_weapons_knowledge(tile, visible_tiles[tile].loot.name)
 
-        tiles_in_range = self._get_weaponable_tiles(pos, self.facing, self.weapon)
-        for tile in tiles_in_range:
-            try:
-                tile_knowledge = knowledge.visible_tiles[tile]
-                if tile_knowledge.loot and tile not in self.weapon_tiles:
-                    self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
-                character = tile_knowledge.character
-                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
-                    # mam wystarczajaco duzo zycia
-                    self.path = []
-                    return characters.Action.ATTACK
+        if not self.runaway:
+            for tile in tiles_in_range:
+                try:
+                    tile_knowledge = knowledge.visible_tiles[tile]
+                    if tile_knowledge.loot and tile not in self.weapon_tiles:
+                        self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
+                    character = tile_knowledge.character
+                    if character is not None:
+                        enemy_weaponable_tiles = self._get_dangerous_fields(tile, knowledge)
+                        if character.health > self.hp and pos in enemy_weaponable_tiles:
+                            self.runaway = True
+                            self.path = self._run_away(pos, enemy_weaponable_tiles)
+                            # print("uciekam!!", pos, self.path, enemy_weaponable_tiles)
+                        else:
+                            self.path = []
+                            # print("atak naprzeciw")
+                            return characters.Action.ATTACK
 
-            except KeyError:
-                pass
+                except KeyError:
+                    pass
 
         while len(self.path) == 0:
-            if self.strategy_iter != 6:
+            if self.strategy_iter < 6:
                 if self.strategy_iter == 0:
                     self.path = self._find_weapon(pos)
                 elif self.strategy_iter == 1:
@@ -314,12 +335,13 @@ class FunnyController(controller.Controller):
             else:
                 self.strategy_iter, self.last_strategy_iter = self.last_strategy_iter, None
 
-        if self.strategy_iter != 3:
+        if self.strategy_iter != 3 and not self.runaway:
             opposing_characters_pos = []
             for delta in FunnyController.FACING_DELTAS[self.facing]:
                 try:
                     curr_pos = s(pos, delta)
-                    if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None:
+                    if curr_pos != pos and knowledge.visible_tiles[curr_pos].character is not None \
+                            and knowledge.visible_tiles[curr_pos].character.health < self.hp:
                         opposing_characters_pos.append(curr_pos)
                 except KeyError:
                     pass
@@ -354,7 +376,10 @@ class FunnyController(controller.Controller):
                     pass
 
                 if len(self.path) == 0:
-                    self.strategy_iter += 1
+                    if not self.runaway:
+                        self.strategy_iter += 1
+                    else:
+                        self.runaway = False
 
         if action == characters.Action.STEP_FORWARD:
             self._reset_surrounding_walls()
@@ -376,6 +401,7 @@ class FunnyController(controller.Controller):
 
         if tile.loot:
             self._update_weapons_knowledge(pos, tile.loot.name)
+
         self.weapon = self_knowledge.weapon.name
 
         if self.facing is None:
@@ -397,12 +423,13 @@ class FunnyController(controller.Controller):
                 if tile_knowledge.loot and tile not in self.weapon_tiles:
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
-                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
-                    # mam wystarczajaco duzo zycia
-                    if character.health <= 2:
-                        self._update_weapons_knowledge(tile, character.weapon.name)
-                        self.weapon_drops.add(tile)
-                    return characters.Action.ATTACK
+                if character is not None:
+                    enemy_weaponable_tiles = self._get_dangerous_fields(tile, knowledge)
+                    if character.health > self.hp and pos in enemy_weaponable_tiles:
+                        self.path = self._run_away(pos, enemy_weaponable_tiles)
+                    else:
+                        self.path = []
+                        return characters.Action.ATTACK
             except KeyError:
                 pass
         if len(self.path) == 0:
@@ -479,12 +506,13 @@ class FunnyController(controller.Controller):
                 if tile_knowledge.loot and tile not in self.weapon_tiles:
                     self._update_weapons_knowledge(tile, tile_knowledge.loot.name)
                 character = tile_knowledge.character
-                if character is not None:  ## dolozyc ze jesli ja nie jestem w jego zasiegu albo jestem ale
-                    # mam wystarczajaco duzo zycia
-                    if character.health <= 2:
-                        self._update_weapons_knowledge(tile, character.weapon.name)
-                        self.weapon_drops.add(tile)
-                    return characters.Action.ATTACK
+                if character is not None:
+                    enemy_weaponable_tiles = self._get_dangerous_fields(tile, knowledge)
+                    if character.health > self.hp and pos in enemy_weaponable_tiles:
+                        self.path = self._run_away(pos, enemy_weaponable_tiles)
+                    else:
+                        self.path = []
+                        return characters.Action.ATTACK
             except KeyError:
                 pass
         if len(self.path) == 0:
