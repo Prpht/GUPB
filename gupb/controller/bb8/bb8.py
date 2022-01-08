@@ -23,7 +23,7 @@ class BB8Controller(controller.Controller):
         return hash(self.first_name)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.strategy.reset()
 
     def praise(self, score: int) -> None:
         pass
