@@ -1,5 +1,6 @@
 import random
 from collections import Counter, defaultdict, deque
+
 from gupb import controller
 from gupb.controller.berserk.knowledge_decoder import KnowledgeDecoder
 

@@ -8,11 +8,11 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
+from gupb.controller.bb8.qlearning import (calculate_state, learn_actions,
+                                           QAction, update_q_values)
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.characters import Facing
-from gupb.controller.bb8.qlearning import (calculate_state, learn_actions, 
-                                           QAction, update_q_values)
 
 PI = 4.0 * math.atan(1.0)
 
@@ -68,7 +68,11 @@ class BB8Strategy(ABC):
         self.facing = None
         self.map = np.zeros((MAP_SIZE, MAP_SIZE))
         self.weapon_positions = {}
-        self.menhir_position = None
+        self.menhir_position = coordinates.Coords(50, 50)
+        self.visited_passages = []
+        self.going_to_passage = False
+        self.destination = None
+        self.checked_points = []
 
     @abstractmethod
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -88,6 +92,7 @@ class BB8Strategy(ABC):
             elif description.type == "menhir":
                 self.map[position[0], position[1]] = 1
                 self.menhir_position = coordinates.Coords(position[0], position[1])
+                self.destination = self.menhir_position
 
             if description.loot is not None:
                 self.weapon_positions[position] = description.loot.name
@@ -104,9 +109,11 @@ class BB8Strategy(ABC):
 
             score = 0.5 * real_score / (0.3 * distance)
 
-            if score > best_score:
+            if score > best_score and weapon_coordinates not in self.checked_points:
                 best_score = score
                 best_coordinates = weapon_coordinates
+                if self.weapon == weapon_name:
+                    best_coordinates = None
 
         return best_coordinates if best_score > 0 else None
 
@@ -184,6 +191,61 @@ class BB8Strategy(ABC):
         self.first_name = self.visible_tiles[self.position].character.controller_name
         self.facing = self.visible_tiles[self.position].character.facing
 
+    def find_passage(self):
+        best_passage_coords = None
+        min_distance = 10000
+
+        for i in range(MAP_SIZE):
+            blocked_count = 0
+            pass_count = 0
+            for j in range(MAP_SIZE):
+                if self.map[i, j] == 0:
+                    blocked_count += 1
+                    if pass_count == 1:
+                        pass_count = 0
+                        passage_coords = coordinates.Coords(i, j)
+                        if self.calculate_distance(
+                                passage_coords) < min_distance and passage_coords not in self.visited_passages:
+                            best_passage_coords = passage_coords
+                            min_distance = self.calculate_distance(best_passage_coords)
+                else:
+                    pass_count += 1
+        for i in range(MAP_SIZE):
+            blocked_count = 0
+            pass_count = 0
+            for j in range(MAP_SIZE):
+                if self.map[j, i] == 0:
+                    blocked_count += 1
+                    if pass_count == 1:
+                        pass_count = 0
+                        passage_coords = coordinates.Coords(i, j)
+                        if self.calculate_distance(
+                                passage_coords) < min_distance and passage_coords not in self.visited_passages:
+                            best_passage_coords = passage_coords
+                            min_distance = self.calculate_distance(best_passage_coords)
+                else:
+                    pass_count += 1
+
+        return best_passage_coords if best_passage_coords not in self.checked_points else None
+
+    def explore(self):
+        best_passage_coords = self.find_passage()
+        if best_passage_coords is not None:
+            self.destination = best_passage_coords
+            self.visited_passages.append(best_passage_coords)
+            return self.go_to_direction(best_passage_coords)
+
+        return self.go_forward()
+
+    def go_to_destination_if_exists(self):
+        if self.destination is not None:
+            if self.position == self.destination:
+                self.checked_points.append(self.destination)
+                self.destination = None
+            else:
+                return self.go_to_direction(self.destination)
+        return None
+
 
 class RandomStrategy(BB8Strategy):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -199,10 +261,15 @@ class EscapeToMenhirStrategy(BB8Strategy):
         self.parse_knowledge(knowledge)
         self.study_map()
 
+        go_to_destination_action = self.go_to_destination_if_exists()
+        if go_to_destination_action is not None:
+            return go_to_destination_action
+
         if not self.is_at_menhir:
             if self.menhir_position is not None:
                 if self.calculate_distance(self.menhir_position) == 1:
                     self.is_at_menhir = True
+                self.destination = self.menhir_position
                 return self.go_to_direction(self.menhir_position)
             else:
                 return self.go_forward()
@@ -226,13 +293,21 @@ class FindBestWeaponStrategy(BB8Strategy):
         self.parse_knowledge(knowledge)
         self.study_map()
 
+        go_to_destination_action = self.go_to_destination_if_exists()
+        if go_to_destination_action is not None:
+            return go_to_destination_action
+
         if self.is_mist_coming() and self.menhir_position is not None:
+            self.destination = self.menhir_position
             return self.go_to_direction(self.menhir_position)
+        elif self.is_mist_coming():
+            self.go_forward()
 
         best_weapon_coordinates = self.find_best_weapon()
         enemy_in_range_coordinates = self.get_enemy_in_range_coordinates()
 
         if best_weapon_coordinates is not None:
+            self.destination = best_weapon_coordinates
             return self.go_to_direction(best_weapon_coordinates)
 
         if enemy_in_range_coordinates is not None:
@@ -243,7 +318,8 @@ class FindBestWeaponStrategy(BB8Strategy):
                 return self.rotate_to_desired_facing(enemy_in_range_coordinates)
 
         return self.behave_randomly()
-    
+
+
 class RLStrategy(BB8Strategy):
     def __init__(self):
         super().__init__()
@@ -251,25 +327,25 @@ class RLStrategy(BB8Strategy):
         self.q_learning_state = None
         self.sight_range = 2000
         self.long_seq = 6
-        
+
     def update_bot(self, knowledge: characters.ChampionKnowledge):
         self.bot_position = knowledge.position
-        character         = knowledge.visible_tiles[self.bot_position].character
-        self.weapon       = character.weapon.name
-        self.facing       = character.facing
+        character = knowledge.visible_tiles[self.bot_position].character
+        self.weapon = character.weapon.name
+        self.facing = character.facing
         self.last_round_health = self.round_health
         self.round_health = character.health
-        
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             self.update_bot(knowledge)
             return self.choose_next_step(knowledge)
         except Exception as e:
             return self.behave_randomly()
-        
+
     def has_next_defined(self):
         return len(self.queue) > 0
-    
+
     def choose_next_step(self, knowledge: characters.ChampionKnowledge) -> None:
         # Choose action based on Q learning
         self.find_vector_to_nearest_mist_tile(knowledge)
@@ -284,22 +360,23 @@ class RLStrategy(BB8Strategy):
             else:
                 reward += -50
             if old_action == QAction.RUN_AWAY:
-                reward+=-1
+                reward += -1
             update_q_values(old_state, old_action, reward, state)
 
         self.q_learning_state = (state, action)
 
         # Perform chosen action
         if action == QAction.RUN_AWAY:
-            return self.go_to_direction(self.menhir_position) 
+            return self.go_to_direction(self.menhir_position)
         elif action == QAction.IGNORE:
             return characters.Action.DO_NOTHING
 
     def find_vector_to_nearest_mist_tile(self, knowledge: characters.ChampionKnowledge):
         g_distance = lambda my_p, ref_p: ((ref_p[0] - my_p[0]) ** 2 + (ref_p[1] - my_p[1]) ** 2)
         g_distance_vec = lambda vec: ((vec[0]) ** 2 + (vec[1]) ** 2)
-        
-        mist_tiles: dict[coordinates.Coords, int] = defaultdict(int) #dict for storing distance to each mist tile from current bot position
+
+        mist_tiles: dict[coordinates.Coords, int] = defaultdict(
+            int)  # dict for storing distance to each mist tile from current bot position
         visible_tiles = knowledge.visible_tiles
 
         for coord in visible_tiles.keys():
@@ -320,4 +397,3 @@ class RLStrategy(BB8Strategy):
                     self.run_seq_step = 1
 
         return self.last_observed_mist_vec
-  

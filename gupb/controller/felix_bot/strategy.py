@@ -22,16 +22,54 @@ WEAPON_RANGE = {
     'knife': 1
 }
 
-SAFE_PLACES = {
-                'fisher_island': Coords(4, 31),
-                'archipelago': Coords(41, 44),
-                'dungeon': Coords(48, 48)
-}
 
+SAFE_POS = {
+    'fisher_island': [
+        Coords(12, 39),
+        Coords(30, 4),
+        Coords(9, 7)
+    ],
+    'isolated_shrine': [
+        Coords(6, 6),
+        Coords(6, 12),
+        Coords(12, 6),
+        Coords(12, 12)
+    ],
+    'archipelago': [
+        Coords(7, 40),
+        Coords(30, 42),
+        Coords(45, 23),
+        Coords(31, 8)
+    ],
+    'dungeon': [
+        Coords(27, 24),
+        Coords(22, 24),
+        Coords(36, 21),
+        Coords(48, 21),
+        Coords(36, 37),
+        Coords(36, 21),
+        Coords(31, 16),
+        Coords(18, 16),
+        Coords(27, 14),
+        Coords(14, 16),
+        Coords(14, 9),
+        Coords(14, 12),
+        Coords(10, 12)
+    ],
+    'wasteland': [
+        Coords(25, 13),
+        Coords(27, 13),
+        Coords(36, 33),
+        Coords(6, 5),
+        Coords(43, 5),
+        Coords(44, 46)
+    ]
+}
 
 class Strategy:
     def __init__(self):
         self.action_queue = []
+        self.path = []
         self.current_weapon = 'knife'
         self.facing = None  # inicjalizacja przy pierwszym decide
         self.position = None  # inicjalizacja przy pierwszym decide
@@ -39,25 +77,30 @@ class Strategy:
         self.grid = {}
         self.reached_menhir = False
         self.is_mist_coming = False
-        self.turning_direction = characters.Action.TURN_LEFT
-        self.turning_state_on = False
+        # self.turning_direction = characters.Action.TURN_LEFT
+        # self.turning_state_on = False
         self.explored_tiles = set()
         self.reached_safe_place = False
         self.banned_coords = []
         self.safe_place = None
-        for x_index in range(50):
-            for y_index in range(50):
-                self.grid[Coords(x_index, y_index)] = TileDescription(type='land', loot=None, character=None,
-                                                                      effects=[])
+        self.random_coord = None
+        self.visible_tile_enemies = []
+        self.arena_description = None
+        self.random_coord = None
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.current_weapon = 'knife'
         self.action_queue = []
+        self.path = []
         self.reached_menhir = False
         self.is_mist_coming = False
         self.reached_safe_place = False
         self.explored_tiles = set()
         self.menhir_coord = None
+        self.visible_tile_enemies = []
+        self.arena_description = arena_description.name
+        self.safe_place = None
+        self.random_coord = None
         # self.safe_place = SAFE_PLACES[arena_description.name]
         for x_index in range(50):
             for y_index in range(50):
@@ -72,8 +115,35 @@ class Strategy:
                                                    loot=None,
                                                    character=None, effects=[])
 
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         pass
+
+    def get_nearest_enemy_tile_coord(self):
+        tile_coord = None
+        smallest_distance = 1000
+        for coord in self.visible_tile_enemies:
+            distance = self.get_distance(coord)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                tile_coord = coord
+        return tile_coord
+
+    def get_safe_place(self):
+        tile_coord = None
+        smallest_distance = 1000
+        for coord in SAFE_POS[self.arena_description]:
+            distance = self.get_distance(coord)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                tile_coord = coord
+        return tile_coord
+
+    def random_action_choice(self):
+        if self.__is_allowed_action(characters.Action.STEP_FORWARD):
+            return characters.Action.STEP_FORWARD
+        else:
+            return characters.Action.TURN_LEFT
 
     def refresh_info(self, knowledge: characters.ChampionKnowledge):
         self.position = knowledge.position
@@ -81,12 +151,14 @@ class Strategy:
         self.facing = character.facing
         if self.current_weapon != character.weapon.name:
             self.action_queue = []
+            self.path = []
             self.safe_place = None
             self.grid[self.position] = TileDescription(type='land', loot=WeaponDescription(name=self.current_weapon), character=character, effects=[])
         self.current_weapon = character.weapon.name
         self.grid.update(knowledge.visible_tiles)
         self.explored_tiles.update(set(knowledge.visible_tiles.keys()))
         self.reached_menhir = False
+        self.visible_tile_enemies = []
         for coord, tile in knowledge.visible_tiles.items():
             if self.menhir_coord is None and tile.type == 'menhir':
                 self.menhir_coord = coord
@@ -95,54 +167,82 @@ class Strategy:
                     if effect.type == 'mist':
                         self.is_mist_coming = True
                         self.action_queue = []  # reset queue since mist appeared
+                        self.path = []
             if tile.type == 'menhir' and self.position == coord:
                 self.reached_menhir = True
 
-    def get_far_coord_orthogonal_to_menhir(self, max_distance):
-        coord = self.menhir_coord
+            if tile.character is not None and coord != self.position:
+                self.visible_tile_enemies.append(coord)
+
+            if coord == self.random_coord:
+                self.random_coord = None
+                self.action_queue = []
+                self.path = []
+        if self.random_coord in self.explored_tiles:
+            self.random_coord = None
+            self.action_queue = []
+            self.path = []
+
+    def get_far_coord_orthogonal_to_tile(self, tile_coord, max_distance):
+        coords = [tile_coord]
         distance = 0
         for i in range(1, max_distance):
             try:
-                new_coord = coordinates.add_coords(self.menhir_coord, Coords(i, 0))
-                if self.grid[new_coord].type == 'wall':
-                    break
-                if self.grid[new_coord].type == 'land':
-                    distance = i
-                    coord = new_coord
-            except KeyError:
-                pass
-        for i in range(1, max_distance):
-            try:
-                new_coord = coordinates.sub_coords(self.menhir_coord, Coords(i, 0))
+                new_coord = coordinates.add_coords(tile_coord, Coords(i, 0))
                 if self.grid[new_coord].type == 'wall':
                     break
                 if i > distance and self.grid[new_coord].type == 'land':
                     distance = i
-                    coord = new_coord
+                    coords = [new_coord]
+                if i == distance and self.grid[new_coord].type == 'land':
+                    coords.append(new_coord)
             except KeyError:
                 pass
         for i in range(1, max_distance):
             try:
-                new_coord = coordinates.add_coords(self.menhir_coord, Coords(0, i))
+                new_coord = coordinates.sub_coords(tile_coord, Coords(i, 0))
                 if self.grid[new_coord].type == 'wall':
                     break
                 if i > distance and self.grid[new_coord].type == 'land':
                     distance = i
-                    coord = new_coord
+                    coords = [new_coord]
+                if i == distance and self.grid[new_coord].type == 'land':
+                    coords.append(new_coord)
             except KeyError:
                 pass
         for i in range(1, max_distance):
             try:
-                new_coord = coordinates.sub_coords(self.menhir_coord, Coords(0, i))
+                new_coord = coordinates.add_coords(tile_coord, Coords(0, i))
                 if self.grid[new_coord].type == 'wall':
                     break
                 if i > distance and self.grid[new_coord].type == 'land':
                     distance = i
-                    coord = new_coord
+                    coords = [new_coord]
+                if i == distance and self.grid[new_coord].type == 'land':
+                    coords.append(new_coord)
+            except KeyError:
+                pass
+        for i in range(1, max_distance):
+            try:
+                new_coord = coordinates.sub_coords(tile_coord, Coords(0, i))
+                if self.grid[new_coord].type == 'wall':
+                    break
+                if i > distance and self.grid[new_coord].type == 'land':
+                    distance = i
+                    coords = [new_coord]
+                if i == distance and self.grid[new_coord].type == 'land':
+                    coords.append(new_coord)
             except KeyError:
                 pass
                 # kafelek nie byl widoczny
-        return coord
+        tile_coord = None
+        smallest_distance = 1000
+        for coord in coords:
+            distance = self.get_distance(coord)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                tile_coord = coord
+        return tile_coord
 
     def can_attack(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> bool:
         try:
@@ -181,6 +281,11 @@ class Strategy:
         if len(self.action_queue) > 0:
             if not self.__is_allowed_action(self.action_queue[0]):
                 self.action_queue = []
+                self.path = []
+                self.safe_place = None
+            if not self.is_mist_coming and len(set(self.visible_tile_enemies).intersection(self.path)) > 0:
+                self.action_queue = []
+                self.path = []
 
     def __is_allowed_action(self, action):
         return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in [

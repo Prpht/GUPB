@@ -14,6 +14,7 @@ from gupb.controller.bb8.strategy import ROTATIONS
 from gupb.model.profiling import profile
 
 
+
 WEAPONS = {
     "bow": Bow(),
     "bow_unloaded": Bow(),
