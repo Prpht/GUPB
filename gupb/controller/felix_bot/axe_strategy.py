@@ -34,6 +34,7 @@ class AxeStrategy(Strategy):
                     if path is not None:
                         self.action_queue = self.generate_queue_from_path(
                             path)
+                        self.path = path
                         if len(self.action_queue) > 0:
                             return self.action_queue.pop(0)
                         else:
@@ -45,18 +46,21 @@ class AxeStrategy(Strategy):
                 random_coord = self.get_random_passable_coord()
                 path = Astar.astar(self.grid, self.position, random_coord)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
-                target_coord = self.get_coord_near_tile(self.menhir_coord)
-                path = Astar.astar(self.grid, self.position, target_coord)
+                self.random_coord = self.get_coord_near_tile(self.menhir_coord)
+                path = Astar.astar(self.grid, self.position, self.random_coord, avoid_enemies=False)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.safe_place is None:
                 self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
 

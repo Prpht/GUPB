@@ -1,6 +1,6 @@
 class Astar:
     @staticmethod
-    def astar(grid, start_position, end_position, passable_tiles=['land', 'menhir']):
+    def astar(grid, start_position, end_position, avoid_enemies=True, passable_tiles=['land', 'menhir']):
         start_node = Node(None, start_position)
         end_node = Node(None, end_position)
 
@@ -33,6 +33,11 @@ class Astar:
                 if grid.get(node_position) is None or grid[node_position].type not in passable_tiles:
                     continue
 
+                if avoid_enemies:
+                    if grid[node_position].character is not None:
+                        continue
+
+
                 # Create new node
                 neighbor = Node(current_node, node_position)
                 # Check if the neighbor is in the closed list
@@ -48,6 +53,8 @@ class Astar:
                 if Astar.__add_to_open(open_list, neighbor):
                     # Everything is green, add neighbor to open list
                     open_list.append(neighbor)
+        if avoid_enemies:
+            return Astar.astar(grid, start_position, end_position, False)
 
     @staticmethod
     def __add_to_open(open_list, neighbor):
