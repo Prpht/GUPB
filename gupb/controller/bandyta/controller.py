@@ -7,11 +7,12 @@ from gupb.controller.bandyta.k_bandit import K_Bandit
 from gupb.controller.bandyta.tactics import passive_tactic, archer_tactic, Tactics, aggressive_tactic
 from gupb.controller.bandyta.utils import POSSIBLE_ACTIONS, get_direction, find_menhir, DirectedCoords, read_arena, \
     Direction, parse_arena, \
-    is_mist_coming, get_my_weapon, update_item_map, State
+    is_mist_coming, get_my_weapon, update_item_map, State, update_mist_list, update_exploration_points
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.profiling import profile
+import traceback
 
 
 class Bandyta(controller.Controller):
@@ -49,6 +50,7 @@ class Bandyta(controller.Controller):
                     passive_tactic(self.state, knowledge))
         except Exception as e:
             # print(e)
+            # traceback.print_exc()
             return random.choice(POSSIBLE_ACTIONS)
 
     def reset(self, arena_description: arenas.ArenaDescription):
@@ -58,7 +60,7 @@ class Bandyta(controller.Controller):
         self.state.arena = read_arena(arena_description)
         self.state.exploration_points = {
             'archipelago': [(7, 8), (33, 8), (43, 21), (9, 30), (30, 38)],
-            'dungeon': [(47, 5), (5, 15), (43, 15), (4, 24), (8, 31), (25, 32), (43, 45), (27, 48)],
+            'dungeon': [(47, 5), (5, 15), (43, 15), (4, 24), (8, 44), (25, 32), (43, 45), (27, 48)],
             'fisher_island': [(14, 3), (36, 12), (8, 16), (43, 24), (11, 36), (24, 47)],
             'wasteland': [(5, 2), (23, 2), (42, 2), (24, 10), (40, 19), (7, 20), (6, 33), (42, 35), (30, 41), (21, 46), (3, 48), (42, 48)]
         }[arena_description.name]
@@ -72,6 +74,11 @@ class Bandyta(controller.Controller):
         self.state.weapon = get_my_weapon(knowledge.visible_tiles, self.name)
         self.state.menhir = find_menhir(knowledge.visible_tiles) if self.state.menhir is None else self.state.menhir
         self.state.mist_coming = self.state.mist_coming if self.state.mist_coming else is_mist_coming(knowledge)
+
+        mist_list_old = self.state.mist_list
+        self.state.mist_list = update_mist_list(knowledge, self.state.mist_list) if self.state.mist_coming else []
+        self.state.new_mist_tiles = len(self.state.mist_list) > len(mist_list_old)
+        self.state.exploration_points = update_exploration_points(self.state.exploration_points, self.state.directed_position.coords)
 
     @property
     def name(self):

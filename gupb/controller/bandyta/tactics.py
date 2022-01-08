@@ -8,7 +8,7 @@ from gupb.controller.bandyta.bfs import find_path
 from gupb.controller.bandyta.utils import DirectedCoords, safe_find_target_player, Weapon, \
     safe_attack_possible, Path, get_distance, find_furthest_point, POSSIBLE_ACTIONS, find_target_player, \
     is_attack_possible, find_players, get_weapon_path, State, move_on_path, extract_pytagorian_nearest, \
-    nearest_coord_to_attack
+    nearest_coord_to_attack, get_mist_away_exploration_point, is_mist_coming
 from gupb.model import characters
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -29,23 +29,32 @@ def passive_tactic(state: State, knowledge: ChampionKnowledge):
     preferred_weapons = [Weapon.bow_loaded, Weapon.bow_unloaded, Weapon.bow]
 
     if player is not None and \
-            safe_attack_possible(knowledge, state.weapon, state.name):
+            is_attack_possible(knowledge, state.weapon, state.name):
         state.path = Path('', [])
         return characters.Action.ATTACK
+
+    if (state.menhir is None and len(state.exploration_points) > 0 and
+            ((state.mist_coming and state.path.dest != 'mist_away_explore') or
+             state.new_mist_tiles)):
+        exploration_checkpoint = get_mist_away_exploration_point(state.mist_list, state.exploration_points)
+        if len(state.path.route) == 0 or exploration_checkpoint.coords != state.path.route[-1].coords:
+            state.path = Path('mist_away_explore', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
     if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming and state.prev_weapon is state.weapon:
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest not in ['scan', 'mist_away_explore']:
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
     if player is not None and not state.mist_coming and (len(state.path.route) == 0 or state.path.dest is player[0]):
         position_to_attack = nearest_coord_to_attack(state, [player[1]], state.directed_position.coords,
                                                      Weapon.from_string(state.weapon.name))
-        state.path = Path(player[0], find_path(state.directed_position, position_to_attack, state.landscape_map))
+
+        if position_to_attack is not None:
+            state.path = Path(player[0], find_path(state.directed_position, position_to_attack, state.landscape_map))
 
     if (len(state.path.route) == 0 or (state.mist_coming and state.path.dest != 'menhir')) and state.menhir is not None:
         if get_distance(state.menhir, knowledge.position) > 0:
@@ -80,14 +89,16 @@ def aggressive_tactic(state: State, knowledge: ChampionKnowledge):
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest not in ['scan', 'mist_away_explore']:
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 
     if player is not None and (len(state.path.route) == 0 or state.path.dest is player[0]):
         position_to_attack = nearest_coord_to_attack(state, [player[1]], state.directed_position.coords,
                                                      Weapon.from_string(state.weapon.name))
-        state.path = Path(player[0], find_path(state.directed_position, position_to_attack, state.landscape_map))
+
+        if position_to_attack is not None:
+            state.path = Path(player[0], find_path(state.directed_position, position_to_attack, state.landscape_map))
 
     if (len(state.path.route) == 0 or (state.mist_coming and state.path.dest != 'menhir')) and state.menhir is not None:
         if get_distance(state.menhir, knowledge.position) > 0:
@@ -117,12 +128,19 @@ def archer_tactic(state: State, knowledge: ChampionKnowledge):
         state.path = Path('', [])
         return characters.Action.ATTACK
 
+    if (state.menhir is None and len(state.exploration_points) > 0 and
+            ((state.mist_coming and state.path.dest != 'mist_away_explore') or
+             state.new_mist_tiles)):
+        exploration_checkpoint = get_mist_away_exploration_point(state.mist_list, state.exploration_points)
+        if len(state.path.route) == 0 or exploration_checkpoint.coords != state.path.route[-1].coords:
+            state.path = Path('mist_away_explore', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
+
     if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming and state.prev_weapon is state.weapon:
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
 
-    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest != 'scan':
+    if state.weapon in preferred_weapons and state.menhir is None and len(state.exploration_points) > 0 and state.path.dest not in ['scan', 'mist_away_explore']:
         exploration_checkpoint = extract_pytagorian_nearest(state)
         state.path = Path('scan', find_path(state.directed_position, exploration_checkpoint, state.landscape_map))
 

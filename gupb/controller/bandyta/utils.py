@@ -4,6 +4,8 @@ from functools import reduce
 from math import fabs
 from typing import NamedTuple, List, Optional, Dict, Tuple
 
+import numpy as np
+
 import gupb.controller.bandyta.bfs as bfs
 from gupb.model import characters, tiles
 from gupb.model.arenas import ArenaDescription
@@ -71,6 +73,8 @@ class State:
         self.prev_weapon: Optional[Weapon] = None
         self.mist_coming: bool = False
         self.exploration_points: List[Tuple[int, int]] = []
+        self.mist_list: List[Coords] = []
+        self.new_mist_tiles: bool = False
 
     def reset(self):
         self.not_reachable_items = []
@@ -83,6 +87,8 @@ class State:
         self.arena = None
         self.item_map = dict()
         self.path = Path(None, [])
+        self.mist_list = []
+        self.new_mist_tiles = False
 
 
 DirectedCoords = NamedTuple('DirectedCoords', [('coords', Coords), ('direction', Optional[Direction])])
@@ -292,7 +298,7 @@ def extract_pytagorian_nearest(state: State) -> DirectedCoords:
         if square_dist(nearest) > square_dist(point):
             nearest = point
 
-    state.exploration_points.remove(nearest)
+    # state.exploration_points.remove(nearest)
 
     return DirectedCoords(Coords(nearest[0], nearest[1]), None)
 
@@ -320,6 +326,10 @@ def nearest_coord_to_attack(
         if distance < min_distance:
             min_distance = distance
             best_coord = p
+
+    if best_coord is None:
+        return None
+
     if best_coord.direction is None:
         best_coord = DirectedCoords(best_coord.coords, Direction.random())  # maybe better tactic for amulet
     return best_coord
@@ -459,6 +469,30 @@ def move_on_path(state: State, dc: DirectedCoords) -> characters.Action:
             characters.Action.TURN_LEFT
     else:
         return characters.Action.STEP_FORWARD
+
+
+def update_mist_list(knowledge: ChampionKnowledge, mist_list: List[Coords]) -> List[Coords]:
+    new_mist_list = mist_list.copy()
+    for cords, tile in knowledge.visible_tiles.items():
+        for effect in tile.effects:
+            if effect.type == 'mist' and cords not in mist_list:
+                new_mist_list.append(cords)
+    return new_mist_list
+
+
+def get_mist_away_exploration_point(
+        mist_list: List[Coords],
+        exploration_points: List[Tuple[int, int]]) -> DirectedCoords:
+    avg_distance = []
+    for exploration_point in exploration_points:
+        avg_distance.append(np.average([get_distance(mist_coord, exploration_point) for mist_coord in mist_list]))
+    return DirectedCoords(exploration_points[np.argmax(avg_distance)], None)
+
+
+def update_exploration_points(exploration_points: List[Tuple[int, int]], current_position: Coords):
+    if (current_position.x, current_position.y) in exploration_points:
+        exploration_points.remove((current_position.x, current_position.y))
+    return exploration_points
 
 
 POSSIBLE_ACTIONS = [
