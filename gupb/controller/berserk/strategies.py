@@ -11,6 +11,8 @@ from gupb.controller.berserk.utilities import distance
 from gupb.model.weapons import *
 from gupb.model.arenas import Arena
 from gupb.controller.bb8.strategy import ROTATIONS
+from gupb.model.profiling import profile
+
 
 
 WEAPONS = {
@@ -55,6 +57,7 @@ class Strategy:
     def pick_action(self):
         pass
 
+    @profile
     def find_path(self, start, goal):
         grid = Grid(matrix=self.knowledge_decoder.map)
         start = grid.node(start.x, start.y)
@@ -67,6 +70,7 @@ class Strategy:
         else:
             self.path.extend([(start.x-1, start.y), (start.x-2, start.y)])
 
+    @profile
     def parse_path(self):
         facing = self.knowledge_decoder.info['facing']
         position = self.knowledge_decoder.knowledge.position
@@ -104,6 +108,7 @@ class Strategy:
         else:
             return np.random.choice(POSSIBLE_ACTIONS, 1, self.walk_around_probabilities)[0]
 
+    @profile
     def choose_shorter_dist(self, list_of_objects):
         position = self.knowledge_decoder.knowledge.position
         distances = [distance(position, object_pos) for object_pos in list_of_objects]
@@ -122,6 +127,7 @@ class Strategy:
         self.find_path(position, enemy_cords)
         self.goal = coordinates.Coords(self.path[-1][0], self.path[-1][1])
 
+    @profile
     def find_menhir(self):
         menhir_coords = self.knowledge_decoder.info['menhir_position']
         if menhir_coords:
@@ -132,6 +138,7 @@ class Strategy:
         self.find_path(position, goal)
         self.goal = goal
 
+    @profile
     def can_attack(self):
         bot_weapon = self.knowledge_decoder.info['weapon']
         bot_coords = self.knowledge_decoder.knowledge.position
@@ -147,6 +154,7 @@ class Strategy:
         )
         return can_attack_enemy
 
+    @profile
     def runaway_from_mist(self):
         mist = self.knowledge_decoder.info['mist']
         if mist:
@@ -169,6 +177,7 @@ class Strategy:
             self.path = deque()
             self.position_history = []
 
+    @profile
     def is_the_same_position(self, past: int = 5):
         current_position = self.knowledge_decoder.knowledge.position
         if len(self.position_history) > past + 1:
@@ -179,16 +188,19 @@ class Strategy:
             return True
         return False
 
+    @profile
     def preparation(self):
         self.position_history.append(self.knowledge_decoder.knowledge.position)
         self.is_goal_reached()
         self.is_moving()
         self.runaway_from_mist()
+        self.low_health()
         self._is_possible_to_move()
 
     def name(self) -> str:
         return self.__class__.__name__.lower()
 
+    @profile
     def _is_possible_to_move(self):
         if self.path:
             next_step = self.path[0]
@@ -202,19 +214,30 @@ class Strategy:
                 self.path = deque()
                 self.important_moves.extend([characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT])
 
+    @profile
     def low_health(self):
         if self.knowledge_decoder.info['health'] <= 2 and self.knowledge_decoder.info['enemies_in_sight']:
             nearest_enemy = self.choose_shorter_dist(self.knowledge_decoder.info['enemies_in_sight'])
+            enemy_hp = self.knowledge_decoder.knowledge.visible_tiles[nearest_enemy].character.health
+            enemy_weapon = self.knowledge_decoder.knowledge.visible_tiles[nearest_enemy].character.weapon.name
             enemy_dist = distance(self.knowledge_decoder.knowledge.position, nearest_enemy)
-            if enemy_dist <= 3:
-                self.path = deque()
-                self.important_moves = deque()
-                self.important_moves.extend([
-                    characters.Action.TURN_RIGHT,
-                    characters.Action.TURN_RIGHT,
-                    characters.Action.STEP_FORWARD,
-                    characters.Action.STEP_FORWARD
-                ])
+            possible_attack = self.can_attack()
+            if enemy_dist <= 3 and not possible_attack and enemy_hp <= 2:
+                self.runaway()
+            elif possible_attack and enemy_hp <= 2:
+                pass
+            elif enemy_weapon in ['bow_loaded', 'bow_unloaded']:
+                self.runaway()
+
+    def runaway(self):
+        self.path = deque()
+        self.important_moves = deque()
+        self.important_moves.extend([
+            characters.Action.TURN_RIGHT,
+            characters.Action.STEP_FORWARD,
+            characters.Action.TURN_RIGHT,
+            characters.Action.STEP_FORWARD
+        ])
 
 
 class AggressiveStrategy(Strategy):
@@ -332,6 +355,7 @@ class RunawayStrategy(Strategy):
         self.old_dist_to_menhir = 200
         self.map_size = None
 
+    @profile
     def calculate_dist(self):
         self.old_dist_to_menhir = self.dist_to_menhir
         position = self.knowledge_decoder.knowledge.position
