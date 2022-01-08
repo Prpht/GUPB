@@ -69,6 +69,7 @@ SAFE_POS = {
 class Strategy:
     def __init__(self):
         self.action_queue = []
+        self.path = []
         self.current_weapon = 'knife'
         self.facing = None  # inicjalizacja przy pierwszym decide
         self.position = None  # inicjalizacja przy pierwszym decide
@@ -85,10 +86,12 @@ class Strategy:
         self.random_coord = None
         self.visible_tile_enemies = []
         self.arena_description = None
+        self.random_coord = None
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.current_weapon = 'knife'
         self.action_queue = []
+        self.path = []
         self.reached_menhir = False
         self.is_mist_coming = False
         self.reached_safe_place = False
@@ -97,6 +100,7 @@ class Strategy:
         self.visible_tile_enemies = []
         self.arena_description = arena_description.name
         self.safe_place = None
+        self.random_coord = None
         # self.safe_place = SAFE_PLACES[arena_description.name]
         for x_index in range(50):
             for y_index in range(50):
@@ -147,6 +151,7 @@ class Strategy:
         self.facing = character.facing
         if self.current_weapon != character.weapon.name:
             self.action_queue = []
+            self.path = []
             self.safe_place = None
             self.grid[self.position] = TileDescription(type='land', loot=WeaponDescription(name=self.current_weapon), character=character, effects=[])
         self.current_weapon = character.weapon.name
@@ -162,14 +167,21 @@ class Strategy:
                     if effect.type == 'mist':
                         self.is_mist_coming = True
                         self.action_queue = []  # reset queue since mist appeared
+                        self.path = []
             if tile.type == 'menhir' and self.position == coord:
                 self.reached_menhir = True
 
             if tile.character is not None and coord != self.position:
                 self.visible_tile_enemies.append(coord)
+
+            if coord == self.random_coord:
+                self.random_coord = None
+                self.action_queue = []
+                self.path = []
         if self.random_coord in self.explored_tiles:
             self.random_coord = None
             self.action_queue = []
+            self.path = []
 
     def get_far_coord_orthogonal_to_tile(self, tile_coord, max_distance):
         coords = [tile_coord]
@@ -269,7 +281,11 @@ class Strategy:
         if len(self.action_queue) > 0:
             if not self.__is_allowed_action(self.action_queue[0]):
                 self.action_queue = []
+                self.path = []
                 self.safe_place = None
+            if not self.is_mist_coming and len(set(self.visible_tile_enemies).intersection(self.path)) > 0:
+                self.action_queue = []
+                self.path = []
 
     def __is_allowed_action(self, action):
         return not (action is characters.Action.STEP_FORWARD and self.grid[self.position + self.facing.value].type in [

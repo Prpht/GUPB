@@ -32,6 +32,7 @@ class SwordStrategy(Strategy):
                 if weapon_coord is not None and weapon_coord not in self.banned_coords:
                     path = Astar.astar(self.grid, self.position, weapon_coord)
                     if path is not None:
+                        self.path = path
                         self.action_queue = self.generate_queue_from_path(
                             path)
                         if len(self.action_queue) > 0:
@@ -42,21 +43,24 @@ class SwordStrategy(Strategy):
                         self.banned_coords.append(weapon_coord)
 
             if self.menhir_coord is None or (self.current_weapon not in ['sword'] and not self.is_mist_coming):
-                random_coord = self.get_random_passable_coord()
-                path = Astar.astar(self.grid, self.position, random_coord)
+                self.random_coord = self.get_random_passable_coord()
+                path = Astar.astar(self.grid, self.position, self.random_coord)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.is_mist_coming and self.menhir_coord is not None:
                 target_coord = self.get_far_coord_orthogonal_to_tile(self.menhir_coord, 4)
-                path = Astar.astar(self.grid, self.position, target_coord)
+                path = Astar.astar(self.grid, self.position, target_coord, avoid_enemies=False)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
             elif self.safe_place is None:
                 self.safe_place = self.get_safe_place()
                 path = Astar.astar(self.grid, self.position, self.safe_place)
                 if path is not None:
+                    self.path = path
                     self.action_queue = self.generate_queue_from_path(
                         path)
 
