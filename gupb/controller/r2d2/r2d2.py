@@ -2,11 +2,13 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from gupb.model.coordinates import Coords
+from queue import SimpleQueue
 
 from gupb.model import arenas, characters, coordinates
 from gupb.model.characters import Facing
 from gupb.model.profiling import profile
 from gupb import controller
+import random
 
 import random
 import numpy as np
@@ -20,6 +22,7 @@ POSSIBLE_ACTIONS = [
 
 EXPLORE_COEF = 0.2
 
+
 class R2D2Controller(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
@@ -29,11 +32,12 @@ class R2D2Controller(controller.Controller):
         self.visible_tiles = {}
         self.menhir_position = None
         self.on_menchir = False
-        self.my_destination=Coords(24,27)
-        self.visited=[]
-        self.known=[]
-        self.destination=False
-        self.path=None
+        self.my_destination = Coords(50, 50)
+        self.visited = []
+        self.known = []
+        self.destination = False
+        self.path = None
+        self.action_queue: SimpleQueue[characters.Action] = SimpleQueue()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, R2D2Controller):
@@ -44,14 +48,19 @@ class R2D2Controller(controller.Controller):
         return hash(self.first_name)
 
     def follow_the_path(self):
-        dest=self.destination
+        dest = self.destination
         matrix = Grid(matrix=self.map)
         start = matrix.node(self.position.x, self.position.y)
         self.destination = matrix.node(self.destination.x, self.destination.y)
         astar_finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
         self.path, _ = astar_finder.find_path(start, self.destination, matrix)
-        dist=np.linalg.norm(np.array((self.position.x, self.position.y)) - np.array((dest.x,dest.y)))
-        if dist==1 and ((self.facing==Facing.DOWN and dest.y-self.position.y==1)or(self.facing==Facing.UP and dest.y-self.position.y==-1)or(self.facing==Facing.RIGHT and dest.x-self.position.x==1)or(self.facing==Facing.LEFT and dest.x-self.position.x==-1)):
+        # print(self.path)
+        dist = np.linalg.norm(np.array((self.position.x, self.position.y)) - np.array((dest.x, dest.y)))
+        # print(dist)
+        if dist == 1 and ((self.facing == Facing.DOWN and dest.y - self.position.y == 1) or (
+                self.facing == Facing.UP and dest.y - self.position.y == -1) or (
+                                  self.facing == Facing.RIGHT and dest.x - self.position.x == 1) or (
+                                  self.facing == Facing.LEFT and dest.x - self.position.x == -1)):
             return characters.Action.STEP_FORWARD
         if self.path:
             orientation = characters.Facing(coordinates.sub_coords(self.path[1], self.position))
@@ -75,14 +84,13 @@ class R2D2Controller(controller.Controller):
                 action = random.choice(POSSIBLE_ACTIONS)
             return action
 
-
     def update_knowledge(self, knowledge: characters.ChampionKnowledge):
-        if self.destination==self.position:
-            self.path=False
-            self.destination=False
+        if self.destination == self.position:
+            self.path = False
+            self.destination = False
         self.position = knowledge.position
         if knowledge.position not in self.visited:
-            self.visited.append((knowledge.position.x,knowledge.position.y))
+            self.visited.append((knowledge.position.x, knowledge.position.y))
         self.visible_tiles = knowledge.visible_tiles
         char_description = knowledge.visible_tiles[knowledge.position].character
         self.facing = char_description.facing
@@ -101,34 +109,64 @@ class R2D2Controller(controller.Controller):
         else:
             return False
 
+    def is_mist_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
+        for i in reversed(range(1,5)):
+            visible_tile=self.position
+            for j in range(i):
+                visible_tile=visible_tile+self.facing.value
+            if visible_tile in knowledge.visible_tiles.keys():
+                for e in knowledge.visible_tiles[visible_tile].effects:
+                    if e.type=='mist':
+                        return True
+        else:
+            return False
+
     @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update_knowledge(knowledge)
-        if self.on_menchir:
-            if self.is_enemy_ahead(knowledge):
-                return characters.Action.ATTACK
-            else:
-                return characters.Action.TURN_RIGHT
+
+        if self.is_enemy_ahead(knowledge):
+            return characters.Action.ATTACK
+
+        if not self.action_queue.empty():
+            return self.action_queue.get()
+
+        if self.is_mist_ahead(knowledge):
+            self.action_queue.put(characters.Action.TURN_RIGHT)
+            self.action_queue.put(characters.Action.STEP_FORWARD)
+            return characters.Action.TURN_RIGHT
+
         else:
-            if self.is_enemy_ahead(knowledge):
-                return characters.Action.ATTACK
-            if self.menhir_position is not None:
-                if (self.position.x - self.menhir_position.x, self.position.y - self.menhir_position.y) == (0, 0):
-                    self.on_menchir = True
-                    pass
+            if self.on_menchir:
+                if self.is_enemy_ahead(knowledge):
+                    return characters.Action.ATTACK
                 else:
-                    self.destination=self.menhir_position
-                    return self.follow_the_path()
+                    return characters.Action.TURN_RIGHT
             else:
-                for i in knowledge.visible_tiles.keys():
-                    if (type(i) is tuple) and (i not in self.known) and (knowledge.visible_tiles[i].type not in ('wall', 'sea')):
-                        self.known.append(i)
-                to_go=list(set(self.known) - set(self.visited) - set(self.position))
-                if to_go==[]:
-                    return characters.Action.STEP_FORWARD
-                ind=self.closest_node((knowledge.position.x, knowledge.position.y),to_go)
-                self.destination=Coords(to_go[ind][0], to_go[ind][1])
-                return self.follow_the_path()
+                if self.is_enemy_ahead(knowledge):
+                    return characters.Action.ATTACK
+                if self.menhir_position is not None:
+                    if (abs(self.position.x - self.menhir_position.x), abs(self.position.y - self.menhir_position.y)) == (1, 1):
+                        self.on_menchir = True
+                        pass
+                    else:
+                        self.destination = self.menhir_position
+                        return self.follow_the_path()
+                else:
+
+                    if random.random() < EXPLORE_COEF:
+                        return characters.Action.TURN_RIGHT
+
+                    for i in knowledge.visible_tiles.keys():
+                        if (type(i) is tuple) and (i not in self.known) and (
+                                knowledge.visible_tiles[i].type not in ('wall', 'sea')):
+                            self.known.append(i)
+                    to_go = list(set(self.known) - set(self.visited) - set(self.position))
+                    if to_go == []:
+                        return characters.Action.STEP_FORWARD
+                    ind = self.closest_node((knowledge.position.x, knowledge.position.y), to_go)
+                    self.destination = Coords(to_go[ind][0], to_go[ind][1])
+                    return self.follow_the_path()
 
     def closest_node(self, node, nodes):
         nodes = np.asarray(nodes)
