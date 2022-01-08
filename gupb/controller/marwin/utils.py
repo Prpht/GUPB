@@ -40,6 +40,7 @@ GOING_FOR_WEAPON = 'going_for_weapon'
 GOING_TO_MENHIR = 'going_to_menhir'
 GOING_TO_TURN = 'going_to_turn'
 CAMPING = 'camping'
+INTERMEDIATE = 'waiting_for_policy'
 
 # weights during pathfinding
 W_UNDISCOVERED = 0

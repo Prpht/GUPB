@@ -33,7 +33,7 @@ def passive_tactic(state: State, knowledge: ChampionKnowledge):
         state.path = Path('', [])
         return characters.Action.ATTACK
 
-    if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming:
+    if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming and state.prev_weapon is state.weapon:
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
@@ -75,7 +75,7 @@ def aggressive_tactic(state: State, knowledge: ChampionKnowledge):
         state.path = Path('', [])
         return characters.Action.ATTACK
 
-    if state.weapon not in preferred_weapons and state.path.dest != 'weapon':
+    if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming and state.prev_weapon is state.weapon:
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path
@@ -117,7 +117,7 @@ def archer_tactic(state: State, knowledge: ChampionKnowledge):
         state.path = Path('', [])
         return characters.Action.ATTACK
 
-    if state.weapon not in preferred_weapons and state.path.dest != 'weapon':
+    if state.weapon not in preferred_weapons and state.path.dest != 'weapon' and not state.mist_coming and state.prev_weapon is state.weapon:
         possible_path: Path = get_weapon_path(state.directed_position, state.item_map, state.not_reachable_items,
                                               state.landscape_map, preferred_weapons)
         state.path = possible_path if len(possible_path.route) > 0 else state.path

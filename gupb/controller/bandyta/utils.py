@@ -68,6 +68,7 @@ class State:
         self.arena = None
         self.directed_position: Optional[DirectedCoords] = None
         self.weapon: Optional[Weapon] = None
+        self.prev_weapon: Optional[Weapon] = None
         self.mist_coming: bool = False
         self.exploration_points: List[Tuple[int, int]] = []
 
@@ -76,6 +77,7 @@ class State:
         self.menhir = None
         self.directed_position = None
         self.weapon = None
+        self.prev_weapon = None
         self.mist_coming = False
         self.landscape_map = dict()
         self.arena = None
@@ -430,21 +432,21 @@ def get_weapon_path(
         not_reachable_items: List[Coords],
         landscape_map: Dict[int, Dict[int, str]],
         preferred_weapons: List[Weapon]):
+    weapon_list: List[Tuple[Coords, int]] = []
     for ranked_weapon in preferred_weapons:
-        weapon_list: List[Tuple[Coords, int]] = []
-
         for coords, weapon in item_map.items():
             if weapon.name == ranked_weapon.name and coords not in not_reachable_items:
                 weapon_list.append((coords, get_distance(dc.coords, coords)))
 
-        if len(weapon_list) > 0:
-            sorted_by_distance = sorted(weapon_list, key=lambda tup: tup[1])
-            for coords, distance in sorted_by_distance:
-                path = bfs.find_path(dc, DirectedCoords(coords, None), landscape_map)
-                if len(path) > 0:
-                    return Path('weapon', path)
-                else:
-                    not_reachable_items.append(coords)
+    if len(weapon_list) > 0:
+        sorted_by_distance = sorted(weapon_list, key=lambda tup: tup[1])
+        for coords, distance in sorted_by_distance:
+            path = bfs.find_path(dc, DirectedCoords(coords, None), landscape_map)
+            if len(path) > 0:
+                return Path('weapon', path)
+            else:
+                not_reachable_items.append(coords)
+
     return Path('', [])
 
 
