@@ -65,8 +65,11 @@ def find_path_to_target(arena, start: coordinates.Coords, end: coordinates.Coord
     start_node = grid.node(start.x, start.y)
     end_node = grid.node(end.x, end.y)
     finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
-    path, runs = finder.find_path(start_node, end_node, grid)
-    return path
+    path, _ = finder.find_path(start_node, end_node, grid)
+    coords_path = []
+    for coords in path:
+        coords_path.append(coordinates.Coords(x=coords[0], y=coords[1]))
+    return coords_path
 
 
 def is_tile_transparent(tile_name: str) -> bool:
@@ -119,7 +122,8 @@ def scan_terrain(terrain: Dict[coordinates.Coords, tiles.TileDescription], chara
     unpassable = {WALL, SEA}
     result = defaultdict(list)
     for coords, tile in terrain.items():
-        if tile.character is not None:
+        coords = coordinates.Coords(x=coords[0], y=coords[1])
+        if tile.character is not None and coords != character_position:
             result[ENEMY].append(coords)
         if map_matrix[coords[1], coords[0]] == W_UNDISCOVERED:
             result[tile.type].append(coords)
