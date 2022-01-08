@@ -54,12 +54,6 @@ class EkonometronController(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    @staticmethod
-    def choose_best_strategy(strategies_list):
-        max_value = max([s.value for s in strategies_list])
-        potential_strats = [s for s in strategies_list if s.value == max_value]
-        return random.choice(potential_strats)
-
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.starting_coords = None
         self.direction = None
@@ -81,13 +75,15 @@ class EkonometronController(controller.Controller):
         self.camp_init = False
         # choosing the strategy
         if arena_description.name not in self.map_strategies:
-            self.map_strategies[arena_description.name] = [TryingMyBest(self), LetsHide(self), KillThemAll(self)]
+            self.map_strategies[arena_description.name] = [KillThemAll(self), TryingMyBest(self), LetsHide(self)]
         strategies_list = self.map_strategies[arena_description.name]
         random_no = random.uniform(0, 1)
         if random_no > self.epsilon:
-            self.chosen_strategy = self.choose_best_strategy(strategies_list)
+            self.chosen_strategy = max(strategies_list, key=lambda s: s.value)
         else:
             self.chosen_strategy = random.choice(strategies_list)
+        # print(self.chosen_strategy.name)
+        # print(self.chosen_strategy.value)
 
     @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:

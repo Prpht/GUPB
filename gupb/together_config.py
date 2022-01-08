@@ -24,7 +24,7 @@ CONFIGURATION = {
         r2d2.R2D2Controller("R2D2"),
         felix_bot.FelixBotController("Felix"),
         bb8.BB8Controller("BB8"),
-        ekonometron.EkonometronController("Johnathan"),
+        ekonometron.EkonometronController("Ekonometron"),
         marwin.reinforced.ReinforcedMarwin("Marwin"),
     ],
     'start_balancing': False,

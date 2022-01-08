@@ -52,68 +52,35 @@ class TryingMyBest(Strategy):
                     self.controller.current_path = self.bfs_shortest_path(knowledge.position, self.controller.destination)
                     self.current_mode = "Go to menhir"
                     return right_action(self.controller)
-            # react to a weapon on the ground
-            if self.weapon_in_reach(knowledge.position):
-                action = self.react_to_weapon(knowledge.position)
-                if action != characters.Action.DO_NOTHING:
-                    return action
-            # turn if there is an obstacle in front
-            if self.obstacle_in_front(knowledge.position):
-                return self.take_a_turn(knowledge.position)
-            # if there is nothing interesting going on, bot will move forward
-            rand_gen = random.random()
-            if rand_gen <= 0.9:
-                return forward_action(self.controller, knowledge.position)
+            if self.controller.destination is None:
+                # turn back for the weapon
+                if self.better_weapon_behind(knowledge.position):
+                    self.controller.destination = knowledge.position - self.controller.direction.value
+                    self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                          self.controller.destination)
+                    return left_action(self.controller)
+                # go for good weapon noticed
+                weapon_coords = self.return_good_weapon_coords(knowledge)
+                if weapon_coords is not None:
+                    self.controller.destination = weapon_coords
+                    self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                          self.controller.destination)
+                    return left_action(self.controller)
+                # turn if there is an obstacle in front
+                if self.obstacle_in_front(knowledge.position):
+                    return self.take_a_turn(knowledge.position)
+                # if there is nothing interesting going on, bot will move forward
+                rand_gen = random.random()
+                if rand_gen <= 0.9:
+                    return forward_action(self.controller, knowledge.position)
+                else:
+                    return self.take_a_turn(knowledge.position)
             else:
-                return self.take_a_turn(knowledge.position)
-
-    def weapon_in_reach(self, position: coordinates.Coords):
-        """Bot checks if it is next to a potential weapon it can reach"""
-        front_coords = position + self.controller.direction.value
-        left_coords = position + self.controller.direction.turn_left().value
-        right_coords = position + self.controller.direction.turn_right().value
-        # front tile had to be inspected independently to right and left tiles because bot doesn't need to know
-        # neither right or left tile to pick up a weapon that is right in front of it
-        front_tile = self.controller.tiles_memory[front_coords]
-        if front_tile.loot is not None:
-            return True
-        try:
-            left_tile = self.controller.tiles_memory[left_coords]
-            right_tile = self.controller.tiles_memory[right_coords]
-        except KeyError:
-            return False
-        else:
-            if left_tile.loot is not None or right_tile.loot is not None:
-                return True
-            return False
-
-    def react_to_weapon(self, position: coordinates.Coords):
-        """Bot picks a proper action to a weapon laying on the ground"""
-        front_coords = position + self.controller.direction.value
-        left_coords = position + self.controller.direction.turn_left().value
-        right_coords = position + self.controller.direction.turn_right().value
-        front_tile = self.controller.tiles_memory[front_coords]
-        # front tile had to be inspected independently to right and left tiles because bot doesn't need to know
-        # neither right or left tile to pick up a weapon that is right in front of it;
-        if front_tile.loot is not None:
-            if WEAPONS_PRIORITIES[front_tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]:
-                return forward_action(self.controller, position)
-            else:
-                if random.random() <= 0.2:
-                    return forward_action(self.controller, position)
-                return self.take_a_turn(position)
-        try:
-            left_tile = self.controller.tiles_memory[left_coords]
-            right_tile = self.controller.tiles_memory[right_coords]
-        except KeyError:
-            return forward_action(self.controller, position)
-        if left_tile.loot is not None:
-            if WEAPONS_PRIORITIES[left_tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]:
-                return left_action(self.controller)
-        if right_tile.loot is not None:
-            if WEAPONS_PRIORITIES[right_tile.loot.name] > WEAPONS_PRIORITIES[self.controller.hold_weapon]:
-                return right_action(self.controller)
-        return characters.Action.DO_NOTHING
+                next_step = self.move(knowledge.position)
+                if next_step is not None:
+                    return next_step
+                else:
+                    return right_action(self.controller)
 
     def obstacle_in_front(self, position: coordinates.Coords):
         """Bots identifies the tile right in front of it"""
@@ -323,28 +290,40 @@ class KillThemAll(Strategy):
                                                                           self.controller.destination)
                     self.current_mode = "Go to menhir"
                     return right_action(self.controller)
+            if self.better_weapon_behind(knowledge.position):
+                self.controller.destination = knowledge.position - self.controller.direction.value
+                self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                      self.controller.destination)
+                return left_action(self.controller)
             if self.controller.destination is None:
-                for w in list(reversed(list(WEAPONS_PRIORITIES.keys())))[:3]:
-                    if self.controller.hold_weapon == w:
+                i = 0
+                while self.best_weapon is None:
+                    w = random.choice(["bow", "sword"])
+                    # print(w)
+                    if w in self.controller.hold_weapon:
                         self.current_mode = "Hunting"
-                        self.hunting_countdown = 50
+                        self.hunting_countdown = 70
                         return right_action(self.controller)
                     coords_list = self.find_best_weapon(w)
                     if len(coords_list) != 0:
                         paths_lens = {}
                         for c in coords_list:
-                            paths_lens[c] = self.bfs_shortest_path(knowledge.position, c)
+                            if c != knowledge.position:
+                                paths_lens[c] = self.bfs_shortest_path(knowledge.position, c)
                         self.controller.destination = min(paths_lens.items(), key=lambda x: len(x[1]))[0]
                         self.best_weapon = w
                         self.controller.current_path = paths_lens[self.controller.destination]
                         return right_action(self.controller)
+                    i += 1
+                    if i == 5:
+                        self.best_weapon = self.controller.hold_weapon
                 # if there are no good weapons found, bot turns into hunting mode regardless
                 self.current_mode = "Hunting"
-                self.hunting_countdown = 50
+                self.hunting_countdown = 70
                 return right_action(self.controller)
             else:
                 if self.controller.destination in knowledge.visible_tiles:
-                    if knowledge.visible_tiles[self.controller.destination].loot.name != self.best_weapon:
+                    if self.best_weapon not in knowledge.visible_tiles[self.controller.destination].loot.name:
                         self.controller.destination = None
                         self.controller.current_path = []
                         return right_action(self.controller)
@@ -365,6 +344,7 @@ class KillThemAll(Strategy):
                     return right_action(self.controller)
             self.hunting_countdown -= 1
             if self.hunting_countdown == 0:
+                self.best_weapon = None
                 self.current_mode = "Find best weapon"
                 self.controller.destination = None
                 self.controller.current_path = []
@@ -372,6 +352,11 @@ class KillThemAll(Strategy):
             action = self.enemy_to_the_side(knowledge.position)
             if action != characters.Action.DO_NOTHING:
                 return action
+            if self.better_weapon_behind(knowledge.position):
+                self.controller.destination = knowledge.position - self.controller.direction.value
+                self.controller.current_path = self.bfs_shortest_path(knowledge.position,
+                                                                      self.controller.destination)
+                return left_action(self.controller)
             if self.controller.destination is None:
                 coords_list = self.find_enemies_locations()
                 if len(coords_list) != 0:
@@ -393,7 +378,7 @@ class KillThemAll(Strategy):
 
     def find_best_weapon(self, weapon_name):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].loot is not None)
-                and (self.controller.tiles_memory[coords].loot.name == weapon_name) and ("mist" not in self.controller.tiles_memory[coords].effects)]
+                and (weapon_name in self.controller.tiles_memory[coords].loot.name) and ("mist" not in self.controller.tiles_memory[coords].effects)]
 
     def find_enemies_locations(self):
         return [coords for coords in self.controller.tiles_memory if (self.controller.tiles_memory[coords].character is not None)
