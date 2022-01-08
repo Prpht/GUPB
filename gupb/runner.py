@@ -41,6 +41,7 @@ class Runner:
             GameStartReport(i + 1).log(logging.INFO)
             self.run_game(i)
 
+    # noinspection PyBroadException
     def run_game(self, game_no: int) -> None:
         arena = random.choice(self.arenas)
         verbose_logger.debug(f"Randomly picked arena: {arena}.")
@@ -65,9 +66,13 @@ class Runner:
         else:
             self.run_in_memory(game)
         for dead_controller, score in game.score().items():
-            logging.info(f"Controller {dead_controller.name} scored {score} points.")
-            ControllerScoreReport(dead_controller.name, score).log(logging.DEBUG)
-            dead_controller.praise(score)
+            verbose_logger.info(f"Controller {dead_controller.name} scored {score} points.")
+            ControllerScoreReport(dead_controller.name, score).log(logging.INFO)
+            try:
+                dead_controller.praise(score)
+            except Exception as e:
+                verbose_logger.warning(f"Controller {dead_controller.name} throw an unexpected exception: {repr(e)}.")
+                controller.ControllerExceptionReport(dead_controller.name, repr(e)).log(logging.WARN)
             self.scores[dead_controller.name] += score
 
     def print_scores(self) -> None:

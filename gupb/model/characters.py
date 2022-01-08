@@ -16,6 +16,8 @@ from gupb.model import weapons
 verbose_logger = logging.getLogger('verbose')
 
 CHAMPION_STARTING_HP: int = 8
+PENALISED_IDLE_TIME = 16
+IDLE_DAMAGE_PENALTY = 1
 
 
 class ChampionKnowledge(NamedTuple):
@@ -52,6 +54,9 @@ class Champion:
         self.arena: arenas.Arena = arena
         self.controller: Optional[controller.Controller] = None
         self.tabard: Optional[Tabard] = None
+        self.previous_facing: Facing = self.facing
+        self.previous_position: coordinates.Coords = self.position
+        self.time_idle: int = 0
 
     def assign_controller(self, assigned_controller: controller.Controller) -> None:
         self.controller = assigned_controller
@@ -60,14 +65,32 @@ class Champion:
     def description(self) -> ChampionDescription:
         return ChampionDescription(self.controller.name, self.health, self.weapon.description(), self.facing)
 
+    def verbose_name(self) -> str:
+        return self.controller.name if self.controller else "NULL_CONTROLLER"
+
     def act(self) -> None:
         if self.alive:
+            self.store_previous_state()
             action = self.pick_action()
-            name = self.controller.name if self.controller else "NULL_CONTROLLER"
-            verbose_logger.debug(f"Champion {name} picked action {action}.")
-            ChampionPickedActionReport(name, action.name).log(logging.DEBUG)
+            verbose_logger.debug(f"Champion {self.verbose_name()} picked action {action}.")
+            ChampionPickedActionReport(self.verbose_name(), action.name).log(logging.DEBUG)
             action(self)
             self.arena.stay(self)
+            self.assess_idle_penalty()
+
+    def store_previous_state(self) -> None:
+        self.previous_position = self.position
+        self.previous_facing = self.facing
+
+    def assess_idle_penalty(self) -> None:
+        if self.position == self.previous_position and self.previous_facing == self.facing:
+            self.time_idle += 1
+        else:
+            self.time_idle = 0
+        if self.time_idle >= PENALISED_IDLE_TIME:
+            verbose_logger.debug(f"Champion {self.verbose_name()} penalised for idle time.")
+            IdlePenaltyReport(self.verbose_name()).log(logging.DEBUG)
+            self.damage(IDLE_DAMAGE_PENALTY)
 
     # noinspection PyBroadException
     def pick_action(self) -> Action:
@@ -77,15 +100,17 @@ class Champion:
             try:
                 action = self.controller.decide(knowledge)
                 if action is None:
-                    verbose_logger.warning(f"Controller {self.controller.name} returned a non-action.")
-                    ControllerExceptionReport(self.controller.name, "a non-action returned").log(logging.WARN)
+                    verbose_logger.warning(f"Controller {self.verbose_name()} returned a non-action.")
+                    controller.ControllerExceptionReport(self.verbose_name(), "a non-action returned").log(logging.WARN)
                     return Action.DO_NOTHING
                 return action
             except Exception as e:
-                verbose_logger.warning(f"Controller {self.controller.name} throw an unexpected exception: {repr(e)}.")
-                ControllerExceptionReport(self.controller.name, repr(e)).log(logging.WARN)
+                verbose_logger.warning(f"Controller {self.verbose_name()} throw an unexpected exception: {repr(e)}.")
+                controller.ControllerExceptionReport(self.verbose_name(), repr(e)).log(logging.WARN)
                 return Action.DO_NOTHING
         else:
+            verbose_logger.warning(f"Controller {self.verbose_name()} was non-existent.")
+            controller.ControllerExceptionReport(self.verbose_name(), "controller non-existent").log(logging.WARN)
             return Action.DO_NOTHING
 
     def turn_left(self) -> None:
@@ -137,6 +162,7 @@ class Facing(Enum):
     DOWN = coordinates.Coords(0, 1)
     LEFT = coordinates.Coords(-1, 0)
     RIGHT = coordinates.Coords(1, 0)
+
     @staticmethod
     def random() -> Facing:
         return random.choice([Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT])
@@ -204,6 +230,5 @@ class ChampionDeathReport(logger_core.LoggingMixin):
 
 
 @dataclass(frozen=True)
-class ControllerExceptionReport(logger_core.LoggingMixin):
+class IdlePenaltyReport(logger_core.LoggingMixin):
     controller_name: str
-    exception: str
