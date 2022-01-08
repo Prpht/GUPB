@@ -8,16 +8,18 @@ from gupb.controller.random import POSSIBLE_ACTIONS
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena
-from gupb.model.characters import Facing, CHAMPION_STARTING_HP
+from gupb.model.characters import Facing, CHAMPION_STARTING_HP, ChampionKnowledge
 from gupb.model.coordinates import Coords
 from gupb.model.profiling import profile
 import json
 from math import pi as M_PI
 from math import sqrt
 
-
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
+from gupb.model.weapons import Knife
+
+
 class WIETnamczyk(controller.Controller):
     FIGHT_NEAR_MENHIR = "fight_near_menhir"
     GET_WEAPON = "get_weapon"
@@ -43,11 +45,13 @@ class WIETnamczyk(controller.Controller):
         rand = random.uniform(0, 1)
         self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
                                                                                                       key=self.Q.get)
+        print(self.current_strategy)
         self.menhir_pos = None
+        self.weapon_ranks = {'bow_loaded': 1, 'bow_unloaded': 2, 'sword': 3, 'axe': 3, 'knife': 4, 'amulet': 5}
         self.good_weapons = ["sword", "axe", "bow_unloaded", "bow_loaded"]
         self.first_name: str = "Adam"
         self.arena_description = None
-        self.current_weapon = "knife"
+        self.current_weapon = Knife()
         self.state = WIETnamczyk.GET_WEAPON
         self.next_dest = None
         self.hp = CHAMPION_STARTING_HP
@@ -135,6 +139,7 @@ class WIETnamczyk(controller.Controller):
                 if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
                     return True
         return False
+
     # @profile(name="find_good_weapon_WIETnamczyk")
     def find_good_weapon(self, bot_pos):
         weapons_pos = []
@@ -559,13 +564,25 @@ class WIETnamczyk(controller.Controller):
 
         return random.choice(POSSIBLE_ACTIONS)
 
+    def are_equal(self, p1, p2):
+        return p1[0] == p2[0] and p1[1] == p2[1]
+
     # @profile(name="explore_map_WIETnamczyk")
-    def explore_map(self, current_position, knowledge):
+    def explore_map(self, current_position, knowledge: ChampionKnowledge):
+        goes_to_weapon = False
+        for tile, description in knowledge.visible_tiles.items():
+            if description.loot and description.loot.name in self.good_weapons and self.dist(tile, current_position) < 5 \
+                    and self.weapon_ranks[description.loot.name] < self.weapon_ranks[self.current_weapon.name]:
+                print("Selecting goal to:", description.loot.name)
+                self.exploration_goal = tile
+                break
+
         attempts = 5
-        while self.exploration_goal is None or self.exploration_goal not in self.unseen_coords or \
+        while self.exploration_goal is None or self.are_equal(current_position, self.exploration_goal) or \
                 self.find_path(current_position, self.exploration_goal) == [] and attempts != 0:
             if WIETnamczyk.MIST_PANIC_MODE:
                 WIETnamczyk.MIST_PANIC_MODE = False
+
             self.exploration_goal = random.choice(list(self.unseen_coords))
             attempts -= 1
         path_to_destination = self.find_path(current_position, self.exploration_goal)
@@ -590,6 +607,7 @@ class WIETnamczyk(controller.Controller):
         rand = random.uniform(0, 1)
         self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
                                                                                                       key=self.Q.get)
+
     @property
     def name(self) -> str:
         return f'WIETnamczyk{self.first_name}'
