@@ -16,6 +16,8 @@ from gupb.model.characters import Facing
 
 PI = 4.0 * math.atan(1.0)
 
+PASSAGE_WIDTH = 3
+
 ROTATIONS = {
     (Facing.UP, Facing.RIGHT): characters.Action.TURN_RIGHT,
     (Facing.UP, Facing.DOWN): characters.Action.TURN_RIGHT,
@@ -66,13 +68,34 @@ class BB8Strategy(ABC):
         self.weapon = "axe"
         self.weapon_range = 1
         self.facing = None
-        self.map = np.zeros((MAP_SIZE, MAP_SIZE))
+        self.map = np.zeros((MAP_SIZE, MAP_SIZE), dtype=np.int32)
         self.weapon_positions = {}
         self.menhir_position = coordinates.Coords(50, 50)
         self.visited_passages = []
         self.going_to_passage = False
         self.destination = None
         self.checked_points = []
+        self.is_mist_coming = False
+        self.path = None
+        self.path_index = 0
+
+    def reset(self):
+        self.position = None
+        self.enemy_nearby = False
+        self.visible_tiles = {}
+        self.weapon = "axe"
+        self.weapon_range = 1
+        self.facing = None
+        self.map = np.zeros((MAP_SIZE, MAP_SIZE), dtype=np.int32)
+        self.weapon_positions = {}
+        self.menhir_position = coordinates.Coords(50, 50)
+        self.visited_passages = []
+        self.going_to_passage = False
+        self.destination = None
+        self.checked_points = []
+        self.is_mist_coming = False
+        self.path = None
+        self.path_index = 0
 
     @abstractmethod
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -84,27 +107,31 @@ class BB8Strategy(ABC):
                               k=1)[0]
 
     def study_map(self):
-        self.map[self.position.x, self.position.y] = 1
+        self.map[self.position.y, self.position.x] = 1
         for position, description in self.visible_tiles.items():
             if description.type == "land":
-                self.map[position[0], position[1]] = 1
+                self.map[position[1], position[0]] = 1
 
             elif description.type == "menhir":
-                self.map[position[0], position[1]] = 1
+                self.map[position[1], position[0]] = 1
                 self.menhir_position = coordinates.Coords(position[0], position[1])
                 self.destination = self.menhir_position
 
             if description.loot is not None:
                 self.weapon_positions[position] = description.loot.name
+        self.check_mist()
 
     def find_best_weapon(self):
         best_score = 0
         best_coordinates = None
+        my_score = WEAPON_SCORES[self.weapon]
 
         for (weapon_position, weapon_name) in self.weapon_positions.items():
             weapon_coordinates = coordinates.Coords(weapon_position[0], weapon_position[1])
             distance = self.calculate_distance(weapon_coordinates) + 1  # to avoid 0 division
             weapon_score = WEAPON_SCORES[weapon_name]
+            if weapon_score <= my_score:
+                continue
             real_score = weapon_score if weapon_score > WEAPON_SCORES[self.weapon] else 0
 
             score = 0.5 * real_score / (0.3 * distance)
@@ -132,9 +159,10 @@ class BB8Strategy(ABC):
 
         return None
 
-    def is_mist_coming(self):
+    def check_mist(self):
         mist_tiles = {k: v for k, v in self.visible_tiles.items() if v.effects}
-        return True if mist_tiles else False
+        if mist_tiles:
+            self.is_mist_coming = True
 
     def get_desired_facing(self, destination_coordinates: coordinates.Coords):
         r_vect = coordinates.Coords(destination_coordinates.x - self.position.x,
@@ -142,11 +170,11 @@ class BB8Strategy(ABC):
         angle = math.atan2(r_vect.y, r_vect.x)
 
         if PI / 4.0 < angle <= 3.0 * PI / 4.0:
-            desired_facing = Facing.UP
+            desired_facing = Facing.DOWN
         elif -1.0 * PI / 4.0 < angle <= PI / 4.0:
             desired_facing = Facing.RIGHT
         elif -3.0 * PI / 4.0 < angle <= -1.0 * PI / 4.0:
-            desired_facing = Facing.DOWN
+            desired_facing = Facing.UP
         else:
             desired_facing = Facing.LEFT
 
@@ -155,29 +183,41 @@ class BB8Strategy(ABC):
     def rotate_to_desired_facing(self, desired_facing):
         return ROTATIONS[(self.facing, desired_facing)]
 
-    def go_to_direction(self, destination_coordinates: coordinates.Coords):
-        grid = Grid(matrix=self.map)
-        start = grid.node(self.position.x, self.position.y)
-        end = grid.node(destination_coordinates.x, destination_coordinates.y)
-        finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
-        path, runs = finder.find_path(start, end, grid)
-
-        if path:
-            next_step = path[0]
+    def go_through_path(self):
+        if self.path_index >= len(self.path):
+            return characters.Action.STEP_FORWARD
+        else:
+            next_step = self.path[self.path_index]
             desired_facing = self.get_desired_facing(coordinates.Coords(next_step[0], next_step[1]))
             if self.facing == desired_facing:
+                self.path_index += 1
                 return characters.Action.STEP_FORWARD
             else:
                 return self.rotate_to_desired_facing(desired_facing)
+
+    def go_to_direction(self, destination_coordinates: coordinates.Coords):
+        if self.path:
+            return self.go_through_path()
         else:
-            return self.go_forward()
+            grid = Grid(matrix=self.map)
+            start = grid.node(self.position.x, self.position.y)
+            end = grid.node(destination_coordinates.x, destination_coordinates.y)
+            finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+            path, runs = finder.find_path(start, end, grid)
+            self.path = path
+            self.path_index = 1
+
+            if path:
+                return self.go_through_path()
+            else:
+                return self.go_forward()
 
     def go_forward(self):
         next_step_x = min(self.position.x + FACING_COORDS[self.facing][0], MAP_SIZE)
         next_step_y = min(self.position.y + FACING_COORDS[self.facing][1], MAP_SIZE)
 
         random_factor = random.random()
-        if random_factor <= 0.33:
+        if random_factor <= 0.1:
             return characters.Action.TURN_RIGHT
 
         if self.map[next_step_x, next_step_y] != 0:
@@ -201,7 +241,7 @@ class BB8Strategy(ABC):
             for j in range(MAP_SIZE):
                 if self.map[i, j] == 0:
                     blocked_count += 1
-                    if pass_count == 1:
+                    if pass_count == PASSAGE_WIDTH:
                         pass_count = 0
                         passage_coords = coordinates.Coords(i, j)
                         if self.calculate_distance(
@@ -216,7 +256,7 @@ class BB8Strategy(ABC):
             for j in range(MAP_SIZE):
                 if self.map[j, i] == 0:
                     blocked_count += 1
-                    if pass_count == 1:
+                    if pass_count == PASSAGE_WIDTH:
                         pass_count = 0
                         passage_coords = coordinates.Coords(i, j)
                         if self.calculate_distance(
@@ -239,9 +279,11 @@ class BB8Strategy(ABC):
 
     def go_to_destination_if_exists(self):
         if self.destination is not None:
-            if self.position == self.destination:
+            if self.position.x == self.destination.x and self.position.y == self.destination.y:
                 self.checked_points.append(self.destination)
                 self.destination = None
+                self.path = None
+                self.path_index = 0
             else:
                 return self.go_to_direction(self.destination)
         return None
@@ -297,16 +339,19 @@ class FindBestWeaponStrategy(BB8Strategy):
         if go_to_destination_action is not None:
             return go_to_destination_action
 
-        if self.is_mist_coming() and self.menhir_position is not None:
-            self.destination = self.menhir_position
-            return self.go_to_direction(self.menhir_position)
-        elif self.is_mist_coming():
+        if self.is_mist_coming and self.menhir_position is not None:
+            if self.position == self.menhir_position:
+                return characters.Action.TURN_RIGHT
+            else:
+                self.destination = self.menhir_position
+                return self.go_to_direction(self.menhir_position)
+        elif self.is_mist_coming:
             self.go_forward()
 
         best_weapon_coordinates = self.find_best_weapon()
         enemy_in_range_coordinates = self.get_enemy_in_range_coordinates()
 
-        if best_weapon_coordinates is not None:
+        if best_weapon_coordinates is not None and best_weapon_coordinates != self.position:
             self.destination = best_weapon_coordinates
             return self.go_to_direction(best_weapon_coordinates)
 
