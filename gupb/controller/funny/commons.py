@@ -109,11 +109,11 @@ SAFE_POS = {
 }
 
 START_RUNNING_FROM_MIST = {
-    'fisher_island': 300,
+    'fisher_island': 210,
     'isolated_shrine': 550,
-    'archipelago': 300,
-    'dungeon': 300,
-    'wasteland': 300
+    'archipelago': 200,
+    'dungeon': 170,
+    'wasteland': 170
 }
 
 def r(x):
