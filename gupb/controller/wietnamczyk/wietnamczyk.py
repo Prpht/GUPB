@@ -45,7 +45,7 @@ class WIETnamczyk(controller.Controller):
         rand = random.uniform(0, 1)
         self.current_strategy = random.choice(self.strategies) if rand < WIETnamczyk.EPSILON else max(self.Q,
                                                                                                       key=self.Q.get)
-        print(self.current_strategy)
+        # print(self.current_strategy)
         self.menhir_pos = None
         self.weapon_ranks = {'bow_loaded': 1, 'bow_unloaded': 2, 'sword': 3, 'axe': 3, 'knife': 4, 'amulet': 5}
         self.good_weapons = ["sword", "axe", "bow_unloaded", "bow_loaded"]
@@ -573,7 +573,7 @@ class WIETnamczyk(controller.Controller):
         for tile, description in knowledge.visible_tiles.items():
             if description.loot and description.loot.name in self.good_weapons and self.dist(tile, current_position) < 5 \
                     and self.weapon_ranks[description.loot.name] < self.weapon_ranks[self.current_weapon.name]:
-                print("Selecting goal to:", description.loot.name)
+                # print("Selecting goal to:", description.loot.name)
                 self.exploration_goal = tile
                 break
 

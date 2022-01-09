@@ -18,7 +18,7 @@ def aggregate_scores(log: str, max_games_no: int) -> dict[str, int]:
 
 
 def main() -> None:
-    result = aggregate_scores("gupb__2022_01_02_15_58_34", 500)
+    result = aggregate_scores("gupb__2022_01_09_01_46_55", 365)
     print(result)
 
 

@@ -69,7 +69,7 @@ class BerserkBot(controller.Controller):
             self.knowledge_decoder.knowledge = knowledge
             return self.strategy.pick_action()
         except Exception as e:
-            print(e)
+            # print(e)
             self.strategy.path = deque()
             # print(self.knowledge_decoder.knowledge.position)
             return characters.Action.STEP_FORWARD

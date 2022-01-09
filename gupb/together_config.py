@@ -5,7 +5,7 @@ from gupb.controller import ekonometron
 from gupb.controller import felix_bot
 from gupb.controller import funny
 from gupb.controller import marwin
-from gupb.controller import r2d2
+from gupb.controller.r2d2 import r2d2
 from gupb.controller import wietnamczyk
 
 
@@ -30,5 +30,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 500,
+    'runs_no': 1000,
 }
