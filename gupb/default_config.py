@@ -1,7 +1,6 @@
-from gupb.controller import keyboard, funny, bandyta, r2d2
+from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller.berserk import berserk
-from gupb.controller.wietnamczyk import wietnamczyk
+
 
 CONFIGURATION = {
     'arenas': [
@@ -10,16 +9,16 @@ CONFIGURATION = {
         'fisher_island',
     ],
     'controllers': [
-        funny.FunnyController(),
-        #bandyta.Bandyta("1.0"),
-        wietnamczyk.WIETnamczyk(),
-        berserk.BerserkBot("Ragnar"),
-        r2d2.R2D2Controller("R2D2"),
+        keyboard.KeyboardController(),
+        random.RandomController("Alice"),
+        random.RandomController("Bob"),
+        random.RandomController("Cecilia"),
+        random.RandomController("Darius"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 500,
+    'runs_no': 5,
     'profiling_metrics': [],
 }
 
