@@ -127,7 +127,11 @@ class Amulet(Weapon):
             coordinates.Coords(*position + (1, 1)),
             coordinates.Coords(*position + (-1, 1)),
             coordinates.Coords(*position + (1, -1)),
-            coordinates.Coords(*position + (-1, -1))
+            coordinates.Coords(*position + (-1, -1)),
+            coordinates.Coords(*position + (2, 2)),
+            coordinates.Coords(*position + (-2, 2)),
+            coordinates.Coords(*position + (2, -2)),
+            coordinates.Coords(*position + (-2, -2)),
         ]
 
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
