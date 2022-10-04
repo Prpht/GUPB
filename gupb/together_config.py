@@ -1,9 +1,6 @@
 CONFIGURATION = {
     'arenas': [
-        'archipelago',
-        'dungeon',
         'fisher_island',
-        'wasteland',
     ],
     'controllers': [
     ],

@@ -4,8 +4,6 @@ from gupb.controller import random
 
 CONFIGURATION = {
     'arenas': [
-        'archipelago',
-        'dungeon',
         'fisher_island',
     ],
     'controllers': [
