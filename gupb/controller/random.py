@@ -27,6 +27,7 @@ class RandomController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        print(knowledge)
         return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
