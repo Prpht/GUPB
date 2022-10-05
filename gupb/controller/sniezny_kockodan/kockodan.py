@@ -22,6 +22,7 @@ class SnieznyKockodanController(controller.Controller):
 
         self.menhir = False
         self.mist = False
+        self.weapon = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
@@ -32,6 +33,11 @@ class SnieznyKockodanController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if not self.weapon:
+            pass  # searching weapon
+        # elif i can see the enemy
+        # else idę do menhira, na środek lub przeciw mgle
+
         return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
@@ -40,6 +46,7 @@ class SnieznyKockodanController(controller.Controller):
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir = False
         self.mist = False
+        self.weapon = False
 
     @property
     def name(self) -> str:
@@ -65,4 +72,8 @@ class SnieznyKockodanController(controller.Controller):
             return y_distance <= SnieznyKockodanController.weapon_distance
 
         return False
+
+    # TODO:
+    # walking procedure
+
 
