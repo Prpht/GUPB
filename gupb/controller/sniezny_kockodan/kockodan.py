@@ -34,7 +34,8 @@ class SnieznyKockodanController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         if not self.weapon:
-            pass  # searching weapon
+            weapons = SnieznyKockodanController.get_visible_weapons(knowledge)
+            pass  # move
         # elif i can see the enemy
         # else idę do menhira, na środek lub przeciw mgle
 
@@ -56,22 +57,36 @@ class SnieznyKockodanController(controller.Controller):
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.WHITE
 
-    @classmethod
-    def count_x_distance(cls, tile_position, current_position):
+    @staticmethod
+    def count_x_distance(tile_position, current_position):
         return abs(tile_position[0] - current_position[0])
 
-    @classmethod
-    def count_y_distance(cls, tile_position, current_position):
+    @staticmethod
+    def count_y_distance(tile_position, current_position):
         return abs(tile_position[1] - current_position[1])
 
-    @classmethod
-    def is_potential_weapon_tile(cls, tile_position, current_position):
+    @staticmethod
+    def is_potential_weapon_tile(tile_position, current_position):
         x_distance = SnieznyKockodanController.count_x_distance(tile_position, current_position)
         if x_distance > SnieznyKockodanController.weapon_distance:
             y_distance = SnieznyKockodanController.count_y_distance(tile_position, current_position)
             return y_distance <= SnieznyKockodanController.weapon_distance
 
         return False
+
+    @staticmethod
+    def get_visible_weapons(knowledge):
+        weapons = []
+        for tile in knowledge.visible_tiles:
+            if knowledge.visible_tiles[tile].loot is not None:
+                weapons += [tile]
+
+        return weapons
+
+    # @staticmethod
+    # def is_weapon_visible(current_position, knowledge):
+    #     for tile in knowledge.visible_tiles.values:
+
 
     # TODO:
     # walking procedure
