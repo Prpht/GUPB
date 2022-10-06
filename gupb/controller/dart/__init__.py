@@ -1,3 +1,4 @@
+from gupb.controller.dart.strategy import RunAwayStrategy
 from .dart_controller import DartController
 
 __all__ = [
@@ -5,6 +6,8 @@ __all__ = [
     'POTENTIAL_CONTROLLERS',
 ]
 
+strategy = RunAwayStrategy()
+
 POTENTIAL_CONTROLLERS = [
-    DartController("Dart"),
+    DartController("Dart", strategy),
 ]
