@@ -14,12 +14,12 @@ POSSIBLE_ACTIONS = [
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class WatykanczykController(controller.Controller):
+class DartController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, WatykanczykController):
+        if isinstance(other, DartController):
             return self.first_name == other.first_name
         return False
 
@@ -27,17 +27,20 @@ class WatykanczykController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        print("decide!!!")
         return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
+        print("praise!!!!")
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        print("reset!!!")
         pass
 
     @property
     def name(self) -> str:
-        return f'WatykanczykController{self.first_name}'
+        return f'DartController{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
