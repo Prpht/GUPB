@@ -33,10 +33,9 @@ class ArenaKnowledge():
     @staticmethod
     def _create_arena_matrix(arena_description: arenas.ArenaDescription) -> ArenaMatrix:
         arena = arenas.Arena.load(arena_description)
-        arena_matrix = [[1]*arena.size[0]]*arena.size[1]
+        arena_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
         for cords, tile in arena.terrain.items():
-            arena_matrix[cords.x][cords.y] = 0 if tile.description().type in ['wall', 'sea'] else 1
-            arena_matrix[cords.x][cords.y] = 0 if tile.loot else 1
+            arena_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
         return arena_matrix
     
     def find_path(self, start: coordinates.Coords, end: coordinates.Coords) -> List[coordinates.Coords]:
@@ -47,8 +46,8 @@ class ArenaKnowledge():
         return path[1:]
 
     def get_desired_facing(self, current_position: coordinates.Coords, desired_position: coordinates.Coords) -> Facing:
-        dx = current_position.x - desired_position.x
-        dy = current_position.y - desired_position.y
+        dx = desired_position.x - current_position.x
+        dy = desired_position.y - current_position.y
 
         desired_facing_coordinates = coordinates.Coords(dx,dy)
 

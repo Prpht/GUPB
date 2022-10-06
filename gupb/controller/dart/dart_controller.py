@@ -38,7 +38,7 @@ class DartController(controller.Controller):
         current_facing = self.arena_knowledge.get_facing(knowledge)
         desired_action = self.arena_knowledge.determine_action(current_facing, desired_facing)
         if desired_action == characters.Action.STEP_FORWARD:
-            self.path.pop()
+            self.path.pop(0)
         print("decide!!!")
         return desired_action
 
