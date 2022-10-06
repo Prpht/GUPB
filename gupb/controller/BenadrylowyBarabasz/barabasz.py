@@ -6,17 +6,37 @@ from gupb import controller
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 
-from gupb.controller.BenadrylowyBarabasz.knowledge_decoder import KnowledgeDecoder
-
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
 ]
 
-WEIGHTED_ACTIONS = random.choices(POSSIBLE_ACTIONS, weights=(1,1,2,1), k=4)
-print(WEIGHTED_ACTIONS)
+
+class SelfKnowledge:
+    def __init__(self, knowledge: characters.ChampionKnowledge = None):
+        self._knowledge = knowledge
+        self._info = dict()
+
+    def decode(self):
+        tile = self.knowledge.visible_tiles.get(self.knowledge.position)
+        character = tile.character if tile else None
+        weapon = character.weapon.name if character else "knife"
+        health = character.health
+        facing = character.facing
+
+        self._info['weapon'] = weapon
+        self._info['health'] = health
+        self._info['facing'] = facing
+
+    @property
+    def knowledge(self):
+        return self._knowledge
+
+    @knowledge.setter
+    def knowledge(self, new_knowledge):
+        self._knowledge = new_knowledge
+        self.decode()
 
 
 # noinspection PyUnusedLocal
@@ -24,7 +44,7 @@ print(WEIGHTED_ACTIONS)
 class BarabaszController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.knowledge_decoder = KnowledgeDecoder()
+        self.knowledge_decoder = SelfKnowledge()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BarabaszController):
@@ -49,7 +69,8 @@ class BarabaszController(controller.Controller):
                 #print("obstacle", knowledge.visible_tiles[in_front].type)
                 return characters.Action.TURN_LEFT
 
-        return random.choice(WEIGHTED_ACTIONS)
+        wieghted_random = random.choices(POSSIBLE_ACTIONS, weights=(1,1,3))[0]
+        return wieghted_random
 
     def praise(self, score: int) -> None:
         pass
@@ -64,3 +85,5 @@ class BarabaszController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.WHITE
+
+
