@@ -3,13 +3,34 @@ import random
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
+from gupb.model import weapons
+from gupb.model import effects
+from gupb.model import coordinates
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
+    characters.Action.ATTACK
 ]
+
+WEAPON_DICT = {
+    'knife': weapons.Knife,
+    'sword': weapons.Sword,
+    'bow': weapons.Bow,
+    'axe': weapons.Axe,
+    'amulet': weapons.Amulet
+}
+
+WEAPON_RANKING = {
+    'knife': 1,
+    'amulet': 2,
+    'sword': 3,
+    'bow': 4,
+    'axe': 5
+}
+
+TERRAIN = arenas.Terrain()
 
 
 # noinspection PyUnusedLocal
@@ -20,9 +41,10 @@ class SnieznyKockodanController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
 
-        self.menhir = False
+        self.menhir = None
         self.mist = False
-        self.weapon = False
+        self.weapon_got = False
+        self.mist_destination = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
@@ -33,21 +55,45 @@ class SnieznyKockodanController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        if not self.weapon:
-            weapons = SnieznyKockodanController.get_visible_weapons(knowledge)
-            pass  # move
-        # elif i can see the enemy
-        # else idę do menhira, na środek lub przeciw mgle
+        champion_info = knowledge.visible_tiles[knowledge.position].character
+        weapon_to_get = self.find_weapon_to_get(knowledge)
+        enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
+        enemy_nearer_to_weapon = True
+        mist_seen = SnieznyKockodanController.find_mist(knowledge)
+        if len(mist_seen) > 0:
+            self.mist = True
 
-        return random.choice(POSSIBLE_ACTIONS)
+        if weapon_to_get is not None:
+            enemy_nearer_to_weapon = SnieznyKockodanController.is_enemy_nearer_to_weapon(enemies_seen, weapon_to_get,
+                                                                                         knowledge.position)
+        facing = champion_info.facing
+        attack_eligible = self.is_eligible_to_attack(enemies_seen, facing, knowledge, champion_info)
+        if self.menhir is None:
+            self.menhir = SnieznyKockodanController.find_menhir(knowledge)
+
+        if self.mist:
+            if self.menhir is not None:
+                pass  # move to menhir
+            else:
+                return self.move_against_mist(mist_seen, knowledge.position)
+        elif weapon_to_get is not None and not enemy_nearer_to_weapon:
+            pass  # move to weapon
+        elif attack_eligible:
+            return characters.Action.ATTACK
+        elif self.menhir is not None:
+            pass  # move to menhir
+        else:
+            return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.menhir = False
+        self.menhir = None
         self.mist = False
-        self.weapon = False
+        self.weapon_got = False
+        self.mist_destination = None
+
 
     @property
     def name(self) -> str:
@@ -76,19 +122,109 @@ class SnieznyKockodanController(controller.Controller):
 
     @staticmethod
     def get_visible_weapons(knowledge):
-        weapons = []
+        visible_weapons = []
         for tile in knowledge.visible_tiles:
             if knowledge.visible_tiles[tile].loot is not None:
-                weapons += [tile]
+                visible_weapons += [tile]
 
-        return weapons
+        return visible_weapons
 
-    # @staticmethod
-    # def is_weapon_visible(current_position, knowledge):
-    #     for tile in knowledge.visible_tiles.values:
+    @staticmethod
+    def find_enemies_seen(knowledge):
+        enemies = []
+        for tile in knowledge.visible_tiles:
+            if knowledge.visible_tiles[tile].character is not None:
+                enemies += [tile]
+
+        return enemies
+
+    @staticmethod
+    def is_enemy_nearer_to_weapon(enemies, weapon, current_position):
+        current_distance = min(
+            SnieznyKockodanController.count_y_distance(weapon, current_position),
+            SnieznyKockodanController.count_x_distance(weapon, current_position)
+        )
+        for enemy in enemies:
+            enemy_distance = min(
+                SnieznyKockodanController.count_y_distance(weapon, enemy),
+                SnieznyKockodanController.count_x_distance(weapon, enemy)
+            )
+            if enemy_distance <= current_distance:
+                return True
+
+        return False
+
+    def is_eligible_to_attack(self, enemies, facing, knowledge, champion_info):
+        health = champion_info.health
+        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        if any(enemy_stronger_health):
+            return False
+
+        weapon = champion_info.weapon.name
+        enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
+                                  > WEAPON_RANKING[weapon]
+                                  for enemy in enemies]
+        if any(enemy_stronger_weapons):
+            return False
+
+        weapon_coordinates = WEAPON_DICT[weapon].cut_positions(TERRAIN, knowledge.position, facing)
+        for enemy in enemies:
+            if enemy in weapon_coordinates:
+                return True
+
+        return False
+
+    def find_weapon_to_get(self, knowledge):
+        if not self.weapon_got:
+            visible_weapons = SnieznyKockodanController.get_visible_weapons(knowledge)
+            for weapon in visible_weapons:
+                if SnieznyKockodanController.is_potential_weapon_tile(weapon, knowledge.position):
+                    return weapon
+
+            return None
+
+        return None
+
+    @staticmethod
+    def find_mist(knowledge):
+        mist_tiles = []
+        for tile in knowledge.visible_tiles:
+            effects_on_tile = knowledge.visible_tiles[tile].efects
+            for effect in effects_on_tile:
+                if isinstance(effect, effects.Mist):
+                    mist_tiles += [tile]
+                    break
+
+        return mist_tiles
+
+    @staticmethod
+    def find_menhir(knowledge):
+        for tile in knowledge.visible_tiles:
+            if knowledge.visible_tiles[tile].type == 'menhir':
+                return tile
+
+        return None
+
+    def move_against_mist(self, mist_tiles, position):
+        # TODO:
+        if len(mist_tiles) == 0:
+            pass  # move to self.mist_destination
+
+        x_distances = [SnieznyKockodanController.count_x_distance(mist_tile, position) for mist_tile in mist_tiles]
+        y_distances = [SnieznyKockodanController.count_y_distance(mist_tile, position) for mist_tile in mist_tiles]
+
+        x_ind = x_distances.index(min(x_distances))
+        y_ind = y_distances.index(min(y_distances))
+
+        destination = coordinates.Coords(x=position[0], y=position[1])
+        difference = coordinates.sub_coords(coordinates.Coords(mist_tiles[x_ind], mist_tiles[y_ind]), destination)
+        destination = coordinates.sub_coords(destination, difference)
+        self.mist_destination = destination
+
+        # move to self.mist_destination
+
+
 
 
     # TODO:
     # walking procedure
-
-
