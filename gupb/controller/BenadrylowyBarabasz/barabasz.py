@@ -1,14 +1,12 @@
 # THIS IS A MODIFIED VERSION OF random.py
 
 import random
-from symbol import factor
-from turtle import position
 
 from gupb import controller
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 
-from gupb.controller.knowledge_decoder import KnowledgeDecoder
+from gupb.controller.BenadrylowyBarabasz.knowledge_decoder import KnowledgeDecoder
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -20,16 +18,16 @@ POSSIBLE_ACTIONS = [
 WEIGHTED_ACTIONS = random.choices(POSSIBLE_ACTIONS, weights=(1,1,2,1), k=4)
 print(WEIGHTED_ACTIONS)
 
+
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
-class ModifiedController(controller.Controller):
+class BarabaszController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.knowledge_decoder = KnowledgeDecoder()
 
-
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, ModifiedController):
+        if isinstance(other, BarabaszController):
             return self.first_name == other.first_name
         return False
 
@@ -50,7 +48,7 @@ class ModifiedController(controller.Controller):
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
                 #print("obstacle", knowledge.visible_tiles[in_front].type)
                 return characters.Action.TURN_LEFT
-        
+
         return random.choice(WEIGHTED_ACTIONS)
 
     def praise(self, score: int) -> None:
@@ -66,12 +64,3 @@ class ModifiedController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.WHITE
-
-
-POTENTIAL_CONTROLLERS = [
-    ModifiedController("Alice"),
-    ModifiedController("Bob"),
-    ModifiedController("Cecilia"),
-    ModifiedController("Darius"),
-]
-

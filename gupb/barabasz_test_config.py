@@ -6,6 +6,7 @@ CONFIGURATION = {
         'archipelago',
         'dungeon',
         'fisher_island',
+        'wasteland',
     ],
     'controllers': [
         barabasz.BarabaszController("BenadrylowyBarabasz"),
@@ -15,9 +16,7 @@ CONFIGURATION = {
         random.RandomController("Darius"),
     ],
     'start_balancing': False,
-    'visualise': True,
+    'visualise': False,
     'show_sight': None,
-    'runs_no': 5,
-    'profiling_metrics': [],
+    'runs_no': 10,
 }
-

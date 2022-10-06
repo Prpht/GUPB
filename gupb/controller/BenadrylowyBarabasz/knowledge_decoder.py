@@ -1,5 +1,6 @@
 from gupb.model import characters
 
+
 class KnowledgeDecoder:
     def __init__(self, knowledge: characters.ChampionKnowledge = None):
         self._knowledge = knowledge
