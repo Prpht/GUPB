@@ -13,6 +13,9 @@ class Strategy(Protocol):
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         ...
 
+    def praise(self, score: int) -> None:
+        ...
+
 
 class RunAwayStrategy(Strategy):
     def __init__(self) -> None:
@@ -22,10 +25,22 @@ class RunAwayStrategy(Strategy):
         self._path: Optional[List[Coords]] = None
         self._previous_position: Optional[Coords] = None
         self._previous_action: Action = Action.DO_NOTHING
+        self._arena_description = None
 
-    def reset(self, arena_description: ArenaDescription) -> None:
+    def _reset(self, arena_description: ArenaDescription) -> None:
         self._movement_mechanics = MovemetMechanics(arena_description)
         self._destination = self._movement_mechanics.find_middle_cords()
+        self._path = None
+        self._previous_position = None
+        self._previous_action = Action.DO_NOTHING
+        self._arena_description = None
+
+    def reset(self, arena_description: ArenaDescription) -> None:
+        self._arena_description = arena_description
+        self._reset(arena_description)
+    
+    def praise(self, score: int) -> None:
+        self._reset(self._arena_description)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         if self._path is None:
