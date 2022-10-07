@@ -59,14 +59,10 @@ class BarabaszController(controller.Controller):
 
         # Check position, check which side one is facing, check tile description
         in_front = coordinates.add_coords(knowledge.position, self.knowledge_decoder._info['facing'].value)
-        #print(knowledge.visible_tiles[in_front].type)
         if in_front in knowledge.visible_tiles.keys():
-            #print("hurray!")
             if knowledge.visible_tiles[in_front].character:
-                #print("Enemy")
                 return characters.Action.ATTACK
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
-                #print("obstacle", knowledge.visible_tiles[in_front].type)
                 return characters.Action.TURN_LEFT
 
         wieghted_random = random.choices(POSSIBLE_ACTIONS, weights=(1,1,3))[0]
@@ -85,5 +81,3 @@ class BarabaszController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.WHITE
-
-
