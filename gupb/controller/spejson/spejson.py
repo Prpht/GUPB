@@ -5,7 +5,7 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action
-from gupb.model.characters import Facing
+from gupb.model.coordinates import Coords
 
 POSSIBLE_ACTIONS = [
     Action.TURN_LEFT,
@@ -21,7 +21,11 @@ class Spejson(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.facing = None
+        self.health = None
+        self.weapon = None
         self.move_number = 0
+        self.menhir_found = False
+        self.target = Coords(25, 25)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -38,18 +42,16 @@ class Spejson(controller.Controller):
 
         available_actions = POSSIBLE_ACTIONS.copy()
 
-        if self.facing is None:
-            # Infer direction if not known yet. TODO: May or may not work if spawned facing a wall
-            n = len(visible_tiles)
-            sum_x, sum_y = 0, 0
+        me = knowledge.visible_tiles[position].character
+        self.facing = me.facing
+        self.health = me.health
+        self.weapon = me.weapon
 
-            for pos in visible_tiles:
-                sum_x += pos[0]
-                sum_y += pos[1]
-
-            angle = np.angle(sum_x / n - position[0] + (sum_y / n - position[1]) * 1j)
-            inferred_dir = int(np.floor(2 * (1.25 + angle / 3.14) % 4))
-            self.facing = [Facing.LEFT, Facing.UP, Facing.RIGHT, Facing.DOWN][inferred_dir]
+        if not self.menhir_found:
+            for tile_coord in visible_tiles:
+                if visible_tiles[tile_coord].type == 'menhir':
+                    self.target = Coords(tile_coord[0], tile_coord[1])
+                    self.menhir_found = True
 
         # Rule out stupid moves
         next_block = position + self.facing.value
@@ -61,21 +63,39 @@ class Spejson(controller.Controller):
             if visible_tiles[next_block].character is not None:
                 available_actions = [Action.ATTACK]
 
-        # Make move
-        move = random.choice(available_actions)
+        if Action.STEP_FORWARD in available_actions:
+            distance_from_target = self.target - position
+            distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
+            if distance_from_target > 100:
+                if np.random.rand() < 0.8:
+                    return Action.STEP_FORWARD
+            else:
+                if np.random.rand() < 0.5:
+                    return Action.STEP_FORWARD
 
-        if move == Action.TURN_LEFT:
-            self.facing = self.facing.turn_left()
-        elif move == Action.TURN_RIGHT:
-            self.facing = self.facing.turn_right()
+        if Action.ATTACK not in available_actions:
+            left_ahead = self.target - (position + self.facing.turn_left().value)
+            left_ahead = left_ahead.x ** 2 + left_ahead.y ** 2
+            right_ahead = self.target - (position + self.facing.turn_right().value)
+            right_ahead = right_ahead.x ** 2 + right_ahead.y ** 2
 
-        return move
+            if left_ahead < right_ahead:
+                return Action.TURN_LEFT if np.random.rand() < 0.7 else Action.TURN_RIGHT
+            else:
+                return Action.TURN_RIGHT if np.random.rand() < 0.7 else Action.TURN_LEFT
+
+        return random.choice(available_actions)
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.facing = None
+        self.health = None
+        self.weapon = None
+        self.move_number = 0
+        self.menhir_found = False
+        self.target = Coords(25, 25)
 
     @property
     def name(self) -> str:
