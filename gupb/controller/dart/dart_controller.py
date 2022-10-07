@@ -27,15 +27,12 @@ class DartController(Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        print("decide!!!")
         return self._strategy.decide(knowledge)
 
     def praise(self, score: int) -> None:
-        print("praise!!!!")
         pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
-        print("reset!!!")
         self._strategy.reset(arena_description)
 
     @property

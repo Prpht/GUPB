@@ -1,10 +1,11 @@
-from typing import List
+from typing import Dict, List
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
 from gupb.model.arenas import Arena, ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionKnowledge, Facing
+from gupb.model.tiles import TileDescription
 
 ArenaMatrix = List[List[bool]]
 
@@ -24,7 +25,7 @@ TURN_ACTIONS = {
 }
 
 
-class MovemetMechanics():
+class PathFinder():
     def __init__(self, arena_description: ArenaDescription):
         self.arena = Arena.load(arena_description.name)
         self.arena_matrix = self._create_arena_matrix()
@@ -36,12 +37,11 @@ class MovemetMechanics():
         return arena_matrix
 
     def find_middle_cords(self) -> Coords:
-        y = self.arena.size[0]//2 
+        y = self.arena.size[0]//2
         for i in range(self.arena.size[0]//2):
             x = self.arena.size[0]//2 + i
             if self.arena_matrix[y][x]:
                 return Coords(x, y)
-
 
     def find_path(self, start: Coords, end: Coords) -> List[Coords]:
         grid = Grid(matrix=self.arena_matrix)
@@ -49,18 +49,38 @@ class MovemetMechanics():
         start = grid.node(start.x, start.y)
         end = grid.node(end.x, end.y)
         path, _ = finder.find_path(start, end, grid)
-        print("finding path!")
         return path[1:]
 
-    def get_facing(self, knowledge: ChampionKnowledge) -> Facing:
-        tile = knowledge.visible_tiles.get(knowledge.position)
-        return tile.character.facing
 
-    def get_desired_facing(self, current_position: Coords, desired_position: Coords) -> Facing:
-        desired_facing_coordinates = desired_position - current_position
-        return Facing(desired_facing_coordinates)
+def find_shortest_path(*paths: List[Coords]) -> List[Coords]:
+    return min(*paths, key=lambda p: len(p))
 
-    def determine_action(self, current_facing: Facing, desired_facing: Facing) -> Action:
-        if current_facing == desired_facing:
-            return Action.STEP_FORWARD
-        return TURN_ACTIONS[(current_facing, desired_facing)]
+
+def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
+    next_position = Coords(*path[0])
+    current_facing = _get_facing(knowledge)
+    desired_facing = _get_desired_facing(knowledge.position, next_position)
+    return _determine_action(current_facing, desired_facing)
+
+
+def _get_facing(knowledge: ChampionKnowledge) -> Facing:
+    tile = knowledge.visible_tiles.get(knowledge.position)
+    return tile.character.facing
+
+
+def _get_desired_facing(current_position: Coords, desired_position: Coords) -> Facing:
+    desired_facing_coordinates = desired_position - current_position
+    return Facing(desired_facing_coordinates)
+
+
+def _determine_action(current_facing: Facing, desired_facing: Facing) -> Action:
+    if current_facing == desired_facing:
+        return Action.STEP_FORWARD
+    return TURN_ACTIONS[(current_facing, desired_facing)]
+
+
+def is_opponent_in_front(opponent_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+    if opponent_position not in visible_tiles:
+        return False
+    opponent = visible_tiles[opponent_position].character
+    return opponent is not None
