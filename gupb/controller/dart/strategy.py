@@ -25,6 +25,7 @@ class RunAwayStrategy(Strategy):
         self._path: Optional[List[Coords]] = None
         self._previous_position: Optional[Coords] = None
         self._previous_action: Action = Action.DO_NOTHING
+        self._axe_found = False
         self._arena_description = None
 
     def _reset(self, arena_description: ArenaDescription) -> None:
@@ -33,6 +34,7 @@ class RunAwayStrategy(Strategy):
         self._path = None
         self._previous_position = None
         self._previous_action = Action.DO_NOTHING
+        self._axe_found = False
         self._arena_description = None
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -44,6 +46,11 @@ class RunAwayStrategy(Strategy):
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         if self._path is None:
+            first_axe_path = self._movement_mechanics.find_path(knowledge.position, Coords(13,17))
+            second_axe_path = self._movement_mechanics.find_path(knowledge.position, Coords(38,16))
+            self._path = first_axe_path if len(first_axe_path) < len(second_axe_path) else second_axe_path
+        elif knowledge.visible_tiles[knowledge.position].character.weapon.name == "axe" and not self._axe_found:
+            self._axe_found = True
             self._path = self._movement_mechanics.find_path(knowledge.position, self._destination)
 
         return self._follow_path(knowledge) if self._path else self._rotate_and_attack()
