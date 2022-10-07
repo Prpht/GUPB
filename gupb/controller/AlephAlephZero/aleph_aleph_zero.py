@@ -15,7 +15,6 @@ from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
 
-from scipy import optimize
 
 from gupb.model.characters import Facing
 from gupb.model.coordinates import sub_coords
@@ -75,6 +74,8 @@ class AlephAlephZeroBot(controller.Controller):
                             self.mists.add(coord)
 
     def _calculate_menhir_center(self):
+        from scipy import optimize
+
         mist_x = np.array([coord[0] for coord in self.mists])
         mist_y = np.array([coord[1] for coord in self.mists])
 
@@ -127,7 +128,10 @@ class AlephAlephZeroBot(controller.Controller):
         self._get_visible_mist(knowledge)
         if len(self.mists)>3 and (not self.menhir_seen):
             self.menhir_pos_updated = True
-            self.menhir_position = self._calculate_menhir_center()
+            try:
+                self.menhir_position = self._calculate_menhir_center()
+            except:
+                pass  # shouldn't go wrong, but just in case, do nothing
 
         if self.menhir_pos_updated or self.menhir_seen:
             curr = graph[(knowledge.position, self.knowledge.facing)]

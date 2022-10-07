@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    AlephAlephZeroBot("AAA")
+    AlephAlephZeroBot("AA0")
 ]
