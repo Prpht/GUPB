@@ -17,16 +17,17 @@ class RunAwayStrategy(Strategy):
     def __init__(self) -> None:
         super().__init__()
         self._movement_mechanics: Optional[MovemetMechanics] = None
+        self._destination: Optional[Coords] = None
         self._path: Optional[List[Coords]] = None
         self._previous_action: Action = Action.DO_NOTHING
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self._movement_mechanics = MovemetMechanics(arena_description)
+        self._destination = self._movement_mechanics.find_middle_cords()
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         if self._path is None:
-            destination = Coords(15, 2)
-            self._path = self._movement_mechanics.find_path(knowledge.position, destination)
+            self._path = self._movement_mechanics.find_path(knowledge.position, self._destination)
 
         return self._follow_path(knowledge) if self._path else self._rotate_and_attack()
 

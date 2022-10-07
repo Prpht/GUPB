@@ -26,17 +26,24 @@ TURN_ACTIONS = {
 
 class MovemetMechanics():
     def __init__(self, arena_description: ArenaDescription):
-        self.arena_matrix = self._create_arena_matrix(arena_description.name)
+        self.arena = Arena.load(arena_description.name)
+        self.arena_matrix = self._create_arena_matrix()
         self.grid = Grid(matrix=self.arena_matrix)
         self.finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
 
-    @staticmethod
-    def _create_arena_matrix(arena_description: ArenaDescription) -> ArenaMatrix:
-        arena = Arena.load(arena_description)
-        arena_matrix = [[1 for _ in range(arena.size[0])] for _ in range(arena.size[1])]
-        for cords, tile in arena.terrain.items():
+    def _create_arena_matrix(self) -> ArenaMatrix:
+        arena_matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
+        for cords, tile in self.arena.terrain.items():
             arena_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
         return arena_matrix
+
+    def find_middle_cords(self) -> Coords:
+        y = self.arena.size[0]//2 
+        for i in range(self.arena.size[0]//2):
+            x = self.arena.size[0]//2 + i
+            if self.arena_matrix[y][x]:
+                return Coords(x, y)
+
 
     def find_path(self, start: Coords, end: Coords) -> List[Coords]:
         start = self.grid.node(start.x, start.y)
