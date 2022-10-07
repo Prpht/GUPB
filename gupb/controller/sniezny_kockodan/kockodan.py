@@ -66,7 +66,6 @@ class SnieznyKockodanController(controller.Controller):
         enemy_nearer_to_weapon = True
         #mist_seen = SnieznyKockodanController.find_mist(knowledge)
         mist_seen = []
-        print("SSSSS")
         if len(mist_seen) > 0:
             self.mist = True
         if weapon_to_get is not None:
@@ -75,7 +74,6 @@ class SnieznyKockodanController(controller.Controller):
         facing = champion_info.facing
         #attack_eligible = self.is_eligible_to_attack(enemies_seen, facing, knowledge, champion_info)
         attack_eligible = False
-        print("SSSSasdsadasdsadS")
         if self.menhir is None:
             self.menhir = SnieznyKockodanController.find_menhir(knowledge)
         if self.mist:
