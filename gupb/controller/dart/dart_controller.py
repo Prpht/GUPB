@@ -1,5 +1,5 @@
 from gupb.controller import Controller
-from gupb.controller.dart.strategy import Strategy
+from gupb.controller.dart.strategy import AxeAndCenterStrategy, Strategy
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
@@ -14,7 +14,7 @@ POSSIBLE_ACTIONS = [
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class DartController(Controller):
-    def __init__(self, first_name: str, strategy: Strategy):
+    def __init__(self, first_name: str, strategy: Strategy = AxeAndCenterStrategy()):
         self.first_name: str = first_name
         self._strategy = strategy
 
