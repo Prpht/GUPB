@@ -28,8 +28,6 @@ class MovemetMechanics():
     def __init__(self, arena_description: ArenaDescription):
         self.arena = Arena.load(arena_description.name)
         self.arena_matrix = self._create_arena_matrix()
-        self.grid = Grid(matrix=self.arena_matrix)
-        self.finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
 
     def _create_arena_matrix(self) -> ArenaMatrix:
         arena_matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
@@ -46,9 +44,11 @@ class MovemetMechanics():
 
 
     def find_path(self, start: Coords, end: Coords) -> List[Coords]:
-        start = self.grid.node(start.x, start.y)
-        end = self.grid.node(end.x, end.y)
-        path, _ = self.finder.find_path(start, end, self.grid)
+        grid = Grid(matrix=self.arena_matrix)
+        finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+        start = grid.node(start.x, start.y)
+        end = grid.node(end.x, end.y)
+        path, _ = finder.find_path(start, end, grid)
         print("finding path!")
         return path[1:]
 
