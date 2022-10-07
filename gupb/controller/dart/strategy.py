@@ -62,6 +62,8 @@ class RunAwayStrategy(Strategy):
         return self._movement_mechanics.determine_action(current_facing, desired_facing)
 
     def _is_opponent_in_front(self, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+        if self._path[0] not in visible_tiles:
+            return False
         opponent = visible_tiles[self._path[0]].character
         return opponent is not None
 
