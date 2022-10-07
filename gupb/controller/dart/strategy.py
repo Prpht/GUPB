@@ -1,8 +1,9 @@
-from typing import List, Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 from gupb.controller.dart.movement_mechanics import MovemetMechanics
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
+from gupb.model.tiles import TileDescription
 
 
 class Strategy(Protocol):
@@ -19,6 +20,7 @@ class RunAwayStrategy(Strategy):
         self._movement_mechanics: Optional[MovemetMechanics] = None
         self._destination: Optional[Coords] = None
         self._path: Optional[List[Coords]] = None
+        self._previous_position: Optional[Coords] = None
         self._previous_action: Action = Action.DO_NOTHING
 
     def reset(self, arena_description: ArenaDescription) -> None:
@@ -34,12 +36,19 @@ class RunAwayStrategy(Strategy):
     def _follow_path(self, knowledge: ChampionKnowledge) -> Action:
         if knowledge.position == self._path[0]:
             self._path.pop(0)
+        if (knowledge.position == self._previous_position) and (self._is_opponent_in_front(knowledge.visible_tiles)):
+            return Action.ATTACK
         if not self._path:
             return Action.ATTACK
         next_position = Coords(*self._path[0])
         current_facing = self._movement_mechanics.get_facing(knowledge)
         desired_facing = self._movement_mechanics.get_desired_facing(knowledge.position, next_position)
+        self._previous_position = knowledge.position
         return self._movement_mechanics.determine_action(current_facing, desired_facing)
+
+    def _is_opponent_in_front(self, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+        opponent = visible_tiles[self._path[0]].character
+        return opponent is not None
 
     def _rotate_and_attack(self) -> Action:
         desired_action = Action.TURN_RIGHT if self._previous_action == Action.ATTACK else Action.ATTACK
