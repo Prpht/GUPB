@@ -32,13 +32,14 @@ class RunAwayStrategy(Strategy):
         return self._follow_path(knowledge) if self._path else self._rotate_and_attack()
 
     def _follow_path(self, knowledge: ChampionKnowledge) -> Action:
+        if knowledge.position == self._path[0]:
+            self._path.pop(0)
+        if not self._path:
+            return Action.ATTACK
         next_position = Coords(*self._path[0])
         current_facing = self._movement_mechanics.get_facing(knowledge)
         desired_facing = self._movement_mechanics.get_desired_facing(knowledge.position, next_position)
-        desired_action = self._movement_mechanics.determine_action(current_facing, desired_facing)
-        if desired_action == Action.STEP_FORWARD:
-            self._path.pop(0)
-        return desired_action
+        return self._movement_mechanics.determine_action(current_facing, desired_facing)
 
     def _rotate_and_attack(self) -> Action:
         desired_action = Action.TURN_RIGHT if self._previous_action == Action.ATTACK else Action.ATTACK
