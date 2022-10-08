@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-
+from gupb.controller.shrek import shrek
 
 CONFIGURATION = {
     'arenas': [
@@ -12,6 +12,7 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        shrek.ShrekController("Fiona")
     ],
     'start_balancing': False,
     'visualise': True,
