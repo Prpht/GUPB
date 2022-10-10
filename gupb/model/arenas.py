@@ -50,6 +50,7 @@ class Arena:
         self.size: tuple[int, int] = terrain_size(self.terrain)
         self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
+        self.no_of_champions_alive: int = 0
 
     @staticmethod
     def load(name: str) -> Arena:
@@ -124,6 +125,12 @@ class Arena:
         self.terrain[self.menhir_position] = tiles.Menhir()
         verbose_logger.debug(f"Menhir spawned at {self.menhir_position}.")
         MenhirSpawnedReport(self.menhir_position).log(logging.DEBUG)
+
+    def spawn_champion_at(self, coords: coordinates.Coords) -> characters.Champion:
+        champion = characters.Champion(coords, self)
+        self.terrain[coords].character = champion
+        self.no_of_champions_alive += 1
+        return champion
 
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius

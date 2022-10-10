@@ -22,6 +22,7 @@ IDLE_DAMAGE_PENALTY = 1
 
 class ChampionKnowledge(NamedTuple):
     position: coordinates.Coords
+    no_of_champions_alive: int
     visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]
 
 
@@ -98,7 +99,7 @@ class Champion:
     def pick_action(self) -> Action:
         if self.controller:
             visible_tiles = self.arena.visible_tiles(self)
-            knowledge = ChampionKnowledge(self.position, visible_tiles)
+            knowledge = ChampionKnowledge(self.position, self.arena.no_of_champions_alive, visible_tiles)
             try:
                 action = self.controller.decide(knowledge)
                 if action is None:
