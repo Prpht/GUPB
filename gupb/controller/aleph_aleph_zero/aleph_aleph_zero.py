@@ -5,12 +5,12 @@ import numpy as np
 from typing import List
 
 from gupb import controller
-from gupb.controller.AlephAlephZero.attack_strategy import AttackStrategy
-from gupb.controller.AlephAlephZero.menhir_rush_strategy import MenhirRushStrategy
-from gupb.controller.AlephAlephZero.scouting_strategy import ScoutingStrategy
-from gupb.controller.AlephAlephZero.shortest_path import build_graph, find_shortest_path
-from gupb.controller.AlephAlephZero.utils import if_character_to_kill
-from gupb.controller.AlephAlephZero.weapon_rush_strategy import WeaponRushStrategy
+from gupb.controller.aleph_aleph_zero.attack_strategy import AttackStrategy
+from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
+from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
+from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill
+from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -166,7 +166,7 @@ class AlephAlephZeroBot(controller.Controller):
 
     @property
     def name(self) -> str:
-        return f'\u2135\u2135\u2080:{self.first_name}'
+        return self.first_name
 
     @property
     def preferred_tabard(self) -> characters.Tabard:

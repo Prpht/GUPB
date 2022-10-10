@@ -1,5 +1,5 @@
-from gupb.controller.AlephAlephZero.scouting_strategy import ScoutingStrategy
-from gupb.controller.AlephAlephZero.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
+from gupb.controller.aleph_aleph_zero.strategy import Strategy
 from gupb.model import characters
 
 

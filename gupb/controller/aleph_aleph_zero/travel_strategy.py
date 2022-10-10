@@ -1,7 +1,7 @@
 from time import sleep
 
-from gupb.controller.AlephAlephZero.shortest_path import build_graph, find_shortest_path
-from gupb.controller.AlephAlephZero.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
+from gupb.controller.aleph_aleph_zero.strategy import Strategy
 
 
 class TravelStrategy(Strategy):

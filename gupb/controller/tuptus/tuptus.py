@@ -44,7 +44,7 @@ class TuptusController(controller.Controller):
         # print(knowledge.position)
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]
-        print(f"{next_block_position} ==> {next_block}")
+        # print(f"{next_block_position} ==> {next_block}")
         
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
@@ -55,7 +55,7 @@ class TuptusController(controller.Controller):
         else:
             choice = POSSIBLE_ACTIONS[2]
         
-        print(f"Chosen action ==> {choice}")
+        # print(f"Chosen action ==> {choice}")
         return choice
 
     def praise(self, score: int) -> None:
@@ -91,7 +91,7 @@ class TuptusController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.VIOLET
+        return characters.Tabard.GREEN
 
 
 POTENTIAL_CONTROLLERS = [

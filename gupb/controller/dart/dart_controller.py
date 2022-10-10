@@ -41,4 +41,4 @@ class DartController(Controller):
 
     @property
     def preferred_tabard(self) -> Tabard:
-        return Tabard.YELLOW
+        return Tabard.ORANGE

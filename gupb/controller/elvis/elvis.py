@@ -162,7 +162,7 @@ class DodgeController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.GREY
+        return characters.Tabard.STRIPPED
 
     def move_possible(self, move):
         if move == 'center':

@@ -92,7 +92,7 @@ class DzikieBorsuki:
 
     @property
     def name(self) -> str:
-        return f'RandomController{self.first_name}'
+        return self.first_name
 
     @property
     def preferred_tabard(self) -> characters.Tabard:

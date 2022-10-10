@@ -65,7 +65,7 @@ class BarabaszController(controller.Controller):
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
                 return characters.Action.TURN_LEFT
 
-        wieghted_random = random.choices(POSSIBLE_ACTIONS, weights=(1,1,3))[0]
+        wieghted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
         return wieghted_random
 
     def praise(self, score: int) -> None:
@@ -76,7 +76,7 @@ class BarabaszController(controller.Controller):
 
     @property
     def name(self) -> str:
-        return f'RandomController{self.first_name}'
+        return f'{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:

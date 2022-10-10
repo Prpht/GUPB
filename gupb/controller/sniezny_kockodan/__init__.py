@@ -1,5 +1,10 @@
-from gupb.controller.sniezny_kockodan import kockodan
+from .kockodan import SnieznyKockodanController
+
+__all__ = [
+    'kockodan',
+    'POTENTIAL_CONTROLLERS'
+]
 
 POTENTIAL_CONTROLLERS = [
-    kockodan.SnieznyKockodanController("SnieznyKockodan")
+    SnieznyKockodanController("SnieznyKockodan")
 ]

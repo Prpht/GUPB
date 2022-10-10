@@ -1,10 +1,10 @@
-from gupb.controller.AlephAlephZero.guarding_strategy import GuardingStrategy
-from gupb.controller.AlephAlephZero.scanning_strategy import ScanningStrategy
-from gupb.controller.AlephAlephZero.scouting_strategy import ScoutingStrategy
-from gupb.controller.AlephAlephZero.shortest_path import build_graph, get_reachable, find_shortest_path
-from gupb.controller.AlephAlephZero.strategy import Strategy
-from gupb.controller.AlephAlephZero.travel_strategy import TravelStrategy
-from gupb.controller.AlephAlephZero.utils import taxicab_distance
+from gupb.controller.aleph_aleph_zero.guarding_strategy import GuardingStrategy
+from gupb.controller.aleph_aleph_zero.scanning_strategy import ScanningStrategy
+from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, get_reachable, find_shortest_path
+from gupb.controller.aleph_aleph_zero.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
+from gupb.controller.aleph_aleph_zero.utils import taxicab_distance
 from gupb.model import characters
 
 weapons_score = {"knife": 1, "sword": 2, "amulet": 3, "axe": 4, "bow": 5, "bow_unloaded": 5, "bow_loaded": 5}

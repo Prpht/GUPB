@@ -1,12 +1,12 @@
 import random
 from enum import Enum
 
-from gupb.controller.AlephAlephZero.scanning_strategy import ScanningStrategy
-from gupb.controller.AlephAlephZero.shortest_path import build_graph, get_reachable, find_shortest_path, \
+from gupb.controller.aleph_aleph_zero.scanning_strategy import ScanningStrategy
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, get_reachable, find_shortest_path, \
     find_closest_orientation
-from gupb.controller.AlephAlephZero.strategy import Strategy
-from gupb.controller.AlephAlephZero.travel_strategy import TravelStrategy
-from gupb.controller.AlephAlephZero.utils import get_edge_of_vision
+from gupb.controller.aleph_aleph_zero.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
+from gupb.controller.aleph_aleph_zero.utils import get_edge_of_vision
 from gupb.model import characters
 
 

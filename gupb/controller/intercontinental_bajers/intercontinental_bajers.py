@@ -93,7 +93,7 @@ class IntercontinentalBajers(controller.Controller):
 
     @property
     def name(self) -> str:
-        return f'Intercontinetal_bajers{self.first_name}'
+        return f'{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
