@@ -31,7 +31,8 @@ WEAPON_ENCODING = {
 }
 
 FIXED_MENHIRS = {
-    'isolated_shrine': coordinates.Coords(9, 9)
+    'isolated_shrine': coordinates.Coords(9, 9),
+    'lone_sanctum': coordinates.Coords(9, 9),
 }
 
 Terrain = Dict[coordinates.Coords, tiles.Tile]
