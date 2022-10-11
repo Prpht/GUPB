@@ -8,7 +8,7 @@ A simplified action game used for teaching machine learning courses at AGH Unive
 
 ## Requirements
 
-The projects requires Python 3.8 or higher.
+The projects requires Python 3.10 or higher.
 
 ## Installation
 
