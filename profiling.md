@@ -8,7 +8,7 @@ import gupb.model.profiling.profile
 class RandomController:
 
     @profile
-    def decide(self,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(cls,  knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
 ```
 
@@ -29,11 +29,11 @@ CONFIGURATION = {
 Metryk wypisywane są na koniec wszystkich gier w metodzie `print_scores` w klasie `Runner`
 
 ```python
-    def print_scores(self) -> None:
+    def print_scores(cls) -> None:
         ...
-        if self.profiling_metrics:
+        if cls.profiling_metrics:
             for func in PROFILE_RESULTS.keys():
-                print_stats(func, **{m: True for m in self.profiling_metrics})
+                print_stats(func, **{m: True for m in cls.profiling_metrics})
 ```
 
 
