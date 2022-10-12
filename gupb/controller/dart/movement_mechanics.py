@@ -1,12 +1,12 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
-from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription, Terrain
+from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
-from gupb.model.weapons import Weapon
+from gupb.model.weapons import Amulet, Axe, Bow, Knife, Sword, Weapon
 
 ArenaMatrix = List[List[bool]]
 
@@ -73,6 +73,21 @@ class MapKnowledge():
         paths = [self.find_path(current_position, dest) for dest in destinations]
         return min(paths, key=lambda p: len(p))
 
+    def find_closest_coords(self, current_position: Coords, destinations: List[Coords]) -> Coords:
+        return min(destinations, key=lambda dest: len(self.find_path(current_position, dest)))
+
+    def can_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> bool:
+        weapon = get_weapon(get_champion_weapon(knowledge))
+        facing = get_facing(knowledge)
+        weapon_cut_positions = weapon.cut_positions(self.arena.terrain, knowledge.position, facing)
+        return opponent_position in weapon_cut_positions
+
+    def get_facing_for_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> Optional[Facing]:
+        for facing in Facing:
+            if self.can_attack(knowledge, opponent_position):
+                return facing
+        return None
+
 
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
     next_position = Coords(*path[0])
@@ -112,20 +127,18 @@ def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
     return knowledge.visible_tiles[knowledge.position].character.weapon.name
 
 
-def can_attack(terrain: Terrain,
-               curren_position: Coords,
-               current_facing: Facing,
-               weapon: Weapon,
-               opponent_position: Coords) -> bool:
-    weapon_cut_positions = weapon.cut_positions(terrain, curren_position, current_facing)
-    return opponent_position in weapon_cut_positions
+def get_weapon(weapon_name: str) -> Weapon:
+    if weapon_name == "knife":
+        return Knife()
+    if weapon_name == "sword":
+        return Sword()
+    if weapon_name == "bow":
+        return Bow()
+    if weapon_name == "axe":
+        return Axe()
+    if weapon_name == "amulet":
+        return Amulet()
 
 
-def get_facing_for_attack(terrain: Terrain,
-                          curren_position: Coords,
-                          weapon: Weapon,
-                          opponent_position: Coords) -> bool:
-    for facing in Facing:
-        if can_attack(terrain, curren_position, facing, weapon, opponent_position):
-            return facing
-    return None
+def find_opponents(visible_tiles: Dict[tuple, TileDescription]) -> Dict[Coords, str]:
+    return {Coords(*coords): tile.character.controller_name for coords, tile in visible_tiles.items() if is_opponent(tile.character)}
