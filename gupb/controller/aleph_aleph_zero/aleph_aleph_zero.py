@@ -9,12 +9,12 @@ from gupb.controller.aleph_aleph_zero.attack_strategy import AttackStrategy
 from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
 from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
-from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill
+from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file
 from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
-
+from gupb.model.arenas import FIXED_MENHIRS
 
 from gupb.model.characters import Facing
 from gupb.model.coordinates import sub_coords
@@ -123,7 +123,7 @@ class AlephAlephZeroBot(controller.Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self._update_knowledge(knowledge)
         self.epoch += 1
-        graph = build_graph(self.knowledge)
+        graph = self.graph
 
         self._get_visible_mist(knowledge)
         if len(self.mists)>3 and (not self.menhir_seen):
@@ -155,6 +155,9 @@ class AlephAlephZeroBot(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        map_knowledge = get_knowledge_from_file(arena_description.name)
+        self.graph = build_graph(map_knowledge)
+
         self.strategy = ScoutingStrategy()
         self.epoch = 0
         self._first_estimate = False

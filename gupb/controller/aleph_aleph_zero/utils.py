@@ -1,5 +1,10 @@
-from gupb.model import coordinates, characters
+import os
+
+from gupb.model import coordinates, characters, tiles
+from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, FIXED_MENHIRS
+from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import add_coords
+from gupb.model.tiles import TileDescription
 
 
 def taxicab_distance(pos1, pos2):
@@ -44,3 +49,29 @@ def if_character_to_kill(knowledge):
             if knowledge.visible_tiles[position].character is not None:
                 return True
     return False
+
+def get_knowledge_from_file(map_name):
+    arena_file_path = os.path.join('resources', 'arenas', f'{map_name}.gupb')
+
+    with open(arena_file_path, "r") as file:
+        lines = file.readlines()
+
+    list_lines = [[letter for letter in line if letter!='\n'] for line in lines]
+    vis_tiles = dict()
+
+    for y, line in enumerate(list_lines):
+        for x, character in enumerate(line):
+            position = coordinates.Coords(x,y)
+            if character in TILE_ENCODING:
+                vis_tiles[position] = TILE_ENCODING[character]().description()
+            elif character in WEAPON_ENCODING:
+                vis_tiles[position] = TileDescription(
+                    "land",
+                    WEAPON_ENCODING[character]().description(),
+                    None,
+                    []
+                )
+
+    if map_name in FIXED_MENHIRS.keys():
+        vis_tiles[FIXED_MENHIRS[map_name]] = tiles.Menhir().description()
+    return ChampionKnowledge(None, 0, visible_tiles=vis_tiles)
