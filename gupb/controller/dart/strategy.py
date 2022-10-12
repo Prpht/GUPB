@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional, Protocol
-from gupb.controller.dart.movement_mechanics import PathFinder, find_shortest_path, follow_path, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import MapKnowledge, follow_path, is_opponent_in_front
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -29,14 +29,14 @@ class AxeAndCenterStrategy(Strategy):
     def __init__(self) -> None:
         super().__init__()
         self._state = Steps.init
-        self._path_finder: Optional[PathFinder] = None
+        self._map_knowledge: Optional[MapKnowledge] = None
         self._path: Optional[List[Coords]] = None
         self._previous_position: Optional[Coords] = None
         self._previous_action: Action = Action.DO_NOTHING
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self._state = Steps.init
-        self._path_finder = PathFinder(arena_description)
+        self._map_knowledge = MapKnowledge(arena_description)
         self._path = None
         self._previous_position = None
         self._previous_action = Action.DO_NOTHING
@@ -45,15 +45,15 @@ class AxeAndCenterStrategy(Strategy):
         ...
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
+        self._map_knowledge.update_weapons_positions()
+        print(self._map_knowledge.weapons)
         if not self._path:
             if self._state == Steps.init:
-                first_axe_path = self._path_finder.find_path(knowledge.position, Coords(13, 17))
-                second_axe_path = self._path_finder.find_path(knowledge.position, Coords(38, 16))
-                self._path = find_shortest_path(first_axe_path, second_axe_path)
+                self._path = self._map_knowledge.get_closest_weapon_path(knowledge.position, 'axe')
                 self._state = Steps.find_axe
             elif self._state == Steps.find_axe:
-                destination = self._path_finder.find_middle_cords()
-                self._path = self._path_finder.find_path(knowledge.position, destination)
+                destination = self._map_knowledge.find_middle_cords()
+                self._path = self._map_knowledge.find_path(knowledge.position, destination)
                 self._state = Steps.go_to_center
 
         return self._follow_path_strategy(knowledge) if self._path else self._rotate_and_attack_strategy()

@@ -30,7 +30,7 @@ class DartController(Controller):
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         try:
             return self._strategy.decide(knowledge)
-        except Exception:
+        except Exception as e:
             return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:

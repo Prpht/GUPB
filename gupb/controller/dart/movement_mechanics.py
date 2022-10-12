@@ -26,10 +26,13 @@ TURN_ACTIONS = {
 }
 
 
-class PathFinder():
+class MapKnowledge():
     def __init__(self, arena_description: ArenaDescription):
         self.arena = Arena.load(arena_description.name)
         self.arena_matrix = self._create_arena_matrix()
+        self.arena_menhir = None
+        self.weapons: Dict[Coords, str] = dict()
+        self.initialize_weapons_positions()
 
     def _create_arena_matrix(self) -> ArenaMatrix:
         arena_matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
@@ -52,9 +55,20 @@ class PathFinder():
         path, _ = finder.find_path(start, end, grid)
         return path[1:]
 
+    def initialize_weapons_positions(self) -> None:
+        self.weapons = {coords:tiles.loot.description().name for coords, tiles in self.arena.terrain.items() if tiles.loot is not None}
 
-def find_shortest_path(*paths: List[Coords]) -> List[Coords]:
-    return min(*paths, key=lambda p: len(p))
+    def update_weapons_positions(self) -> None:
+        for coords in self.weapons:
+            self.weapons[coords] = self.arena.terrain[coords].loot.description().name
+
+    def get_closest_weapon_path(self, current_position: Coords, weapon_type: str) -> List[Coords]:
+        weapons_coords = [coords for coords, type in self.weapons.items() if type == weapon_type]
+        return self.find_shortest_path(current_position, weapons_coords)
+
+    def find_shortest_path(self, current_position: Coords, destinations: List[Coords]) -> List[Coords]:
+        paths = [self.find_path(current_position, dest) for dest in destinations]
+        return min(paths, key=lambda p: len(p))
 
 
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
