@@ -2,7 +2,7 @@ from typing import Dict, List
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
-from gupb.model.arenas import Arena, ArenaDescription, Terrain
+from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription, Terrain
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
@@ -41,6 +41,8 @@ class MapKnowledge():
         return arena_matrix
 
     def find_middle_cords(self) -> Coords:
+        if self.arena.name in FIXED_MENHIRS:
+            return FIXED_MENHIRS[self.arena.name]
         y = self.arena.size[0]//2
         for i in range(self.arena.size[0]//2):
             x = self.arena.size[0]//2 + i
