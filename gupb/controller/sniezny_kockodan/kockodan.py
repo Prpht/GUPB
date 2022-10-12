@@ -1,3 +1,4 @@
+import math
 import random
 
 from gupb import controller
@@ -34,7 +35,8 @@ WEAPON_RANKING = {
 
 TERRAIN_NAME = 'fisher_island'
 
-TERRAIN = arenas.Arena.load(TERRAIN_NAME).terrain
+ARENA = arenas.Arena.load(TERRAIN_NAME)
+TERRAIN = ARENA.terrain
 
 
 # noinspection PyUnusedLocal
@@ -296,3 +298,8 @@ class SnieznyKockodanController(controller.Controller):
             return self.move_queue.get()
         else:
             return random.choice(POSSIBLE_ACTIONS)
+
+    def get_map_center(self, terrain: arenas.Terrain) -> coordinates.Coords:
+        size = arenas.terrain_size(terrain)
+        return coordinates.Coords(x=math.ceil(size[0] / 2) - 1,
+                                  y=math.ceil(size[1] / 2) - 1)
