@@ -2,10 +2,11 @@ from typing import Dict, List
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
-from gupb.model.arenas import Arena, ArenaDescription
+from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
+from gupb.model.weapons import Weapon
 
 ArenaMatrix = List[List[bool]]
 
@@ -84,3 +85,22 @@ def is_opponent_in_front(opponent_position: Coords, visible_tiles: Dict[Coords, 
         return False
     opponent = visible_tiles[opponent_position].character
     return opponent is not None
+
+
+def can_attack(terrain: Terrain,
+               curren_position: Coords,
+               current_facing: Facing,
+               weapon: Weapon,
+               opponent_position: Coords) -> bool:
+    weapon_cut_positions = weapon.cut_positions(terrain, curren_position, current_facing)
+    return opponent_position in weapon_cut_positions
+
+
+def get_facing_for_attack(terrain: Terrain,
+                          curren_position: Coords,
+                          weapon: Weapon,
+                          opponent_position: Coords) -> bool:
+    for facing in Facing:
+        if can_attack(terrain, curren_position, facing, weapon, opponent_position):
+            return facing
+    return None
