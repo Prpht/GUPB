@@ -4,7 +4,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
 from gupb.model.arenas import Arena, ArenaDescription, Terrain
 from gupb.model.coordinates import Coords
-from gupb.model.characters import Action, ChampionKnowledge, Facing
+from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
 from gupb.model.weapons import Weapon
 
@@ -56,7 +56,8 @@ class MapKnowledge():
         return path[1:]
 
     def initialize_weapons_positions(self) -> None:
-        self.weapons = {coords:tiles.loot.description().name for coords, tiles in self.arena.terrain.items() if tiles.loot is not None}
+        self.weapons = {coords: tile.loot.description().name
+                        for coords, tile in self.arena.terrain.items() if tile.loot is not None}
 
     def update_weapons_positions(self) -> None:
         for coords in self.weapons:
@@ -73,22 +74,22 @@ class MapKnowledge():
 
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
     next_position = Coords(*path[0])
-    current_facing = _get_facing(knowledge)
-    desired_facing = _get_desired_facing(knowledge.position, next_position)
-    return _determine_action(current_facing, desired_facing)
+    current_facing = get_facing(knowledge)
+    desired_facing = get_desired_facing(knowledge.position, next_position)
+    return determine_action(current_facing, desired_facing)
 
 
-def _get_facing(knowledge: ChampionKnowledge) -> Facing:
+def get_facing(knowledge: ChampionKnowledge) -> Facing:
     tile = knowledge.visible_tiles.get(knowledge.position)
     return tile.character.facing
 
 
-def _get_desired_facing(current_position: Coords, desired_position: Coords) -> Facing:
+def get_desired_facing(current_position: Coords, desired_position: Coords) -> Facing:
     desired_facing_coordinates = desired_position - current_position
     return Facing(desired_facing_coordinates)
 
 
-def _determine_action(current_facing: Facing, desired_facing: Facing) -> Action:
+def determine_action(current_facing: Facing, desired_facing: Facing) -> Action:
     if current_facing == desired_facing:
         return Action.STEP_FORWARD
     return TURN_ACTIONS[(current_facing, desired_facing)]
@@ -98,7 +99,15 @@ def is_opponent_in_front(opponent_position: Coords, visible_tiles: Dict[Coords, 
     if opponent_position not in visible_tiles:
         return False
     opponent = visible_tiles[opponent_position].character
-    return opponent is not None
+    return is_opponent(opponent)
+
+
+def is_opponent(character: ChampionDescription) -> bool:
+    return not (character is None or character.controller_name.startswith("DartController"))
+
+
+def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
+    return knowledge.visible_tiles[knowledge.position].character.weapon.name
 
 
 def can_attack(terrain: Terrain,
