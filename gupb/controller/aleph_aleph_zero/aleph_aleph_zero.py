@@ -5,7 +5,7 @@ import numpy as np
 from typing import List
 
 from gupb import controller
-from gupb.controller.aleph_aleph_zero.attack_strategy import AttackStrategy
+from gupb.controller.aleph_aleph_zero.one_action_strategys import AttackStrategy, RunStrategy
 from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
 from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
@@ -17,7 +17,7 @@ from gupb.model import coordinates
 from gupb.model.arenas import FIXED_MENHIRS
 
 from gupb.model.characters import Facing
-from gupb.model.coordinates import sub_coords
+from gupb.model.coordinates import sub_coords, Coords
 
 
 class Knowledge:
@@ -26,7 +26,7 @@ class Knowledge:
         self.visible_tiles = dict()
         self.facing = None
 
-EPOCH_TO_BE_IN_MELCHIR = 150
+EPOCH_TO_BE_IN_MELCHIR = 75
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -40,9 +40,12 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.knowledge = Knowledge()
 
-        self.menhir_position = None
-        self.menhir_seen = False
-        self.menhir_pos_updated = False
+        self.menhir_position = Coords(10,10)
+        self.menhir_seen = True
+        self.menhir_pos_updated = True
+
+        self.life_points = 8
+        self.killed_now = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AlephAlephZeroBot):
@@ -119,6 +122,9 @@ class AlephAlephZeroBot(controller.Controller):
                 self.menhir_position = coords
                 self.menhir_seen = True
                 self.menhir_pos_updated = True
+        if new_knowledge.visible_tiles[self.knowledge.position].character.health != self.life_points:
+            self.killed_now = True
+            self.life_points = new_knowledge.visible_tiles[self.knowledge.position].character.health
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self._update_knowledge(knowledge)
@@ -146,8 +152,13 @@ class AlephAlephZeroBot(controller.Controller):
         if if_character_to_kill(knowledge):
             self.strategy = AttackStrategy()
 
+        if self.killed_now:
+            self.strategy = RunStrategy(self.strategy)
+            self.killed_now = False
+
         while True:
             action, self.strategy = self.strategy.decide_and_proceed(self.knowledge, graph=graph)
+            print(self.strategy)
             if action is not None:
                 return action
 
@@ -166,6 +177,9 @@ class AlephAlephZeroBot(controller.Controller):
         self.menhir_position = None
         self.menhir_seen = False
         self.menhir_pos_updated = False
+
+        self.life_points = 8
+        self.killed_now = False
 
     @property
     def name(self) -> str:

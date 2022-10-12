@@ -3,7 +3,7 @@ import os
 from gupb.model import coordinates, characters, tiles
 from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, FIXED_MENHIRS
 from gupb.model.characters import ChampionKnowledge
-from gupb.model.coordinates import add_coords
+from gupb.model.coordinates import add_coords, Coords
 from gupb.model.tiles import TileDescription
 
 
@@ -30,20 +30,30 @@ def get_edge_of_vision(knowledge):
 
 def if_character_to_kill(knowledge):
     weapon = knowledge.visible_tiles[knowledge.position].character.weapon
+    facing = knowledge.visible_tiles[knowledge.position].character.facing.value
     if weapon.name == "bow_unloaded":
         return True
     attacked_positions = []
     if weapon.name == "knife":
-        attacked_positions.append(knowledge.position + knowledge.visible_tiles[knowledge.position].character.facing.value)
-    if weapon.name == "sword" or weapon.name == "axe":
-        attacked_positions.append(knowledge.position + knowledge.visible_tiles[knowledge.position].character.facing.value)
+        attacked_positions.append(knowledge.position + facing)
+    if weapon.name == "sword":
+        attacked_positions.append(knowledge.position + facing)
         for i in range(2):
-            attacked_positions.append(attacked_positions[-1]+ knowledge.visible_tiles[knowledge.position].character.facing.value)
+            attacked_positions.append(attacked_positions[-1]+ facing)
     if weapon.name == "bow_loaded":
-        attacked_positions.append(knowledge.position + knowledge.visible_tiles[knowledge.position].character.facing.value)
+        attacked_positions.append(knowledge.position + facing)
         for i in range(49):
-            attacked_positions.append(attacked_positions[-1]+ knowledge.visible_tiles[knowledge.position].character.facing.value)
-    #print(attacked_positions)
+            attacked_positions.append(attacked_positions[-1]+ facing)
+    if weapon.name == "axe":
+        attacked_positions.append(knowledge.position + facing)
+        last_pos = attacked_positions[-1]
+        if facing.x == 0:
+            for cord in [Coords(-1,0), Coords(1,0),]:
+                attacked_positions.append(last_pos + cord)
+        else:
+            for cord in [Coords(0,-1), Coords(0,1)]:
+                attacked_positions.append(last_pos + cord)
+
     for position in attacked_positions:
         if position in knowledge.visible_tiles:
             if knowledge.visible_tiles[position].character is not None:

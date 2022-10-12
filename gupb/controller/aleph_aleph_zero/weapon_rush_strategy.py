@@ -7,7 +7,7 @@ from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
 from gupb.controller.aleph_aleph_zero.utils import taxicab_distance
 from gupb.model import characters
 
-weapons_score = {"knife": 1, "sword": 2, "amulet": 3, "axe": 4, "bow": 5, "bow_unloaded": 5, "bow_loaded": 5}
+weapons_score = {"knife": 1, "sword": 2, "amulet": 0, "axe": 4, "bow": 5, "bow_unloaded": 5, "bow_loaded": 5}
 
 
 class WeaponRushStrategy(Strategy):
