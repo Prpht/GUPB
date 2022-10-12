@@ -1,10 +1,9 @@
-# THIS IS A MODIFIED VERSION OF random.py
-
 import random
 
 from gupb import controller
 from gupb.model import arenas, coordinates
 from gupb.model import characters
+from gupb.controller.barabasz.weapon_mechanics import deathzone
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -59,14 +58,32 @@ class BarabaszController(controller.Controller):
 
         # Check position, check which side one is facing, check tile description
         in_front = coordinates.add_coords(knowledge.position, self.knowledge_decoder._info['facing'].value)
+        
         if in_front in knowledge.visible_tiles.keys():
-            if knowledge.visible_tiles[in_front].character:
-                return characters.Action.ATTACK
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
                 return characters.Action.TURN_LEFT
+            if self.knowledge_decoder._info['weapon']=='knife' and knowledge.visible_tiles[in_front].character:
+                return characters.Action.ATTACK
+            if self.knowledge_decoder._info['weapon']!='knife':
+                if self.knowledge_decoder._info['weapon']=='bow_unloaded':
+                    return characters.Action.ATTACK
+                if self.knowledge_decoder._info['weapon']=='bow_loaded':
+                    return random.choice([characters.Action.TURN_LEFT, 
+                    characters.Action.TURN_RIGHT,
+                    characters.Action.STEP_FORWARD, 
+                    characters.Action.ATTACK])
+                print("weapon: ", self.knowledge_decoder._info['weapon'], type(self.knowledge_decoder._info['weapon']))
+                deathtiles = deathzone(weapon=self.knowledge_decoder._info['weapon'], 
+                position=knowledge.position, 
+                facing=self.knowledge_decoder._info['facing'].value)
+                for cords in deathtiles:
+                    if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
+                        print("SMACK! ", self.knowledge_decoder._info['weapon'])
+                        print("Position: ", knowledge.position, "EnemyPos: ", cords)
+                        return characters.Action.ATTACK
 
-        wieghted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
-        return wieghted_random
+        weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
+        return weighted_random
 
     def praise(self, score: int) -> None:
         pass
