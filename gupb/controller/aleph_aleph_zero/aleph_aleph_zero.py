@@ -46,9 +46,8 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.knowledge = Knowledge()
 
-        self.menhir_position = Coords(10,10)
-        self.menhir_seen = True
-        self.menhir_pos_updated = True
+        self.menhir_seen = False
+        self.menhir_pos_updated = False
 
         self.life_points = 8
         self.killed_now = False
@@ -177,6 +176,11 @@ class AlephAlephZeroBot(controller.Controller):
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.map_knowledge = get_knowledge_from_file(arena_description.name)
         self.graph = build_graph(self.map_knowledge)
+
+        if arena_description.name in FIXED_MENHIRS.keys():
+            self.menhir_position = FIXED_MENHIRS[arena_description.name]
+            self.menhir_seen = True
+            self.menhir_pos_updated = True
 
         self.strategy = ScoutingStrategy()
         self.epoch = 0
