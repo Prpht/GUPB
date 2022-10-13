@@ -66,7 +66,7 @@ class MapKnowledge():
             self.weapons[coords] = self.arena.terrain[coords].loot.description().name
 
     def get_closest_weapon_path(self, current_position: Coords, weapon_type: str) -> List[Coords]:
-        weapons_coords = [coords for coords, type in self.weapons.items() if type == weapon_type]
+        weapons_coords = [coords for coords, type in self.weapons.items() if type.startswith(weapon_type)]
         return self.find_shortest_path(current_position, weapons_coords)
 
     def find_shortest_path(self, current_position: Coords, destinations: List[Coords]) -> List[Coords]:
@@ -132,7 +132,7 @@ def get_weapon(weapon_name: str) -> Weapon:
         return Knife()
     if weapon_name == "sword":
         return Sword()
-    if weapon_name == "bow":
+    if weapon_name.startswith("bow"):
         return Bow()
     if weapon_name == "axe":
         return Axe()
