@@ -33,7 +33,7 @@ class TravelStrategy(Strategy):
                         and two_ahead.character is not None \
                         and two_ahead.character.facing not in {knowledge.facing, knowledge.facing.turn_left(), knowledge.facing.turn_right()}:
                     if (dodge_place := self._find_dodge_place(knowledge, map_knowledge)) is not None:
-                        return None, TravelStrategy(dodge_place, self, priority=StrategyPriority.CRITICAL)
+                        return None, TravelStrategy(dodge_place, self.proceeding_strategy, priority=StrategyPriority.CRITICAL)
 
             return next_action, self if len(shortest_path) > 1 else self.proceeding_strategy
         else:
