@@ -17,7 +17,7 @@ pygame.init()
 
 Sprite = TypeVar('Sprite')
 
-INIT_TILE_SIZE = 16
+INIT_TILE_SIZE = 32
 KEEP_TILE_RATIO = False
 
 HEALTH_BAR_HEIGHT = 4

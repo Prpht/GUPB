@@ -13,7 +13,7 @@ from gupb.controller import tuptus
 
 CONFIGURATION = {
     'arenas': [
-        'fisher_island',
+        'lone_sanctum',
     ],
     'controllers': [
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
