@@ -1,3 +1,4 @@
+import math
 from typing import Dict, List, Optional
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -5,7 +6,7 @@ from pathfinding.finder.a_star import AStarFinder
 from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
-from gupb.model.tiles import TileDescription
+from gupb.model.tiles import Tile, TileDescription
 from gupb.model.weapons import Amulet, Axe, Bow, Knife, Sword, Weapon
 
 ArenaMatrix = List[List[bool]]
@@ -88,6 +89,14 @@ class MapKnowledge():
                 return facing
         return None
 
+    def is_land(self, coords: Coords) -> bool:
+        return self.arena_matrix[coords.y][coords.x]
+
+    def find_mist_coords(self, knowledge: ChampionKnowledge) -> Optional[Coords]:
+        mist_coords = [Coords(*coords) for coords, tile in knowledge.visible_tiles.items() if is_mist(tile)]
+        mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords)) for coords in mist_coords]
+        return min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
+
 
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
     next_position = Coords(*path[0])
@@ -123,6 +132,10 @@ def is_opponent(character: ChampionDescription) -> bool:
     return not (character is None or character.controller_name.startswith("DartController"))
 
 
+def is_mist(tile: Tile) -> bool:
+    return "mist" in [e.type for e in tile.effects]
+
+
 def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
     return knowledge.visible_tiles[knowledge.position].character.weapon.name
 
@@ -142,3 +155,7 @@ def get_weapon(weapon_name: str) -> Weapon:
 
 def find_opponents(visible_tiles: Dict[tuple, TileDescription]) -> Dict[Coords, str]:
     return {Coords(*coords): tile.character.controller_name for coords, tile in visible_tiles.items() if is_opponent(tile.character)}
+
+
+def euclidean_distance(c1: Coords, c2: Coords) -> float:
+    return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)

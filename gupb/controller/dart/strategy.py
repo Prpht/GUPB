@@ -1,10 +1,18 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
+import random
 from typing import List, Optional, Tuple
-from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_action, find_opponents, follow_path, get_facing, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_action, euclidean_distance, find_opponents, follow_path, get_facing, is_opponent_in_front
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
+
+POSSIBLE_ACTIONS = [
+    Action.TURN_LEFT,
+    Action.TURN_RIGHT,
+    Action.STEP_FORWARD,
+    Action.ATTACK,
+]
 
 
 class Steps(Enum):
@@ -57,6 +65,20 @@ class Strategy(ABC):
             return determine_action(current_facing, desired_facing)
         self._path = self._map_knowledge.find_path(knowledge.position, opponent_coords)
         return self._action_follow_path(knowledge)
+
+    def _action_run_away(self, knowledge: ChampionKnowledge, opponent_coords: Coords) -> Action:
+        x = min(self._map_knowledge.arena.size[0]-1, max(
+            0, knowledge.position.x - (opponent_coords.x - knowledge.position.x)))
+        y = min(self._map_knowledge.arena.size[1]-1, max(
+            0, knowledge.position.y - (opponent_coords.y - knowledge.position.y)))
+
+        for i in range(self._map_knowledge.arena.size[0]):
+            for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
+                run_destination = Coords(x+i*sign_x, y+i*sign_y)
+                if self._map_knowledge.is_land(run_destination):
+                    self._path = self._map_knowledge.find_path(knowledge.position, run_destination)
+                    return self._action_follow_path(knowledge)
+        return random.choice(POSSIBLE_ACTIONS)
 
 
 class AxeAndCenterStrategy(Strategy):
