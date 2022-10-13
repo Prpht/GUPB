@@ -11,6 +11,7 @@ from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStra
 from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
 from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
+from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
 from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file
 from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
 from gupb.model import arenas
