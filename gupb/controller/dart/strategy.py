@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 import random
 from typing import List, Optional, Tuple
-from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_action, euclidean_distance, find_opponents, follow_path, get_facing, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_action, euclidean_distance, find_opponents, follow_path, get_champion_weapon, get_facing, is_opponent_in_front
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -17,8 +17,13 @@ POSSIBLE_ACTIONS = [
 
 class Steps(Enum):
     init = auto()
-    find_axe = auto()
-    go_to_center = auto()
+    weapon_found = auto()
+    mist_found = auto()
+
+
+class Mode(Enum):
+    run_away = auto()
+    attack = auto()
 
 
 class Strategy(ABC):
@@ -87,11 +92,13 @@ class AxeAndCenterStrategy(Strategy):
         self._state = Steps.init
         self._previous_action: Action = Action.DO_NOTHING
         self._opponent: Optional[Tuple[Coords, str]] = None
+        self._mode = Mode.run_away
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self._state = Steps.init
         self._previous_action = Action.DO_NOTHING
         self._opponent = None
+        self._mode = Mode.run_away
         return super().reset(arena_description)
 
     def praise(self, score: int) -> None:
@@ -100,22 +107,33 @@ class AxeAndCenterStrategy(Strategy):
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self._map_knowledge.update_weapons_positions()
 
+        # Handle opponent found
         opponents = find_opponents(knowledge.visible_tiles)
         if opponents:
             opponents_coords = list(opponents.keys())
             if self._opponent:
                 opponents_coords.append(self._opponent[0])
             opponent_coords = self._map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
-            return self._action_attack_opponent(knowledge, opponent_coords)
+            if euclidean_distance(knowledge.position, opponent_coords) < 3:
+                if self._mode == Mode.run_away:
+                    return self._action_run_away(knowledge, opponent_coords)
+                return self._action_attack_opponent(knowledge, opponent_coords)
+
+        # Handle mist found
+        mist_coords = self._map_knowledge.find_mist_coords(knowledge)
+        if mist_coords:
+            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_middle_cords())
+            self._mode = Mode.attack
 
         if not self._path:
             if self._state == Steps.init:
+                if get_champion_weapon(knowledge) != "knife":
+                    self._state = Steps.weapon_found
+                    self._mode = Mode.attack
                 self._path = self._map_knowledge.get_closest_weapon_path(knowledge.position, 'axe')
-                self._state = Steps.find_axe
-            elif self._state == Steps.find_axe:
-                destination = self._map_knowledge.find_middle_cords()
-                self._path = self._map_knowledge.find_path(knowledge.position, destination)
-                self._state = Steps.go_to_center
+            elif self._state == Steps.weapon_found:
+                # return random.choice(POSSIBLE_ACTIONS)
+                self._path = self._map_knowledge.find_middle_cords()
 
         return self._action_follow_path(knowledge) if self._path else self._action_rotate_and_attack()
 
