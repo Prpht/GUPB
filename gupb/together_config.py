@@ -10,11 +10,10 @@ from gupb.controller import shrek
 from gupb.controller import sniezny_kockodan
 from gupb.controller import spejson
 from gupb.controller import tuptus
+from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': [
-        'lone_sanctum',
-    ],
+    'arenas': arena_generator.generate_arenas(10),
     'controllers': [
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
         barabasz.BarabaszController("BenadrylowyBarabasz"),
@@ -30,7 +29,7 @@ CONFIGURATION = {
         tuptus.TuptusController("CiCik"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
     'runs_no': 100,
 }
