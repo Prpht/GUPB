@@ -1,14 +1,16 @@
 import random
+from copy import copy
 from time import sleep
 
 import numpy as np
 from typing import List
 
 from gupb import controller
-from gupb.controller.aleph_aleph_zero.attack_strategy import AttackStrategy
+from gupb.controller.aleph_aleph_zero.one_action_strategys import AttackStrategy, RunStrategy
 from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
 from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
+from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
 from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file
 from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
 from gupb.model import arenas
@@ -17,16 +19,19 @@ from gupb.model import coordinates
 from gupb.model.arenas import FIXED_MENHIRS
 
 from gupb.model.characters import Facing
-from gupb.model.coordinates import sub_coords
+from gupb.model.coordinates import sub_coords, Coords
 
 
 class Knowledge:
-    def __init__(self):
-        self.position = None
-        self.visible_tiles = dict()
-        self.facing = None
+    def __init__(self, position = None, visible_tiles = None, facing = None, no_of_champions_alive = 0):
+        if visible_tiles is None:
+            visible_tiles = dict()
+        self.position = position
+        self.visible_tiles = visible_tiles
+        self.facing = facing
+        self.no_of_champions_alive = no_of_champions_alive
 
-EPOCH_TO_BE_IN_MELCHIR = 150
+EPOCH_TO_BE_IN_MELCHIR = 75
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -40,9 +45,12 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.knowledge = Knowledge()
 
-        self.menhir_position = None
-        self.menhir_seen = False
-        self.menhir_pos_updated = False
+        self.menhir_position = Coords(10,10)
+        self.menhir_seen = True
+        self.menhir_pos_updated = True
+
+        self.life_points = 8
+        self.killed_now = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AlephAlephZeroBot):
@@ -60,7 +68,7 @@ class AlephAlephZeroBot(controller.Controller):
             return True
         return False  # if we don't know, assume it's mist
 
-    def _get_visible_mist(self, knowledge: characters.ChampionKnowledge):
+    def _get_visible_mist(self, knowledge):
         for coord, tile_desc in knowledge.visible_tiles.items():
             if coord in self.mists:
                 self.mists.remove(coord)
@@ -119,8 +127,15 @@ class AlephAlephZeroBot(controller.Controller):
                 self.menhir_position = coords
                 self.menhir_seen = True
                 self.menhir_pos_updated = True
+        if new_knowledge.visible_tiles[self.knowledge.position].character.health != self.life_points:
+            self.killed_now = True
+            self.life_points = new_knowledge.visible_tiles[self.knowledge.position].character.health
+
+    def _convert_knowledge(self, knowledge):
+        return Knowledge(knowledge.position, copy(knowledge.visible_tiles), knowledge.visible_tiles[knowledge.position].character.facing, knowledge.no_of_champions_alive)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        knowledge = self._convert_knowledge(knowledge)  # change to our api
         self._update_knowledge(knowledge)
         self.epoch += 1
         graph = self.graph
@@ -138,16 +153,20 @@ class AlephAlephZeroBot(controller.Controller):
             shortest_path = find_shortest_path(curr, self.menhir_position)
             if (not self.menhir_seen) or shortest_path is None or self.epoch + len(shortest_path) > EPOCH_TO_BE_IN_MELCHIR:
                 self.menhir_pos_updated = False
-                self.strategy = MenhirRushStrategy(self.menhir_position)
+                self.strategy = self.strategy.get_more_important(MenhirRushStrategy(self.menhir_position, priority=StrategyPriority.TIME_SENSITIVE))
 
             elif self.menhir_seen: #widzielismy juz menhira, znamy do niego droge i mamy duzo czasu
-                self.strategy = WeaponRushStrategy()
+                self.strategy = self.strategy.get_more_important((WeaponRushStrategy(StrategyPriority.PURPOSEFUL)))
 
         if if_character_to_kill(knowledge):
-            self.strategy = AttackStrategy()
+            self.strategy = self.strategy.get_more_important(AttackStrategy(priority=StrategyPriority.AGGRESSIVE))
+
+        if self.killed_now:
+            self.strategy = self.strategy.get_more_important(RunStrategy(self.strategy, priority=StrategyPriority.CRITICAL))
+            self.killed_now = False
 
         while True:
-            action, self.strategy = self.strategy.decide_and_proceed(self.knowledge, graph=graph)
+            action, self.strategy = self.strategy.decide_and_proceed(self.knowledge, graph=graph, map_knowlege=self.map_knowledge)
             if action is not None:
                 return action
 
@@ -155,8 +174,8 @@ class AlephAlephZeroBot(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        map_knowledge = get_knowledge_from_file(arena_description.name)
-        self.graph = build_graph(map_knowledge)
+        self.map_knowledge = get_knowledge_from_file(arena_description.name)
+        self.graph = build_graph(self.map_knowledge)
 
         self.strategy = ScoutingStrategy()
         self.epoch = 0
@@ -166,6 +185,9 @@ class AlephAlephZeroBot(controller.Controller):
         self.menhir_position = None
         self.menhir_seen = False
         self.menhir_pos_updated = False
+
+        self.life_points = 8
+        self.killed_now = False
 
     @property
     def name(self) -> str:

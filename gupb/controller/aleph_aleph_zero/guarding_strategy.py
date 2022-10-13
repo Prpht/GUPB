@@ -9,7 +9,8 @@ class GuardingStrategy(Strategy):  # primitive guarding strategy that dodges the
     LOOK_TO_THE_SIDE = [characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
     PATROL_CYCLE = STAB_REPEATEDLY+LOOK_TO_THE_SIDE
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.action_queue = GuardingStrategy.TURN_AROUND
 
     def decide_and_proceed(self, knowledge, **kwargs):
