@@ -103,9 +103,9 @@ class DzikieBorsuki:
             weaponable_tiles = utils.get_weaponable_tiles(self.arena, position, facing, self.weapon)
             if health >= characters.CHAMPION_STARTING_HP * 0.25:
                 for tile_coords in weaponable_tiles:
-                    print(visible_tiles[tile_coords].character)
+                    # print(visible_tiles[tile_coords].character)
                     if visible_tiles[tile_coords].character is not None:
-                        print("atak bez buga")
+                        # print("atak bez buga")
                         return characters.Action.ATTACK
             if visible_tiles[position].type == "menhir":
                 return characters.Action.TURN_RIGHT
