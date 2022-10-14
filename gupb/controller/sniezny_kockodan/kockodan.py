@@ -84,7 +84,6 @@ class SnieznyKockodanController(controller.Controller):
             return self.random_decision()
 
         champion_info = knowledge.visible_tiles[knowledge.position].character
-        print(champion_info.weapon)
         weapon_to_get = self.find_weapon_to_get(knowledge)
         enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
         enemy_nearer_to_weapon = True
