@@ -16,14 +16,6 @@ ACTIONS_WITH_WEIGHTS = {
     characters.Action.STEP_FORWARD: 0.8,
 }
 
-WEAPON_DICT = {
-    'knife': weapons.Knife,
-    'sword': weapons.Sword,
-    'bow': weapons.Bow,
-    'axe': weapons.Axe,
-    'amulet': weapons.Amulet
-}
-
 # ranking do ustalenia
 WEAPON_RANKING = {
     'knife': 1,
@@ -68,10 +60,9 @@ class DzikieBorsuki:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.menhir_coords = None
         self.gps = utils.PathFinder(arena_description)
+        self.arena = arenas.Arena.load(arena_description.name)
         self.path = []
-        """self.menhir_coords = None
-        self.weapon = "knife"
-        self.better_weapon_cords = None"""
+        self.weapon = 'knife'
 
     def calculate_distance(self, self_position: coordinates.Coords, other_position: coordinates.Coords) -> int:
         distance = math.sqrt((self_position[0] - other_position[0]) ** 2 + (self_position[1] - other_position[1]) ** 2)
@@ -109,8 +100,13 @@ class DzikieBorsuki:
             facing = self_description.facing
             tile_in_front_coords = facing.value + position
             tile_in_front = visible_tiles[tile_in_front_coords]
-            if health >= characters.CHAMPION_STARTING_HP * 0.25 and tile_in_front.character is not None:
-                return characters.Action.ATTACK
+            weaponable_tiles = utils.get_weaponable_tiles(self.arena, position, facing, self.weapon)
+            if health >= characters.CHAMPION_STARTING_HP * 0.25:
+                for tile_coords in weaponable_tiles:
+                    print(visible_tiles[tile_coords].character)
+                    if visible_tiles[tile_coords].character is not None:
+                        print("atak bez buga")
+                        return characters.Action.ATTACK
             if visible_tiles[position].type == "menhir":
                 return characters.Action.TURN_RIGHT
             if len(self.path) != 0:
