@@ -8,7 +8,9 @@ from gupb.model import weapons
 from gupb.model import effects
 from gupb.model import coordinates
 from queue import SimpleQueue
-
+from pathfinding.core.grid import Grid
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.finder.a_star import AStarFinder
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -33,7 +35,7 @@ WEAPON_RANKING = {
     'axe': 5
 }
 
-TERRAIN_NAME = 'fisher_island'
+TERRAIN_NAME = 'lone_sanctum'
 
 ARENA = arenas.Arena.load(TERRAIN_NAME)
 TERRAIN = ARENA.terrain
@@ -51,10 +53,10 @@ class SnieznyKockodanController(controller.Controller):
         self.first_name: str = first_name
         self.menhir: (coordinates.Coords, None) = None
         self.mist: bool = False
-        self.move_queue: SimpleQueue[characters.Action] = SimpleQueue()
+        #self.move_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.weapon_got: bool = False
         self.mist_destination: (coordinates.Coords, None) = None
-        self.change_axis: bool = False
+        self.arena = self._create_arena_matrix()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
@@ -64,13 +66,18 @@ class SnieznyKockodanController(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
+    def _create_arena_matrix(self):
+        arena = [[0 for _ in range(ARENA.size[0])] for _ in range(ARENA.size[1])]
+        for cords, tile in TERRAIN.items():
+            arena[cords.y][cords.x] = 1 if tile.description().type == 'land' else 0
+        return arena
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         champion_info = knowledge.visible_tiles[knowledge.position].character
         weapon_to_get = self.find_weapon_to_get(knowledge)
         enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
         enemy_nearer_to_weapon = True
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
-        # mist_seen = []
         if len(mist_seen) > 0:
             self.mist = True
         if weapon_to_get is not None:
@@ -78,9 +85,12 @@ class SnieznyKockodanController(controller.Controller):
                                                                                          knowledge.position)
         facing = champion_info.facing
         attack_eligible = self.is_eligible_to_attack(enemies_seen, facing, knowledge, champion_info)
-        # attack_eligible = False
         if self.menhir is None:
             self.menhir = SnieznyKockodanController.find_menhir(knowledge)
+
+        if knowledge.position == self.menhir:
+            return random.choice(POSSIBLE_ACTIONS)
+
         if self.mist:
             if self.menhir is not None:
                 return self._move(knowledge, self.menhir)
@@ -242,68 +252,31 @@ class SnieznyKockodanController(controller.Controller):
         self.mist_destination = destination
         return self._move(knowledge, destination)
 
+    def find_path(self, start: coordinates.Coords, destination: coordinates.Coords):
+        grid = Grid(matrix=self.arena)
+        finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+        start = grid.node(start.x, start.y)
+        destination = grid.node(destination[0], destination[1])
+        path, _ = finder.find_path(start, destination, grid)
+        return path[1:]
+
     def _move(self,
               champion_knowledge: characters.ChampionKnowledge,
               destination_coordinates: coordinates.Coords) -> characters.Action:
+
         current_coordinates = champion_knowledge.position
         current_facing = champion_knowledge.visible_tiles.get(champion_knowledge.position).character.facing
 
-        if self.change_axis is False:
-            self.change_axis = True
-            if current_coordinates[0] - destination_coordinates[0] > 0:
-                if current_facing == characters.Facing.UP:
-                    self.move_queue.put(characters.Action.TURN_LEFT)
-                elif current_facing == characters.Facing.DOWN:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                elif current_facing == characters.Facing.RIGHT:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                else:
-                    self.move_queue.put(characters.Action.STEP_FORWARD)
-            elif current_coordinates[0] - destination_coordinates[0] < 0:
-                if current_facing == characters.Facing.UP:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                elif current_facing == characters.Facing.DOWN:
-                    self.move_queue.put(characters.Action.TURN_LEFT)
-                elif current_facing == characters.Facing.LEFT:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                else:
-                    self.move_queue.put(characters.Action.STEP_FORWARD)
-            else:
-                self.move_queue.put(characters.Action.STEP_FORWARD)
+        path = self.find_path(current_coordinates, destination_coordinates)
 
-            self.move_queue.put(characters.Action.STEP_FORWARD)
-        else:
-            self.change_axis = False
-            if current_coordinates[1] - destination_coordinates[1] > 0:
-                if current_facing == characters.Facing.RIGHT:
-                    self.move_queue.put(characters.Action.TURN_LEFT)
-                elif current_facing == characters.Facing.LEFT:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                elif current_facing == characters.Facing.DOWN:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                else:
-                    self.move_queue.put(characters.Action.STEP_FORWARD)
-            elif current_coordinates[1] - destination_coordinates[1] < 0:
-                if current_facing == characters.Facing.LEFT:
-                    self.move_queue.put(characters.Action.TURN_LEFT)
-                elif current_facing == characters.Facing.RIGHT:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                elif current_facing == characters.Facing.UP:
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                    self.move_queue.put(characters.Action.TURN_RIGHT)
-                else:
-                    self.move_queue.put(characters.Action.STEP_FORWARD)
-            else:
-                self.move_queue.put(characters.Action.STEP_FORWARD)
-            self.move_queue.put(characters.Action.STEP_FORWARD)
+        if current_coordinates + current_facing.value == path[0]:
+            return characters.Action.STEP_FORWARD
 
-        if not self.move_queue.empty():
-            return self.move_queue.get()
+        if current_coordinates + current_facing.turn_right().value == path[0]:
+            return characters.Action.TURN_RIGHT
         else:
-            return random.choice(POSSIBLE_ACTIONS)
+            return characters.Action.TURN_LEFT
+
 
     def get_map_center(self, terrain: arenas.Terrain) -> coordinates.Coords:
         size = arenas.terrain_size(terrain)
