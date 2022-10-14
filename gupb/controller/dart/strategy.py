@@ -130,10 +130,9 @@ class AxeAndCenterStrategy(Strategy):
                 if get_champion_weapon(knowledge) != "knife":
                     self._state = Steps.weapon_found
                     self._mode = Mode.attack
-                self._path = self._map_knowledge.get_closest_weapon_path(knowledge.position, 'axe')
+                self._path = self._map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword')
             elif self._state == Steps.weapon_found:
-                # return random.choice(POSSIBLE_ACTIONS)
-                self._path = self._map_knowledge.find_middle_cords()
+                self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_middle_cords())
 
         return self._action_follow_path(knowledge) if self._path else self._action_rotate_and_attack()
 
