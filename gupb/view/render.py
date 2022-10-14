@@ -17,7 +17,7 @@ pygame.init()
 
 Sprite = TypeVar('Sprite')
 
-INIT_TILE_SIZE = 16
+INIT_TILE_SIZE = 32
 KEEP_TILE_RATIO = False
 
 HEALTH_BAR_HEIGHT = 4
@@ -55,10 +55,12 @@ class SpriteRepository:
             characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
             characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
             characters.Tabard.GREY: load_sprite('characters', 'champion_grey', BLACK),
+            characters.Tabard.GREEN: load_sprite('characters', 'champion_green', BLACK),
             characters.Tabard.LIME: load_sprite('characters', 'champion_lime', BLACK),
             characters.Tabard.ORANGE: load_sprite('characters', 'champion_orange', BLACK),
             characters.Tabard.PINK: load_sprite('characters', 'champion_pink', BLACK),
             characters.Tabard.RED: load_sprite('characters', 'champion_red', BLACK),
+            characters.Tabard.STRIPPED: load_sprite('characters', 'champion_stripped', BLACK),
             characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
@@ -79,10 +81,12 @@ class SpriteRepository:
                     characters.Tabard.BLUE,
                     characters.Tabard.BROWN,
                     characters.Tabard.GREY,
+                    characters.Tabard.GREEN,
                     characters.Tabard.LIME,
                     characters.Tabard.ORANGE,
                     characters.Tabard.PINK,
                     characters.Tabard.RED,
+                    characters.Tabard.STRIPPED,
                     characters.Tabard.VIOLET,
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,

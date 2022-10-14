@@ -8,3 +8,4 @@ results/
 gupb/controller/botelka_ml/tmp/
 .vscode/
 gupb/our.py
+env
