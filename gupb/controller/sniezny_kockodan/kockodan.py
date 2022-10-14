@@ -7,7 +7,7 @@ from gupb.model import characters
 from gupb.model import weapons
 from gupb.model import effects
 from gupb.model import coordinates
-from queue import SimpleQueue
+# from queue import SimpleQueue
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
@@ -51,12 +51,17 @@ class SnieznyKockodanController(controller.Controller):
 
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.menhir: (coordinates.Coords, None) = None
+        # self.menhir: (coordinates.Coords, None) = None
+        self.menhir: (coordinates.Coords, None) = SnieznyKockodanController.get_map_center(TERRAIN)
         self.mist: bool = False
-        #self.move_queue: SimpleQueue[characters.Action] = SimpleQueue()
+        # self.move_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.weapon_got: bool = False
         self.mist_destination: (coordinates.Coords, None) = None
-        self.arena = self._create_arena_matrix()
+        self.arena: list[list[int]] = self._create_arena_matrix()
+        self.prev_position: (coordinates.Coords, None) = None
+        self.prev_facing: (characters.Facing, None) = None
+        self.attacked: bool = False
+        self.menhir_attack_counter: int = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
@@ -73,7 +78,13 @@ class SnieznyKockodanController(controller.Controller):
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if self.need_to_randomize(knowledge):
+            self.prev_position = knowledge.position
+            self.prev_facing = knowledge.visible_tiles[knowledge.position].character.facing
+            return self.random_decision()
+
         champion_info = knowledge.visible_tiles[knowledge.position].character
+        print(champion_info.weapon)
         weapon_to_get = self.find_weapon_to_get(knowledge)
         enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
         enemy_nearer_to_weapon = True
@@ -89,7 +100,12 @@ class SnieznyKockodanController(controller.Controller):
             self.menhir = SnieznyKockodanController.find_menhir(knowledge)
 
         if knowledge.position == self.menhir:
-            return random.choice(POSSIBLE_ACTIONS)
+            if attack_eligible and self.menhir_attack_counter < 3:
+                self.menhir_attack_counter += 1
+                return self.attack()
+
+            self.menhir_attack_counter = 0
+            return self.random_decision()
 
         if self.mist:
             if self.menhir is not None:
@@ -99,20 +115,25 @@ class SnieznyKockodanController(controller.Controller):
         elif weapon_to_get is not None and not enemy_nearer_to_weapon:
             return self._move(knowledge, weapon_to_get)
         elif attack_eligible:
-            return characters.Action.ATTACK
+            return self.attack()
         elif self.menhir is not None:
             return self._move(knowledge, self.menhir)
         else:
-            return random.choice(POSSIBLE_ACTIONS)
+            return self._move(knowledge, SnieznyKockodanController.get_map_center(TERRAIN))
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.menhir = None
+        # self.menhir = None
+        self.menhir: (coordinates.Coords, None) = SnieznyKockodanController.get_map_center(TERRAIN)
         self.mist = False
         self.weapon_got = False
         self.mist_destination = None
+        self.prev_position = None
+        self.prev_facing = None
+        self.attacked = False
+        self.menhir_attack_counter = 0
 
     @property
     def name(self) -> str:
@@ -127,8 +148,16 @@ class SnieznyKockodanController(controller.Controller):
         return abs(tile_position[0] - current_position[0])
 
     @staticmethod
+    def count_x_difference(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> int:
+        return tile_position[0] - current_position[0]
+
+    @staticmethod
     def count_y_distance(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> int:
         return abs(tile_position[1] - current_position[1])
+
+    @staticmethod
+    def count_y_difference(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> int:
+        return tile_position[1] - current_position[1]
 
     @staticmethod
     def is_potential_weapon_tile(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> bool:
@@ -235,20 +264,24 @@ class SnieznyKockodanController(controller.Controller):
     def move_against_mist(self,
                           mist_tiles: list[coordinates.Coords],
                           knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.attacked = False
         if len(mist_tiles) == 0:
             return self._move(knowledge, self.mist_destination)
 
-        x_distances = [SnieznyKockodanController.count_x_distance(mist_tile, knowledge.position)
+        x_distances = [SnieznyKockodanController.count_x_difference(mist_tile, knowledge.position)
                        for mist_tile in mist_tiles]
-        y_distances = [SnieznyKockodanController.count_y_distance(mist_tile, knowledge.position)
+        y_distances = [SnieznyKockodanController.count_y_difference(mist_tile, knowledge.position)
                        for mist_tile in mist_tiles]
 
-        x_ind = x_distances.index(min(x_distances))
-        y_ind = y_distances.index(min(y_distances))
+        x_distances_abs = [abs(x) for x in x_distances]
+        y_distances_abs = [abs(y) for y in y_distances]
+
+        x_ind = x_distances_abs.index(min(x_distances_abs))
+        y_ind = y_distances_abs.index(min(y_distances_abs))
 
         destination = coordinates.Coords(x=knowledge.position[0], y=knowledge.position[1])
-        difference = coordinates.sub_coords(coordinates.Coords(mist_tiles[x_ind].x, mist_tiles[y_ind].y), destination)
-        destination = coordinates.sub_coords(destination, difference)
+        difference = coordinates.Coords(x=x_distances[x_ind], y=y_distances[y_ind])
+        destination = coordinates.add_coords(destination, difference)
         self.mist_destination = destination
         return self._move(knowledge, destination)
 
@@ -263,6 +296,7 @@ class SnieznyKockodanController(controller.Controller):
     def _move(self,
               champion_knowledge: characters.ChampionKnowledge,
               destination_coordinates: coordinates.Coords) -> characters.Action:
+        self.attacked = False
 
         current_coordinates = champion_knowledge.position
         current_facing = champion_knowledge.visible_tiles.get(champion_knowledge.position).character.facing
@@ -277,8 +311,22 @@ class SnieznyKockodanController(controller.Controller):
         else:
             return characters.Action.TURN_LEFT
 
-
-    def get_map_center(self, terrain: arenas.Terrain) -> coordinates.Coords:
+    @staticmethod
+    def get_map_center(terrain: arenas.Terrain) -> coordinates.Coords:
         size = arenas.terrain_size(terrain)
         return coordinates.Coords(x=math.ceil(size[0] / 2) - 1,
                                   y=math.ceil(size[1] / 2) - 1)
+
+    def attack(self) -> characters.Action:
+        self.attacked = True
+        return characters.Action.ATTACK
+
+    def random_decision(self) -> characters.Action:
+        action = random.choice(POSSIBLE_ACTIONS)
+        self.attacked = action == characters.Action.ATTACK
+        return action
+
+    def need_to_randomize(self, knowledge: characters.ChampionKnowledge):
+        return self.prev_position == knowledge.position \
+            and self.prev_facing == knowledge.visible_tiles[knowledge.position].character.facing \
+            and not self.attacked
