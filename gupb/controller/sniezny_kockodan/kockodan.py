@@ -7,6 +7,7 @@ from gupb.model import characters
 from gupb.model import weapons
 from gupb.model import effects
 from gupb.model import coordinates
+from gupb.model import tiles
 # from queue import SimpleQueue
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -43,6 +44,8 @@ TERRAIN = ARENA.terrain
 MAX_HEALTH: int = characters.CHAMPION_STARTING_HP
 HEALTH_ATTACK_THRESHOLD: float = 1/3
 
+MAX_WEAPON_PATH_LEN: int = 10
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -62,6 +65,8 @@ class SnieznyKockodanController(controller.Controller):
         self.prev_facing: (characters.Facing, None) = None
         self.attacked: bool = False
         self.menhir_attack_counter: int = 0
+        self.memory: dict[coordinates.Coords, tiles.TileDescription] = {}
+        self.arcade_weapon: bool = True
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
@@ -78,19 +83,26 @@ class SnieznyKockodanController(controller.Controller):
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        for tile in knowledge.visible_tiles:
+            self.memory[tile] = knowledge.visible_tiles[tile]
+
         if self.need_to_randomize(knowledge):
             self.prev_position = knowledge.position
             self.prev_facing = knowledge.visible_tiles[knowledge.position].character.facing
             return self.random_decision()
 
         champion_info = knowledge.visible_tiles[knowledge.position].character
+        if champion_info.weapon.name != 'knife':
+            self.arcade_weapon = False
+
+        nearest_corner = self.arcade_weapon_gain(knowledge.position)
         weapon_to_get = self.find_weapon_to_get(knowledge)
         enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
         enemy_nearer_to_weapon = True
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
         if len(mist_seen) > 0:
             self.mist = True
-        if weapon_to_get is not None:
+        if weapon_to_get is not None and not self.arcade_weapon:
             enemy_nearer_to_weapon = SnieznyKockodanController.is_enemy_nearer_to_weapon(enemies_seen, weapon_to_get,
                                                                                          knowledge.position)
         facing = champion_info.facing
@@ -111,6 +123,8 @@ class SnieznyKockodanController(controller.Controller):
                 return self._move(knowledge, self.menhir)
             else:
                 return self.move_against_mist(mist_seen, knowledge)
+        elif self.arcade_weapon:
+            return self._move(knowledge, nearest_corner)
         elif weapon_to_get is not None and not enemy_nearer_to_weapon:
             return self._move(knowledge, weapon_to_get)
         elif attack_eligible:
@@ -133,6 +147,8 @@ class SnieznyKockodanController(controller.Controller):
         self.prev_facing = None
         self.attacked = False
         self.menhir_attack_counter = 0
+        self.memory = {}
+        self.arcade_weapon = True
 
     @property
     def name(self) -> str:
@@ -180,7 +196,15 @@ class SnieznyKockodanController(controller.Controller):
     def find_enemies_seen(knowledge: characters.ChampionKnowledge) -> list[coordinates.Coords]:
         enemies = []
         for tile in knowledge.visible_tiles:
-            if knowledge.visible_tiles[tile].character is not None:
+            if knowledge.visible_tiles[tile].character is not None and tile != knowledge.position:
+                enemies += [tile]
+
+        return enemies
+
+    def find_enemies(self, knowledge: characters.ChampionKnowledge):
+        enemies = []
+        for tile in self.memory:
+            if self.memory[tile].character is not None and tile != knowledge.position:
                 enemies += [tile]
 
         return enemies
@@ -225,7 +249,7 @@ class SnieznyKockodanController(controller.Controller):
         except TypeError:
             weapon_coordinates = []
 
-        for enemy in enemies:
+        for enemy in enemies:  # self.find_enemies(knowledge):
             if enemy in weapon_coordinates:
                 return True
         return False
@@ -284,7 +308,7 @@ class SnieznyKockodanController(controller.Controller):
         self.mist_destination = destination
         return self._move(knowledge, destination)
 
-    def find_path(self, start: coordinates.Coords, destination: coordinates.Coords):
+    def find_path(self, start: coordinates.Coords, destination: coordinates.Coords) -> list[coordinates.Coords]:
         grid = Grid(matrix=self.arena)
         finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
         start = grid.node(start.x, start.y)
@@ -325,7 +349,24 @@ class SnieznyKockodanController(controller.Controller):
         self.attacked = action == characters.Action.ATTACK
         return action
 
-    def need_to_randomize(self, knowledge: characters.ChampionKnowledge):
+    def need_to_randomize(self, knowledge: characters.ChampionKnowledge) -> bool:
         return self.prev_position == knowledge.position \
             and self.prev_facing == knowledge.visible_tiles[knowledge.position].character.facing \
             and not self.attacked
+
+    def arcade_weapon_gain(self, current_position):
+        corners: dict[coordinates.Coords, int] = {
+            coordinates.Coords(1, 1): 1000,
+            coordinates.Coords(1, ARENA.size[1] - 2): 1000,
+            coordinates.Coords(ARENA.size[0] - 2, 1): 1000,
+            coordinates.Coords(ARENA.size[0] - 2, ARENA.size[1] - 2): 1000
+        }
+
+        for corner in corners:
+            corners[corner] = len(self.find_path(current_position, corner))
+
+        nearest_corner = min(corners, key=corners.get)
+        if corners[nearest_corner] > MAX_WEAPON_PATH_LEN:
+            self.arcade_weapon = False
+
+        return nearest_corner
