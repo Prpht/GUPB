@@ -1,7 +1,7 @@
 import random
 
 from gupb import controller
-from gupb.model import arenas, coordinates
+from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 from gupb.controller.barabasz.weapon_mechanics import deathzone
 
@@ -12,38 +12,33 @@ POSSIBLE_ACTIONS = [
 ]
 
 
-class SelfKnowledge:
-    def __init__(self, knowledge: characters.ChampionKnowledge = None):
-        self._knowledge = knowledge
-        self._info = dict()
-
-    def decode(self):
-        tile = self.knowledge.visible_tiles.get(self.knowledge.position)
-        character = tile.character if tile else None
-        weapon = character.weapon.name if character else "knife"
-        health = character.health
-        facing = character.facing
-
-        self._info['weapon'] = weapon
-        self._info['health'] = health
-        self._info['facing'] = facing
-
-    @property
-    def knowledge(self):
-        return self._knowledge
-
-    @knowledge.setter
-    def knowledge(self, new_knowledge):
-        self._knowledge = new_knowledge
-        self.decode()
+WEAPONS = {
+    'knife': weapons.Knife,
+    'sword': weapons.Sword,
+    'bow': weapons.Bow,
+    'axe': weapons.Axe,
+    'amulet': weapons.Amulet
+}
 
 
-# noinspection PyUnusedLocal
-# noinspection PyMethodMayBeStatic
+def weapon_description_to_weapon(description: weapons.WeaponDescription):
+    if description.name[0:3] == 'bow':
+        weapon = weapons.Bow()
+        if description.name == 'bow_loaded':
+            weapon.ready = True
+    else:
+        weapon = WEAPONS[description.name]()
+
+    return weapon
+
+
 class BarabaszController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.knowledge_decoder = SelfKnowledge()
+        self.position: coordinates.Coords = None
+        self.weapon: weapons.Weapon = weapons.Knife()
+        self.health: int = 8
+        self.facing: characters.Facing = characters.Facing.random()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BarabaszController):
@@ -54,36 +49,53 @@ class BarabaszController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.knowledge_decoder.knowledge = knowledge
 
-        # Check position, check which side one is facing, check tile description
-        in_front = coordinates.add_coords(knowledge.position, self.knowledge_decoder._info['facing'].value)
-        
-        if in_front in knowledge.visible_tiles.keys():
-            if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
-                return characters.Action.TURN_LEFT
-            if self.knowledge_decoder._info['weapon']=='knife' and knowledge.visible_tiles[in_front].character:
-                return characters.Action.ATTACK
-            if self.knowledge_decoder._info['weapon']!='knife':
-                if self.knowledge_decoder._info['weapon']=='bow_unloaded':
+        try:
+            self.update_self_knowledge(knowledge)
+
+            # Check position, check which side one is facing, check tile description
+            in_front = coordinates.add_coords(knowledge.position, self.facing.value)
+
+            if in_front in knowledge.visible_tiles.keys():
+                if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
+                    return characters.Action.TURN_LEFT
+                if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
                     return characters.Action.ATTACK
-                if self.knowledge_decoder._info['weapon']=='bow_loaded':
-                    return random.choice([characters.Action.TURN_LEFT, 
-                    characters.Action.TURN_RIGHT,
-                    characters.Action.STEP_FORWARD, 
-                    characters.Action.ATTACK])
-                print("weapon: ", self.knowledge_decoder._info['weapon'], type(self.knowledge_decoder._info['weapon']))
-                deathtiles = deathzone(weapon=self.knowledge_decoder._info['weapon'], 
-                position=knowledge.position, 
-                facing=self.knowledge_decoder._info['facing'].value)
+                deathtiles = deathzone(weapon=self.weapon,
+                                       position=self.position,
+                                       facing=self.facing.value)
                 for cords in deathtiles:
                     if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
-                        print("SMACK! ", self.knowledge_decoder._info['weapon'])
-                        print("Position: ", knowledge.position, "EnemyPos: ", cords)
+                        # print("SMACK! ", self.weapon)
+                        # print("Position: ", knowledge.position, "EnemyPos: ", cords)
                         return characters.Action.ATTACK
 
-        weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
-        return weighted_random
+            weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
+            return weighted_random
+        except Exception as e:
+            print(e)
+
+        # self.update_self_knowledge(knowledge)
+        #
+        # # Check position, check which side one is facing, check tile description
+        # in_front = coordinates.add_coords(knowledge.position, self.facing.value)
+        #
+        # if in_front in knowledge.visible_tiles.keys():
+        #     if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
+        #         return characters.Action.TURN_LEFT
+        #     if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
+        #         return characters.Action.ATTACK
+        #     deathtiles = deathzone(weapon=self.weapon,
+        #                            position=self.position,
+        #                            facing=self.facing.value)
+        #     for cords in deathtiles:
+        #         if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
+        #             print("SMACK! ", self.weapon)
+        #             print("Position: ", knowledge.position, "EnemyPos: ", cords)
+        #             return characters.Action.ATTACK
+        #
+        # weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
+        # return weighted_random
 
     def praise(self, score: int) -> None:
         pass
@@ -98,3 +110,13 @@ class BarabaszController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.WHITE
+
+    def update_self_knowledge(self, knowledge: characters.ChampionKnowledge = None):
+        self.position = knowledge.position
+        tile = knowledge.visible_tiles.get(self.position)
+        character = tile.character if tile else None
+
+        if character:
+            self.weapon = weapon_description_to_weapon(character.weapon)
+            self.health = character.health
+            self.facing = character.facing

@@ -1,68 +1,43 @@
-from gupb.model import arenas, coordinates
-from gupb.model import characters
-from gupb.model.tiles import TileDescription
+from gupb.model import coordinates
+from gupb.model import weapons
+from gupb.model import arenas
 
 
-
-def deathzone(weapon: str, position: coordinates.Coords, facing: coordinates.Coords):
+def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coordinates.Coords):
     death_coords = []
 
-    if weapon == 'axe':
-        if facing == coordinates.Coords(0, -1):  # UP
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,-1)))
-        if facing == coordinates.Coords(0, 1):  # DOWN
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,1)))
-        if facing == coordinates.Coords(-1, 0):  # LEFT
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,-1)))
-        if facing == coordinates.Coords(1, 0):  # RIGHT
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,-1)))
-    
-    # TODO: Implement bow mechanics properly
-    if weapon == 'sword' or weapon == 'bow':
-        if facing == coordinates.Coords(0, -1):  # UP
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(0,-2)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(0,-3)))
-        if facing == coordinates.Coords(0, 1):  # DOWN
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(0,2)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(0,3)))
-        if facing == coordinates.Coords(-1, 0):  # LEFT
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-2,0)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-3,0)))
-        if facing == coordinates.Coords(1, 0):  # RIGHT
-            death_coords.append(coordinates.add_coords(position, facing))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(2,0)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(3,0)))
-    if weapon == 'amulet':
-        if facing == coordinates.Coords(0, -1):  # UP
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(2,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-2,-1)))
-        if facing == coordinates.Coords(0, 1):  # DOWN
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(2,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-2,1)))
-        if facing == coordinates.Coords(-1, 0):  # LEFT
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,2)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(-1,-2)))
-        if facing == coordinates.Coords(1, 0):  # RIGHT
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,2)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,-1)))
-            death_coords.append(coordinates.add_coords(position, coordinates.Coords(1,-2)))
+    if isinstance(weapon, weapons.Knife):
+        death_coords.append(coordinates.add_coords(position, facing))
+
+    elif isinstance(weapon, weapons.Axe):
+        death_coords.append(coordinates.add_coords(position, facing))
+        if facing[0] == 0:
+            for i in [-1, 1]:
+                death_coords.append(coordinates.add_coords(position, coordinates.Coords(i, facing[1])))
+        else:
+            for i in [-1, 1]:
+                death_coords.append(coordinates.add_coords(position, coordinates.Coords(facing[0], i)))
+
+    elif isinstance(weapon, weapons.Sword):
+        sword_range = 3
+        attacked_position = position
+        for i in range(sword_range):
+            attacked_position = coordinates.add_coords(attacked_position, facing)
+            death_coords.append(attacked_position)
+
+    elif isinstance(weapon, weapons.Amulet):
+        amulet_range = 2
+        for i in range(amulet_range):
+            for x in [-i, i]:
+                for y in [-i, i]:
+                    death_coords.append(coordinates.add_coords(position, coordinates.Coords(x, y)))
+
+    elif isinstance(weapon, weapons.Bow):
+        if weapon.ready:
+            bow_range = 8
+            attacked_position = position
+            for i in range(bow_range):
+                attacked_position = coordinates.add_coords(attacked_position, facing)
+                death_coords.append(attacked_position)
 
     return death_coords
