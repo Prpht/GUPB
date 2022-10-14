@@ -38,6 +38,9 @@ TERRAIN_NAME = 'fisher_island'
 ARENA = arenas.Arena.load(TERRAIN_NAME)
 TERRAIN = ARENA.terrain
 
+MAX_HEALTH: int = characters.CHAMPION_STARTING_HP
+HEALTH_ATTACK_THRESHOLD: float = 1/3
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -67,7 +70,7 @@ class SnieznyKockodanController(controller.Controller):
         enemies_seen = SnieznyKockodanController.find_enemies_seen(knowledge)
         enemy_nearer_to_weapon = True
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
-        #mist_seen = []
+        # mist_seen = []
         if len(mist_seen) > 0:
             self.mist = True
         if weapon_to_get is not None:
@@ -75,7 +78,7 @@ class SnieznyKockodanController(controller.Controller):
                                                                                          knowledge.position)
         facing = champion_info.facing
         attack_eligible = self.is_eligible_to_attack(enemies_seen, facing, knowledge, champion_info)
-        #attack_eligible = False
+        # attack_eligible = False
         if self.menhir is None:
             self.menhir = SnieznyKockodanController.find_menhir(knowledge)
         if self.mist:
@@ -167,9 +170,12 @@ class SnieznyKockodanController(controller.Controller):
                               knowledge: characters.ChampionKnowledge,
                               champion_info: characters.ChampionDescription) -> bool:
         health = champion_info.health
-        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
-        if any(enemy_stronger_health):
+        # enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        # if any(enemy_stronger_health):
+        #     return False
+        if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
             return False
+
         weapon = champion_info.weapon.name
         enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
                                   > WEAPON_RANKING[weapon]
