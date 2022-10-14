@@ -73,8 +73,7 @@ class Game(statemachine.StateMachine):
         if len(to_spawn) != len(self.initial_champion_positions):
             raise RuntimeError("Unable to spawn champions: not enough positions!")  # TODO: remove if works
         for controller_to_spawn, coords in zip(to_spawn, self.initial_champion_positions):
-            champion = characters.Champion(coords, self.arena)
-            self.arena.terrain[coords].character = champion
+            champion = self.arena.spawn_champion_at(coords)
             champion.assign_controller(controller_to_spawn)
             champions.append(champion)
             verbose_logger.debug(f"{champion.tabard.value} champion for {controller_to_spawn.name}"
@@ -101,6 +100,7 @@ class Game(statemachine.StateMachine):
             else:
                 death = ChampionDeath(champion, self.episode)
                 self.deaths.append(death)
+                self.arena.no_of_champions_alive -= 1
         self.champions = alive
         if len(self.champions) == 1:
             verbose_logger.debug(f"Champion {self.champions[0].controller.name} was the last one standing.")
