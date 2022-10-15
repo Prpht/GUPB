@@ -1,7 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 
-
 CONFIGURATION = {
     'arenas': [
         'fisher_island',
