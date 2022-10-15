@@ -1,3 +1,4 @@
+from gupb.controller import aksolotl
 from gupb.controller import aleph_aleph_zero
 from gupb.controller import barabasz
 from gupb.controller import dart
@@ -16,6 +17,7 @@ CONFIGURATION = {
         'lone_sanctum',
     ],
     'controllers': [
+        aksolotl.AksolotlController("Old"),
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
         barabasz.BarabaszController("BenadrylowyBarabasz"),
         dart.DartController("Dart", dart.strategy.AxeAndCenterStrategy()),
@@ -32,5 +34,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 100,
+    'runs_no': 1000,
 }

@@ -152,7 +152,7 @@ class SnieznyKockodanController(controller.Controller):
 
     @property
     def name(self) -> str:
-        return f'SnieznyKockodanController{self.first_name}'
+        return f'MemeController{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:

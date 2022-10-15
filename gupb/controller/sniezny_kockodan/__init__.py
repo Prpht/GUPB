@@ -1,5 +1,5 @@
-from gupb.controller.sniezny_kockodan import kockodan
+from gupb.controller.sniezny_kockodan.kockodan import SnieznyKockodanController
 
 POTENTIAL_CONTROLLERS = [
-    kockodan.SnieznyKockodanController("SnieznyKockodan")
+    SnieznyKockodanController("SnieznyKockodan")
 ]
