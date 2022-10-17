@@ -6,7 +6,7 @@ from gupb.model.characters import Facing
 
 class Axe(Weapon):
     name = "axe"
-    value = 2
+    value = 3
 
     @staticmethod
     def get_attack_range(map, facing, position) -> List[Point2d]:
