@@ -1,12 +1,13 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import lord_icon
 
 CONFIGURATION = {
     'arenas': [
         'fisher_island',
     ],
     'controllers': [
-        keyboard.KeyboardController(),
+        lord_icon.LordIcon("Marko"),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),

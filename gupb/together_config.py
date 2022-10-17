@@ -32,7 +32,7 @@ CONFIGURATION = {
         tuptus.TuptusController("CiCik"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 1000,
+    'runs_no': 5,
 }
