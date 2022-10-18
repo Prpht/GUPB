@@ -6,13 +6,15 @@ import numpy as np
 from typing import List
 
 from gupb import controller
+from gupb.controller.aleph_aleph_zero.guarding_strategy import GuardingStrategy
 from gupb.controller.aleph_aleph_zero.one_action_strategys import AttackStrategy, RunStrategy
 from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
 from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
-from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path, get_closest_points
 from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
 from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
-from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file
+from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
+from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file, get_save_spots
 from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
 from gupb.model import arenas
 from gupb.model import characters
@@ -32,7 +34,7 @@ class Knowledge:
         self.facing = facing
         self.no_of_champions_alive = no_of_champions_alive
 
-EPOCH_TO_BE_IN_MELCHIR = 75
+EPOCH_TO_BE_IN_MELCHIR = 150
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -51,6 +53,9 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.life_points = 8
         self.killed_now = False
+
+        self.map_knowledge_cache = {}
+        self.save_spots_cache = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AlephAlephZeroBot):
@@ -156,7 +161,15 @@ class AlephAlephZeroBot(controller.Controller):
                 self.strategy = self.strategy.get_more_important(MenhirRushStrategy(self.menhir_position, priority=StrategyPriority.TIME_SENSITIVE))
 
             elif self.menhir_seen: #widzielismy juz menhira, znamy do niego droge i mamy duzo czasu
-                self.strategy = self.strategy.get_more_important((WeaponRushStrategy(StrategyPriority.PURPOSEFUL)))
+                if self.knowledge.visible_tiles[knowledge.position].character.weapon.name=="knife":
+                    self.strategy = self.strategy.get_more_important(WeaponRushStrategy(StrategyPriority.PURPOSEFUL))
+                else:
+                    self.strategy = self.strategy.get_more_important(
+                        TravelStrategy(
+                            get_closest_points(self.save_spots, self.graph, graph[knowledge.position,knowledge.facing])[0],
+                            GuardingStrategy(priority=StrategyPriority.PURPOSEFUL),
+                            priority=StrategyPriority.PURPOSEFUL
+                        ))
 
         if if_character_to_kill(knowledge):
             self.strategy = self.strategy.get_more_important(AttackStrategy(priority=StrategyPriority.AGGRESSIVE))
@@ -174,7 +187,18 @@ class AlephAlephZeroBot(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.map_knowledge = get_knowledge_from_file(arena_description.name)
+        if arena_description.name in self.map_knowledge_cache.keys():
+            self.map_knowledge = self.map_knowledge_cache[arena_description.name]
+        else:
+            self.map_knowledge = get_knowledge_from_file(arena_description.name)
+            self.map_knowledge_cache[arena_description.name] = self.map_knowledge
+
+        if arena_description.name in self.save_spots_cache.keys():
+            self.save_spots = self.save_spots_cache[arena_description.name]
+        else:
+            self.save_spots = get_save_spots(self.map_knowledge)
+            self.save_spots_cache[arena_description.name] = self.save_spots
+
         self.graph = build_graph(self.map_knowledge)
 
         if arena_description.name in FIXED_MENHIRS.keys():
