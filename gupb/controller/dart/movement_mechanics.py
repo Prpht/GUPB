@@ -69,9 +69,10 @@ class MapKnowledge():
         self.weapons = {coords: tile.loot.description().name
                         for coords, tile in self.arena.terrain.items() if tile.loot is not None}
 
-    def update_weapons_positions(self) -> None:
-        for coords in self.weapons:
-            self.weapons[coords] = self.arena.terrain[coords].loot.description().name
+    def update_weapons_positions(self, knowledge: ChampionKnowledge) -> None:
+        for coords, tile in knowledge.visible_tiles.items():
+            if tile.loot is not None:
+                self.weapons[Coords(*coords)] = tile.loot.name
 
     def get_closest_weapon_path(self, current_position: Coords, *weapon_types: str) -> List[Coords]:
         weapons_coords = [coords for coords, type in self.weapons.items() if type.startswith(weapon_types)]
