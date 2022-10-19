@@ -160,7 +160,7 @@ def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
     next_position = Coords(*path[0])
     current_facing = get_facing(knowledge)
     desired_facing = get_desired_facing(knowledge.position, next_position)
-    return determine_action(current_facing, desired_facing)
+    return determine_rotation_action(current_facing, desired_facing)
 
 
 def get_facing(knowledge: ChampionKnowledge) -> Facing:
@@ -173,7 +173,7 @@ def get_desired_facing(current_position: Coords, desired_position: Coords) -> Fa
     return Facing(desired_facing_coordinates)
 
 
-def determine_action(current_facing: Facing, desired_facing: Facing) -> Action:
+def determine_rotation_action(current_facing: Facing, desired_facing: Facing) -> Action:
     if current_facing == desired_facing:
         return Action.STEP_FORWARD
     return TURN_ACTIONS[(current_facing, desired_facing)]
@@ -215,3 +215,9 @@ def get_weapon(weapon_name: str) -> Weapon:
 
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
+
+
+def find_mist_coords(knowledge: ChampionKnowledge) -> Optional[Coords]:
+    mist_coords = [Coords(*coords) for coords, tile in knowledge.visible_tiles.items() if is_mist(tile)]
+    mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords)) for coords in mist_coords]
+    return min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
