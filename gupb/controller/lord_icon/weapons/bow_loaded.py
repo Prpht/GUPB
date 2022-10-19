@@ -4,8 +4,8 @@ from gupb.controller.lord_icon.weapons.weapon import Weapon
 from gupb.model.characters import Facing
 
 
-class Bow(Weapon):
-    name = "bow"
+class BowLoaded(Weapon):
+    name = "bow_loaded"
     value = 5
 
     @staticmethod
@@ -14,23 +14,23 @@ class Bow(Weapon):
         x, y = position[0], position[1]
         attack_range = []
         if facing == Facing.UP:
-            for i in range(0, y):
-                if map[x][i] != 1:
+            for i in range(y - 1, 0, -1):
+                if map[x][i] == 10:
                     return attack_range
-                attack_range.append(map[x][i])
+                attack_range.append((x, i))
         if facing == Facing.DOWN:
-            for i in range(y + 1, m + 1):
-                if map[x][i] != 1:
+            for i in range(y + 1, m):
+                if map[x][i] == 10:
                     return attack_range
-                attack_range.append(map[x][i])
+                attack_range.append((x, i))
         if facing == Facing.LEFT:
-            for i in range(0, x):
-                if map[i][y] != 1:
+            for i in range(x - 1, 0, -1):
+                if map[i][y] == 10:
                     return attack_range
-                attack_range.append(map[i][y])
+                attack_range.append((i, y))
         if facing == Facing.RIGHT:
-            for i in range(x+1, n+1) :
-                if map[i][y] != 1:
+            for i in range(x + 1, n):
+                if map[i][y] == 10:
                     return attack_range
-                attack_range.append(map[i][y])
-        return []
+                attack_range.append((i, y))
+        return attack_range

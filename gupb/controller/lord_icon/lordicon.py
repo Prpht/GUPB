@@ -53,8 +53,8 @@ class LordIcon(controller.Controller):
 
         action = StrategyController.decide(self.knowledge)
 
-        # if action:
-        #     return action
+        if action:
+            return action
 
         return random.choice(POSSIBLE_ACTIONS)
 

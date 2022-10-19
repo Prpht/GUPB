@@ -23,7 +23,6 @@ def find_path(map: np.ndarray, start: Point2d, goal: Point2d) -> List[Point2d]:
     fscore = {start: heuristic(start, goal)}
     oheap = []
     heapq.heappush(oheap, (fscore[start], start))
-
     while oheap:
         current = heapq.heappop(oheap)[1]
         if current == goal:
