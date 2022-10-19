@@ -6,7 +6,7 @@ from pathfinding.finder.a_star import AStarFinder
 from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
-from gupb.model.tiles import Tile, TileDescription
+from gupb.model.tiles import TileDescription
 from gupb.model.weapons import Amulet, Axe, Bow, Knife, Sword, Weapon
 import numpy as np
 
@@ -197,6 +197,10 @@ def is_menhir(tile: TileDescription) -> bool:
     return "menhir" == tile.type
 
 
+def is_menhir(tile: TileDescription) -> bool:
+    return "menhir" == tile.type
+
+
 def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
     return knowledge.visible_tiles[knowledge.position].character.weapon.name
 
@@ -213,6 +217,10 @@ def get_weapon(weapon_name: str) -> Weapon:
     if weapon_name == "amulet":
         return Amulet()
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2e197f6 (Add update_map_knowledge)
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
 
