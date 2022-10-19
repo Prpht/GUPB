@@ -7,7 +7,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    DartController("Dart1", AxeAndCenterStrategy()),
-    DartController("Dart2", AxeAndCenterStrategy()),
-    DartController("Dart3", AxeAndCenterStrategy()),
+    DartController("Dart", AxeAndCenterStrategy()),
 ]
