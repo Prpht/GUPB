@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 import random
 from typing import List, Optional, Tuple
-from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_action, euclidean_distance, follow_path, get_champion_weapon, get_facing, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, euclidean_distance, follow_path, get_champion_weapon, get_facing, is_opponent_in_front
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -27,24 +27,19 @@ class Mode(Enum):
 
 
 class Strategy(ABC):
-    def __init__(self) -> None:
+    def __init__(self, arena_description: ArenaDescription) -> None:
         super().__init__()
-        self._map_knowledge: Optional[MapKnowledge] = None
+        self.map_knowledge = MapKnowledge(arena_description)
         self._path: Optional[List[Coords]] = None
         self._previous_position: Optional[Coords] = None
 
     @abstractmethod
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        ...
+        self.map_knowledge.update_weapons_positions(knowledge)
+        self.map_knowledge.update_map_knowledge(knowledge, knowledge.visible_tiles)
 
-    @abstractmethod
     def praise(self, score: int) -> None:
         ...
-
-    def reset(self, arena_description: ArenaDescription) -> None:
-        self._map_knowledge = MapKnowledge(arena_description)
-        self._path = None
-        self._previous_position = None
 
     def _action_follow_path(self, knowledge: ChampionKnowledge) -> Action:
         if knowledge.position == self._path[0]:
@@ -61,89 +56,79 @@ class Strategy(ABC):
     def _is_blocked_by_opponent(self, knowledge: ChampionKnowledge) -> bool:
         return (knowledge.position == self._previous_position) and (is_opponent_in_front(self._path[0], knowledge.visible_tiles))
 
-    def _action_attack_opponent(self, knowledge: ChampionKnowledge, opponent_coords: Coords) -> Action:
-        if self._map_knowledge.can_attack(knowledge, opponent_coords):
-            return Action.ATTACK
-        desired_facing = self._map_knowledge.get_facing_for_attack(knowledge, opponent_coords)
-        if desired_facing:
-            current_facing = get_facing(knowledge)
-            return determine_action(current_facing, desired_facing)
-        self._path = self._map_knowledge.find_path(knowledge.position, opponent_coords)
-        return self._action_follow_path(knowledge)
 
-    def _action_run_away(self, knowledge: ChampionKnowledge, opponent_coords: Coords) -> Action:
-        x = min(self._map_knowledge.arena.size[0]-1, max(
-            0, knowledge.position.x - (opponent_coords.x - knowledge.position.x)))
-        y = min(self._map_knowledge.arena.size[1]-1, max(
-            0, knowledge.position.y - (opponent_coords.y - knowledge.position.y)))
-
-        for i in range(self._map_knowledge.arena.size[0]):
-            for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
-                run_destination = Coords(x+i*sign_x, y+i*sign_y)
-                if self._map_knowledge.is_land(run_destination):
-                    self._path = self._map_knowledge.find_path(knowledge.position, run_destination)
-                    return self._action_follow_path(knowledge)
-        return random.choice(POSSIBLE_ACTIONS)
-
-
-class AxeAndCenterStrategy(Strategy):
-    def __init__(self) -> None:
-        super().__init__()
-        self._state = Steps.init
+class RotateAndAttackStrategy(Strategy):
+    def __init__(self, arena_description: ArenaDescription) -> None:
+        super().__init__(arena_description)
         self._previous_action: Action = Action.DO_NOTHING
-        # self._last_seen_opponent: Optional[Tuple[str, Coords]] = None
-        self._mode = Mode.run_away
-
-    def reset(self, arena_description: ArenaDescription) -> None:
-        self._state = Steps.init
-        self._previous_action = Action.DO_NOTHING
-        # self._last_seen_opponent = None
-        self._mode = Mode.run_away
-        return super().reset(arena_description)
-
-    def praise(self, score: int) -> None:
-        ...
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self._map_knowledge.update_weapons_positions()
-        self._map_knowledge.update_map_knowledge(knowledge, knowledge.visible_tiles)
-
-        # Handle opponent found
-        if self._map_knowledge.opponents:
-            opponents_coords = list(self._map_knowledge.opponents.values())
-            # if self._last_seen_opponent:
-            #     opponents_coords.append(self._last_seen_opponent[1])
-            opponent_coords = self._map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
-            # self._last_seen_opponent = (knowledge.visible_tiles[opponent_coords].character.controller_name, opponent_coords)
-            if euclidean_distance(knowledge.position, opponent_coords) < 3:
-                if self._mode == Mode.run_away:
-                    return self._action_run_away(knowledge, opponent_coords)
-                return self._action_attack_opponent(knowledge, opponent_coords)
-
-        # Handle mist found
-        if self._map_knowledge.closest_mist_coords:
-            try:
-                if len(self._map_knowledge.mists) > 3 and (not self._map_knowledge.arena_menhir):
-                    self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.calculate_menhir_center())
-                else:
-                    self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
-            except:
-                pass
-            self._mode = Mode.attack
-
-        if not self._path:
-            if self._state == Steps.init:
-                if get_champion_weapon(knowledge) != "knife":
-                    self._state = Steps.weapon_found
-                    self._mode = Mode.attack
-                    return self._action_rotate_and_attack()
-                self._path = self._map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword')
-            elif self._state == Steps.weapon_found:
-                return self._action_rotate_and_attack()
-
-        return self._action_follow_path(knowledge) if self._path else self._action_rotate_and_attack()
-
-    def _action_rotate_and_attack(self) -> Action:
+        super().decide(knowledge)
         desired_action = Action.TURN_RIGHT if self._previous_action == Action.ATTACK else Action.ATTACK
         self._previous_action = desired_action
         return desired_action
+
+
+class CollectClosestWeaponStrategy(Strategy):
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
+        super().decide(knowledge)
+        self._path = self.map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword')
+        return self._action_follow_path(knowledge)
+
+
+class GoToMenhirStrategy(Strategy):
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
+        super().decide(knowledge)
+        if self._path is None:
+            if self._map_knowledge.closest_mist_coords:
+                    if len(self._map_knowledge.mists) > 3 and (not self._map_knowledge.arena_menhir):
+                        try:
+                            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.calculate_menhir_center())
+                        except:
+                            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
+                    else:
+                        self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
+        return self._action_follow_path(knowledge)
+
+
+class RunAwayFromOpponentStrategy(Strategy):
+    def __init__(self, arena_description: ArenaDescription, opponent_coords: Coords) -> None:
+        super().__init__(arena_description)
+        self._opponent_coords = opponent_coords
+
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
+        super().decide(knowledge)
+        if self._path is None:
+            run_destination = self._find_run_destination(knowledge.position)
+            self._path = self.map_knowledge.find_path(knowledge.position, run_destination)
+        return self._action_follow_path(knowledge)
+
+    def _find_run_destination(self, position: Coords) -> Coords:
+        x = min(self.map_knowledge.arena.size[0] - 1, max(0, position.x - (self._opponent_coords.x - position.x)))
+        y = min(self.map_knowledge.arena.size[1] - 1, max(0, position.y - (self._opponent_coords.y - position.y)))
+
+        for i in range(self.map_knowledge.arena.size[0]):
+            for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
+                run_destination = Coords(x+i*sign_x, y+i*sign_y)
+                if self.map_knowledge.is_land(run_destination):
+                    return run_destination
+        raise RuntimeError("Could not find run destination")
+
+
+class AttackOpponentStrategy(Strategy):
+    def __init__(self, arena_description: ArenaDescription, opponent_coords: Coords) -> None:
+        super().__init__(arena_description)
+        self._opponent_coords = opponent_coords
+
+    def decide(self, knowledge: ChampionKnowledge) -> Action:
+        super().decide(knowledge)
+        if self.map_knowledge.can_attack(knowledge, self._opponent_coords):
+            return Action.ATTACK
+
+        desired_facing = self.map_knowledge.get_facing_for_attack(knowledge, self._opponent_coords)
+        if desired_facing:
+            current_facing = get_facing(knowledge)
+            return determine_rotation_action(current_facing, desired_facing)
+
+        self._path = self.map_knowledge.find_path(knowledge.position, self._opponent_coords)
+        return self._action_follow_path(knowledge)
