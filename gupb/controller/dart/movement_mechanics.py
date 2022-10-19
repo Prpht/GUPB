@@ -34,6 +34,8 @@ class MapKnowledge():
         self.arena_menhir = None
         self.weapons: Dict[Coords, str] = dict()
         self.initialize_weapons_positions()
+        self.mist_coord: Optional[Coords] = None
+        self.opponents: Dict[str, Coords] = dict()
 
     def _create_arena_matrix(self) -> ArenaMatrix:
         arena_matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
@@ -98,6 +100,9 @@ class MapKnowledge():
         return min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
 
 
+
+
+
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
     next_position = Coords(*path[0])
     current_facing = get_facing(knowledge)
@@ -135,6 +140,9 @@ def is_opponent(character: ChampionDescription) -> bool:
 def is_mist(tile: Tile) -> bool:
     return "mist" in [e.type for e in tile.effects]
 
+def is_menhir(tile: TileDescription) -> bool:
+    return "menhir" == tile.type
+
 
 def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
     return knowledge.visible_tiles[knowledge.position].character.weapon.name
@@ -151,11 +159,6 @@ def get_weapon(weapon_name: str) -> Weapon:
         return Axe()
     if weapon_name == "amulet":
         return Amulet()
-
-
-def find_opponents(visible_tiles: Dict[tuple, TileDescription]) -> Dict[Coords, str]:
-    return {Coords(*coords): tile.character.controller_name for coords, tile in visible_tiles.items() if is_opponent(tile.character)}
-
 
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
