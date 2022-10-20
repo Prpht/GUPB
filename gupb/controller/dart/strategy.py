@@ -33,18 +33,20 @@ class Strategy(ABC):
         self._previous_position: Optional[Coords] = None
 
     @abstractmethod
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         self.map_knowledge.update_weapons_positions(knowledge)
         self.map_knowledge.update_map_knowledge(knowledge, knowledge.visible_tiles)
 
-    def _action_follow_path(self, knowledge: ChampionKnowledge) -> Action:
+    def _action_follow_path(self, knowledge: ChampionKnowledge) -> Optional[Action]:
+        if not self._path:
+            return None
+
         if knowledge.position == self._path[0]:
             self._path.pop(0)
 
-        if not self._path:
-            return Action.ATTACK
         if self._is_blocked_by_opponent(knowledge):
             return Action.ATTACK
+
         next_action = follow_path(self._path, knowledge)
         self._previous_position = knowledge.position
         return next_action
@@ -66,14 +68,14 @@ class RotateAndAttackStrategy(Strategy):
 
 
 class CollectClosestWeaponStrategy(Strategy):
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
         self._path = self.map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword')
         return self._action_follow_path(knowledge)
 
 
 class GoToMenhirStrategy(Strategy):
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
         if self._path is None:
             if self._map_knowledge.closest_mist_coords:
@@ -92,7 +94,7 @@ class RunAwayFromOpponentStrategy(Strategy):
         super().__init__(arena_description)
         self._opponent_coords = opponent_coords
 
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
         if self._path is None:
             run_destination = self._find_run_destination(knowledge.position)
@@ -116,7 +118,7 @@ class AttackOpponentStrategy(Strategy):
         super().__init__(arena_description)
         self._opponent_coords = opponent_coords
 
-    def decide(self, knowledge: ChampionKnowledge) -> Action:
+    def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
         if self.map_knowledge.can_attack(knowledge, self._opponent_coords):
             return Action.ATTACK
