@@ -1,3 +1,4 @@
+import random
 from gupb.controller import Controller
 from gupb.controller.dart.strategy import AxeAndCenterStrategy, Strategy
 from gupb.model.arenas import ArenaDescription
@@ -27,7 +28,10 @@ class DartController(Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        return self._strategy.decide(knowledge)
+        try:
+            return self._strategy.decide(knowledge)
+        except Exception as e:
+            return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
         pass

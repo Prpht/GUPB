@@ -43,6 +43,7 @@ class Tabard(Enum):
     PINK = 'Pink'
     RED = 'Red'
     STRIPPED = 'Stripped'
+    TURQUOISE = 'Turquoise'
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
