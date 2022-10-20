@@ -121,8 +121,14 @@ class AxeAndCenterStrategy(Strategy):
                 return self._action_attack_opponent(knowledge, opponent_coords)
 
         # Handle mist found
-        if self._map_knowledge.mist_coords:
-            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_middle_cords())
+        if self._map_knowledge.closest_mist_coords:
+            try:
+                if len(self._map_knowledge.mists) > 3 and (not self._map_knowledge.arena_menhir):
+                    self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.calculate_menhir_center())
+                else:
+                    self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
+            except:
+                pass
             self._mode = Mode.attack
 
         if not self._path:
