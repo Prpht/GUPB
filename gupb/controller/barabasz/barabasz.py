@@ -3,7 +3,7 @@ import random
 from gupb import controller
 from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
-from gupb.controller.barabasz.weapon_mechanics import deathzone
+from gupb.controller.barabasz.deathzone import deathzone
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
