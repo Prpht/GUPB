@@ -107,7 +107,9 @@ class RunAwayFromOpponentStrategy(Strategy):
 
         for i in range(self.map_knowledge.arena.size[0]):
             for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
-                run_destination = Coords(x+i*sign_x, y+i*sign_y)
+                new_x = min(self.map_knowledge.arena.size[0] - 1, max(0, x + i *sign_x))
+                new_y = min(self.map_knowledge.arena.size[1] - 1, max(0, y + i *sign_y))
+                run_destination = Coords(new_x, new_y)
                 if self.map_knowledge.is_land(run_destination):
                     return run_destination
         raise RuntimeError("Could not find run destination")
