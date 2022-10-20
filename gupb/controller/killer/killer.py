@@ -1,11 +1,12 @@
 from typing import List
+from math import acos
 import numpy as np
 from enum import Enum
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
-from gupb.model.characters import Action, Facing
-from gupb.model.coordinates import Coords, add_coords, sub_coords
+from gupb.model.characters import Action
+from gupb.model.coordinates import Coords, add_coords
 
 from .utils import PathConstants, find_path
 
@@ -23,16 +24,30 @@ class PathFinder:
 
     def find_path(self, position: Coords, direction: Coords) -> List[Action]:
         found_path = []
-        find_path(arr=self.__map_ref,
-                  visited=np.zeros_like(self.__map_ref),
-                  curr_pos=position,
-                  path=found_path)
+        is_found = find_path(arr=self.__map_ref,
+                             visited=np.zeros_like(self.__map_ref),
+                             curr_pos=position,
+                             path=found_path)
         actions = []
-        curr_direction = direction
-        for i in range(len(found_path)-1):
-            direction = sub_coords(found_path[i], found_path[i-1])
+        if not is_found:
+            return actions
 
-            curr_direction = direction
+        curr_d = direction
+        for i in range(len(found_path) - 1):
+            d = found_path[i + 1][0] - found_path[i][0], found_path[i + 1][1] - found_path[i][1]
+            sign = d[1] * curr_d[0] - d[0] * curr_d[1]
+            angle = acos(d[0] * curr_d[0] + d[1] * curr_d[1])
+            if 1. <= angle <= 2.5:
+                if sign < 0:
+                    actions.append(Action.TURN_RIGHT)
+                else:
+                    actions.append(Action.TURN_LEFT)
+            if 2.5 <= angle:
+                actions.append(Action.TURN_RIGHT)
+                actions.append(Action.TURN_RIGHT)
+            actions.append(Action.STEP_FORWARD)
+            curr_d = d
+        return actions
 
 
 class KillerController(controller.Controller):
@@ -73,13 +88,16 @@ class KillerController(controller.Controller):
     def update_map(self,
                    knowledge: characters.ChampionKnowledge,
                    current_interest: KillerInterests) -> None:
+        # TODO: Update only player locations
         pass
 
-    def get_facing(self, knowledge: characters.ChampionKnowledge):
+    @staticmethod
+    def get_facing(knowledge: characters.ChampionKnowledge):
         return knowledge.visible_tiles[knowledge.position].character.facing
 
-    def get_facing_element(self, knowledge: characters.ChampionKnowledge):
-        return knowledge.visible_tiles[add_coords(knowledge.position, self.get_facing(knowledge).value)]
+    @staticmethod
+    def get_facing_element(knowledge: characters.ChampionKnowledge):
+        return knowledge.visible_tiles[add_coords(knowledge.position, KillerController.get_facing(knowledge).value)]
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         if self.game_map is None:
@@ -93,28 +111,8 @@ class KillerController(controller.Controller):
 
         if len(self.planned_actions) > 0:
             return self.planned_actions.pop(0)
-
-        self.path_finder.find_path(knowledge.position)
-
-
-    def wander(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        # The wandering algorithm is running in circles until we find a wall or enemy
-        x = knowledge.position.x
-        y = knowledge.position.y
-        for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
-            try:
-                step_forward = Coords(x=x + dx, y=y + dy)
-                if knowledge.visible_tiles[step_forward].type == "land":
-                    if knowledge.visible_tiles[step_forward].character is not None:
-                        return Action.ATTACK
-                    else:
-                        self.update_map(knowledge)
-                        return Action.STEP_FORWARD
-            except KeyError:
-                pass
-
-        self.update_map(knowledge)
-        return Action.TURN_RIGHT
+        else:
+            self.planned_actions.append(self.path_finder.find_path(knowledge.position))
 
     def praise(self, score: int) -> None:
         pass
