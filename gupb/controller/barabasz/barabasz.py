@@ -50,52 +50,27 @@ class BarabaszController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
 
-        try:
-            self.update_self_knowledge(knowledge)
+        self.update_self_knowledge(knowledge)
 
-            # Check position, check which side one is facing, check tile description
-            in_front = coordinates.add_coords(knowledge.position, self.facing.value)
+        # Check position, check which side one is facing, check tile description
+        in_front = coordinates.add_coords(knowledge.position, self.facing.value)
 
-            if in_front in knowledge.visible_tiles.keys():
-                if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
-                    return characters.Action.TURN_LEFT
-                if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
+        if in_front in knowledge.visible_tiles.keys():
+            if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
+                return characters.Action.TURN_LEFT
+            if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
+                return characters.Action.ATTACK
+            deathtiles = deathzone(weapon=self.weapon,
+                                   position=self.position,
+                                   facing=self.facing.value)
+            for cords in deathtiles:
+                if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
+                    # print("SMACK! ", self.weapon)
+                    # print("Position: ", knowledge.position, "EnemyPos: ", cords)
                     return characters.Action.ATTACK
-                deathtiles = deathzone(weapon=self.weapon,
-                                       position=self.position,
-                                       facing=self.facing.value)
-                for cords in deathtiles:
-                    if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
-                        # print("SMACK! ", self.weapon)
-                        # print("Position: ", knowledge.position, "EnemyPos: ", cords)
-                        return characters.Action.ATTACK
 
-            weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
-            return weighted_random
-        except Exception as e:
-            print(e)
-
-        # self.update_self_knowledge(knowledge)
-        #
-        # # Check position, check which side one is facing, check tile description
-        # in_front = coordinates.add_coords(knowledge.position, self.facing.value)
-        #
-        # if in_front in knowledge.visible_tiles.keys():
-        #     if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
-        #         return characters.Action.TURN_LEFT
-        #     if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
-        #         return characters.Action.ATTACK
-        #     deathtiles = deathzone(weapon=self.weapon,
-        #                            position=self.position,
-        #                            facing=self.facing.value)
-        #     for cords in deathtiles:
-        #         if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
-        #             print("SMACK! ", self.weapon)
-        #             print("Position: ", knowledge.position, "EnemyPos: ", cords)
-        #             return characters.Action.ATTACK
-        #
-        # weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
-        # return weighted_random
+        weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]
+        return weighted_random
 
     def praise(self, score: int) -> None:
         pass
