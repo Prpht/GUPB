@@ -29,7 +29,7 @@ class Movement:
     def init_grid_matrix(self):
         matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
         for coords, tile in self.arena.terrain.items():
-            matrix[coords.y][coords.x] = 0 if not self.is_walkable(tile)
+            matrix[coords.y][coords.x] = 0 if not self.is_walkable(tile) else 1
         return matrix
 
     # TODO: Implement info updates
