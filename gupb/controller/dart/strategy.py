@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-import random
-from typing import List, Optional, Tuple
-from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, euclidean_distance, follow_path, get_champion_weapon, get_facing, is_opponent_in_front
+from typing import List, Optional
+from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, follow_path, get_facing, is_opponent_in_front
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -37,9 +36,6 @@ class Strategy(ABC):
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         self.map_knowledge.update_weapons_positions(knowledge)
         self.map_knowledge.update_map_knowledge(knowledge, knowledge.visible_tiles)
-
-    def praise(self, score: int) -> None:
-        ...
 
     def _action_follow_path(self, knowledge: ChampionKnowledge) -> Action:
         if knowledge.position == self._path[0]:
