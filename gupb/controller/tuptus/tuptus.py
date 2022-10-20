@@ -1,4 +1,8 @@
 import random
+from math import sqrt
+import numpy as np
+from numpy import empty, sqrt, square
+from scipy.linalg import lstsq
 from xmlrpc.client import Boolean
 
 from gupb import controller
@@ -21,7 +25,10 @@ POSSIBLE_ACTIONS = [
 class TuptusController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        self.menhir_coords = None
         self.facing: Optional[characters.Facing] = None
+        self.mist_tiles = np.array([])
+        self.mist_directions: List[Optional[characters.Facing]] = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TuptusController):
@@ -42,20 +49,40 @@ class TuptusController(controller.Controller):
         #     print(f"{key} ==> {val}")
         # print("\n\n")
         # print(knowledge.position)
+        if not self.menhir_coords:
+            self.menhir = self.is_menhir(knowledge.visible_tiles)
         next_block_position = knowledge.position + self.facing.value
-        next_block = knowledge.visible_tiles[next_block_position]
-        # print(f"{next_block_position} ==> {next_block}")
-        
+        next_block = knowledge.visible_tiles[next_block_position]        
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
-        elif self.is_mist(knowledge.visible_tiles):
-            choice = POSSIBLE_ACTIONS[random.randint(0,1)]
-        elif next_block.character:
+        elif self.is_mist_bool(knowledge.visible_tiles) > 0:
+            self.mist_directions.append(self.facing)
+            if self.facing == characters.Facing.UP and characters.Facing.RIGHT in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[1]
+            elif self.facing == characters.Facing.UP and characters.Facing.LEFT in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[0]
+            elif self.facing == characters.Facing.DOWN and characters.Facing.RIGHT in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[0]
+            elif self.facing == characters.Facing.DOWN and characters.Facing.LEFT in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[1]
+            elif self.facing == characters.Facing.RIGHT and characters.Facing.UP in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[1]
+            elif self.facing == characters.Facing.RIGHT and characters.Facing.DOWN in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[0]
+            elif self.facing == characters.Facing.LEFT and characters.Facing.UP in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[0]
+            elif self.facing == characters.Facing.LEFT and characters.Facing.DOWN in self.mist_directions:
+                choice = POSSIBLE_ACTIONS[1]
+            else:
+                choice = POSSIBLE_ACTIONS[1]
+        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health >= next_block.character.health):
             choice = POSSIBLE_ACTIONS[3]
+        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health) and not (self.are_opposite(next_block.character.facing, self.facing)):
+            choice = POSSIBLE_ACTIONS[3]
+        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health):
+            choice = POSSIBLE_ACTIONS[random.randint(0,1)]
         else:
             choice = POSSIBLE_ACTIONS[2]
-        
-        # print(f"Chosen action ==> {choice}")
         return choice
 
     def praise(self, score: int) -> None:
@@ -63,6 +90,8 @@ class TuptusController(controller.Controller):
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.facing = None
+        self.mist_tiles = np.array([])
+        self.mist_directions = []
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
         facing_dct = {(0, -1): characters.Facing.UP,
@@ -79,15 +108,40 @@ class TuptusController(controller.Controller):
                 self.facing = facing_dct[difference]
                 break
     
-    def is_mist(self, visible_tiles) -> Boolean:
+    def is_mist(self, visible_tiles) -> list:
+        for coords, tile in visible_tiles.items():
+            if effects.EffectDescription(type='mist') in tile.effects:
+                if len(self.mist_tiles)==0:
+                    self.mist_tiles = np.array(np.array(coords))
+                elif np.array(coords) not in self.mist_tiles:
+                    self.mist_tiles = np.vstack((self.mist_tiles, np.array(np.array(coords))))  
+        return self.mist_tiles
+    
+    def are_opposite(self, opponent_facing, character_facing):
+        opposites = [(characters.Facing.UP, characters.Facing.DOWN),
+        (characters.Facing.DOWN, characters.Facing.UP),
+        (characters.Facing.LEFT, characters.Facing.RIGHT),
+        (characters.Facing.RIGHT, characters.Facing.LEFT)]
+        if (opponent_facing, character_facing) in opposites:
+            return True
+        return False
+
+
+    def is_mist_bool(self, visible_tiles) -> bool:
         for tile in visible_tiles.values():
             if effects.EffectDescription(type='mist') in tile.effects:
-                return True
+                return True  
         return False
+    
+    def is_menhir(self, visible_tiles):
+        for coords, tile in visible_tiles.items():
+            if effects.EffectDescription(type='menhir') in tile.effects:
+                return coords 
+        return None
 
     @property
     def name(self) -> str:
-        return f'RandomController{self.first_name}'
+        return f'TuptusController{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
