@@ -44,6 +44,9 @@ class Strategy(ABC):
         if knowledge.position == self._path[0]:
             self._path.pop(0)
 
+        if not self._path:
+            return None
+
         if self._is_blocked_by_opponent(knowledge):
             return Action.ATTACK
 
@@ -107,8 +110,8 @@ class RunAwayFromOpponentStrategy(Strategy):
 
         for i in range(self.map_knowledge.arena.size[0]):
             for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
-                new_x = min(self.map_knowledge.arena.size[0] - 1, max(0, x + i *sign_x))
-                new_y = min(self.map_knowledge.arena.size[1] - 1, max(0, y + i *sign_y))
+                new_x = min(self.map_knowledge.arena.size[0] - 1, max(0, x + i * sign_x))
+                new_y = min(self.map_knowledge.arena.size[1] - 1, max(0, y + i * sign_y))
                 run_destination = Coords(new_x, new_y)
                 if self.map_knowledge.is_land(run_destination):
                     return run_destination
@@ -122,6 +125,9 @@ class AttackOpponentStrategy(Strategy):
 
     def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
+        if is_opponent_in_front(self._opponent_coords, knowledge.visible_tiles):
+            return None
+
         if self.map_knowledge.can_attack(knowledge, self._opponent_coords):
             return Action.ATTACK
 
