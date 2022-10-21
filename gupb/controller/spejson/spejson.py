@@ -89,6 +89,8 @@ def pathfinding_next_move(position, facing, next_cluster, clusters):
         step = visited[path[-1]]
 
     path = path[::-1]
+    if len(path) < 2:
+        return None
 
     f_0 = path[0][1]
     f_1 = path[1][1]
@@ -127,6 +129,8 @@ def pathfinding_next_move_in_cluster(position, facing, target_pos, clusters):
         step = visited[path[-1]]
 
     path = path[::-1]
+    if len(path) < 2:
+        return None
 
     f_0 = path[0][1]
     f_1 = path[1][1]
@@ -355,6 +359,7 @@ def analyze_map(arena_name):
 class Spejson(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        self.position = None
         self.facing = None
         self.health = None
         self.weapon = None
@@ -371,6 +376,7 @@ class Spejson(controller.Controller):
         self.clusters = None
         self.adj = None
         self.terrain = None
+        self.latest_states = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -389,9 +395,22 @@ class Spejson(controller.Controller):
         available_actions = POSSIBLE_ACTIONS.copy()
 
         me = knowledge.visible_tiles[position].character
+        self.position = position
         self.facing = me.facing
         self.health = me.health
         self.weapon = me.weapon
+
+        self.latest_states = (self.latest_states + [(self.position, self.facing)])[-5:]
+        if len(self.latest_states) >= 5 and (
+                self.latest_states[0] == self.latest_states[1] == self.latest_states[2]
+                == self.latest_states[3] == self.latest_states[4]
+        ):
+            self.panic_mode = 6
+            for _ in range(50):  # Just to avoid while True lol
+                rx, ry = np.random.randint(32, size=[2])
+                if self.clusters[(ry, rx)]:
+                    self.target = Coords(x=rx, y=ry)
+                    break
 
         to_del = []
         for pos in self.weapons_knowledge:
@@ -470,9 +489,11 @@ class Spejson(controller.Controller):
         if self.weapon.name != "bow_unloaded":
             for pos in in_reach:
                 if pos in visible_tiles and visible_tiles[pos].character is not None:
+                    self.latest_states += ["att"]
                     return Action.ATTACK
 
         if self.weapon.name == "bow_unloaded":
+            self.latest_states += ["att"]
             return Action.ATTACK
         available_actions = [x for x in available_actions if x not in [Action.ATTACK]]
 
@@ -507,17 +528,33 @@ class Spejson(controller.Controller):
             if len(cluster_path_to_target) > 1:
                 move = pathfinding_next_move(
                     (position.y, position.x), facing_to_letter[self.facing], cluster_path_to_target[1], self.clusters)
-                available_actions = (
-                    ([move] if move in available_actions else [])
-                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                )
+                if move is None:
+                    self.panic_mode = 8
+                    for _ in range(50):  # Just to avoid while True lol
+                        rx, ry = np.random.randint(32, size=[2])
+                        if self.clusters[(ry, rx)]:
+                            self.target = Coords(x=rx, y=ry)
+                            break
+                else:
+                    available_actions = (
+                        ([move] if move in available_actions else [])
+                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                    )
             else:
                 move = pathfinding_next_move_in_cluster(
                     (position.y, position.x), facing_to_letter[self.facing], (self.target.y, self.target.x), self.clusters)
-                available_actions = (
-                    ([move] if move in available_actions else [])
-                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                )
+                if move is None:
+                    self.panic_mode = 8
+                    for _ in range(50):  # Just to avoid while True lol
+                        rx, ry = np.random.randint(32, size=[2])
+                        if self.clusters[(ry, rx)]:
+                            self.target = Coords(x=rx, y=ry)
+                            break
+                else:
+                    available_actions = (
+                        ([move] if move in available_actions else [])
+                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                    )
 
         if len(available_actions) == 0:
             return random.choice([Action.ATTACK, Action.TURN_LEFT])
@@ -528,6 +565,7 @@ class Spejson(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.position = None
         self.facing = None
         self.health = None
         self.weapon = None
@@ -538,11 +576,13 @@ class Spejson(controller.Controller):
         self.mist_spotted = False
         self.panic_mode = 0
         self.touched_by_mist = False
+        self.latest_states = []
 
         self.arena_name = arena_description.name
         self.terrain = arenas.Arena.load(self.arena_name).terrain
         start, clusters, adj, weapons_knowledge = analyze_map(self.arena_name)
         self.target = Coords(x=start[1], y=start[0])
+        self.menhir_location = self.target
         self.clusters = clusters
         self.adj = adj
         self.weapons_knowledge = weapons_knowledge
