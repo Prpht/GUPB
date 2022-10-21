@@ -217,10 +217,7 @@ def get_weapon(weapon_name: str) -> Weapon:
     if weapon_name == "amulet":
         return Amulet()
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 2e197f6 (Add update_map_knowledge)
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
 
