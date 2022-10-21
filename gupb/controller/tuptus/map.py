@@ -1,5 +1,8 @@
+import numpy as np
 from gupb.model import characters
 from gupb.model import coordinates
+from gupb.model import tiles
+from gupb.model.arenas import Arena, ArenaDescription
 from typing import List, Dict, Optional
 
 """
@@ -13,15 +16,19 @@ from typing import List, Dict, Optional
 
 
 class Map():
-    def __init__(self, max_size: int = 75):
-        self.tuptable_map: List[List[int]] = [[1]*max_size for _ in range(max_size)]
+    def __init__(self):
+        self.tuptable_map: np.ndarray 
         self.weapons_position: Dict = {}
         self.menhir_position: Optional[coordinates.Coords]
 
-
     def decode_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
         for coord, tile in knowledge.visible_tiles.items():
-            if tile.type == "land":
-                self.tuptable_map[coord[0]][coord[1]] = 0
-                if tile.loot and tile.loot.name != "knife":
-                    self.weapons_position[tile.loot.name] = coord
+            if tile.loot and tile.loot.name != "knife":
+                self.weapons_position[tile.loot.name] = coord
+
+    def _init_map(self, arena_description):
+        self.tuptable_map = np.zeros(arena_description.size)
+        for coords, tile in arena_description.terrain.items():
+            if tile == tiles.Sea or tiles.Wall:
+                self.tuptable_map[coords] = 1
+        return self.tuptable_map
