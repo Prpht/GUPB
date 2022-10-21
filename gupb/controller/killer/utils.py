@@ -1,5 +1,5 @@
 from enum import Enum
-from numpy import ndarray, shape, zeros_like
+from numpy import ndarray, shape
 
 # Available directions
 _DIR = [[0, 1], [0, -1], [1, 0], [-1, 0]]
@@ -9,23 +9,22 @@ _DIR = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 class PathConstants(Enum):
     WALL = 0
     WALKABLE = 1
-    DESTINATION = 2
 
 
 def find_path(arr: ndarray,
               visited: ndarray,
               curr_pos: tuple,
               path: list,
-              min_sought_val: int = PathConstants.DESTINATION.value
+              min_sought_val: int = 2
               ) -> bool:
     x_bound, y_bound = shape(arr)
 
     visited[curr_pos[0]][curr_pos[1]] = 1
-    if arr[curr_pos[0]][curr_pos[1]] == min_sought_val:
+    if arr[curr_pos[0]][curr_pos[1]] == PathConstants.WALL.value:
         return False
 
     path.append(curr_pos)
-    if arr[curr_pos[0]][curr_pos[1]] >= PathConstants.DESTINATION.value:
+    if arr[curr_pos[0]][curr_pos[1]] >= min_sought_val:
         return True
 
     for i in range(4):
