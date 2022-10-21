@@ -103,14 +103,15 @@ class SnieznyKockodanController(controller.Controller):
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        print('decide start')
         self.decrement_menhir_movement_counter(knowledge)
         tiles_in_radius = self.tiles_in_max_radius(knowledge)
-
+        print('ddddd')
         if knowledge.position == self.random_walk_destination:
             self.random_walk_destination = None
             self.random_walk_counter = RANDOM_WALK_INIT
             self.turn_counter = TURN_INIT
-
+        print('xxxx')
         for tile in knowledge.visible_tiles:
             self.memory_map[tile] = knowledge.visible_tiles[tile]
 
@@ -549,7 +550,7 @@ class SnieznyKockodanController(controller.Controller):
     def tiles_in_max_radius(self, knowledge: characters.ChampionKnowledge) -> list[coordinates.Coords]:
         positions_in_radius = []
         for tile in self.memory_map:
-            if SnieznyKockodanController.euclidean_distance(tile, knowledge.position) <= 5:
+            if SnieznyKockodanController.euclidean_distance(coordinates.Coords(tile[0], tile[1]), knowledge.position) <= 5:
                 positions_in_radius += [tile]
 
         return positions_in_radius
