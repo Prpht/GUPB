@@ -118,9 +118,6 @@ class AttackOpponentStrategy(Strategy):
 
     def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
-        if is_opponent_in_front(self._opponent_coords, knowledge.visible_tiles):
-            return None
-
         if self.map_knowledge.can_attack(knowledge, self._opponent_coords):
             return Action.ATTACK
 
