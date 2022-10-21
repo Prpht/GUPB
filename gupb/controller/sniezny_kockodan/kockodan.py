@@ -154,6 +154,8 @@ class SnieznyKockodanController(controller.Controller):
             self.menhir_attack_counter = 0
             return self.random_decision()
 
+        start_conditions = self.menhir_movement_counter >= MENHIR_MOVEMENT_COUNTER_INIT - 4
+
         if self.mist:
             if self.menhir is not None:
                 return self._move(knowledge, self.menhir)
@@ -161,17 +163,17 @@ class SnieznyKockodanController(controller.Controller):
                 return self.move_against_mist(mist_seen, knowledge)
         # elif self.arcade_weapon:
         #     return self._move(knowledge, nearest_corner)
-        elif weapon_to_get is not None and not enemy_nearer_to_weapon:
+        elif weapon_to_get is not None and not enemy_nearer_to_weapon and not start_conditions:
             return self._move(knowledge, weapon_to_get)
-        elif attack_eligible:
+        elif attack_eligible and not start_conditions:
             return self.attack()
-        elif self.need_to_escape(enemies_seen, tiles_in_radius):
+        elif self.need_to_escape(enemies_seen, tiles_in_radius) and not start_conditions:
             self.escape(enemies_seen, knowledge)
         elif self.random_walk_destination is not None:
             return self._move(knowledge, self.random_walk_destination)
         elif self.turn_counter > 0 and not self.menhir_eligible():
             return self.turn()
-        elif self.menhir_eligible():
+        elif not self.menhir_eligible():
             return self.walk_random_known(knowledge)
         elif self.menhir is not None and self.menhir_eligible():
             return self._move(knowledge, self.menhir)
@@ -435,7 +437,7 @@ class SnieznyKockodanController(controller.Controller):
     #     return nearest_corner
 
     def menhir_eligible(self) -> bool:
-        return self.menhir_movement_counter > 0
+        return self.menhir_movement_counter < 0
 
     def decrement_menhir_movement_counter(self, knowledge: characters.ChampionKnowledge) -> None:
         self.menhir_movement_counter -= 1
