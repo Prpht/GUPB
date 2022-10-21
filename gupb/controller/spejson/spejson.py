@@ -351,7 +351,7 @@ def analyze_map(arena_name):
             elif island_ar[i, j] == 'M':
                 weapons_knowledge[(i, j)] = 'M'
 
-    return start, clusters, adj, weapons_knowledge
+    return start, clusters, adj, weapons_knowledge, height, width
 
 
 # noinspection PyUnusedLocal
@@ -377,6 +377,8 @@ class Spejson(controller.Controller):
         self.adj = None
         self.terrain = None
         self.latest_states = []
+        self.map_height = 0
+        self.map_width = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -407,7 +409,7 @@ class Spejson(controller.Controller):
         ):
             self.panic_mode = 6
             for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(32, size=[2])
+                rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
                 if self.clusters[(ry, rx)]:
                     self.target = Coords(x=rx, y=ry)
                     break
@@ -479,7 +481,7 @@ class Spejson(controller.Controller):
         if bad_neighborhood_factor > 2 and self.panic_mode < 2:
             self.panic_mode = 6
             for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(32, size=[2])
+                rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
                 if self.clusters[(ry, rx)]:
                     self.target = Coords(x=rx, y=ry)
                     break
@@ -531,7 +533,7 @@ class Spejson(controller.Controller):
                 if move is None:
                     self.panic_mode = 8
                     for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(32, size=[2])
+                        rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
                         if self.clusters[(ry, rx)]:
                             self.target = Coords(x=rx, y=ry)
                             break
@@ -546,7 +548,7 @@ class Spejson(controller.Controller):
                 if move is None:
                     self.panic_mode = 8
                     for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(32, size=[2])
+                        rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
                         if self.clusters[(ry, rx)]:
                             self.target = Coords(x=rx, y=ry)
                             break
@@ -580,12 +582,14 @@ class Spejson(controller.Controller):
 
         self.arena_name = arena_description.name
         self.terrain = arenas.Arena.load(self.arena_name).terrain
-        start, clusters, adj, weapons_knowledge = analyze_map(self.arena_name)
+        start, clusters, adj, weapons_knowledge, height, width = analyze_map(self.arena_name)
         self.target = Coords(x=start[1], y=start[0])
         self.menhir_location = self.target
         self.clusters = clusters
         self.adj = adj
         self.weapons_knowledge = weapons_knowledge
+        self.map_height = height
+        self.map_width = width
 
     @property
     def name(self) -> str:
