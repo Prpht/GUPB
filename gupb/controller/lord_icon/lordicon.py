@@ -66,7 +66,7 @@ class LordIcon(controller.Controller):
 
     @property
     def name(self) -> str:
-        return f"Marek łowca wiertarek {self.first_name}"
+        return f"Lord Icon - {self.first_name}"
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
