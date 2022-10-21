@@ -72,7 +72,6 @@ class SnieznyKockodanController(controller.Controller):
         # self.move_queue: SimpleQueue[characters.Action] = SimpleQueue()
         self.weapon_got: bool = False
         self.mist_destination: (coordinates.Coords, None) = None
-        self.arena: (list[list[int]], None) = None
         self.prev_position: (coordinates.Coords, None) = None
         self.prev_facing: (characters.Facing, None) = None
         self.attacked: bool = False
@@ -100,8 +99,7 @@ class SnieznyKockodanController(controller.Controller):
     def _create_arena_matrix(self):
         arena = [[0 for _ in range(ARENA[0])] for _ in range(ARENA[1])]
         for cords, description in self.memory_map.items():
-            arena[cords.y][cords.x] = 1 if description.type == 'land' else 0
-
+            arena[cords[1]][cords[0]] = 1 if description.type == 'land' else 0
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -119,9 +117,11 @@ class SnieznyKockodanController(controller.Controller):
         self.arena = self._create_arena_matrix()
 
         if self.terrain is None and self.turn_counter == 0:
+            print(1)
             self.find_terrain()
 
         if self.need_to_randomize(knowledge):
+            print(2)
             self.prev_position = knowledge.position
             self.prev_facing = knowledge.visible_tiles[knowledge.position].character.facing
             return self.random_decision()
@@ -136,17 +136,21 @@ class SnieznyKockodanController(controller.Controller):
         enemy_nearer_to_weapon = True
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
         if len(mist_seen) > 0:
+            print(3)
             self.mist = True
 
         if weapon_to_get is not None:  # and not self.arcade_weapon:
+            print(4)
             enemy_nearer_to_weapon = SnieznyKockodanController.is_enemy_nearer_to_weapon(enemies_seen, weapon_to_get,
                                                                                          knowledge.position)
         facing = champion_info.facing
         attack_eligible = self.is_eligible_to_attack(enemies_seen, facing, knowledge, champion_info)
         if self.menhir is None:
+            print(5)
             self.menhir = SnieznyKockodanController.find_menhir(knowledge)
 
         if knowledge.position == self.menhir:
+            print(6)
             if attack_eligible and self.menhir_attack_counter < 3:
                 self.menhir_attack_counter += 1
                 return self.attack()
@@ -157,6 +161,7 @@ class SnieznyKockodanController(controller.Controller):
         start_conditions = self.menhir_movement_counter >= MENHIR_MOVEMENT_COUNTER_INIT - 4
 
         if self.mist:
+            print(7)
             if self.menhir is not None:
                 return self._move(knowledge, self.menhir)
             else:
@@ -164,20 +169,28 @@ class SnieznyKockodanController(controller.Controller):
         # elif self.arcade_weapon:
         #     return self._move(knowledge, nearest_corner)
         elif weapon_to_get is not None and not enemy_nearer_to_weapon and not start_conditions:
+            print(8)
             return self._move(knowledge, weapon_to_get)
         elif attack_eligible and not start_conditions:
+            print(9)
             return self.attack()
-        elif self.need_to_escape(enemies_seen, tiles_in_radius) and not start_conditions:
-            self.escape(enemies_seen, knowledge)
+        # elif self.need_to_escape(enemies_seen, tiles_in_radius) and not start_conditions:
+        #     print(10)
+        #     self.escape(enemies_seen, knowledge)
         elif self.random_walk_destination is not None:
+            print(11)
             return self._move(knowledge, self.random_walk_destination)
         elif self.turn_counter > 0 and not self.menhir_eligible():
+            print(12)
             return self.turn()
         elif self.menhir_eligible():
+            print(13)
             return self.walk_random_known(knowledge)
         elif self.menhir is not None and self.menhir_eligible():
+            print(14)
             return self._move(knowledge, self.menhir)
         else:
+            print(15)
             # return self._move(knowledge, SnieznyKockodanController.get_map_center(TERRAIN))
             return self.random_decision()
 
@@ -364,7 +377,7 @@ class SnieznyKockodanController(controller.Controller):
         # destination = coordinates.add_coords(destination, difference)
         euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, x) for x in mist_tiles]
         min_tile_ind = euclidean_distances.index(min(euclidean_distances))
-        # TODO
+
         neighbourhood = self.find_eligible_tiles_in_neighbourhood(knowledge)
         euclidean_neighbourhood = [SnieznyKockodanController.euclidean_distance(mist_tiles[min_tile_ind], tile)
                                    for tile in neighbourhood]
@@ -385,12 +398,13 @@ class SnieznyKockodanController(controller.Controller):
               champion_knowledge: characters.ChampionKnowledge,
               destination_coordinates: coordinates.Coords) -> characters.Action:
         self.attacked = False
-
+        print('_move')
         current_coordinates = champion_knowledge.position
         current_facing = champion_knowledge.visible_tiles.get(champion_knowledge.position).character.facing
 
         path = self.find_path(current_coordinates, destination_coordinates)
-
+        print("path")
+        print(path)
         if current_coordinates + current_facing.value == path[0]:
             return characters.Action.STEP_FORWARD
 
@@ -484,8 +498,14 @@ class SnieznyKockodanController(controller.Controller):
 
     def walk_random_known(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         available_spots = self.find_eligible_tiles_in_neighbourhood(knowledge)
+        print('available_spots')
+        print(available_spots)
         destination = random.choice(available_spots)
+        print('destination')
+        print(destination)
         self.random_walk_destination = coordinates.Coords(destination[0], destination[1])
+        print('self.random_walk_destination')
+        print(self.random_walk_destination)
         self.random_walk_counter -= 1
         if self.random_walk_counter == 0:
             self.turn_counter = TURN_INIT
@@ -493,19 +513,33 @@ class SnieznyKockodanController(controller.Controller):
 
     def find_eligible_tiles_in_neighbourhood(self, knowledge: characters.ChampionKnowledge):
         current_position = knowledge.position
+        print('current_position')
+        print(current_position)
         spots = []
         for x in range(ARENA[0]):
             for y in range(ARENA[1]):
-                if self.arena[x][y] == 1:
+                if self.arena[y][x] == 1:
                     spots.append((x, y))
+        # print('arena')
+        # print(self.arena)
+        print('spots')
+        print(spots)
         eligible_spots = []
         for spot in spots:
             destination = coordinates.Coords(spot[0], spot[1])
+            print('destination')
+            print(destination)
             distance = self.euclidean_distance(current_position, destination)
+            print('distance')
+            print(distance)
             path = self.find_path(current_position, destination)
-            if distance <= EUCLIDEAN_MAX_RADIUS and path:
+            print('path')
+            print(path)
+            if distance <= EUCLIDEAN_MAX_RADIUS and destination != current_position and path:
+                print('GOT ELIGIBLE SPOT YAAY')
                 eligible_spots.append(spot)
-
+        print('eligible_spots')
+        print(eligible_spots)
         return eligible_spots
 
     @staticmethod
@@ -530,11 +564,12 @@ class SnieznyKockodanController(controller.Controller):
 
     def escape(self, enemies: list[coordinates.Coords],
                knowledge: characters.ChampionKnowledge) -> characters.Action:
-        euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, enemy)
+        euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, coordinates.Coords(enemy[0], enemy[1]))
                                for enemy in enemies]
         min_tile_ind = euclidean_distances.index(min(euclidean_distances))
         neighbourhood = self.find_eligible_tiles_in_neighbourhood(knowledge)
-        euclidean_neighbourhood = [SnieznyKockodanController.euclidean_distance(enemies[min_tile_ind], tile)
+        euclidean_neighbourhood = [SnieznyKockodanController.euclidean_distance(coordinates.Coords(enemies[min_tile_ind][0], enemies[min_tile_ind][1]),
+                                                                                coordinates.Coords(tile[0], tile[1]))
                                    for tile in neighbourhood]
         max_neigh_ind = euclidean_neighbourhood.index(max(euclidean_neighbourhood))
-        return self._move(knowledge, neighbourhood[max_neigh_ind])
+        return self._move(knowledge, coordinates.Coords(neighbourhood[max_neigh_ind][0], neighbourhood[max_neigh_ind][1]))
