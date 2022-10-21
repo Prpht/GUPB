@@ -6,6 +6,7 @@ from gupb.controller.aleph_aleph_zero.strategy import Strategy, StrategyPriority
 from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
 from gupb.controller.aleph_aleph_zero.utils import taxicab_distance
 from gupb.model import characters
+from gupb.model.characters import Action
 
 weapons_score = {"knife": 1, "sword": 2, "amulet": 0, "axe": 4, "bow": 5, "bow_unloaded": 5, "bow_loaded": 5}
 
@@ -43,7 +44,11 @@ class WeaponRushStrategy(Strategy):
         weapons.sort(key=lambda x: len(find_shortest_path(curr, x)))
 
         travel_strategy = TravelStrategy(weapons[0], self)
+        i=0
         while True:
+            i+=1
+            if i == 500:
+                return Action.DO_NOTHING, self
             action, travel_strategy = travel_strategy.decide_and_proceed(knowledge, graph=graph, map_knowlege=map_knowledge, priority=self.priority)
             if action is not None:
                 return action, self.get_more_important(travel_strategy)

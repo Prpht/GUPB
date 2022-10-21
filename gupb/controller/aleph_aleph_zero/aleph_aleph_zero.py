@@ -21,7 +21,7 @@ from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.arenas import FIXED_MENHIRS
 
-from gupb.model.characters import Facing
+from gupb.model.characters import Facing, Action
 from gupb.model.coordinates import sub_coords, Coords
 
 
@@ -172,14 +172,18 @@ class AlephAlephZeroBot(controller.Controller):
                         ))
 
         if if_character_to_kill(knowledge):
-            self.strategy = self.strategy.get_more_important(AttackStrategy(priority=StrategyPriority.AGGRESSIVE))
+            self.strategy = self.strategy.get_more_important(AttackStrategy(priority=StrategyPriority.CRITICAL))
 
         if self.killed_now:
             self.strategy = self.strategy.get_more_important(RunStrategy(self.strategy, priority=StrategyPriority.CRITICAL))
             self.killed_now = False
 
+        i=0  # quick fix
         while True:
             action, self.strategy = self.strategy.decide_and_proceed(self.knowledge, graph=graph, map_knowlege=self.map_knowledge)
+            i+=1
+            if i==500:
+                return Action.DO_NOTHING
             if action is not None:
                 return action
 
