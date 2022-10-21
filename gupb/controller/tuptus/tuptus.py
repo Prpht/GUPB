@@ -9,6 +9,8 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters, effects
 from gupb.model import coordinates
+from gupb.model import tiles
+from gupb.model.arenas import Arena, ArenaDescription
 
 from typing import Optional, List
 
@@ -27,8 +29,9 @@ class TuptusController(controller.Controller):
         self.first_name: str = first_name
         self.menhir_coords = None
         self.facing: Optional[characters.Facing] = None
-        self.mist_tiles = np.array([])
+        self.mist_tiles:np.ndarray  = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
+        self.map: np.ndarray 
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TuptusController):
@@ -39,7 +42,6 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        
         # if not self.facing:
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
         # print(knowledge.visible_tiles.keys())
@@ -49,6 +51,7 @@ class TuptusController(controller.Controller):
         #     print(f"{key} ==> {val}")
         # print("\n\n")
         # print(knowledge.position)
+        print(knowledge.visible_tiles[knowledge.position].character.health)
         if not self.menhir_coords:
             self.menhir = self.is_menhir(knowledge.visible_tiles)
         next_block_position = knowledge.position + self.facing.value
@@ -92,6 +95,7 @@ class TuptusController(controller.Controller):
         self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
+        self.map = self._init_map(Arena.load(arena_description.name))
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
         facing_dct = {(0, -1): characters.Facing.UP,
@@ -122,6 +126,7 @@ class TuptusController(controller.Controller):
         (characters.Facing.DOWN, characters.Facing.UP),
         (characters.Facing.LEFT, characters.Facing.RIGHT),
         (characters.Facing.RIGHT, characters.Facing.LEFT)]
+        print((opponent_facing, character_facing))
         if (opponent_facing, character_facing) in opposites:
             return True
         return False
@@ -138,6 +143,13 @@ class TuptusController(controller.Controller):
             if effects.EffectDescription(type='menhir') in tile.effects:
                 return coords 
         return None
+
+    def _init_map(self, arena_description):
+        self.map = np.zeros(arena_description.size)
+        for coords, tile in arena_description.terrain.items():
+            if tile == tiles.Sea or tiles.Land:
+                self.map[coords] = 1
+        return self.map
 
     @property
     def name(self) -> str:
