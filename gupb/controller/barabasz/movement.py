@@ -43,7 +43,7 @@ class Movement:
     def update_weapons(self, knowledge: ChampionKnowledge):
         pass
 
-    def find_path(self, start: Coords, end: Coords):
+    def astar_path(self, start: Coords, end: Coords):
         grid = Grid(matrix=self.grid_matrix)
         finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
         start = grid.node(start.x, start.y)

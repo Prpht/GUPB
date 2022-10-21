@@ -1,6 +1,7 @@
 import random
 
 from gupb import controller
+from gupb.controller.barabasz.movement import Movement
 from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 from gupb.controller.barabasz.deathzone import deathzone
@@ -76,6 +77,7 @@ class BarabaszController(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.map_info = Movement(arena_description)
         pass
 
     @property
