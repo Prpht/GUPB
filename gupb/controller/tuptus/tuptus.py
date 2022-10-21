@@ -10,7 +10,21 @@ from gupb.model import arenas
 from gupb.model import characters, effects
 from gupb.model import coordinates
 
+from gupb.controller.tuptus.map import Map
+from gupb.controller.tuptus.pathfinder import Pathfinder
+
 from typing import Optional, List
+
+
+
+""" 
+    @TODO:
+        1) Cleanup in decide method
+        2) Move information from Controller to Map class
+
+"""
+
+
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -25,8 +39,11 @@ POSSIBLE_ACTIONS = [
 class TuptusController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.menhir_coords = None
+        self.map: Map = Map()
+        self.pathfinder: Pathfinder = Pathfinder(self.map)
         self.facing: Optional[characters.Facing] = None
+        self.planned_actions: Optional[List] = None
+        self.menhir_coords = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
 
@@ -39,16 +56,12 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if self.planned_actions:
+            return self.planned_actions.pop(0)
         
-        # if not self.facing:
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
-        # print(knowledge.visible_tiles.keys())
-        # for key in knowledge.visible_tiles.keys():
-            # print(f"{key} ==> {type(key)}")
-        # for key, val in knowledge.visible_tiles.items():
-        #     print(f"{key} ==> {val}")
-        # print("\n\n")
-        # print(knowledge.position)
+
+
         if not self.menhir_coords:
             self.menhir = self.is_menhir(knowledge.visible_tiles)
         next_block_position = knowledge.position + self.facing.value
