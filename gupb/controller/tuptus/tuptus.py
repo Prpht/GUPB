@@ -12,7 +12,24 @@ from gupb.model import coordinates
 from gupb.model import tiles
 from gupb.model.arenas import Arena, ArenaDescription
 
+from gupb.controller.tuptus.map import Map
+from gupb.controller.tuptus.pathfinder import Pathfinder
+
+from gupb.controller.tuptus.map import Map
+from gupb.controller.tuptus.pathfinder import Pathfinder
+
 from typing import Optional, List
+
+
+
+""" 
+    @TODO:
+        1) Cleanup in decide method
+        2) Move information from Controller to Map class
+
+"""
+
+
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -27,11 +44,14 @@ POSSIBLE_ACTIONS = [
 class TuptusController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.menhir_coords = None
+        self.map: Map = Map()
+        self.pathfinder: Pathfinder = Pathfinder(self.map)
         self.facing: Optional[characters.Facing] = None
-        self.mist_tiles:np.ndarray  = np.array([])
+        self.planned_actions: Optional[List] = None
+        self.menhir_coords = None
+        self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
-        self.map: np.ndarray 
+        self.arena: np.ndarray 
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TuptusController):
@@ -42,16 +62,11 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        # if not self.facing:
+
+        if self.planned_actions:
+            return self.planned_actions.pop(0)
+        
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
-        # print(knowledge.visible_tiles.keys())
-        # for key in knowledge.visible_tiles.keys():
-            # print(f"{key} ==> {type(key)}")
-        # for key, val in knowledge.visible_tiles.items():
-        #     print(f"{key} ==> {val}")
-        # print("\n\n")
-        # print(knowledge.position)
-        print(knowledge.visible_tiles[knowledge.position].character.health)
         if not self.menhir_coords:
             self.menhir = self.is_menhir(knowledge.visible_tiles)
         next_block_position = knowledge.position + self.facing.value
@@ -95,7 +110,7 @@ class TuptusController(controller.Controller):
         self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
-        self.map = self._init_map(Arena.load(arena_description.name))
+        self.arena = self._init_map(Arena.load(arena_description.name))
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
         facing_dct = {(0, -1): characters.Facing.UP,
@@ -145,11 +160,11 @@ class TuptusController(controller.Controller):
         return None
 
     def _init_map(self, arena_description):
-        self.map = np.zeros(arena_description.size)
+        self.arena = np.zeros(arena_description.size)
         for coords, tile in arena_description.terrain.items():
             if tile == tiles.Sea or tiles.Land:
-                self.map[coords] = 1
-        return self.map
+                self.arena[coords] = 1
+        return self.arena
 
     @property
     def name(self) -> str:
