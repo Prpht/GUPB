@@ -183,7 +183,7 @@ class SnieznyKockodanController(controller.Controller):
         elif self.turn_counter > 0 and not self.menhir_eligible():
             print(12)
             return self.turn()
-        elif self.menhir_eligible():
+        elif not self.menhir_eligible():
             print(13)
             return self.walk_random_known(knowledge)
         elif self.menhir is not None and self.menhir_eligible():
@@ -451,7 +451,7 @@ class SnieznyKockodanController(controller.Controller):
     #     return nearest_corner
 
     def menhir_eligible(self) -> bool:
-        return self.menhir_movement_counter > 0
+        return self.menhir_movement_counter < 0
 
     def decrement_menhir_movement_counter(self, knowledge: characters.ChampionKnowledge) -> None:
         self.menhir_movement_counter -= 1
