@@ -51,6 +51,11 @@ class MapKnowledge():
             return FIXED_MENHIRS[self.arena.name]
         if self.arena_menhir:
             return self.arena_menhir
+        if len(self.map_knowledge.mists) > 3:
+            try:
+                return self.calculate_menhir_center()
+            except:
+                pass
         y = self.arena.size[0]//2
         for i in range(self.arena.size[0]//2):
             x = self.arena.size[0]//2 + i

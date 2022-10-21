@@ -81,14 +81,7 @@ class GoToMenhirStrategy(Strategy):
     def decide(self, knowledge: ChampionKnowledge) -> Optional[Action]:
         super().decide(knowledge)
         if self._path is None:
-            if self._map_knowledge.closest_mist_coords:
-                    if len(self._map_knowledge.mists) > 3 and (not self._map_knowledge.arena_menhir):
-                        try:
-                            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.calculate_menhir_center())
-                        except:
-                            self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
-                    else:
-                        self._path = self._map_knowledge.find_path(knowledge.position, self._map_knowledge.find_menhir())
+            self._path = self.map_knowledge.find_path(knowledge.position, self.map_knowledge.find_menhir())
         return self._action_follow_path(knowledge)
 
 
