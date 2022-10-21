@@ -1,7 +1,7 @@
 import random
 
 from gupb import controller
-from gupb.controller.barabasz.movement import Movement
+from gupb.controller.barabasz.movement import Movement, weapon_description_to_weapon
 from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 from gupb.controller.barabasz.deathzone import deathzone
@@ -11,26 +11,6 @@ POSSIBLE_ACTIONS = [
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
 ]
-
-
-WEAPONS = {
-    'knife': weapons.Knife,
-    'sword': weapons.Sword,
-    'bow': weapons.Bow,
-    'axe': weapons.Axe,
-    'amulet': weapons.Amulet
-}
-
-
-def weapon_description_to_weapon(description: weapons.WeaponDescription):
-    if description.name[0:3] == 'bow':
-        weapon = weapons.Bow()
-        if description.name == 'bow_loaded':
-            weapon.ready = True
-    else:
-        weapon = WEAPONS[description.name]()
-
-    return weapon
 
 
 class BarabaszController(controller.Controller):
