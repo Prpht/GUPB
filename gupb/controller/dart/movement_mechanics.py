@@ -193,9 +193,6 @@ def is_opponent(character: ChampionDescription) -> bool:
 def is_mist(tile: TileDescription) -> bool:
     return "mist" in [e.type for e in tile.effects]
 
-def is_menhir(tile: TileDescription) -> bool:
-    return "menhir" == tile.type
-
 
 def is_menhir(tile: TileDescription) -> bool:
     return "menhir" == tile.type
@@ -220,9 +217,3 @@ def get_weapon(weapon_name: str) -> Weapon:
 
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
-
-
-def find_mist_coords(knowledge: ChampionKnowledge) -> Optional[Coords]:
-    mist_coords = [Coords(*coords) for coords, tile in knowledge.visible_tiles.items() if is_mist(tile)]
-    mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords)) for coords in mist_coords]
-    return min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
