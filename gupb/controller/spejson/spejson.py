@@ -409,7 +409,7 @@ class Spejson(controller.Controller):
         ):
             self.panic_mode = 6
             for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
+                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
                 if self.clusters[(ry, rx)]:
                     self.target = Coords(x=rx, y=ry)
                     break
@@ -481,7 +481,7 @@ class Spejson(controller.Controller):
         if bad_neighborhood_factor > 2 and self.panic_mode < 2:
             self.panic_mode = 6
             for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
+                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
                 if self.clusters[(ry, rx)]:
                     self.target = Coords(x=rx, y=ry)
                     break
@@ -533,7 +533,7 @@ class Spejson(controller.Controller):
                 if move is None:
                     self.panic_mode = 8
                     for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
+                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
                         if self.clusters[(ry, rx)]:
                             self.target = Coords(x=rx, y=ry)
                             break
@@ -548,7 +548,7 @@ class Spejson(controller.Controller):
                 if move is None:
                     self.panic_mode = 8
                     for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(min(self.map_height, self.map_height), size=[2])
+                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
                         if self.clusters[(ry, rx)]:
                             self.target = Coords(x=rx, y=ry)
                             break
