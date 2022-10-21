@@ -99,7 +99,10 @@ class SnieznyKockodanController(controller.Controller):
     def _create_arena_matrix(self):
         arena = [[0 for _ in range(ARENA[0])] for _ in range(ARENA[1])]
         for cords, description in self.memory_map.items():
-            arena[cords[1]][cords[0]] = 1 if description.type == 'land' else 0
+            if description.type == 'land' or description.type == 'menhir':
+                arena[cords[1]][cords[0]] = 1
+            else:
+                arena[cords[1]][cords[0]] = 0
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
@@ -550,8 +553,8 @@ class SnieznyKockodanController(controller.Controller):
     def tiles_in_max_radius(self, knowledge: characters.ChampionKnowledge) -> list[coordinates.Coords]:
         positions_in_radius = []
         for tile in self.memory_map:
-            if SnieznyKockodanController.euclidean_distance(coordinates.Coords(tile[0], tile[1]), knowledge.position) <= 5:
-                positions_in_radius += [tile]
+            if SnieznyKockodanController.euclidean_distance(coordinates.Coords(tile[0], tile[1]), knowledge.position) <= EUCLIDEAN_MAX_RADIUS:
+                positions_in_radius += [coordinates.Coords(tile[0], tile[1])]
 
         return positions_in_radius
 
