@@ -54,6 +54,11 @@ MAX_WEAPON_PATH_LEN: int = 10
 TURN_INIT: int = 3
 RANDOM_WALK_INIT: int = 2
 
+MENHIR_MOVEMENT_COUNTER_INIT: int = 50
+CHAMPIONS_COUNT: int = 13
+
+EUCLIDEAN_MAX_RADIUS: int = 5
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -78,6 +83,8 @@ class SnieznyKockodanController(controller.Controller):
         self.turn_counter: int = TURN_INIT
         self.random_walk_counter: int = RANDOM_WALK_INIT
         self.random_walk_destination: (coordinates.Coords, None) = None
+        self.menhir_movement_counter: int = MENHIR_MOVEMENT_COUNTER_INIT
+        self.prev_champions: int = CHAMPIONS_COUNT
         #self.arcade_weapon: bool = True
 
     def __eq__(self, other: object) -> bool:
@@ -97,6 +104,9 @@ class SnieznyKockodanController(controller.Controller):
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.decrement_menhir_movement_counter(knowledge)
+        tiles_in_radius = SnieznyKockodanController.tiles_in_max_radius(knowledge)
+
         if knowledge.position == self.random_walk_destination:
             self.random_walk_destination = None
             self.random_walk_counter = RANDOM_WALK_INIT
@@ -155,6 +165,8 @@ class SnieznyKockodanController(controller.Controller):
             return self._move(knowledge, self.random_walk_destination)
         elif self.turn_counter > 0 and not self.menhir_eligible():
             return self.turn()
+        elif self.menhir_eligible():
+            return self.walk_random_known()
         elif self.menhir is not None and self.menhir_eligible():
             return self._move(knowledge, self.menhir)
         else:
@@ -179,6 +191,8 @@ class SnieznyKockodanController(controller.Controller):
         self.turn_counter = TURN_INIT
         self.random_walk_counter = RANDOM_WALK_INIT
         self.random_walk_destination = None
+        self.menhir_movement_counter = MENHIR_MOVEMENT_COUNTER_INIT
+        self.prev_champions = CHAMPIONS_COUNT
         #self.arcade_weapon = True
 
     @property
@@ -406,8 +420,13 @@ class SnieznyKockodanController(controller.Controller):
     #
     #     return nearest_corner
 
-    def menhir_eligible(self):
-        pass
+    def menhir_eligible(self) -> bool:
+        return self.menhir_movement_counter > 0
+
+    def decrement_menhir_movement_counter(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.menhir_movement_counter -= 1
+        self.menhir_movement_counter -= self.prev_champions - knowledge.no_of_champions_alive
+        self.prev_champions = knowledge.no_of_champions_alive
 
     @staticmethod
     def convert_terrain(terrain: Dict[coordinates.Coords, tiles.Tile]) \
@@ -447,13 +466,34 @@ class SnieznyKockodanController(controller.Controller):
 
         return characters.Action.TURN_RIGHT
 
-    def walk_random_known(self):
+    def walk_random_known(self) -> characters.Action:
         # TODO
         self.random_walk_counter -= 1
         if self.random_walk_counter == 0:
             self.turn_counter = TURN_INIT
 
         pass
+
+    @staticmethod
+    def euclidean_distance(position1: coordinates.Coords, position2:coordinates.Coords) -> float:
+        sqrted = (position1.x - position2.x)**2 + (position2.y - position1.y)**2
+        return math.sqrt(sqrted)
+
+    def tiles_in_max_radius(self, knowledge: characters.ChampionKnowledge) -> list[coordinates.Coords]:
+        positions_in_radius = []
+        for tile in self.memory_map:
+            if SnieznyKockodanController.euclidean_distance(tile, knowledge.position) <= 5:
+                positions_in_radius += [tile]
+
+        return positions_in_radius
+
+    def need_to_escape(self, enemies: list[coordinates.Coords], tiles_in_radius: list[coordinates.Coords]) \
+            -> (bool, (coordinates.Coords, None)):
+        for enemy in enemies:
+            if enemy in tiles_in_radius:
+                return True, enemy
+
+        return False, None
 
 
 
