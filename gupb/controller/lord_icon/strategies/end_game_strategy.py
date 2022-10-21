@@ -17,7 +17,7 @@ class EndGameStrategy(Strategy):
 
         # Avoid attack range from enemies
         for enemy in knowledge.enemies:
-            attack_range = enemy.predict_attack_range(map)
+            attack_range = enemy.get_attack_range(map)
             for pos in attack_range:
                 EndGameStrategy.enemies_ranges.append(pos)
 

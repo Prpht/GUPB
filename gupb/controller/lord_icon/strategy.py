@@ -19,7 +19,7 @@ class StrategyController(NamedTuple):
         if knowledge.seen_mist and knowledge.menhir is not None:
             return EndGameStrategy.get_action(knowledge)
 
-        if knowledge.character.weapon == 'knife' and knowledge.menhir is None:
+        if knowledge.character.weapon == 'knife' or knowledge.menhir is None:
             return ExploreStrategy.get_action(knowledge)
 
         return CampStrategy.get_action(knowledge)
