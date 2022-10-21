@@ -18,10 +18,11 @@ POSSIBLE_ACTIONS = [
 class KillStrategy(Strategy):
     name = "KillStrategy"
     counter = 0
+    target = None
 
     @staticmethod
     def get_action(knowledge: Knowledge):
-        target = None
+
 
         # # Avoid attack range from enemies
         # map = knowledge.map.copy()
@@ -30,33 +31,29 @@ class KillStrategy(Strategy):
         #     for pos in attack_range:
         #         map[pos] = 1
 
-        print('essa')
-
-        for enemy in knowledge.enemies:
-            if ALL_WEAPONS[enemy.weapon].value < ALL_WEAPONS[knowledge.character.weapon].value and enemy.health < knowledge.character.health:
-                target = enemy
-
-        print('essa1')
-
-        if target and knowledge.character.can_attack(knowledge.map, target.position):
-            return Action.ATTACK
-        print('essa2')
-        if target:
-            x, y = target.position[0], target.position[1]
-            moves = find_path(knowledge.map, knowledge.character.position, (x, y))
-            if len(moves) > 0:
-                return MoveController.next_move(knowledge, moves[0])
-        print('essa3')
         # Attack if you can
         for enemy in knowledge.enemies:
             if knowledge.character.can_attack(knowledge.map, enemy.position):
                 return Action.ATTACK
-        print('essa4')
+
+        if KillStrategy.target is None:
+            for enemy in knowledge.enemies:
+                if ALL_WEAPONS[enemy.weapon].value < ALL_WEAPONS[
+                    knowledge.character.weapon].value and enemy.health <= knowledge.character.health:
+                    KillStrategy.target = enemy
+
+        if KillStrategy.target and knowledge.character.can_attack(knowledge.map, KillStrategy.target.position):
+            return Action.ATTACK
+
+        if KillStrategy.target:
+            x, y = KillStrategy.target.position[0], KillStrategy.target.position[1]
+            moves = find_path(knowledge.map, knowledge.character.position, (x, y))
+            if len(moves) > 0:
+                return MoveController.next_move(knowledge, moves[0])
+
+        # Attack if you can
+        for enemy in knowledge.enemies:
+            if knowledge.character.can_attack(knowledge.map, enemy.position):
+                return Action.ATTACK
+
         return random.choice(POSSIBLE_ACTIONS)
-
-
-
-
-
-
-

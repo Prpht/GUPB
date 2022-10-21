@@ -71,9 +71,11 @@ def parse_coords(coord):
 
 class Knowledge:
     def __init__(self):
+        self.mist_points = []
         self.position = None
         self.arena = None
         self.map = None
+        self.seen_mist = False
         self.menhir = None
         self.character = None
         self.weapons = {}
@@ -84,12 +86,12 @@ class Knowledge:
         self.position = knowledge.position.x, knowledge.position.y
 
         # Load weapons only once after restart, during first update
-        if len(self.initial_weapons_positions) > 0:
-            for pos, name in self.initial_weapons_positions:
+        for pos, name in self.initial_weapons_positions:
+            if pos not in self.weapons.keys():
                 self.weapons[pos] = heuristic(pos, self.position) - ALL_WEAPONS[name].value
-            self.initial_weapons_positions = []
 
         self.enemies = []
+        self.mist_points = []
 
         for coord, tile in knowledge.visible_tiles.items():
             x, y = parse_coords(coord)
@@ -99,10 +101,15 @@ class Knowledge:
             else:
                 if tile.character:
                     self.enemies.append(CharacterInfo.from_tile(tile, (x, y)))
-                elif tile.loot and tile.loot.name != 'knife':
+                elif tile.loot and ALL_WEAPONS[tile.loot.name].value < ALL_WEAPONS[self.character.weapon].value:
                     self.weapons[(x, y)] = heuristic((x, y), self.position) - ALL_WEAPONS[tile.loot.name].value
             if tile.type == "menhir":
                 self.menhir = (x, y)
+            if tile.effects:
+                for effect_desc in tile.effects:
+                    if effect_desc.type == "mist":
+                        self.seen_mist = True
+                        self.mist_points.append((x, y))
 
             # Update map
             self.map[x, y] = MAPPER[tile.type]
@@ -113,11 +120,17 @@ class Knowledge:
         self.arena = Arena.load(arena_name)
         n, m = self.arena.size
         self.map = np.ones((n, m))
+        self.position = None
+        self.menhir = None
+        self.seen_mist = False
+        self.character = None
+        self.weapons = {}
+        self.enemies = []
+        self.mist_points = []
 
         for position, tile in self.arena.terrain.items():
             self.map[position.x, position.y] = MAPPER[tile.description().type]
             if tile.loot:
                 self.initial_weapons_positions.append((position, tile.loot.description().name))
 
-        self.position = None
-        self.menhir = None
+
