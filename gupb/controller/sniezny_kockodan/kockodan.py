@@ -134,6 +134,7 @@ class SnieznyKockodanController(controller.Controller):
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
         if len(mist_seen) > 0:
             self.mist = True
+
         if weapon_to_get is not None:  #and not self.arcade_weapon:
             enemy_nearer_to_weapon = SnieznyKockodanController.is_enemy_nearer_to_weapon(enemies_seen, weapon_to_get,
                                                                                          knowledge.position)
@@ -161,6 +162,8 @@ class SnieznyKockodanController(controller.Controller):
             return self._move(knowledge, weapon_to_get)
         elif attack_eligible:
             return self.attack()
+        elif self.need_to_escape(enemies_seen, tiles_in_radius):
+            self.escape(enemies_seen, knowledge)
         elif self.random_walk_destination is not None:
             return self._move(knowledge, self.random_walk_destination)
         elif self.turn_counter > 0 and not self.menhir_eligible():
@@ -335,25 +338,30 @@ class SnieznyKockodanController(controller.Controller):
 
     def move_against_mist(self,
                           mist_tiles: list[coordinates.Coords],
-                          knowledge: characters.ChampionKnowledge) -> characters.Action:
+                          knowledge: characters.ChampionKnowledge,
+                          neighbour_hood: list[coordinates.Coords]) -> characters.Action:
         self.attacked = False
         if len(mist_tiles) == 0:
             return self._move(knowledge, self.mist_destination)
 
-        x_distances = [SnieznyKockodanController.count_x_difference(mist_tile, knowledge.position)
-                       for mist_tile in mist_tiles]
-        y_distances = [SnieznyKockodanController.count_y_difference(mist_tile, knowledge.position)
-                       for mist_tile in mist_tiles]
-
-        x_distances_abs = [abs(x) for x in x_distances]
-        y_distances_abs = [abs(y) for y in y_distances]
-
-        x_ind = x_distances_abs.index(min(x_distances_abs))
-        y_ind = y_distances_abs.index(min(y_distances_abs))
-
-        destination = coordinates.Coords(x=knowledge.position[0], y=knowledge.position[1])
-        difference = coordinates.Coords(x=x_distances[x_ind], y=y_distances[y_ind])
-        destination = coordinates.add_coords(destination, difference)
+        # x_distances = [SnieznyKockodanController.count_x_difference(mist_tile, knowledge.position)
+        #                for mist_tile in mist_tiles]
+        # y_distances = [SnieznyKockodanController.count_y_difference(mist_tile, knowledge.position)
+        #                for mist_tile in mist_tiles]
+        #
+        # x_distances_abs = [abs(x) for x in x_distances]
+        # y_distances_abs = [abs(y) for y in y_distances]
+        #
+        # x_ind = x_distances_abs.index(min(x_distances_abs))
+        # y_ind = y_distances_abs.index(min(y_distances_abs))
+        #
+        # destination = coordinates.Coords(x=knowledge.position[0], y=knowledge.position[1])
+        # difference = coordinates.Coords(x=x_distances[x_ind], y=y_distances[y_ind])
+        # destination = coordinates.add_coords(destination, difference)
+        euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, x) for x in mist_tiles]
+        min_tile_ind = euclidean_distances.index(min(euclidean_distances))
+        # TODO
+        destination = coordinates.Coords(0, 0)
         self.mist_destination = destination
         return self._move(knowledge, destination)
 
@@ -494,6 +502,12 @@ class SnieznyKockodanController(controller.Controller):
                 return True, enemy
 
         return False, None
+
+    def escape(self, enemies: list[coordinates.Coords], knowledge: characters.ChampionKnowledge):
+        euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, enemy)
+                               for enemy in enemies]
+        min_tile_ind = euclidean_distances.index(min(euclidean_distances))
+
 
 
 
