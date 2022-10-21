@@ -1,5 +1,6 @@
 import math
 import random
+import os
 
 from gupb import controller
 from gupb.model import arenas
@@ -8,6 +9,7 @@ from gupb.model import weapons
 from gupb.model import effects
 from gupb.model import coordinates
 from gupb.model import tiles
+from typing import Dict
 # from queue import SimpleQueue
 from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -49,6 +51,9 @@ HEALTH_ATTACK_THRESHOLD: float = 1/3
 
 MAX_WEAPON_PATH_LEN: int = 10
 
+TURN_INIT: int = 3
+RANDOM_WALK_INIT: int = 2
+
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -69,11 +74,16 @@ class SnieznyKockodanController(controller.Controller):
         self.attacked: bool = False
         self.menhir_attack_counter: int = 0
         self.memory_map: dict[coordinates.Coords, tiles.TileDescription] = {}
+        self.terrain: dict[coordinates.Coords, tiles.TileDescription] = {}
+        self.turn_counter: int = TURN_INIT
+        self.random_walk_counter: int = RANDOM_WALK_INIT
+        self.random_walk_destination: (coordinates.Coords, None) = None
         #self.arcade_weapon: bool = True
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SnieznyKockodanController):
             return self.first_name == other.first_name
+
         return False
 
     def __hash__(self) -> int:
@@ -83,11 +93,20 @@ class SnieznyKockodanController(controller.Controller):
         arena = [[0 for _ in range(ARENA[0])] for _ in range(ARENA[1])]
         for cords, description in self.memory_map.items():
             arena[cords.y][cords.x] = 1 if description.type == 'land' else 0
+
         return arena
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if knowledge.position == self.random_walk_destination:
+            self.random_walk_destination = None
+            self.random_walk_counter = RANDOM_WALK_INIT
+            self.turn_counter = TURN_INIT
+
         for tile in knowledge.visible_tiles:
             self.memory_map[tile] = knowledge.visible_tiles[tile]
+
+        if self.terrain is None and self.turn_counter == 0:
+            self.find_terrain()
 
         if self.need_to_randomize(knowledge):
             self.prev_position = knowledge.position
@@ -95,8 +114,8 @@ class SnieznyKockodanController(controller.Controller):
             return self.random_decision()
 
         champion_info = knowledge.visible_tiles[knowledge.position].character
-        if champion_info.weapon.name != 'knife':
-            self.arcade_weapon = False
+        # if champion_info.weapon.name != 'knife':
+        #     self.arcade_weapon = False
 
         #nearest_corner = self.arcade_weapon_gain(knowledge.position)
         weapon_to_get = self.find_weapon_to_get(knowledge)
@@ -105,7 +124,7 @@ class SnieznyKockodanController(controller.Controller):
         mist_seen = SnieznyKockodanController.find_mist(knowledge)
         if len(mist_seen) > 0:
             self.mist = True
-        if weapon_to_get is not None and not self.arcade_weapon:
+        if weapon_to_get is not None:  #and not self.arcade_weapon:
             enemy_nearer_to_weapon = SnieznyKockodanController.is_enemy_nearer_to_weapon(enemies_seen, weapon_to_get,
                                                                                          knowledge.position)
         facing = champion_info.facing
@@ -132,7 +151,11 @@ class SnieznyKockodanController(controller.Controller):
             return self._move(knowledge, weapon_to_get)
         elif attack_eligible:
             return self.attack()
-        elif self.menhir is not None:
+        elif self.random_walk_destination is not None:
+            return self._move(knowledge, self.random_walk_destination)
+        elif self.turn_counter > 0 and not self.menhir_eligible():
+            return self.turn()
+        elif self.menhir is not None and self.menhir_eligible():
             return self._move(knowledge, self.menhir)
         else:
             #return self._move(knowledge, SnieznyKockodanController.get_map_center(TERRAIN))
@@ -152,6 +175,10 @@ class SnieznyKockodanController(controller.Controller):
         self.attacked = False
         self.menhir_attack_counter = 0
         self.memory_map = {}
+        self.terrain: dict[coordinates.Coords, tiles.TileDescription] = {}
+        self.turn_counter = TURN_INIT
+        self.random_walk_counter = RANDOM_WALK_INIT
+        self.random_walk_destination = None
         #self.arcade_weapon = True
 
     @property
@@ -235,12 +262,15 @@ class SnieznyKockodanController(controller.Controller):
                               facing: characters.Facing,
                               knowledge: characters.ChampionKnowledge,
                               champion_info: characters.ChampionDescription) -> bool:
-        health = champion_info.health
-        # enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
-        # if any(enemy_stronger_health):
-        #     return False
-        if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
+        if len(self.terrain) == 0:
             return False
+
+        health = champion_info.health
+        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        if any(enemy_stronger_health):
+            return False
+        # if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
+        #     return False
 
         weapon = champion_info.weapon.name
         enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
@@ -249,13 +279,14 @@ class SnieznyKockodanController(controller.Controller):
         if any(enemy_stronger_weapons):
             return False
         try:
-            weapon_coordinates = WEAPON_DICT[weapon].cut_positions(TERRAIN, knowledge.position, facing)
+            weapon_coordinates = WEAPON_DICT[weapon].cut_positions(self.terrain, knowledge.position, facing)
         except TypeError:
             weapon_coordinates = []
 
         for enemy in enemies:  # self.find_enemies(knowledge):
             if enemy in weapon_coordinates:
                 return True
+
         return False
 
     def find_weapon_to_get(self, knowledge: characters.ChampionKnowledge) -> (coordinates.Coords, None):
@@ -374,3 +405,55 @@ class SnieznyKockodanController(controller.Controller):
     #         self.arcade_weapon = False
     #
     #     return nearest_corner
+
+    def menhir_eligible(self):
+        pass
+
+    @staticmethod
+    def convert_terrain(terrain: Dict[coordinates.Coords, tiles.Tile]) \
+            -> dict[coordinates.Coords, tiles.TileDescription]:
+        converted_terrain = dict()
+        for tile in terrain:
+            converted_terrain[tile] = terrain[tile].description()
+
+        return converted_terrain
+
+    def find_terrain(self) -> None:
+        directory_in_str = os.path.join('resources', 'arenas')
+        directory = os.fsencode(directory_in_str)
+
+        terrains = []
+        for file in os.listdir(directory):
+            filename = os.fsdecode(file)
+            terrain = arenas.Arena.load(filename).terrain
+            if self.check_terrain(terrain):
+                terrains += [terrain]
+
+        if len(terrains) == 1:
+            self.terrain = terrains[0]
+            self.memory_map = SnieznyKockodanController.convert_terrain(self.terrain)
+
+    def check_terrain(self, terrain: Dict[coordinates.Coords, tiles.Tile]) -> bool:
+        for tile in self.memory_map:
+            if self.memory_map[tile].type != terrain[tile].description().type:
+                return False
+
+        return True
+
+    def turn(self) -> characters.Action:
+        self.turn_counter -= 1
+        if self.turn_counter == 0:
+            self.random_walk_counter = RANDOM_WALK_INIT
+
+        return characters.Action.TURN_RIGHT
+
+    def walk_random_known(self):
+        # TODO
+        self.random_walk_counter -= 1
+        if self.random_walk_counter == 0:
+            self.turn_counter = TURN_INIT
+
+        pass
+
+
+
