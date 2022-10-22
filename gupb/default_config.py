@@ -6,6 +6,7 @@ CONFIGURATION = {
         'fisher_island',
     ],
     'controllers': [
+        keyboard.KeyboardController(),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
