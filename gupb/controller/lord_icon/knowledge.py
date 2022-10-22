@@ -113,7 +113,7 @@ class Knowledge:
 
             # Update map
             self.map[x, y] = MAPPER[tile.type]
-            if tile.loot and ALL_WEAPONS[tile.loot.name].value <= ALL_WEAPONS[self.character.weapon].value:
+            if tile.loot and self.character and ALL_WEAPONS[tile.loot.name].value <= ALL_WEAPONS[self.character.weapon].value:
                 self.map[x, y] = 1
 
     def reset(self, arena_name):
