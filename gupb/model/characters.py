@@ -109,9 +109,10 @@ class Champion:
                     return Action.DO_NOTHING
                 return action
             except Exception as e:
-                verbose_logger.warning(f"Controller {self.verbose_name()} throw an unexpected exception: {repr(e)}.")
-                controller.ControllerExceptionReport(self.verbose_name(), repr(e)).log(logging.WARN)
-                return Action.DO_NOTHING
+                # verbose_logger.warning(f"Controller {self.verbose_name()} throw an unexpected exception: {repr(e)}.")
+                # controller.ControllerExceptionReport(self.verbose_name(), repr(e)).log(logging.WARN)
+                # return Action.DO_NOTHING
+                raise e
         else:
             verbose_logger.warning(f"Controller {self.verbose_name()} was non-existent.")
             controller.ControllerExceptionReport(self.verbose_name(), "controller non-existent").log(logging.WARN)
