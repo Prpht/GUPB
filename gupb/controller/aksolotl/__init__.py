@@ -1,4 +1,4 @@
-from gupb.controller.aksolotl.aksolotl import AksolotlController
+from gupb.controller.aksolotl import AksolotlController
 
 __all__ = [
     'aksolotl',
@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    AksolotlController("Old")
+    AksolotlController("old")
 ]
