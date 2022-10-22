@@ -32,7 +32,7 @@ COORDS_DIRS = {
 TILES_VALUES = {"sea": 0, "wall": 0, "menhir": 1, "land": 1, "weapon": 100}
 
 
-class MyController(controller.Controller):
+class AksolotlController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.position = None
@@ -57,9 +57,11 @@ class MyController(controller.Controller):
         self.on_menhir = False
         self.reached_target = False
         self.store_map_before_mist = None
+        self.largest_x = 0
+        self.largest_y = 0
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, MyController):
+        if isinstance(other, AksolotlController):
             return self.first_name == other.first_name
         return False
 
@@ -85,6 +87,11 @@ class MyController(controller.Controller):
     def update_map(self):
         for position, tile in self.knowledge.visible_tiles.items():
             x, y = position[0], position[1]
+            if x > self.largest_x:
+                self.largest_x = x
+            if y > self.largest_y:
+                self.largest_y = y
+                # TODO add automatic updating of the map's width and height
             if tile.type in ["wall", "sea"]:
                 self.map[y, x] = TILES_VALUES[tile.type]
                 if (x, y) in self.recommended_path:
@@ -267,7 +274,7 @@ class MyController(controller.Controller):
         target = grid.node(destination[0], destination[1])
 
         astar = AStarFinder()
-        path, r = astar.find_path(start, target, grid)
+        path, runs = astar.find_path(start, target, grid)
         if len(path) > 1:
             path = path[1:]
             self.recommended_path = path
@@ -354,6 +361,7 @@ class MyController(controller.Controller):
                 act = self.act_when_blocked()
                 return act
 
+            # gdy ściezka prawie pusta pojawiają się errory
             else:
                 self.follow_path(self.recommended_path)
                 return self.act_update()
@@ -422,5 +430,5 @@ class MyController(controller.Controller):
 
 
 POTENTIAL_CONTROLLERS = [
-    MyController("Bob"),
+    AksolotlController("Bob"),
 ]
