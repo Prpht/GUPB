@@ -10,6 +10,7 @@ class ScanningStrategy(Strategy):
             self.turns_to_do-=1
             return characters.Action.TURN_LEFT, self
 
-    def __init__(self, proceeding_strategy):
+    def __init__(self, proceeding_strategy, **kwargs):
+        super().__init__(**kwargs)
         self.proceeding_strategy = proceeding_strategy
         self.turns_to_do=3

@@ -16,7 +16,8 @@ class ScoutingPhase(Enum):
 
 
 class ScoutingStrategy(Strategy):
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.curr_target = None
         self.phase = ScoutingPhase.TRAVELLING
 
