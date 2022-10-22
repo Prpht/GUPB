@@ -74,5 +74,10 @@ def find_closest_orientation(shortest_paths, graph, coord):
         if length<best_length:
             closest_orientation = orientation
             best_length = length
+
     return closest_orientation, best_length
+
+def get_closest_points(points, graph, position):
+    shortest_paths = find_shortest_path(position)
+    return sorted(points, key=lambda x: find_closest_orientation(shortest_paths, graph, x)[1])
 
