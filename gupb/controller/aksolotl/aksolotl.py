@@ -46,7 +46,7 @@ class AksolotlController(controller.Controller):
         self.temp_target = None
         self.action_queue = []
         self.mist_positions = []
-        self.map = np.ones((10, 10))
+        self.map = np.ones((60, 60))
         self.recommended_path = []
         self.blocked = False
         self.prev_facing = None
