@@ -29,6 +29,6 @@ class Map():
     def _init_map(self, arena_description):
         self.tuptable_map = np.zeros(arena_description.size)
         for coords, tile in arena_description.terrain.items():
-            if tile == tiles.Sea or tiles.Wall:
+            if tile == tiles.Sea or tile == tiles.Wall:
                 self.tuptable_map[coords] = 1
         return self.tuptable_map

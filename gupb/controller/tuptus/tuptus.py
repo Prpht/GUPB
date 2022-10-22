@@ -58,13 +58,11 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-
         if self.planned_actions:
             return self.planned_actions.pop(0)
-        
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
-        if not self.menhir_coords:
-            self.menhir = self.is_menhir(knowledge.visible_tiles)
+        if self.menhir_coords is None:
+            self.menhir_coords = self.is_menhir(knowledge.visible_tiles)
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]        
         if next_block.type in ["wall", "sea"]: 
@@ -150,7 +148,7 @@ class TuptusController(controller.Controller):
     
     def is_menhir(self, visible_tiles):
         for coords, tile in visible_tiles.items():
-            if effects.EffectDescription(type='menhir') in tile.effects:
+            if tile == tiles.Menhir:
                 return coords 
         return None
 
