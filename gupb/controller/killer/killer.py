@@ -79,9 +79,9 @@ class KillerController(controller.Controller):
         verbose_logger.debug(f"Is path found: {is_found}")
         actions = []
         if not is_found:
-            verbose_logger.debug(f"Map: {self.game_map}")
+            # verbose_logger.debug(f"Map: {self.game_map}")
             return actions
-        verbose_logger.debug(f"Found_path: {found_path}")
+        # verbose_logger.debug(f"Found_path: {found_path}")
 
         curr_d = direction
         for i in range(len(found_path) - 1):
@@ -98,13 +98,42 @@ class KillerController(controller.Controller):
                 actions.append(Action.TURN_RIGHT)
             actions.append(Action.STEP_FORWARD)
             curr_d = d
-        verbose_logger.debug(actions)
+        # verbose_logger.debug(actions)
         return actions
 
     def find_new_interest(self, curr_position):
-        # todo: put some 'KillerInterest.POINT_ON_MAP.value' in the map matrix to mark it
-        #       as a new point of interest (place to go), it has to be different than curr_pos
-        pass
+        x_max, y_max = self.game_map.shape
+        map = self.game_map.copy()
+        map[curr_position] = 0
+        stack = [curr_position]
+        distances = []
+        get_distance = lambda z: np.sqrt(z[0]**2 + z[1]**2)
+        while stack:
+            coords = stack.pop()
+            if coords[0] - 1 >= 0 and map[coords[0] - 1, coords[1]] == 1:
+                new_coords = coords[0] - 1, coords[1]
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[0] + 1 < x_max and map[coords[0] + 1, coords[1]] == 1:
+                new_coords = coords[0] + 1, coords[1]
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[1] - 1 >= 0 and map[coords[0], coords[1] - 1] == 1:
+                new_coords = coords[0], coords[1] - 1
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[1] + 1 < y_max and map[coords[0], coords[1] + 1] == 1:
+                new_coords = coords[0], coords[1] + 1
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+        if distances:
+            self.game_map[sorted(distances, key=lambda x: x[1])[-1][0]] = 2
+
+
 
     @staticmethod
     def get_facing(knowledge: characters.ChampionKnowledge):
@@ -115,11 +144,11 @@ class KillerController(controller.Controller):
         return knowledge.visible_tiles[add_coords(knowledge.position, KillerController.get_facing(knowledge).value)]
 
     def find(self, knowledge: characters.ChampionKnowledge, interest: KillerInterest):
-        verbose_logger.debug("Looking for path...")
+        # verbose_logger.debug("Looking for path...")
         current_position = knowledge.position
-        verbose_logger.debug(f"Curr position: {current_position}")
+        # verbose_logger.debug(f"Curr position: {current_position}")
         facing = self.get_facing(knowledge)
-        verbose_logger.debug(f"Facing: {facing}")
+        # verbose_logger.debug(f"Facing: {facing}")
         if facing == Facing.UP:
             curr_direction = -1, 0
         elif facing == Facing.DOWN:
@@ -128,14 +157,14 @@ class KillerController(controller.Controller):
             curr_direction = 0, -1
         else:  # facing == Facing.RIGHT
             curr_direction = 0, 1
-        verbose_logger.debug(f"Current direction: {curr_direction}")
+        # verbose_logger.debug(f"Current direction: {curr_direction}")
         path_actions = self.__get_path_actions(current_position, curr_direction, interest)
-        logging.debug(f"Actions to get there: {path_actions}")
+        # logging.debug(f"Actions to get there: {path_actions}")
         if len(path_actions) != 0:
             self.planned_actions += path_actions
             self.planned_actions.append(KillerAction.LOOK_AROUND)
 
-    def execute_action(self, action: KillerAction, knowledge: characters.ChampionKnowledge = None):
+    def execute_action(self, action: KillerAction, knowledge: characters.ChampionKnowledge):
         if action == KillerAction.LEARN_MAP:
             self.learn_map(knowledge)
 
@@ -155,6 +184,15 @@ class KillerController(controller.Controller):
             self.find_new_interest(curr_position=knowledge.position)
             self.find(knowledge, interest=KillerInterest.POINT_ON_MAP)
 
+    def check_for_enemies(self, knowledge: characters.ChampionKnowledge):
+        #mark enemies
+        are_enemies = False
+        for coords, value in knowledge.visible_tiles.items():
+            if value.character is not None and value.character.controller_name != 'Killer':
+                self.game_map[coords] = KillerInterest.KILLING.value
+                are_enemies = True
+        return are_enemies
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         facing_element = self.get_facing_element(knowledge)
         if facing_element.character is not None:
@@ -162,30 +200,33 @@ class KillerController(controller.Controller):
 
         if self.game_map is None:
             self.game_map = np.zeros(shape=(50, 50))
-            self.execute_action(KillerAction.LOOK_AROUND)
+            self.execute_action(KillerAction.LOOK_AROUND, knowledge)
 
         if self.menhir_pos == knowledge.position:
-            self.execute_action(KillerAction.SPIN_AROUND)
+            self.execute_action(KillerAction.SPIN_AROUND, knowledge)
 
-        verbose_logger.debug(f"Planned actions: {self.planned_actions}")
+        # verbose_logger.debug(f"Planned actions: {self.planned_actions}")
         if len(self.planned_actions) == 0 and (self.menhir_pos is not None):
-            self.execute_action(KillerAction.FIND_MENHIR)
+            self.execute_action(KillerAction.FIND_MENHIR, knowledge)
 
-        if len(self.planned_actions) == 0:  # Could not find menhir
-            self.execute_action(KillerAction.FIND_VICTIM)
+        if len(self.planned_actions) == 0 and self.check_for_enemies(knowledge):  # Could not find menhir
+            self.execute_action(KillerAction.FIND_VICTIM, knowledge)
 
         if len(self.planned_actions) == 0:  # Could not find victim
-            self.execute_action(KillerAction.DISCOVER)
+            self.execute_action(KillerAction.DISCOVER, knowledge)
 
-        verbose_logger.debug(self.planned_actions)
+        # verbose_logger.debug(self.planned_actions)
         while len(self.planned_actions) > 0:
             action = self.planned_actions.pop(0)
             if isinstance(action, KillerAction):
                 self.execute_action(action, knowledge)
             else:
-                return action
+                if action == Action.STEP_FORWARD and facing_element.type != 'land':
+                    return Action.TURN_RIGHT
+                else:
+                    return action
         else:
-            return Action.STEP_FORWARD
+            return Action.TURN_RIGHT
 
     def praise(self, score: int) -> None:
         pass
