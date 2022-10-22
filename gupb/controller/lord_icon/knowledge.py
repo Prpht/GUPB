@@ -101,7 +101,7 @@ class Knowledge:
             else:
                 if tile.character:
                     self.enemies.append(CharacterInfo.from_tile(tile, (x, y)))
-                elif tile.loot and ALL_WEAPONS[tile.loot.name].value < ALL_WEAPONS[self.character.weapon].value:
+                elif tile.loot and self.character and ALL_WEAPONS[tile.loot.name].value < ALL_WEAPONS[self.character.weapon].value:
                     self.weapons[(x, y)] = heuristic((x, y), self.position) - ALL_WEAPONS[tile.loot.name].value
             if tile.type == "menhir":
                 self.menhir = (x, y)
