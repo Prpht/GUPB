@@ -19,7 +19,7 @@ CONFIGURATION = {
         aksolotl.AksolotlController("Old"),
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
         barabasz.BarabaszController("BenadrylowyBarabasz"),
-        dart.DartController("Dart", dart.strategy.AxeAndCenterStrategy()),
+        dart.DartController("Dart"),
         dzikie_borsuki.DzikieBorsuki("DzikieBorsuki"),
         elvis.DodgeController("Elvis"),
         intercontinental_bajers.IntercontinentalBajers("IntercontinentalBajers"),
