@@ -54,7 +54,6 @@ class Pathfinder():
         # Loop until you find the end
         while len(open_list) > 0:
             outer_iterations += 1
-
             if outer_iterations > max_iterations:
                 # if we hit this point return the path such as it is
                 # it will not contain the destination
@@ -63,6 +62,7 @@ class Pathfinder():
             # Get the current node
             current_node = heapq.heappop(open_list)
             closed_list.append(current_node)
+            
 
             # Found the goal
             if current_node == end_node:
@@ -76,7 +76,6 @@ class Pathfinder():
                 # Get node position
                 node_position = (
                     current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
-
                 # Make sure within range
                 if node_position[0] > (len(self.map.tuptable_map) - 1) or node_position[0] < 0 or node_position[1] > (len(self.map.tuptable_map[len(self.map.tuptable_map)-1]) - 1) or node_position[1] < 0:
                     continue
@@ -90,7 +89,6 @@ class Pathfinder():
 
                 # Append
                 children.append(new_node)
-
             # Loop through children
             for child in children:
                 # Child is on the closed list

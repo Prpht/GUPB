@@ -62,14 +62,33 @@ class TuptusController(controller.Controller):
         if self.planned_actions:
             return self.planned_actions.pop(0)
         
+
+        self.map.decode_knowledge(knowledge)
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
         if not self.menhir_coords:
-            self.menhir = self.is_menhir(knowledge.visible_tiles)
+            self.menhir_coords = self.is_menhir(knowledge.visible_tiles)
+
+
+        if self.map.weapons_position and not self.is_mist_bool(knowledge.visible_tiles):
+            for _, pos in self.map.weapons_position.items():
+                weapon_pos = pos
+            
+            self._raw_path = self.pathfinder.astar(knowledge.position, weapon_pos)
+            if self._raw_path:
+                self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
+                return self.planned_actions.pop(0)
+
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]        
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
         elif self.is_mist_bool(knowledge.visible_tiles) > 0:
+            if self.menhir_coords:
+                self._raw_path = self.pathfinder.astar(knowledge.position, self.menhir_coords)
+                if self._raw_path:
+                    self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
+                    return self.planned_actions.pop(0)
+
             self.mist_directions.append(self.facing)
             if self.facing == characters.Facing.UP and characters.Facing.RIGHT in self.mist_directions:
                 choice = POSSIBLE_ACTIONS[1]
@@ -107,6 +126,7 @@ class TuptusController(controller.Controller):
         self.mist_tiles = np.array([])
         self.mist_directions = []
         self.arena = self.map._init_map(Arena.load(arena_description.name))
+        self.map.weapons_position = {}
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
         facing_dct = {(0, -1): characters.Facing.UP,
@@ -130,6 +150,7 @@ class TuptusController(controller.Controller):
                     self.mist_tiles = np.array(np.array(coords))
                 elif np.array(coords) not in self.mist_tiles:
                     self.mist_tiles = np.vstack((self.mist_tiles, np.array(np.array(coords))))  
+                self.map.tuptable_map[coords] = 1
         return self.mist_tiles
     
     def are_opposite(self, opponent_facing, character_facing):
@@ -150,7 +171,7 @@ class TuptusController(controller.Controller):
     
     def is_menhir(self, visible_tiles):
         for coords, tile in visible_tiles.items():
-            if effects.EffectDescription(type='menhir') in tile.effects:
+            if  tile == tiles.Menhir:
                 return coords 
         return None
 
