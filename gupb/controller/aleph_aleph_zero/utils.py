@@ -2,7 +2,7 @@ import os
 
 from gupb.model import coordinates, characters, tiles
 from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, FIXED_MENHIRS
-from gupb.model.characters import ChampionKnowledge
+from gupb.model.characters import ChampionKnowledge, Facing
 from gupb.model.coordinates import add_coords, Coords
 from gupb.model.tiles import TileDescription
 
@@ -86,3 +86,18 @@ def get_knowledge_from_file(map_name):
         vis_tiles[FIXED_MENHIRS[map_name]] = tiles.Menhir().description()
     return ChampionKnowledge(None, 0, visible_tiles=vis_tiles)
 
+def get_save_spots(map_knowledge):
+    save_spots = []
+    for coords, tile_info in map_knowledge.visible_tiles.items():
+        if tile_info.type == "land" or tile_info.type == "menhir":
+            unaccessible = 0
+            for direction in Facing:
+                adjacent = add_coords(coords, direction.value)
+                adjacent_info = map_knowledge.visible_tiles[adjacent]
+                if adjacent_info.type == "land" or adjacent_info == "menhir":
+                    pass
+                else:
+                    unaccessible+=1
+            if unaccessible == 3:
+                save_spots.append(coords)
+    return save_spots
