@@ -21,8 +21,8 @@ class EndGameStrategy(Strategy):
             for pos in attack_range:
                 EndGameStrategy.enemies_ranges.append(pos)
 
-        for enemy_range in EndGameStrategy.enemies_ranges:
-            map[enemy_range] = 1
+        # for enemy_range in EndGameStrategy.enemies_ranges:
+        #     map[enemy_range] = 1
 
         if EndGameStrategy.counter == 2:
             EndGameStrategy.enemies_ranges = []
