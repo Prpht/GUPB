@@ -1,7 +1,5 @@
-from time import sleep
-
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path
-from gupb.controller.aleph_aleph_zero.strategy import Strategy, StrategyPriority
+from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy, StrategyPriority
 from gupb.model import characters
 from gupb.model.coordinates import sub_coords, add_coords
 

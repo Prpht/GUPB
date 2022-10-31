@@ -1,13 +1,12 @@
 import random
 from enum import Enum
 
-from gupb.controller.aleph_aleph_zero.scanning_strategy import ScanningStrategy
+from gupb.controller.aleph_aleph_zero.strategies.scanning_strategy import ScanningStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, get_reachable, find_shortest_path, \
     find_closest_orientation
-from gupb.controller.aleph_aleph_zero.strategy import Strategy
-from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
+from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelStrategy
 from gupb.controller.aleph_aleph_zero.utils import get_edge_of_vision
-from gupb.model import characters
 
 
 class ScoutingPhase(Enum):
