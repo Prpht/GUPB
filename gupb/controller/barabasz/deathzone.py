@@ -1,6 +1,5 @@
 from gupb.model import coordinates
 from gupb.model import weapons
-from gupb.model import arenas
 
 
 def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coordinates.Coords):

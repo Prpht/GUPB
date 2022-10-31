@@ -4,7 +4,6 @@ import heapq
 
 
 Point2d = Tuple[int, int]
-Direction = Tuple[int, int]
 
 
 def dist(a: Point2d, b: Point2d) -> int:
@@ -12,10 +11,11 @@ def dist(a: Point2d, b: Point2d) -> int:
 
 
 def heuristic(a, b):
-    return np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+    return abs(b[0] - a[0]) + abs(b[1] - a[1])
+    # return np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
 
 
-def astar(map: np.ndarray, start: Point2d, goal: Point2d) -> List[Point2d]:
+def find_path(map: np.ndarray, start: Point2d, goal: Point2d) -> List[Point2d]:
     neighbors = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     close_set = set()
     came_from = {}
@@ -23,7 +23,6 @@ def astar(map: np.ndarray, start: Point2d, goal: Point2d) -> List[Point2d]:
     fscore = {start: heuristic(start, goal)}
     oheap = []
     heapq.heappush(oheap, (fscore[start], start))
-
     while oheap:
         current = heapq.heappop(oheap)[1]
         if current == goal:
@@ -46,7 +45,9 @@ def astar(map: np.ndarray, start: Point2d, goal: Point2d) -> List[Point2d]:
             else:
                 continue
 
-            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+            if neighbor in close_set and tentative_g_score >= gscore.get(
+                neighbor, 0
+            ):
                 continue
 
             if tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [
