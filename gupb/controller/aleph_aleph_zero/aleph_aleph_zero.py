@@ -1,3 +1,4 @@
+import random
 from copy import copy
 
 import numpy as np
@@ -33,6 +34,12 @@ class Knowledge:
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class AlephAlephZeroBot(controller.Controller):
+    HLSs = (
+        HideRun,
+        LootHide,
+        LootConquer
+    )
+
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.mists = set()
@@ -48,6 +55,8 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.map_knowledge_cache = {}
         self.save_spots_cache = {}
+
+        self.rewards_dict = dict()
 
 
     def __eq__(self, other: object) -> bool:
@@ -159,18 +168,25 @@ class AlephAlephZeroBot(controller.Controller):
         if if_character_to_kill(self.knowledge):
             return characters.Action.ATTACK
 
-        if self.killed_now:
-            self.killed_now = False
-            return characters.Action.STEP_FORWARD
-
         return self.high_level_strategy.decide()
 
 
     def praise(self, score: int) -> None:
-        pass
+        n = self.rewards_dict[self.map_name][type(self.high_level_strategy)]["n"]
+        self.rewards_dict[self.map_name][type(self.high_level_strategy)]["reward_estimate"] = score/(n+1)+(n*self.rewards_dict[self.map_name][type(self.high_level_strategy)]["reward_estimate"])/(n+1)
+        self.rewards_dict[self.map_name][type(self.high_level_strategy)]["n"] = n+1
 
-    def _choose_hls(self, map_name):
-        return HideRun(self)
+    def _choose_hls(self, map_name, epsilon=0.15):
+        if random.uniform(0,1)<epsilon:  # take random
+            return random.choice(AlephAlephZeroBot.HLSs)(self)
+        else:  # take argmax
+            max_estimate = 0
+            best_hls = None
+            for hls in AlephAlephZeroBot.HLSs:
+                if self.rewards_dict[self.map_name][hls]["reward_estimate"]>=max_estimate:
+                    best_hls = hls
+                    max_estimate = self.rewards_dict[self.map_name][hls]["reward_estimate"]
+            return best_hls(self)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         if arena_description.name in self.map_knowledge_cache.keys():
@@ -191,6 +207,10 @@ class AlephAlephZeroBot(controller.Controller):
             self.menhir_position = FIXED_MENHIRS[arena_description.name]
             self.menhir_seen = True
             self.menhir_pos_updated = True
+
+        self.map_name = arena_description.name
+        if self.map_name not in self.rewards_dict.keys():
+            self.rewards_dict[self.map_name] = {hls:{"reward_estimate": 0, "n": 0} for hls in AlephAlephZeroBot.HLSs}
 
         self.high_level_strategy = self._choose_hls(arena_description.name)
 

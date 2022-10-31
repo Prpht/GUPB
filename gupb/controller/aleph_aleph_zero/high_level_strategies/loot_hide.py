@@ -37,9 +37,11 @@ class LootHide(HighLevelStrategy):
                         TravelStrategy(
                             get_closest_points(self.bot.save_spots, self.bot.graph,
                                                self.bot.graph[self.bot.knowledge.position, self.bot.knowledge.facing])[0],
-                            GuardingStrategy(priority=StrategyPriority.PURPOSEFUL),
+                            GuardingStrategy(priority=StrategyPriority.PURPOSEFUL, signature="guarding safespot"),
                             priority=StrategyPriority.PURPOSEFUL
-                        ))
+                        ),
+                        exception_signature="guarding safespot"
+                    )
 
         i = 0  # quick fix
         while True:
