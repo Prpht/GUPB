@@ -1,7 +1,7 @@
 import random
-from typing import List, Optional, Type
+from typing import Optional, Type
 from gupb.controller import Controller
-from gupb.controller.dart.movement_mechanics import euclidean_distance, get_champion_weapon, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import euclidean_distance, get_champion_weapon, is_opponent_at_coords
 from gupb.controller.dart.strategy import AttackOpponentStrategy, CollectClosestWeaponStrategy, GoToMenhirStrategy, RotateAndAttackStrategy, RunAwayFromOpponentStrategy, Strategy
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
@@ -41,8 +41,8 @@ class DartController(Controller):
 
                 # Handle opponent found
                 elif self._handle_opponent_strategy(knowledge):
-                    self._strategy = self._handle_opponent_strategy(knowledge)                    
-                
+                    self._strategy = self._handle_opponent_strategy(knowledge)
+
                 # Choose different strategy
                 else:
                     break
@@ -52,7 +52,8 @@ class DartController(Controller):
                     return action
 
             action = self._strategy.decide(knowledge)
-            if action and not self._is_same_strategy(CollectClosestWeaponStrategy) and not self._is_same_strategy(RotateAndAttackStrategy):
+            if action and not self._is_same_strategy(CollectClosestWeaponStrategy) and \
+                    not self._is_same_strategy(RotateAndAttackStrategy):
                 return action
 
             # Handle collect weapon
@@ -66,15 +67,18 @@ class DartController(Controller):
             return self._strategy.decide(knowledge)
         except Exception as e:
             return random.choice(POSSIBLE_ACTIONS)
-    
+
     def _handle_opponent_strategy(self, knowledge: ChampionKnowledge) -> Optional[Strategy]:
         if self._strategy.map_knowledge.opponents:
-            if self._previous_opponent_coords in knowledge.visible_tiles and not is_opponent_in_front(self._previous_opponent_coords, knowledge.visible_tiles):
+            # Opponent has moved
+            if is_opponent_at_coords(self._previous_opponent_coords, knowledge.visible_tiles):
                 self._previous_opponent_coords = None
+            # Get closest opponent coords
             opponents_coords = list(self._strategy.map_knowledge.opponents.values())
             if self._previous_opponent_coords:
                 opponents_coords.append(self._previous_opponent_coords)
             opponent_coords = self._strategy.map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
+            # Decide
             if euclidean_distance(knowledge.position, opponent_coords) < 3:
                 self._previous_opponent_coords = opponent_coords
                 return AttackOpponentStrategy(self._arena_description, opponent_coords)

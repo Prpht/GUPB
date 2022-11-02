@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import List, Optional
-from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, follow_path, get_facing, is_opponent_in_front
+from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, follow_path, get_facing, is_opponent_at_coords
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
@@ -55,7 +55,7 @@ class Strategy(ABC):
         return next_action
 
     def _is_blocked_by_opponent(self, knowledge: ChampionKnowledge) -> bool:
-        return (knowledge.position == self._previous_position) and (is_opponent_in_front(self._path[0], knowledge.visible_tiles))
+        return (knowledge.position == self._previous_position) and (is_opponent_at_coords(self._path[0], knowledge.visible_tiles))
 
 
 class RotateAndAttackStrategy(Strategy):

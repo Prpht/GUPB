@@ -94,7 +94,8 @@ class MapKnowledge():
         weapon = get_weapon(get_champion_weapon(knowledge))
         facing = get_facing(knowledge)
         weapon_cut_positions = weapon.cut_positions(self.arena.terrain, knowledge.position, facing)
-        return opponent_position in weapon_cut_positions
+        return is_opponent_at_coords(opponent_position, knowledge.visible_tiles) and \
+            opponent_position in weapon_cut_positions
 
     def get_facing_for_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> Optional[Facing]:
         for facing in Facing:
@@ -114,14 +115,15 @@ class MapKnowledge():
         return False
 
     def get_visible_mist(self, knowledge: ChampionKnowledge, coords, tile):
-            if coords in self.mists:
-                self.mists.remove(coords)
-            if is_mist(tile):
-                for i in (-1, 1):
-                    adj_coord_x = Coords(*coords) + Coords(i, 0)
-                    adj_coord_y = Coords(*coords) + Coords(0, i)
-                    if self.check_if_tile_is_mist_free(knowledge, adj_coord_x) or self.check_if_tile_is_mist_free(knowledge, adj_coord_y):
-                        self.mists.add(coords)
+        if coords in self.mists:
+            self.mists.remove(coords)
+        if is_mist(tile):
+            for i in (-1, 1):
+                adj_coord_x = Coords(*coords) + Coords(i, 0)
+                adj_coord_y = Coords(*coords) + Coords(0, i)
+                if self.check_if_tile_is_mist_free(knowledge, adj_coord_x) or \
+                        self.check_if_tile_is_mist_free(knowledge, adj_coord_y):
+                    self.mists.add(coords)
 
     def update_map_knowledge(self, knowledge: ChampionKnowledge, visible_tiles: Dict[tuple, TileDescription]) -> None:
         self.opponents = dict()
@@ -134,8 +136,10 @@ class MapKnowledge():
             if is_menhir(tile):
                 self.arena_menhir = Coords(*coords)
             self.get_visible_mist(knowledge, coords, tile)
-        mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords)) for coords in self.mist_coords]
-        self.closest_mist_coords = min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
+        mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords))
+                                     for coords in self.mist_coords]
+        self.closest_mist_coords = min(mist_coords_and_distances, key=lambda x: x[1])[0] \
+            if mist_coords_and_distances else None
 
     def calculate_menhir_center(self):
         from scipy import optimize
@@ -184,7 +188,7 @@ def determine_rotation_action(current_facing: Facing, desired_facing: Facing) ->
     return TURN_ACTIONS[(current_facing, desired_facing)]
 
 
-def is_opponent_in_front(opponent_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+def is_opponent_at_coords(opponent_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
     if opponent_position not in visible_tiles:
         return False
     opponent = visible_tiles[opponent_position].character
