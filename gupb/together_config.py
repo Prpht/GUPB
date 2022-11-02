@@ -14,12 +14,12 @@ from gupb.controller import tuptus
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(20),
+    'arenas': arena_generator.generate_arenas(30),
     'controllers': [
         aksolotl.AksolotlController("Old"),
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
         barabasz.BarabaszController("BenadrylowyBarabasz"),
-        dart.DartController("Dart", dart.strategy.AxeAndCenterStrategy()),
+        dart.DartController("Dart"),
         dzikie_borsuki.DzikieBorsuki("DzikieBorsuki"),
         elvis.DodgeController("Elvis"),
         intercontinental_bajers.IntercontinentalBajers("IntercontinentalBajers"),

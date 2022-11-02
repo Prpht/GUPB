@@ -1,4 +1,3 @@
-from gupb.controller.dart.strategy import AxeAndCenterStrategy
 from .dart_controller import DartController
 
 __all__ = [
@@ -7,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    DartController("Dart", AxeAndCenterStrategy()),
+    DartController("Dart"),
 ]

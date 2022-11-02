@@ -1,43 +1,42 @@
+from typing import List
+from math import acos
 import numpy as np
-from collections import deque
+from enum import Enum
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action, Facing
-from gupb.model.coordinates import Coords
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
-import pathfinding as pth
+from gupb.model.coordinates import Coords, add_coords
+import logging
 
-def save_method_returns(limit):
-    def wrapper(method):
-        def save(*args, **kwargs):
-            obj_ref = args[0]
-            if not hasattr(obj_ref, "saved_returns"):
-                obj_ref.saved_returns = []
+from .utils import PathConstants, find_path
+verbose_logger = logging.getLogger("verbose")
 
-            result = method(*args, **kwargs)
 
-            obj_ref.saved_returns.append(result)
-            if len(obj_ref.saved_returns) > limit:
-                obj_ref.saved_returns = obj_ref.saved_returns[1:]
+class KillerInterest(Enum):
+    POINT_ON_MAP = 2
+    ITEM = 3
+    KILLING = 4
+    MENHIR = 5
 
-            return result
-        return save
-    return wrapper
+
+class KillerAction(Enum):
+    DISCOVER = 0  # Find new point of interest on map
+    FIND_PATH = 1  # Find actions to get to the destination
+    FIND_VICTIM = 2  # Find path to enemy
+    FIND_MENHIR = 3  # Find path to menhir if one exists
+    LEARN_MAP = 4  # Invoke learn_map method
+    LOOK_AROUND = 5  # Perform ('turn right', 'learn_map') 4 times
+    SPIN_AROUND = 6  # Perform 'turn right' 4 times
 
 
 class KillerController(controller.Controller):
 
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.menhir_coordinates = None
-        self.map = np.zeros(shape=(50, 50))
-        self.saved_returns = []
-        self.dead_ends = []
-        self.turn_direction = Action.TURN_RIGHT
-        # self.facing_position
+        self.game_map = None
+        self.menhir_pos = None
+        self.planned_actions = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KillerController):
@@ -47,128 +46,187 @@ class KillerController(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def memorize_map(self, knowledge: characters.ChampionKnowledge):
+    def learn_map(self, knowledge: characters.ChampionKnowledge) -> None:
+
         for coord, tile in knowledge.visible_tiles.items():
+
             if tile.type == "land":
-                self.map[coord[0], coord[1]] = 1
+                self.game_map[coord[0], coord[1]] = PathConstants.WALKABLE.value
+                if tile.character is not None:
+                    self.game_map[coord[0], coord[1]] = KillerInterest.KILLING.value
 
-    def find_path_to_menhir(self, knowledge: characters.ChampionKnowledge) -> Action:
-        path = self.get_path(knowledge)
-        current_facing = self.get_facing(knowledge)
-        if path is not None and len(path) > 1:
-            if current_facing.value + knowledge.position == path[1]:
-                return Action.STEP_FORWARD
-            else:
-                if current_facing == Facing.UP:
-                    if (Facing.RIGHT.value + knowledge.position == path[1]) or (Facing.DOWN.value + knowledge.position == path[1]):
-                        return Action.TURN_RIGHT
-                    else:
-                        return Action.TURN_LEFT
-                if current_facing == Facing.LEFT:
-                    if (Facing.UP.value + knowledge.position == path[1]) or (Facing.RIGHT.value + knowledge.position == path[1]):
-                        return Action.TURN_RIGHT
-                    else:
-                        return Action.TURN_LEFT
-                if current_facing == Facing.DOWN:
-                    if (Facing.LEFT.value + knowledge.position == path[1]) or (Facing.UP.value + knowledge.position == path[1]):
-                        return Action.TURN_RIGHT
-                    else:
-                        return Action.TURN_LEFT
-                if current_facing == Facing.RIGHT:
-                    if (Facing.DOWN.value + knowledge.position == path[1]) or (Facing.LEFT.value + knowledge.position == path[1]):
-                        return Action.TURN_RIGHT
-                    else:
-                        return Action.TURN_LEFT
-        elif path is not None:
-            return Action.ATTACK
-        else:
-            return Action.DO_NOTHING
+            if self.menhir_pos is None:
+                if tile.type == "menhir":
+                    self.game_map[coord[0], coord[1]] = KillerInterest.MENHIR.value
+                    self.menhir_pos = coord[0], coord[1]
 
-    def get_path(self, knowledge: characters.ChampionKnowledge) -> list:
-        queue = deque([[knowledge.position]])
-        seen = set([knowledge.position])
-        while queue:
-            path = queue.popleft()
-            x, y = path[-1]
-            if self.map[y][x] == 2.:
-                return [Coords(p[1], p[0]) for p in path] #to be swapped
-            for x2, y2 in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= x2 < 50 and 0 <= y2 < 50 and self.map[y2][x2] != 0 and (x2, y2) not in seen:
-                    queue.append(path + [(x2, y2)])
-                    seen.add((x2, y2))
+    def update_map(self,
+                   knowledge: characters.ChampionKnowledge,
+                   current_interest: KillerInterest) -> None:
+        # to do: Update only player locations (not the whole map)
+        pass
 
-    # def get_path(self, knowledge: characters.ChampionKnowledge) -> list:
-    #     map = Grid(self.map)
-    #     start = map.node(knowledge.position.x, knowledge.position.y)
-    #     end = map.node(self.menhir_coordinates[0], self.menhir_coordinates[1])
-    #     finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
-    #     path, _ = finder.find_path(start, end, map)
+    def __get_path_actions(self,
+                           position: Coords,
+                           direction: Coords,
+                           interest: KillerInterest) -> List[Action]:
+        found_path = []
+        is_found = find_path(arr=self.game_map,
+                             visited=np.zeros_like(self.game_map),
+                             curr_pos=position,
+                             path=found_path,
+                             min_sought_val=interest.value)
+        verbose_logger.debug(f"Is path found: {is_found}")
+        actions = []
+        if not is_found:
+            # verbose_logger.debug(f"Map: {self.game_map}")
+            return actions
+        # verbose_logger.debug(f"Found_path: {found_path}")
 
-    def get_facing(self, knowledge: characters.ChampionKnowledge):
+        curr_d = direction
+        for i in range(len(found_path) - 1):
+            d = found_path[i + 1][0] - found_path[i][0], found_path[i + 1][1] - found_path[i][1]
+            sign = curr_d[0] * d[1] - d[0] * curr_d[1]
+            angle = acos(d[0] * curr_d[0] + d[1] * curr_d[1])
+            if 1. <= angle <= 2.5:
+                if sign < 0:
+                    actions.append(Action.TURN_RIGHT)
+                else:
+                    actions.append(Action.TURN_LEFT)
+            if 2.5 <= angle:
+                actions.append(Action.TURN_RIGHT)
+                actions.append(Action.TURN_RIGHT)
+            actions.append(Action.STEP_FORWARD)
+            curr_d = d
+        # verbose_logger.debug(actions)
+        return actions
+
+    def find_new_interest(self, curr_position):
+        x_max, y_max = self.game_map.shape
+        map = self.game_map.copy()
+        map[curr_position] = 0
+        stack = [curr_position]
+        distances = []
+        get_distance = lambda z: np.sqrt(z[0]**2 + z[1]**2)
+        while stack:
+            coords = stack.pop()
+            if coords[0] - 1 >= 0 and map[coords[0] - 1, coords[1]] == 1:
+                new_coords = coords[0] - 1, coords[1]
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[0] + 1 < x_max and map[coords[0] + 1, coords[1]] == 1:
+                new_coords = coords[0] + 1, coords[1]
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[1] - 1 >= 0 and map[coords[0], coords[1] - 1] == 1:
+                new_coords = coords[0], coords[1] - 1
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+            if coords[1] + 1 < y_max and map[coords[0], coords[1] + 1] == 1:
+                new_coords = coords[0], coords[1] + 1
+                map[new_coords] = 0
+                distances.append((new_coords, get_distance(new_coords)))
+                stack.append(new_coords)
+        if distances:
+            self.game_map[sorted(distances, key=lambda x: x[1])[-1][0]] = 2
+
+
+
+    @staticmethod
+    def get_facing(knowledge: characters.ChampionKnowledge):
         return knowledge.visible_tiles[knowledge.position].character.facing
 
-    def noticed_menhir(self, knowledge: characters.ChampionKnowledge) -> bool:
-        if self.menhir_coordinates is not None:
-            return True
-        else:
-            visible_types = list(map(lambda tile: tile.type, knowledge.visible_tiles.values()))
-            coordinates = knowledge.visible_tiles.keys()
-            if "menhir" in visible_types:
-                elements = dict(zip(visible_types, coordinates))
-                self.menhir_coordinates = elements["menhir"]
-                self.map[elements["menhir"]] = 2.
-                self.memorize_map(knowledge)
-                return True
-            else:
-                return False
+    @staticmethod
+    def get_facing_element(knowledge: characters.ChampionKnowledge):
+        return knowledge.visible_tiles[add_coords(knowledge.position, KillerController.get_facing(knowledge).value)]
 
-    @save_method_returns(limit=2)
+    def find(self, knowledge: characters.ChampionKnowledge, interest: KillerInterest):
+        # verbose_logger.debug("Looking for path...")
+        current_position = knowledge.position
+        # verbose_logger.debug(f"Curr position: {current_position}")
+        facing = self.get_facing(knowledge)
+        # verbose_logger.debug(f"Facing: {facing}")
+        if facing == Facing.UP:
+            curr_direction = -1, 0
+        elif facing == Facing.DOWN:
+            curr_direction = 1, 0
+        elif facing == Facing.LEFT:
+            curr_direction = 0, -1
+        else:  # facing == Facing.RIGHT
+            curr_direction = 0, 1
+        # verbose_logger.debug(f"Current direction: {curr_direction}")
+        path_actions = self.__get_path_actions(current_position, curr_direction, interest)
+        # logging.debug(f"Actions to get there: {path_actions}")
+        if len(path_actions) != 0:
+            self.planned_actions += path_actions
+            self.planned_actions.append(KillerAction.LOOK_AROUND)
+
+    def execute_action(self, action: KillerAction, knowledge: characters.ChampionKnowledge):
+        if action == KillerAction.LEARN_MAP:
+            self.learn_map(knowledge)
+
+        if action == KillerAction.LOOK_AROUND:
+            self.planned_actions += 4 * [Action.TURN_RIGHT, KillerAction.LEARN_MAP]
+
+        if action == KillerAction.SPIN_AROUND:
+            self.planned_actions += 4 * [Action.TURN_RIGHT]
+
+        if action == KillerAction.FIND_VICTIM:
+            self.find(knowledge, interest=KillerInterest.KILLING)
+
+        if action == KillerAction.FIND_MENHIR:
+            self.find(knowledge, interest=KillerInterest.MENHIR)
+
+        if action == KillerAction.DISCOVER:
+            self.find_new_interest(curr_position=knowledge.position)
+            self.find(knowledge, interest=KillerInterest.POINT_ON_MAP)
+
+    def check_for_enemies(self, knowledge: characters.ChampionKnowledge):
+        #mark enemies
+        are_enemies = False
+        for coords, value in knowledge.visible_tiles.items():
+            if value.character is not None and value.character.controller_name != 'Killer':
+                self.game_map[coords] = KillerInterest.KILLING.value
+                are_enemies = True
+        return are_enemies
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        if self.noticed_menhir(knowledge):
-            what_to_do = self.find_path_to_menhir(knowledge)
-            if what_to_do is not Action.DO_NOTHING:
-                return what_to_do
+        facing_element = self.get_facing_element(knowledge)
+        if facing_element.character is not None:
+            return Action.ATTACK
+
+        if self.game_map is None:
+            self.game_map = np.zeros(shape=(50, 50))
+            self.execute_action(KillerAction.LOOK_AROUND, knowledge)
+
+        if self.menhir_pos == knowledge.position:
+            self.execute_action(KillerAction.SPIN_AROUND, knowledge)
+
+        # verbose_logger.debug(f"Planned actions: {self.planned_actions}")
+        if len(self.planned_actions) == 0 and (self.menhir_pos is not None):
+            self.execute_action(KillerAction.FIND_MENHIR, knowledge)
+
+        if len(self.planned_actions) == 0 and self.check_for_enemies(knowledge):  # Could not find menhir
+            self.execute_action(KillerAction.FIND_VICTIM, knowledge)
+
+        if len(self.planned_actions) == 0:  # Could not find victim
+            self.execute_action(KillerAction.DISCOVER, knowledge)
+
+        # verbose_logger.debug(self.planned_actions)
+        while len(self.planned_actions) > 0:
+            action = self.planned_actions.pop(0)
+            if isinstance(action, KillerAction):
+                self.execute_action(action, knowledge)
             else:
-                return self.wander(knowledge)
+                if action == Action.STEP_FORWARD and facing_element.type != 'land':
+                    return Action.TURN_RIGHT
+                else:
+                    return action
         else:
-            return self.wander(knowledge)
-
-    def wander(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        # The wandering algorithm is running in circles until we find a wall or enemy
-        x = knowledge.position.x
-        y = knowledge.position.y
-        for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
-            try:
-                step_forward = Coords(x=x + dx, y=y + dy)
-                if knowledge.visible_tiles[step_forward].type == "land":
-                    if knowledge.visible_tiles[step_forward].character is not None:
-                        return Action.ATTACK
-                    else:
-                        self.memorize_map(knowledge)
-                        return Action.STEP_FORWARD
-            except KeyError:
-                pass
-
-        self.memorize_map(knowledge)
-        if knowledge.position in self.dead_ends:
-            if self.turn_direction == Action.TURN_RIGHT:
-                self.turn_direction = Action.TURN_LEFT
-            else:
-                self.turn_direction = Action.TURN_RIGHT
-        else:
-            if all(action == Action.TURN_RIGHT for action in self.saved_returns):
-                self.dead_ends.append(knowledge.position)
-            if all(action == Action.TURN_LEFT for action in self.saved_returns):
-                self.dead_ends.append(knowledge.position)
-
-        return self.turn_direction
-
-    # def move_to_destination(self, knowledge: characters.ChampionKnowledge, coords: Coords):
-    #     x = knowledge.position.x
-    #     y = knowledge.position.y
-    #     x_t = coords.x
-    #     y_t = coords.y
-
+            return Action.TURN_RIGHT
 
     def praise(self, score: int) -> None:
         pass
