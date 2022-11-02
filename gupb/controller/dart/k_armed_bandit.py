@@ -12,9 +12,10 @@ class KArmedBandit():
         self.current_action = 0
 
     def reward(self, score):
+        score = (score/(_fibonacci_of(13)[:-1]))
         gain = (1/self.N[self.current_action]) * (score - self.Q[self.current_action])
         self.Q[self.current_action] = self.Q[self.current_action] + gain
-        write_to_file()
+        self.write_to_file()
 
     def pull_arm(self):
         x = np.random.uniform() # 0..1
@@ -32,5 +33,7 @@ class KArmedBandit():
         with open("k_armed_bandit_n.txt", "a") as f:
             f.write(self.N)
 
-        
-
+    def _fibonacci_of(n):
+        if n in {0, 1}:
+            return n
+        return _fibonacci_of(n - 1) + _fibonacci_of(n - 2)
