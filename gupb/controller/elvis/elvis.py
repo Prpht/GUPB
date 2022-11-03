@@ -3,7 +3,10 @@ import random
 import enum
 from typing import NamedTuple, Optional, List, Tuple
 
+import numpy as np
+
 from gupb import controller
+from gupb.controller.elvis.cluster import Cluster
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.coordinates import Coords, add_coords, sub_coords
@@ -32,29 +35,20 @@ WEAPON_ENCODING = {
     'M': WeaponDescription(name='amulet'),
 }
 
-AREAS = {
-    'center': (Coords(7, 7), Coords(12, 12)),
-    'north-west': (Coords(0, 0), Coords(10, 10)),
-    'north-east': (Coords(10, 0), Coords(19, 9)),
-    'south-west': (Coords(0, 10), Coords(9, 19)),
-    'south-east': (Coords(9, 9), Coords(19, 19))
-}
-
 INFINITY: int = 99999999
-TURNS_TO_FOG: int = 80
+TURNS_TO_FOG: int = 150
 MENHIR: Coords = Coords(9, 9)
 
 
 class Strategy(enum.Enum):
-    EARLY_SPIN = 'early_spin'
+    SPIN = 'spin'
     ATTACK = 'attack'
     MOVE_TO_CENTER = 'move_to_center'
     ESCAPE = 'escape'
     RANDOM = 'random'
     MINIMIZE_RISK = 'minimize_risk'
-    GRAB_WEAPON = 'grab_weapon'
-    ENDGAME = 'endgame'
     ANTI_IDLE = 'anti_idle'
+    CHANGE_CLUSTER = 'change_cluster'
 
 
 # noinspection PyUnusedLocal
@@ -78,18 +72,17 @@ class DodgeController(controller.Controller):
         self.turn: int = 0
         self.health: int = 8
         self.run: int = 0
-        self.areas: {str: List[ChampionDescription]} = {
-            'center': [],
-            'north-west': [],
-            'north-east': [],
-            'south-west': [],
-            'south-east': [],
-        }
-        self.safe_to_get_weapon = True
         self.idle_time = 0
         self.last_position = None
         self.last_facing = None
+        self.arena_name = 'generated_0' if os.path.exists('resources/arenas/generated_0.gupb') else 'island'
+        self.menhir: Optional[Coords] = None
+        self.clusters: List[Cluster] = []
+        self.explored_clusters: List[int] = []
+        self.current_cluster: int = -1
+        self.number_of_enemies = 13
         self.load_arena()
+        self.create_clusters()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DodgeController):
@@ -105,6 +98,40 @@ class DodgeController(controller.Controller):
         self.last_facing = self.facing
         self.last_position = self.position
         self.position = knowledge.position
+        self.number_of_enemies = knowledge.no_of_champions_alive
+
+        for i in range(len(self.clusters)):
+            if self.position in self.clusters[i].tiles.keys():
+                self.current_cluster = i
+
+        danger_changes = [{} for cluster in self.clusters]
+        for i in range(len(self.clusters)):
+            cluster = self.clusters[i]
+            for neighbor in cluster.neighbors:
+                distance = cluster.get_distance_between_centers_of_mass(self.clusters[neighbor].center_of_mass)
+                if distance == 0.0:
+                    if i in self.clusters[neighbor].neighbors:
+                        self.clusters[neighbor].neighbors.remove(i)
+                    if neighbor in cluster.neighbors:
+                        cluster.neighbors.remove(neighbor)
+                    continue
+                percentage_lost = 0.25 / distance
+                for danger in cluster.extra_danger.keys():
+                    if danger_changes[i].get(danger) is None:
+                        danger_changes[i][danger] = -percentage_lost * cluster.extra_danger[danger]
+                    else:
+                        danger_changes[i][danger] -= percentage_lost * cluster.extra_danger[danger]
+                    if danger_changes[neighbor].get(danger) is None:
+                        danger_changes[neighbor][danger] = percentage_lost * cluster.extra_danger[danger]
+                    else:
+                        danger_changes[neighbor][danger] += percentage_lost * cluster.extra_danger[danger]
+        for i in range(len(danger_changes)):
+            for danger in danger_changes[i].keys():
+                if self.clusters[i].extra_danger.get(danger) is None:
+                    self.clusters[i].extra_danger[danger] = danger_changes[i][danger]
+                else:
+                    self.clusters[i].extra_danger[danger] += danger_changes[i][danger]
+
         for tile in knowledge.visible_tiles:
             self.tiles[Coords(tile[0], tile[1])] = knowledge.visible_tiles[tile]
             if tile == self.position:
@@ -116,65 +143,29 @@ class DodgeController(controller.Controller):
             elif knowledge.visible_tiles[tile].character is not None:
                 self.known_enemies[knowledge.visible_tiles[tile].character.controller_name] \
                     = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
-                for area in self.areas.keys():
-                    if self.areas[area].count(knowledge.visible_tiles[tile].character) > 0:
-                        self.areas[area].remove(knowledge.visible_tiles[tile].character)
-                current_area = 'center'
-                for area in AREAS.keys():
-                    if AREAS[area][0].x <= tile[0] < AREAS[area][1].x and AREAS[area][0].y <= tile[1] < AREAS[area][1].y:
-                        current_area = area
+                for cluster in self.clusters:
+                    if Coords(tile[0], tile[1]) in cluster.tiles:
+                        cluster.extra_danger[knowledge.visible_tiles[tile].character.controller_name] = 1.0
+                    else:
+                        cluster.extra_danger[knowledge.visible_tiles[tile].character.controller_name] = 0.0
+            if knowledge.visible_tiles[tile].type == 'menhir' and self.menhir is None:
+                self.menhir = Coords(tile[0], tile[1])
+                for cluster in self.clusters:
+                    if Coords(tile[0], tile[1]) in cluster.tiles:
+                        cluster.contains_menhir = True
+                        cluster.set_base_danger(self.number_of_enemies)
                         break
-                self.areas[current_area].append(knowledge.visible_tiles[tile].character)
-            if knowledge.visible_tiles[tile].type == 'menhir':
-                self.target = Coords(tile[0], tile[1])
+
+        for cluster in self.clusters:
+            cluster.update_danger(self.number_of_enemies)
+
+        if self.position == self.clusters[self.current_cluster].central_point and self.current_cluster not in self.explored_clusters and self.spinning_stage == 4:
+            self.spinning_stage = 0
 
         if self.position == self.last_position and self.facing == self.last_facing:
             self.idle_time += 1
         else:
             self.idle_time = 0
-
-        # Check where to go
-        if self.turn > TURNS_TO_FOG or not self.safe_to_get_weapon:
-            self.target = MENHIR
-            self.safe_to_get_weapon = False
-        else:
-            for area in self.areas.keys():
-                if AREAS[area][0].x <= self.position.x < AREAS[area][1].x and AREAS[area][0].y <= self.position.y < AREAS[area][1].y:
-                    if area == 'center':
-                        self.safe_to_get_weapon = False
-                        self.target = None
-                    elif area == 'north-west':
-                        if self.weapon == WeaponDescription(name='knife'):
-                            self.target = Coords(1, 2)
-                        else:
-                            self.target = Coords(3, 2)
-                    elif area == 'north-east':
-                        if self.weapon == WeaponDescription(name='knife'):
-                            self.target = Coords(17, 2)
-                        else:
-                            self.target = Coords(17, 3)
-                    elif area == 'south-west':
-                        if self.weapon == WeaponDescription(name='knife'):
-                            self.target = Coords(1, 16)
-                        else:
-                            self.target = Coords(3, 15)
-                    elif area == 'south-east':
-                        if self.weapon == WeaponDescription(name='knife'):
-                            self.target = Coords(16, 17)
-                        else:
-                            self.target = Coords(15, 16)
-                    break
-
-        # Check if getting a weapon is safe
-        if self.safe_to_get_weapon and self.weapon == WeaponDescription(name='knife'):
-            for area in self.areas.keys():
-                if AREAS[area][0].x <= self.position.x < AREAS[area][1].x and AREAS[area][0].y <= self.position.y < AREAS[area][1].y:
-                    current_distance = self.find_path(self.position, self.target, self.facing)[1]
-                    for enemy in self.areas[area]:
-                        if self.find_path(self.known_enemies[enemy.controller_name][0], self.target, enemy.facing)[1] < current_distance:
-                            self.safe_to_get_weapon = False
-                            break
-                    break
 
         # Update risks
         for enemy in self.known_enemies.keys():
@@ -213,12 +204,6 @@ class DodgeController(controller.Controller):
                 best_rating = self.danger_ratings[move]
                 best_move = move
 
-        # Find the best path to the chosen target
-        if self.target is not None:
-            self.path = self.find_path(self.position, self.target, self.facing)[0]
-            if len(self.path) > 0:
-                self.path.pop(0)
-
         # Choose strategy for the turn
         strategy: Strategy = Strategy.RANDOM
         if self.idle_time == PENALISED_IDLE_TIME - 1:
@@ -228,13 +213,11 @@ class DodgeController(controller.Controller):
         elif self.run > 0 and self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir'):
             strategy = Strategy.ESCAPE
         elif self.spinning_stage < 4:
-            strategy = Strategy.EARLY_SPIN
-        elif self.safe_to_get_weapon:
-            strategy = Strategy.GRAB_WEAPON
-        elif random.random() * TURNS_TO_FOG * 2 < self.turn and self.path is not None and len(self.path) > 0:
+            strategy = Strategy.SPIN
+        elif random.random() * TURNS_TO_FOG * 2 < self.turn and self.menhir is not None:
             strategy = Strategy.MOVE_TO_CENTER
-        elif self.turn > TURNS_TO_FOG and 7 <= self.position.x < 12 and 7 <= self.position.y < 12:
-            strategy = Strategy.ENDGAME
+        elif (self.clusters[self.current_cluster].danger_sum > 9.0 and min([self.clusters[x].danger_sum for x in self.clusters[self.current_cluster].neighbors]) < 9.0) or (random.random() * TURNS_TO_FOG < self.turn and self.menhir is None):
+            strategy = Strategy.CHANGE_CLUSTER
         elif random.random() * 100 < best_rating:
             strategy = Strategy.RANDOM
         else:
@@ -243,8 +226,10 @@ class DodgeController(controller.Controller):
         # Update some values
         if self.run > 0:
             self.run -= 1
-        if self.spinning_stage < 4:
+        if self.spinning_stage < 4 and strategy == Strategy.SPIN:
             self.spinning_stage += 1
+            if self.spinning_stage == 4 and self.current_cluster in self.explored_clusters:
+                self.explored_clusters.append(self.current_cluster)
 
         # Execute strategy
         if strategy == Strategy.ANTI_IDLE:
@@ -254,135 +239,66 @@ class DodgeController(controller.Controller):
             return characters.Action.ATTACK
         elif strategy == Strategy.ESCAPE:
             return characters.Action.STEP_FORWARD
-        elif strategy == Strategy.EARLY_SPIN:
+        elif strategy == Strategy.SPIN:
             return characters.Action.TURN_LEFT
-        elif strategy == Strategy.GRAB_WEAPON:
-            if self.target == self.position:
-                if self.position.x < 9:
-                    if self.position.y > 9:
-                        if self.facing == Facing.RIGHT:
-                            return characters.Action.ATTACK
-                        elif self.facing.turn_left() == Facing.RIGHT:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                    else:
-                        if self.facing == Facing.DOWN:
-                            return characters.Action.ATTACK
-                        elif self.facing.turn_left() == Facing.DOWN:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                else:
-                    if self.facing == Facing.LEFT:
-                        return characters.Action.ATTACK
-                    elif self.facing.turn_left() == Facing.LEFT:
-                        return characters.Action.TURN_LEFT
-                    else:
-                        return characters.Action.TURN_RIGHT
-            else:
-                return self.get_action_to_move_in_path()
         elif strategy == Strategy.MOVE_TO_CENTER:
-            return self.get_action_to_move_in_path()
-        elif strategy == Strategy.ENDGAME:
-            if self.position == Coords(9, 9):
-                return characters.Action.TURN_LEFT
-            if self.weapon == WeaponDescription(name='sword')\
-                    or self.weapon == WeaponDescription(name='bow_loaded')\
-                    or self.weapon == WeaponDescription(name='bow_unloaded'):
-                optimal_positions = [Coords(7, 9), Coords(9, 7), Coords(9, 11), Coords(11, 9)]
-                if self.position not in optimal_positions:
-                    path = None
-                    distance = INFINITY
-                    for position in optimal_positions:
-                        current_path, current_distance = self.find_path(self.position, position, self.facing)
-                        if current_distance < distance:
-                            distance = current_distance
-                            path = current_path
-                    if len(path) > 1:
-                        direction = sub_coords(path[1], self.position)
-                        if direction == self.facing.value:
-                            self.path.pop(1)
-                            return characters.Action.STEP_FORWARD
-                        elif direction == self.facing.turn_left().value:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                    else:
-                        return random.choice(POSSIBLE_ACTIONS)
-                else:
-                    direction = Coords(int(sub_coords(self.target, self.position).x / 2),
-                                       int(sub_coords(self.target, self.position).y / 2))
-                    if direction == self.facing.turn_left().value:
-                        return characters.Action.TURN_LEFT
-                    else:
-                        return characters.Action.TURN_RIGHT
-            elif self.weapon == WeaponDescription(name='axe'):
-                enemy_weapon = WeaponDescription(name='knife')
-                for enemy in self.known_enemies.values():
-                    if enemy[0] == Coords(9, 9):
-                        enemy_weapon = enemy[1].weapon.name
-                        break
-
-                optimal_positions = [Coords(8, 9), Coords(9, 8), Coords(10, 9), Coords(9, 10)]\
-                    if enemy_weapon == 'amulet' else [Coords(8, 8), Coords(10, 10)]
-
-                if self.position in optimal_positions:
-                    if self.position.x == self.position.y:
-                        if self.facing == Facing.RIGHT or self.facing == Facing.LEFT:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                    else:
-                        direction = sub_coords(self.target, self.position)
-                        if direction == self.facing.turn_left().value:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                else:
-                    path = None
-                    distance = INFINITY
-                    for position in optimal_positions:
-                        current_path, current_distance = self.find_path(self.position, position, self.facing)
-                        if current_distance < distance:
-                            distance = current_distance
-                            path = current_path
-                    if len(path) > 1:
-                        direction = sub_coords(path[1], self.position)
-                        if direction == self.facing.value:
-                            self.path.pop(1)
-                            return characters.Action.STEP_FORWARD
-                        elif direction == self.facing.turn_left().value:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                    else:
-                        return random.choice(POSSIBLE_ACTIONS)
-            elif self.weapon == WeaponDescription(name='amulet'):
-                optimal_positions = [Coords(7, 7), Coords(11, 11), Coords(7, 11), Coords(11, 7)]
-                if self.position in optimal_positions:
-                    return self.get_action_to_move_in_path()
-                else:
-                    path = None
-                    distance = INFINITY
-                    for position in optimal_positions:
-                        current_path, current_distance = self.find_path(self.position, position, self.facing)
-                        if current_distance < distance:
-                            distance = current_distance
-                            path = current_path
-                    if len(path) > 1:
-                        direction = sub_coords(path[1], self.position)
-                        if direction == self.facing.value:
-                            self.path.pop(1)
-                            return characters.Action.STEP_FORWARD
-                        elif direction == self.facing.turn_left().value:
-                            return characters.Action.TURN_LEFT
-                        else:
-                            return characters.Action.TURN_RIGHT
-                    else:
-                        return random.choice(POSSIBLE_ACTIONS)
-            else:
+            if self.menhir is not None:
+                self.path = self.find_path(self.position, self.menhir, self.facing)[0]
                 return self.get_action_to_move_in_path()
+            else:
+                neighbors = []
+                for neighbor in self.clusters[self.current_cluster].neighbors:
+                    neighbors.append(neighbor)
+                while neighbors and len(neighbors) > 0:
+                    least_danger = INFINITY
+                    best_neighbor = neighbors[0]
+                    for neighbor in neighbors:
+                        if neighbor in self.clusters and least_danger > self.clusters[neighbor].danger_sum:
+                            best_neighbor = neighbors
+                            least_danger = self.clusters[neighbor].danger_sum + (100.0 if self.menhir is None and neighbor not in self.explored_clusters else 0.0)
+                    if best_neighbor in neighbors:
+                        neighbors.remove(best_neighbor)
+                    path_to_center = self.find_path(self.position, self.clusters[best_neighbor].central_point, self.facing)
+                    path_to_center = path_to_center[0] if path_to_center else path_to_center
+                    enemy_in_sight = False
+                    if self.path is not None and len(self.path) > 0:
+                        for enemy in self.known_enemies.values():
+                            if enemy[2] == 0 and np.sqrt(np.power(enemy[0].x - self.path[0].x, 2) + np.power(enemy[0].y - self.path[0].y, 2)) < 5.0:
+                                enemy_in_sight = True
+                    else:
+                        enemy_in_sight = True
+
+                    if not enemy_in_sight:
+                        return self.get_action_to_move_in_path()
+
+                return self.pick_action(best_move)
+        elif strategy == Strategy.CHANGE_CLUSTER:
+            neighbors = []
+            for neighbor in self.clusters[self.current_cluster].neighbors:
+                neighbors.append(neighbor)
+            while neighbors and len(neighbors) > 0:
+                least_danger = INFINITY
+                best_neighbor = neighbors[0]
+                for neighbor in neighbors:
+                    if neighbor in self.clusters and least_danger > self.clusters[neighbor].danger_sum:
+                        best_neighbor = neighbors
+                        least_danger = self.clusters[neighbor].danger_sum + (100.0 if self.menhir is None and neighbor not in self.explored_clusters else 0.0)
+                if best_neighbor in neighbors:
+                    neighbors.remove(best_neighbor)
+                path_to_center = self.find_path(self.position, self.clusters[best_neighbor].central_point, self.facing)
+                path_to_center = path_to_center[0] if path_to_center else path_to_center
+                enemy_in_sight = False
+                if self.path is not None and len(self.path) > 0:
+                    for enemy in self.known_enemies.values():
+                        if enemy[2] == 0 and np.sqrt(np.power(enemy[0].x - self.path[0].x, 2) + np.power(enemy[0].y - self.path[0].y, 2)) < 5.0:
+                            enemy_in_sight = True
+                else:
+                    enemy_in_sight = True
+
+                if not enemy_in_sight:
+                    return self.get_action_to_move_in_path()
+
+            return self.pick_action(best_move)
         elif strategy == Strategy.RANDOM:
             return random.choice(POSSIBLE_ACTIONS)
         else:
@@ -408,18 +324,17 @@ class DodgeController(controller.Controller):
         self.turn: int = 0
         self.health: int = 8
         self.run: int = 0
-        self.areas: {str: List[ChampionDescription]} = {
-            'center': [],
-            'north-west': [],
-            'north-east': [],
-            'south-west': [],
-            'south-east': [],
-        }
-        self.safe_to_get_weapon = True
         self.idle_time = 0
         self.last_position = None
         self.last_facing = None
+        self.arena_name = arena_description.name
+        self.menhir: Optional[Coords] = None
+        self.clusters: List[Cluster] = []
+        self.explored_clusters: List[int] = []
+        self.current_cluster: int = -1
+        self.number_of_enemies = 13
         self.load_arena()
+        self.create_clusters()
 
     @property
     def name(self) -> str:
@@ -439,8 +354,169 @@ class DodgeController(controller.Controller):
         else:
             return characters.Action.TURN_RIGHT
 
+    def create_clusters(self):
+        # Step 1
+        coords_per_no_neighbors = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: []}
+        for coords in self.tiles.keys():
+            if self.tiles[coords].type not in ('land', 'menhir'):
+                continue
+
+            count = 0
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if not (dx == 0 and dy == 0) and self.tiles.get(Coords(coords.x + dx, coords.y + dy)) is not None and self.tiles.get(Coords(coords.x + dx, coords.y + dy)).type in ('land', 'menhir'):
+                        count += 1
+
+            coords_per_no_neighbors[count].append(coords)
+
+        # Step 2
+        mini_clusters = []
+        for i in range(8, -1, -1):
+            while len(coords_per_no_neighbors[i]) > 0:
+                new_cluster = Cluster(len(self.clusters))
+                current_coords = coords_per_no_neighbors[i][0]
+                new_cluster.tiles[current_coords] = self.tiles[current_coords]
+                to_be_checked = []
+                to_be_found = []
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        if not (dx == 0 and dy == 0):
+                            is_found = False
+                            for neighbor_list in coords_per_no_neighbors.values():
+                                if Coords(current_coords.x + dx, current_coords.y + dy) in neighbor_list:
+                                    is_found = True
+                                    break
+                            if is_found:
+                                to_be_found.append(Coords(current_coords.x + dx, current_coords.y + dy))
+
+                to_be_found.append(current_coords)
+
+                for neighbor_list in coords_per_no_neighbors.values():
+                    for neighbor in to_be_found:
+                        if neighbor in neighbor_list:
+                            neighbor_list.remove(neighbor)
+                            if neighbor in to_be_found:
+                                to_be_found.remove(neighbor)
+                            to_be_checked.append(neighbor)
+
+                while len(to_be_checked) > 0:
+                    currently_checked = to_be_checked.pop()
+                    new_cluster.tiles[currently_checked] = self.tiles[currently_checked]
+                    neighbor_indices = []
+                    mini_neighbor_indices = []
+                    for dx in [-1, 0, 1]:
+                        for dy in [-1, 0, 1]:
+                            if not (dx == 0 and dy == 0):
+                                to_be_found.append(Coords(currently_checked.x + dx, currently_checked.y + dy))
+                                for cluster in self.clusters:
+                                    if Coords(currently_checked.x + dx, currently_checked.y + dy) in cluster.tiles.keys():
+                                        neighbor_indices.append(cluster.index)
+                                for mini_cluster in mini_clusters:
+                                    if Coords(currently_checked.x + dx, currently_checked.y + dy) in mini_cluster.tiles.keys():
+                                        mini_neighbor_indices.append(mini_cluster.index)
+
+                    for index in neighbor_indices:
+                        if index not in new_cluster.neighbors:
+                            new_cluster.neighbors.append(index)
+                    for index in mini_neighbor_indices:
+                        if index not in new_cluster.mini_neighbors:
+                            new_cluster.mini_neighbors.append(index)
+
+                    while len(to_be_found) > 0:
+                        next_neighbor = to_be_found.pop()
+                        count_in_cluster = 0
+                        for dx in [-1, 0, 1]:
+                            for dy in [-1, 0, 1]:
+                                if not (dx == 0 and dy == 0):
+                                    if new_cluster.tiles.get(Coords(currently_checked.x + dx, currently_checked.y + dy)) is not None:
+                                        count_in_cluster += 1
+
+                        if count_in_cluster >= 3:
+                            for neighbor_list in coords_per_no_neighbors.values():
+                                if next_neighbor in neighbor_list:
+                                    neighbor_list.remove(next_neighbor)
+                                    to_be_checked.append(next_neighbor)
+
+                if len(new_cluster.tiles.keys()) > 9:
+                    new_cluster.index = len(self.clusters)
+                    self.clusters.append(new_cluster)
+                else:
+                    new_cluster.index = len(mini_clusters)
+                    mini_clusters.append(new_cluster)
+
+        for cluster in self.clusters:
+            for neighbor in cluster.neighbors:
+                if cluster.index not in self.clusters[neighbor].neighbors:
+                    self.clusters[neighbor].neighbors.append(cluster.index)
+            for neighbor in cluster.mini_neighbors:
+                if cluster.index not in mini_clusters[neighbor].neighbors:
+                    mini_clusters[neighbor].neighbors.append(cluster.index)
+        for cluster in mini_clusters:
+            for neighbor in cluster.neighbors:
+                if cluster.index not in self.clusters[neighbor].mini_neighbors:
+                    self.clusters[neighbor].mini_neighbors.append(cluster.index)
+            for neighbor in cluster.mini_neighbors:
+                if cluster.index not in mini_clusters[neighbor].mini_neighbors:
+                    mini_clusters[neighbor].mini_neighbors.append(cluster.index)
+
+        # Step 3
+        remaining_mini_clusters = [x for x in range(len(mini_clusters))]
+        to_be_moved_up = []
+        for size in range(1, 10):
+            for mini_cluster in mini_clusters:
+                if len(mini_cluster.tiles.keys()) == size and mini_cluster.index in remaining_mini_clusters:
+                    remaining_mini_clusters.remove(mini_cluster.index)
+                    optimal_neighbor = None
+                    optimal_neighbor_size = -1
+                    for mini_neighbor_index in mini_cluster.mini_neighbors:
+                        mini_neighbor = mini_clusters[mini_neighbor_index]
+                        if 10 > len(mini_neighbor.tiles.keys()) > optimal_neighbor_size or optimal_neighbor_size < 0:
+                            optimal_neighbor = mini_neighbor_index
+                            optimal_neighbor_size = len(mini_neighbor.tiles.keys())
+                    if optimal_neighbor is None:
+                        for neighbor_index in mini_cluster.neighbors:
+                            neighbor = mini_clusters[neighbor_index]
+                            if len(neighbor.tiles.keys()) > optimal_neighbor_size:
+                                optimal_neighbor = neighbor_index
+                                optimal_neighbor_size = len(neighbor.tiles.keys())
+
+                    if optimal_neighbor is not None:
+                        for tile in mini_cluster.tiles.keys():
+                            mini_clusters[optimal_neighbor].tiles[tile] = mini_cluster.tiles[tile]
+                        for neighbor in mini_cluster.neighbors:
+                            if neighbor not in mini_clusters[optimal_neighbor].neighbors:
+                                mini_clusters[optimal_neighbor].neighbors.append(neighbor)
+                        for mini_neighbor in mini_cluster.mini_neighbors:
+                            if mini_neighbor not in mini_clusters[optimal_neighbor].mini_neighbors:
+                                mini_clusters[optimal_neighbor].mini_neighbors.append(mini_neighbor)
+
+                        if len(mini_clusters[optimal_neighbor].tiles) > 9:
+                            to_be_moved_up.append(optimal_neighbor)
+                            if optimal_neighbor in remaining_mini_clusters:
+                                remaining_mini_clusters.remove(optimal_neighbor)
+
+        for cluster_index in to_be_moved_up:
+            self.clusters.append(mini_clusters[cluster_index])
+            mini_clusters[cluster_index].index = len(self.clusters) - 1
+            for i in range(len(self.clusters) - 1):
+                if cluster_index in self.clusters[i].mini_neighbors:
+                    self.clusters[i].neighbors.append(mini_clusters[cluster_index].index)
+
+        # Step 4
+        for cluster in self.clusters:
+            cluster.find_central_point()
+
+        # Step 5
+        for cluster in self.clusters:
+            for neighbor in cluster.neighbors:
+                cluster.neighbor_distances.append(cluster.get_distance_between_centers_of_mass(self.clusters[neighbor].center_of_mass))
+
+        # Step 6
+        for cluster in self.clusters:
+            cluster.set_base_danger(self.number_of_enemies)
+
     def load_arena(self):
-        with open(os.path.abspath('resources/arenas/lone_sanctum.gupb')) as file:
+        with open(os.path.abspath('resources/arenas/' + self.arena_name + '.gupb')) as file:
             for y, line in enumerate(file.readlines()):
                 for x, character in enumerate(line):
                     if character != '\n':

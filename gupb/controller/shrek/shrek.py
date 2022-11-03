@@ -1,3 +1,4 @@
+import os
 import random
 import numpy as np
 from pathfinding.core.grid import Grid
@@ -9,23 +10,25 @@ from gupb.model.arenas import Arena
 from gupb.model.characters import Facing
 from gupb.model import coordinates
 
-HIDING_SPOTS = [(7, 11), (11, 7)]
-WEAPON_SPOTS = [(3, 3), (15, 3), (3, 15)]
+
+# HIDING_SPOTS = [(7, 11), (11, 7)]
+# WEAPON_SPOTS = []  #now its aelf.tactic_spots
 
 
 class ShrekController:
     def __init__(self, first_name: str):
-        self.tactic = 1
+        self.points_to_visit = None
         self.first_name: str = first_name
         self.position = None
-        self.facing = None
-        self.current_map_knowledge = {}
         self.weapon_name = 'knife'
-        self.panic_moves = []
+        self.menhir = None
         self.path = []
-        self.map = self.load_map('lone_sanctum')
-        self.flag = True
+        self.tactic_spots = []
+        self.facing = None
+        self.weapon_name = 'knife'
+        self.map = None
         self.goal = None
+        # self.visited_points =[]
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ShrekController):
@@ -38,19 +41,20 @@ class ShrekController:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.position = None
         self.facing = None
-        self.current_map_knowledge = {}
         self.weapon_name = 'knife'
-        self.goal = (9, 9)
-        self.flag = True
-        self.panic_moves = False
+        self.map, self.tactic_spots = self.load_map(arena_description.name)
+        self.goal = None
         self.path = []
-        self.tactic = 1
+        self.points_to_visit = self.find_spots_to_visit()
+        self.menhir = None
+        # self.visited_points =[]
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.position = knowledge.position
         info = knowledge.visible_tiles[self.position].character
         self.facing = info.facing
         self.weapon_name = info.weapon.name
+
         if self.is_enemy_around(knowledge):
             facing_tile = self.position + self.facing.value  # if we face character we fight
             if knowledge.visible_tiles[facing_tile].character:
@@ -65,17 +69,16 @@ class ShrekController:
                     if knowledge.visible_tiles[facing_tile3].character:
                         return characters.Action.ATTACK
 
-        if self.am_i_on_goal():
-            self.find_better_weapon(knowledge)
-            if not self.path:
-                self.goal = HIDING_SPOTS[0]
-                self.path = self.find_path(self.goal)
-            if not self.path:
-                self.hide()
-
-        if self.flag:
-            self.set_goal(knowledge)
-            self.flag = False
+        if self.am_i_on_menhir():
+            return characters.Action.TURN_RIGHT
+        else:
+            if self.do_i_see_menhir(knowledge.visible_tiles, knowledge.position):
+                self.set_path(knowledge)
+            if self.tactic_spots and self.goal is None:
+                self.find_closest_weapon()
+                self.set_path(knowledge)
+            # if self.mist_comes and self.menhir is None:
+            #     self.goal = self.find_farest_point()
 
         if self.path:
             wanted_field = coordinates.Coords(self.path[0][0], self.path[0][1])
@@ -84,98 +87,21 @@ class ShrekController:
             if self.facing == needed_facing:
                 self.path.pop(0)
                 # check 3 fields next to goal if someone is there:
-                if len(self.path) == 2:
-                    if self.wanted_position_is_occupied(knowledge, self.goal):
-                        if not self.wanted_position_is_occupied(knowledge, HIDING_SPOTS[0]):
-                            self.goal = HIDING_SPOTS[0]
-                            self.flag = True
-
                 return characters.Action.STEP_FORWARD
             else:
                 return characters.Action.TURN_RIGHT
 
-        # if self.path_blocked(knowledge):
-        #         return self.make_a_turn()
-        # else:
-        #     return self.move()
-
-        # if self.mist_comes(knowledge):
-        #     self.path = []
-        #     res = self.find_path((9,9))
-        #     self.flag = False
-
-        # if self.next_moves:
-        #     return self.next_moves.pop(0)
-
-        # # later:
-        # # TODO if mnist coming : RUN in right direction - create list of direction to remember where to go - for now it only turns in other direction
-        # # TODO weapon around, get it has to be better the knife
-        # # TODO go after enemy
-        # # TODO remember next step for some strategy
-        # # TODO remember direction -> not go back
-
-        # if self.is_enemy_around(knowledge):
-        #     if info.health >= characters.CHAMPION_STARTING_HP * 0.5:
-        #         facing_tile = self.position + self.facing.value
-        #         if knowledge.visible_tiles[facing_tile].character:
-        #             return characters.Action.ATTACK
-        #     else:
-        #         return characters.Action.STEP_FORWARD
-
-    def wanted_position_is_occupied(self, knowledge: characters.ChampionKnowledge, goal):
-
-        for coordinate, tile_descr in knowledge.visible_tiles.items():
-            x = coordinate[0]
-            y = coordinate[1]
-            if tile_descr.character and x == goal[0] and y == goal[1]:
-                return True
-        return False
-
-    def am_i_on_goal(self):
-        cords = coordinates.Coords(self.goal[0], self.goal[1])
-
-        if self.position.x == cords.x and self.position.y == cords.y:
-            return True
-        return False
-
-    def path_blocked(self, knowledge: characters.ChampionKnowledge):
-        """
-        Check if there is an obstacle blocking the path (Sea or Wall)
-        """
-        facing_tile = self.position + self.facing.value
-        if knowledge.visible_tiles[facing_tile].type != 'land':
-            return True
-
-        return False
-
-    def mist_comes(self, knowledge: characters.ChampionKnowledge):
-        """
-        Check if there is mist nearby
-        """
-        facing_tile = self.position + self.facing.value
-        for effect in knowledge.visible_tiles[facing_tile].effects:
-            if effect.type == 'mist':
-                return True
-        return False
-
-    def make_a_turn(self):
-        """
-        Make a random turn right or left
-        """
-        POSSIBLE_TURNS = [characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
-        return random.choice(POSSIBLE_TURNS)
-
-    def move(self):
-        """
-        Take a step forward, or turn
-        """
-        rand_num = random.random()
-        if rand_num <= 0.8:
-            return characters.Action.STEP_FORWARD
-        elif rand_num > 0.8 and rand_num <= 0.9:
-            return characters.Action.TURN_LEFT
         else:
-            return characters.Action.TURN_RIGHT
+            self.goal = self.find_closest_point()
+            # self.visited_points.append(self.goal)
+            self.points_to_visit.remove(self.goal)
+            self.set_path(knowledge)
+
+        return characters.Action.TURN_RIGHT
+
+    """
+    Here are the functions we use:
+    """
 
     def is_enemy_around(self, knowledge: characters.ChampionKnowledge):
         """
@@ -186,16 +112,96 @@ class ShrekController:
                 return True
         return False
 
+    def am_i_on_menhir(self):
+        """
+               Check if bot is on the mehir
+        """
+        if self.menhir is not None:
+            cords = coordinates.Coords(self.menhir[0], self.menhir[1])
+            if self.position.x == cords.x and self.position.y == cords.y:
+                return True
+        return False
+
+    def do_i_see_menhir(self, visible_tiles, position):
+        """
+               Check if bot sees the menhir
+        """
+        for coordinate, tile_descr in visible_tiles.items():
+            if tile_descr.type == 'menhir':
+                self.goal = coordinate[0], coordinate[1]
+                self.menhir = self.goal
+                return True
+        return False
+
+    def set_path(self, knowledge: characters.ChampionKnowledge):
+        """
+               Remember the path to menhir
+        """
+        self.path = self.find_path(self.goal)
+
+    def find_spots_to_visit(self):
+        width = len(self.map[0]) - 1
+        height = len(self.map) - 1
+        
+        points = [(0, 0), (0, width), (height, 0),  (height, width)]
+        for i, p in enumerate(points):
+            x, y = p[0], p[1]
+            while self.map[x][y] == 0:
+                if i == 0:
+                    x += 1
+                    y += 1
+                elif i == 1:
+                    x += 1
+                    y -= 1
+                elif i == 2:
+                    x -= 1
+                    y += 1
+                else: 
+                    x -= 1
+                    y -= 1
+            points[i] = (x,y)
+        return points
+
+    def find_closest_point(self):
+        """
+        Find the closest point to bot
+        """
+        distances = {}
+        for p in self.points_to_visit:
+            distances[p] = self.get_distance((self.position.x, self.position.y), p)
+        return min(distances, key=distances.get)
+
+    # def find_farest_point(self):
+    #     """
+    #     Find the farest point to bot
+    #     """
+    #     distances = {}
+    #     for p in self.visited_points:
+    #         distances[p] = self.get_distance((self.position.x, self.position.y), p)
+    #     return max(distances, key=distances.get)
+
+    def get_distance(self, coords_a, coords_b):
+        return ((coords_a[0] - coords_b[0]) ** 2 + (coords_a[1] - coords_b[1]) ** 2) ** 0.5
+
     def load_map(self, map_name):
+        """
+        Load the map
+        """
+        tactic_spots = []
         arena = Arena.load(map_name)
         map_matrix = [[1 for x in range(arena.size[0])] for y in range(arena.size[1])]
         for cords, tile in arena.terrain.items():
             map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
             if tile.description().loot:
-                map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow"] else 1
-        return map_matrix
+                map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow_unloaded"] else 1
+                if tile.description().loot.name in ["axe","sword"]:
+                    tactic_spots.append((cords.x, cords.y))
+        return map_matrix, tactic_spots
 
     def find_path(self, destination):
+        """
+        Find the path to current destination
+        """
         grid = Grid(matrix=self.map)
         start = grid.node(self.position[0], self.position[1])
         end = grid.node(destination[0], destination[1])
@@ -205,87 +211,32 @@ class ShrekController:
             path.pop(0)
         return path
 
-    def learn_the_terrain(self, visible_tiles, position):
+    def find_closest_weapon(self):
         """
-        For now it only learns the path to menhir
+        Decide which weapon is the closest and go to it(only include the axe and sword)
         """
-        bigest_x = 0
-        bigest_y = 0
-        menhir = []
-        for coordinate, tile_descr in visible_tiles.items():
-            if coordinate[0] > bigest_x:
-                bigest_x = coordinate[0]
-            if coordinate[1] > bigest_y:
-                bigest_y = coordinate[1]
-        mat = np.zeros((bigest_y + 2, bigest_x + 2))
-        interesting_objects = {}
-        for coordinate, tile_descr in visible_tiles.items():
-            x = coordinate[0]
-            y = coordinate[1]
-            if tile_descr.type == 'land' and tile_descr.effects == []:
-                mat[y][x] = 1
-            if tile_descr.type == 'menhir':
-                mat[y][x] = 1
-                menhir = coordinate
-                interesting_objects[tile_descr.type] = coordinate
+        min_path_len = 10000
+        closest_weapon = ()
+        for weapon in self.tactic_spots:
+            weapon_len = len(self.find_path(weapon))
+            if weapon_len < min_path_len:
+                closest_weapon = weapon
+                min_path_len = weapon_len
+        self.tactic_spots = []
+        self.goal = closest_weapon
 
-        grid = Grid(matrix=mat)
-        start = grid.node(position[0], position[1])
-        end = 0
-        if menhir:
-            end = grid.node(menhir[0], menhir[1])
-        if end != 0:
-            finder = AStarFinder()
-            path, runs = finder.find_path(start, end, grid)
-            if len(path) > 1:
-                path.pop(0)
-            self.path = path
-
-    def weapon_value(self, weapon):
-        if weapon == 'knife':
-            return 1
-        elif weapon == 'amulet':
-            return 0
-        elif weapon == 'sword':
-            return 4
-        elif weapon == 'axe':
-            return 2
-        elif weapon == 'bow_unloaded' or weapon == 'bow_loaded' or weapon == 'bow':
-            return 3
-        else:
-            return 0
-
-    def set_goal(self, knowledge: characters.ChampionKnowledge):
-        if (self.position.x<4 and self.position.y<4) or (self.position.x < 4 and self.position.y>14) or (self.position.x>14 and self.position.y <4):
-            self.find_better_weapon(knowledge)
-        for spot in WEAPON_SPOTS:
-            if len(self.find_path(spot)) <= len(self.find_path(self.goal)) or self.find_path(spot) == []:
-                self.goal = spot
-        self.path = self.find_path(self.goal)
-
-    def find_better_weapon(self, knowledge: characters.ChampionKnowledge):
-        shortest_path = 100
-        for coords, tile_desc in knowledge.visible_tiles.items():
-            if tile_desc.loot:
-                if self.weapon_value(tile_desc.loot.name) > self.weapon_value(self.weapon_name) and not self.mist_comes(knowledge) and not self.is_near_menhir():
-                    path = self.find_path(coords)
-                    if len(path) < shortest_path:
-                        self.path = path
-                        self.goal = (coords[0], coords[1])
-                        shortest_path = len(path)
-
-    def hide(self):
-        if self.position.x != 7 and self.position.y != 11:
-            self.goal = HIDING_SPOTS[0]
-            self.path = self.find_path(self.goal)
-        else:
-            self.goal = HIDING_SPOTS[1]
-            self.path = self.find_path(self.goal)
-
-    def is_near_menhir(self):
-        if len(self.find_path((9, 9))) < 7:
-            return True
+    def mist_comes(self, knowledge: characters.ChampionKnowledge):
+        """
+        Check if there is mist nearby
+        """
+        facing_tile = self.position + self.facing.value + self.facing.value + self.facing.value + self.facing.value
+        if facing_tile in knowledge.visible_tiles:
+            if knowledge.visible_tiles[facing_tile].effects:
+                for effect in knowledge.visible_tiles[facing_tile].effects:
+                    if effect.type == 'mist':
+                        return True
         return False
+
 
     @property
     def name(self) -> str:
