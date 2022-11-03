@@ -9,7 +9,7 @@ from gupb import controller
 from gupb.controller.lord_icon.distance import Point2d, dist, find_path
 from gupb.controller.lord_icon.knowledge import Knowledge
 from gupb.controller.lord_icon.move import MoveController
-from gupb.controller.lord_icon.strategy import StrategyController
+from gupb.controller.lord_icon.strategy import ClassicStrategyController
 from gupb.model import arenas, characters, coordinates
 from gupb.model.arenas import Arena
 from gupb.model.weapons import WeaponDescription
@@ -36,8 +36,6 @@ class LordIcon(controller.Controller):
         # Knowledge
         self.knowledge = Knowledge()
 
-        # Weapons
-
     def __eq__(self, other: object) -> bool:
         if isinstance(other, LordIcon):
             return self.first_name == other.first_name
@@ -49,14 +47,18 @@ class LordIcon(controller.Controller):
     def decide(
         self, knowledge: characters.ChampionKnowledge
     ) -> characters.Action:
-        self.knowledge.update(knowledge)
+        try:
+            self.knowledge.update(knowledge)
 
-        action = StrategyController.decide(self.knowledge)
+            action = ClassicStrategyController.decide(self.knowledge)
 
-        if action:
-            return action
+            if action:
+                return action
 
-        return random.choice(POSSIBLE_ACTIONS)
+            return random.choice(POSSIBLE_ACTIONS)
+        except Exception as e:  # noqa
+            print(e)
+            return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
         pass
