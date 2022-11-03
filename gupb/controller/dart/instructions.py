@@ -1,30 +1,11 @@
 from abc import ABC, abstractmethod
-from enum import Enum, auto
 from typing import List, Optional
 from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, follow_path, get_facing, is_opponent_at_coords
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
 
-POSSIBLE_ACTIONS = [
-    Action.TURN_LEFT,
-    Action.TURN_RIGHT,
-    Action.STEP_FORWARD,
-    Action.ATTACK,
-]
 
-
-class Steps(Enum):
-    init = auto()
-    weapon_found = auto()
-    mist_found = auto()
-
-
-class Mode(Enum):
-    run_away = auto()
-    attack = auto()
-
-
-class Strategy(ABC):
+class Instruction(ABC):
     def __init__(self) -> None:
         super().__init__()
         self._path: Optional[List[Coords]] = None
@@ -52,7 +33,7 @@ class Strategy(ABC):
         return (knowledge.position == self._previous_position) and (is_opponent_at_coords(self._path[0], knowledge.visible_tiles))
 
 
-class RotateAndAttackStrategy(Strategy):
+class RotateAndAttackInstruction(Instruction):
     def __init__(self) -> None:
         super().__init__()
         self._previous_action: Action = Action.DO_NOTHING
@@ -63,7 +44,7 @@ class RotateAndAttackStrategy(Strategy):
         return desired_action
 
 
-class CollectClosestWeaponStrategy(Strategy):
+class CollectClosestWeaponInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
         if self._path and knowledge.position in self._path:
             return None
@@ -71,14 +52,14 @@ class CollectClosestWeaponStrategy(Strategy):
         return self._action_follow_path(knowledge)
 
 
-class GoToMenhirStrategy(Strategy):
+class GoToMenhirInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
         if self._path is None:
             self._path = map_knowledge.find_path(knowledge.position, map_knowledge.find_menhir())
         return self._action_follow_path(knowledge)
 
 
-class RunAwayFromOpponentStrategy(Strategy):
+class RunAwayFromOpponentInstruction(Instruction):
     def __init__(self, opponent_coords: Coords) -> None:
         super().__init__()
         self._opponent_coords = opponent_coords
@@ -103,7 +84,7 @@ class RunAwayFromOpponentStrategy(Strategy):
         raise RuntimeError("Could not find run destination")
 
 
-class AttackOpponentStrategy(Strategy):
+class AttackOpponentInstruction(Instruction):
     def __init__(self, opponent_coords: Coords) -> None:
         super().__init__()
         self._opponent_coords = opponent_coords
