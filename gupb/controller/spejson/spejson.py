@@ -1,357 +1,15 @@
 import random
-import os
 import numpy as np
 
 from gupb import controller
+from gupb.controller.spejson.static_map_processing import analyze_map
+from gupb.controller.spejson.dynamic_map_processing import analyze_weapons_on_map, find_closest_weapon
+from gupb.controller.spejson.pathfinding import find_path, pathfinding_next_move, pathfinding_next_move_in_cluster
+from gupb.controller.spejson.utils import POSSIBLE_ACTIONS, weapons, facing_to_letter, weapons_name_to_letter
 from gupb.model import arenas
 from gupb.model import characters
-from gupb.model.characters import Action, Facing
+from gupb.model.characters import Action
 from gupb.model.coordinates import Coords
-from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
-
-POSSIBLE_ACTIONS = [
-    Action.TURN_LEFT,
-    Action.TURN_RIGHT,
-    Action.STEP_FORWARD,
-    Action.ATTACK,
-]
-
-weapons = {
-    'knife': Knife,
-    'axe': Axe,
-    'bow_loaded': Bow,
-    'bow_unloaded': Bow,
-    'sword': Sword,
-    'amulet': Amulet
-}
-
-facings = {
-    "U": ["L", "R"], "R": ["U", "D"], "D": ["R", "L"], "L": ["D", "U"]
-}
-forwards = {
-    "U": np.array([-1, 0]), "R": np.array([0, 1]), "D": np.array([1, 0]), "L": np.array([0, -1])
-}
-facing_to_letter = {
-    Facing.UP: "U",Facing.RIGHT: "R", Facing.DOWN: "D", Facing.LEFT: "L"
-}
-weapons_to_letter = {
-    Knife: "K", Axe: "A", Bow: "B", Sword: "S", Amulet: "M"
-}
-weapons_name_to_letter = {
-    'knife': "K", 'axe': "A", 'bow_loaded': "B", 'bow_unloaded': "B", 'sword': "S", 'amulet': "M"
-}
-
-
-def find_path(adjacency_dict, c_from, c_to):
-    accessed_from = np.zeros(len(adjacency_dict), dtype=np.int32)
-    accessed_from[c_from - 1] = -1
-    stack = [c_from]
-
-    while stack:
-        node_from = stack.pop(0)
-        for node_to in adjacency_dict[node_from]:
-            if accessed_from[node_to - 1] == 0:
-                accessed_from[node_to - 1] = node_from
-                stack.append(node_to)
-
-    path = []
-    step = c_to
-    while step != -1:
-        path.append(step)
-        step = accessed_from[path[-1] - 1]
-
-    return path[::-1]
-
-
-def pathfinding_next_move(position, facing, next_cluster, clusters):
-    stack = [(position, facing)]
-    visited = {stack[0]: None}
-    is_found = False
-    pos_found = None
-
-    while stack and not is_found:
-        pos, face = stack.pop(0)
-
-        for new_pos, new_face in list(zip([pos, pos], facings[face])) + [(tuple(forwards[face] + pos), face)]:
-
-            if clusters[new_pos] and (new_pos, new_face) not in visited:
-                visited[(new_pos, new_face)] = (pos, face)
-                stack.append((new_pos, new_face))
-
-                if clusters[new_pos] == next_cluster:
-                    is_found = True
-                    pos_found = (new_pos, new_face)
-
-    path = []
-    step = pos_found
-    while step is not None:
-        path.append(step)
-        step = visited[path[-1]]
-
-    path = path[::-1]
-    if len(path) < 2:
-        return None
-
-    f_0 = path[0][1]
-    f_1 = path[1][1]
-
-    if f_0 == f_1:
-        return Action.STEP_FORWARD
-    elif f_1 == facings[facing][0]:
-        return Action.TURN_LEFT
-    elif f_1 == facings[facing][1]:
-        return Action.TURN_RIGHT
-
-
-def pathfinding_next_move_in_cluster(position, facing, target_pos, clusters):
-    stack = [(position, facing)]
-    visited = {stack[0]: None}
-    is_found = False
-    pos_found = None
-
-    while stack and not is_found:
-        pos, face = stack.pop(0)
-
-        for new_pos, new_face in list(zip([pos, pos], facings[face])) + [(tuple(forwards[face] + pos), face)]:
-
-            if clusters[new_pos] and (new_pos, new_face) not in visited:
-                visited[(new_pos, new_face)] = (pos, face)
-                stack.append((new_pos, new_face))
-
-                if new_pos == target_pos:
-                    is_found = True
-                    pos_found = (new_pos, new_face)
-
-    path = []
-    step = pos_found
-    while step is not None:
-        path.append(step)
-        step = visited[path[-1]]
-
-    path = path[::-1]
-    if len(path) < 2:
-        return None
-
-    f_0 = path[0][1]
-    f_1 = path[1][1]
-
-    if f_0 == f_1:
-        return Action.STEP_FORWARD
-    elif f_1 == facings[facing][0]:
-        return Action.TURN_LEFT
-    elif f_1 == facings[facing][1]:
-        return Action.TURN_RIGHT
-
-
-def analyze_weapons_on_map(weapons_knowledge, clusters):
-    stack_axe = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'A']
-    stack_bow = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'B']
-    stack_sword = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'S']
-    stack_amulet = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'M']
-
-    def get_dists(stack, base=0):
-        dists = 9999 * np.ones(clusters.shape, dtype=np.int32)
-
-        for pos in stack:
-            dists[pos] = base
-
-        while stack:
-            pos = stack.pop(0)
-
-            for dxdy in np.array([[-1, 0], [1, 0], [0, -1], [0, 1]]):
-                new_pos = tuple(pos + dxdy)
-                if clusters[new_pos] and dists[pos] + 1 < dists[new_pos]:
-                    dists[new_pos] = dists[pos] + 1
-                    stack.append(new_pos)
-
-        return dists
-
-    dists_axe = get_dists(stack_axe)
-    dists_bow = get_dists(stack_bow, base=-1)  # Preferred weapon
-    dists_sword = get_dists(stack_sword)
-    dists_amulet = get_dists(stack_amulet)
-
-    closest_weapon = np.argmin(np.stack(
-        [9998 * np.ones(clusters.shape, dtype=np.int32),
-         dists_axe, dists_bow, dists_sword, dists_amulet,
-        ], axis=-1), axis=-1)
-
-    closest_weapon = np.where(
-        closest_weapon == 0,
-        "-",
-        np.where(
-            closest_weapon < 3,
-            np.where(closest_weapon == 1, "A", "B"),
-            np.where(closest_weapon == 3, "S", "M")
-        )
-    )
-    return closest_weapon
-
-
-def find_closest_weapon(weapons_knowledge, position, weapon_letter, clusters, adj, menhir_location):
-    closest_weapon_position = (menhir_location.y, menhir_location.x)
-    closest_weapon_distance = 9999
-
-    for pos in [pos for pos in weapons_knowledge if weapons_knowledge[pos] == weapon_letter]:
-        dist = len(find_path(adj, clusters[(position.y, position.x)], clusters[pos]))
-        if dist < closest_weapon_distance:
-            closest_weapon_distance = dist
-            closest_weapon_position = pos
-
-    return Coords(x=closest_weapon_position[1], y=closest_weapon_position[0])
-
-
-def analyze_map(arena_name):
-    arena_filepath = os.path.join('resources', 'arenas', f'{arena_name}.gupb')
-
-    txt = []
-
-    with open(arena_filepath, mode='r') as file:
-        for line in file:
-            txt += [line.strip("\n")]
-
-    island_ar = np.array([list(i) for i in txt])
-
-    height = island_ar.shape[0]
-    width = island_ar.shape[1]
-
-    traversable = np.logical_and(island_ar != '=', island_ar != '#').astype(np.int32)
-
-    start = ((height - 1) // 2, (width - 1) // 2)
-    best_pos = None
-    best_dist = 9999
-
-    for _ in range(150):
-        pos = (start[0] + np.random.randint(-8, 9), start[1] + np.random.randint(-8, 9))
-        if island_ar[pos] == '.':
-            dist = (start[0] - pos[0]) ** 2 + (start[1] - pos[1]) ** 2
-            if dist < best_dist:
-                best_pos = pos
-                best_dist = dist
-
-    start = best_pos
-
-    # Initial cluster calculation by BFS in BFS
-    clusters = np.zeros([height, width], dtype=np.int32)
-    current_cluster = 1
-    stack = [start]
-    directions = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
-
-    while stack:
-        pos = stack.pop(0)
-
-        if clusters[pos] == 0:
-            clusters[pos] = current_cluster
-
-            substack = [pos]
-            i = 0
-            while i < 6 and substack:
-                i += 1
-                pos = substack.pop(0)
-
-                for dxdy in directions:
-                    new_pos = tuple(pos + dxdy)
-                    if traversable[new_pos] and clusters[new_pos] == 0:
-                        clusters[new_pos] = current_cluster
-                        substack.append(new_pos)
-
-            for pos in substack:
-                clusters[pos] = 0
-
-            stack.extend(substack)
-            current_cluster += 1
-
-    # Get derivable cluster information in valid cells
-    c = clusters.reshape(-1)
-    xs = np.tile(np.arange(width), [width, 1]).reshape(-1)
-    ys = np.tile(np.arange(height).reshape(-1, 1), [1, height]).reshape(-1)
-
-    xs = xs[c > 0]
-    ys = ys[c > 0]
-    c = c[c > 0]
-
-    counts = np.zeros(np.max(c), dtype=np.int32)
-    np.add.at(counts, c - 1, 1)
-
-    proto_x = np.zeros(np.max(c), dtype=np.int32)
-    proto_y = np.zeros(np.max(c), dtype=np.int32)
-    np.put(proto_x, c - 1, xs)
-    np.put(proto_y, c - 1, ys)
-
-    # Merge tiny clusters into neighbors
-    for i in np.arange(counts.shape[0])[counts < 5]:
-        stack = [(proto_y[i], proto_x[i])]
-
-        j = 0
-        c_found = 0
-
-        while j < len(stack):
-            pos = stack[j]
-
-            for dxdy in directions:
-                new_pos = tuple(pos + dxdy)
-
-                if clusters[new_pos] == i + 1:
-                    if new_pos not in stack:
-                        stack.append(new_pos)
-                else:
-                    if c_found == 0:
-                        c_found = clusters[new_pos]
-
-            j += 1
-
-        counts[i] = 0
-        for pos in stack:
-            clusters[pos] = c_found
-
-    clusters = np.r_[0, np.cumsum(counts > 0) * (counts > 0)][clusters]
-
-    # Get derivable cluster information in valid cells again (final)
-    c = clusters.reshape(-1)
-    xs = np.tile(np.arange(width), [width, 1]).reshape(-1)
-    ys = np.tile(np.arange(height).reshape(-1, 1), [1, height]).reshape(-1)
-
-    xs = xs[c > 0]
-    ys = ys[c > 0]
-    c = c[c > 0]
-
-    counts = np.zeros(np.max(c), dtype=np.int32)
-    np.add.at(counts, c - 1, 1)
-
-    proto_x = np.zeros(np.max(c), dtype=np.int32)
-    proto_y = np.zeros(np.max(c), dtype=np.int32)
-    np.put(proto_x, c - 1, xs)
-    np.put(proto_y, c - 1, ys)
-
-    # Get neighbors pairs and construct adjacency dictionary
-    neighbors = np.concatenate([
-        np.stack([clusters[:, 1:], clusters[:, :-1]], axis=-1).reshape(-1, 2),
-        np.stack([clusters[1:, :], clusters[:-1, :]], axis=-1).reshape(-1, 2)
-    ], axis=0)
-
-    neighbors = neighbors[neighbors[:, 0] != neighbors[:, 1]]
-    neighbors = neighbors[np.logical_and(neighbors[:, 0] != 0, neighbors[:, 1] != 0)]
-    neighbors = list(
-        set(map(lambda x: tuple(x), np.vstack([neighbors, neighbors[:, ::-1]]).tolist())))
-
-    adj = {i: [] for i in range(1, counts.shape[0] + 1)}
-    for c_from, c_to in neighbors:
-        adj[c_from].append(c_to)
-
-    # Create initial weapons knowledge dict
-    weapons_knowledge = {}
-    for i in range(height):
-        for j in range(width):
-            if island_ar[i, j] == 'A':
-                weapons_knowledge[(i, j)] = 'A'
-            elif island_ar[i, j] == 'B':
-                weapons_knowledge[(i, j)] = 'B'
-            elif island_ar[i, j] == 'S':
-                weapons_knowledge[(i, j)] = 'S'
-            elif island_ar[i, j] == 'M':
-                weapons_knowledge[(i, j)] = 'M'
-
-    return start, clusters, adj, weapons_knowledge, height, width
 
 
 # noinspection PyUnusedLocal
@@ -379,6 +37,44 @@ class Spejson(controller.Controller):
         self.latest_states = []
         self.map_height = 0
         self.map_width = 0
+
+        self.scalars = {
+            'my_hp': [0],  # Health points rescaled to 0-1
+            'my_weapon': [0, 0, 0, 0, 0],  # One-hot encoding of current weapon (Knife, Axe, Bow, Sword, Amulet)
+            'someone_in_range': [0],  # 1 if yes, 0 otherwise
+            'me_in_dmg_range': [0],  # 1 if yes, 0 otherwise
+            'epoch_num': [0],  # Rescaled by 0.02 factor
+            'move_to_axe': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Axe
+            'move_to_bow': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Bow
+            'move_to_sword': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Sword
+            'move_to_amulet': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Amulet
+            'move_to_menhir': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward)
+            'keypoint_dist': [0, 0, 0, 0, 0],  # Graph-hop dists to each weapon type and menhir
+            'menhir_found': [0],  # 1 if yes, 0 otherwise
+            'mist_spotted': [0],  # 1 if yes, 0 otherwise
+            'mist_close': [0],  # 1 if yes, 0 otherwise
+            'bow_unloaded': [0],  # 1 if yes, 0 otherwise
+        }
+
+        self.matrices = {
+            'walkability': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'visibility': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'is_wall': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'someone_here': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'character_hp': np.zeros([13, 13, 1], dtype=float),  # Health points rescaled to 0-1
+            'character_weapon': np.zeros([13, 13, 5], dtype=float),  # One-hot encoding of current weapon (Knife, Axe, Bow, Sword, Amulet)
+            'menhir_loc': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'weapon_loc': np.zeros([13, 13, 5], dtype=float),  # 1 if yes, 0 otherwise (Knife, Axe, Bow, Sword, Amulet)
+            'mist_effect': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'damage_effect': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'my_dmg_range': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'others_dmg_range': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
+            'min_distance': np.zeros([13, 13, 1], dtype=float),  # log(1 + value) of graph-hop distance
+            'attackability_fct': np.zeros([13, 13, 5], dtype=float),  # value
+            'betweenness_centr': np.zeros([13, 13, 1], dtype=float),  # value
+            'non_cluster_coeff': np.zeros([13, 13, 1], dtype=float),  # value
+            'borderedness': np.zeros([13, 13, 1], dtype=float),  # value
+        }
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -582,14 +278,16 @@ class Spejson(controller.Controller):
 
         self.arena_name = arena_description.name
         self.terrain = arenas.Arena.load(self.arena_name).terrain
-        start, clusters, adj, weapons_knowledge, height, width = analyze_map(self.arena_name)
-        self.target = Coords(x=start[1], y=start[0])
+
+        analytics = analyze_map(self.arena_name)
+
+        self.target = Coords(x=analytics['start'][1], y=analytics['start'][0])
         self.menhir_location = self.target
-        self.clusters = clusters
-        self.adj = adj
-        self.weapons_knowledge = weapons_knowledge
-        self.map_height = height
-        self.map_width = width
+        self.clusters = analytics['clusters']
+        self.adj = analytics['adj']
+        self.weapons_knowledge = analytics['weapons_knowledge']
+        self.map_height = analytics['height']
+        self.map_width = analytics['width']
 
     @property
     def name(self) -> str:
