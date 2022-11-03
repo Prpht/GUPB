@@ -62,3 +62,100 @@ class DefaultStrategy:
 
     def _is_same_instruction(self, strategy_class: Type[Instruction]) -> bool:
         return self._instruction.__class__.__name__ == strategy_class.__name__
+
+
+class PassivePassiveStrategy(DefaultStrategy):
+    def _handle_opponent_instruction(self, knowledge: ChampionKnowledge,
+                                     map_knowledge: MapKnowledge) -> Optional[Instruction]:
+        # Opponent has moved
+        if self._previous_opponent_coords in knowledge.visible_tiles and not is_opponent_at_coords(
+                self._previous_opponent_coords, knowledge.visible_tiles):
+            self._previous_opponent_coords = None
+        # Find all opponents
+        opponents_coords = list(map_knowledge.opponents.values())
+        if self._previous_opponent_coords:
+            opponents_coords.append(self._previous_opponent_coords)
+        # No opponents
+        if not opponents_coords:
+            return None
+        # Decide
+        opponent_coords = map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
+        if not self._is_same_instruction(RunAwayFromOpponentInstruction) and euclidean_distance(
+                knowledge.position, opponent_coords) < 5:
+            return RunAwayFromOpponentInstruction(opponent_coords)
+        return None
+
+
+class AgressiveAgressiveStrategy(DefaultStrategy):
+    def _handle_opponent_instruction(self, knowledge: ChampionKnowledge,
+                                     map_knowledge: MapKnowledge) -> Optional[Instruction]:
+        # Opponent has moved
+        if self._previous_opponent_coords in knowledge.visible_tiles and not is_opponent_at_coords(
+                self._previous_opponent_coords, knowledge.visible_tiles):
+            self._previous_opponent_coords = None
+        # Find all opponents
+        opponents_coords = list(map_knowledge.opponents.values())
+        if self._previous_opponent_coords:
+            opponents_coords.append(self._previous_opponent_coords)
+        # No opponents
+        if not opponents_coords:
+            return None
+        # Decide
+        opponent_coords = map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
+        return AttackOpponentInstruction(opponent_coords)
+
+
+class PassiveAgressiveStrategy(DefaultStrategy):
+    def _handle_opponent_instruction(self, knowledge: ChampionKnowledge,
+                                     map_knowledge: MapKnowledge) -> Optional[Instruction]:
+        # Opponent has moved
+        if self._previous_opponent_coords in knowledge.visible_tiles and not is_opponent_at_coords(
+                self._previous_opponent_coords, knowledge.visible_tiles):
+            self._previous_opponent_coords = None
+        # Find all opponents
+        opponents_coords = list(map_knowledge.opponents.values())
+        if self._previous_opponent_coords:
+            opponents_coords.append(self._previous_opponent_coords)
+        # No opponents
+        if not opponents_coords:
+            return None
+        # Decide
+        opponent_coords = map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
+        if get_champion_weapon(knowledge) != "knife":
+            return AttackOpponentInstruction(opponent_coords)
+        if not self._is_same_instruction(RunAwayFromOpponentInstruction) and euclidean_distance(
+                knowledge.position, opponent_coords) < 5:
+            return RunAwayFromOpponentInstruction(opponent_coords)
+        return None
+
+
+class AgressivePassiveStrategy(DefaultStrategy):
+    def _handle_opponent_instruction(self, knowledge: ChampionKnowledge,
+                                     map_knowledge: MapKnowledge) -> Optional[Instruction]:
+        # Opponent has moved
+        if self._previous_opponent_coords in knowledge.visible_tiles and not is_opponent_at_coords(
+                self._previous_opponent_coords, knowledge.visible_tiles):
+            self._previous_opponent_coords = None
+        # Find all opponents
+        opponents_coords = list(map_knowledge.opponents.values())
+        if self._previous_opponent_coords:
+            opponents_coords.append(self._previous_opponent_coords)
+        # No opponents
+        if not opponents_coords:
+            return None
+        # Decide
+        opponent_coords = map_knowledge.find_closest_coords(knowledge.position, opponents_coords)
+        if get_champion_weapon(knowledge) == "knife":
+            return AttackOpponentInstruction(opponent_coords)
+        if not self._is_same_instruction(RunAwayFromOpponentInstruction) and euclidean_distance(
+                knowledge.position, opponent_coords) < 5:
+            return RunAwayFromOpponentInstruction(opponent_coords)
+        return None
+
+
+POSSIBLE_STRATEGIES = [
+    AgressiveAgressiveStrategy,
+    PassivePassiveStrategy,
+    PassiveAgressiveStrategy,
+    AgressivePassiveStrategy
+]
