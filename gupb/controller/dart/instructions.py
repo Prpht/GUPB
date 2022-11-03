@@ -54,8 +54,9 @@ class CollectClosestWeaponInstruction(Instruction):
 
 class GoToMenhirInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
-        if self._path is None:
-            self._path = map_knowledge.find_path(knowledge.position, map_knowledge.find_menhir())
+        if map_knowledge.is_any_opponent_in_range(knowledge):
+            return Action.ATTACK
+        self._path = map_knowledge.find_path(knowledge.position, map_knowledge.find_menhir())
         return self._action_follow_path(knowledge)
 
 

@@ -87,6 +87,9 @@ class MapKnowledge():
     def find_closest_coords(self, current_position: Coords, destinations: List[Coords]) -> Coords:
         return min(destinations, key=lambda dest: len(self.find_path(current_position, dest)))
 
+    def is_any_opponent_in_range(self, knowledge: ChampionKnowledge) -> bool:
+        return any(self.can_attack(knowledge, pos) for pos in self.opponents.values())
+
     def can_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> bool:
         weapon = get_weapon(get_champion_weapon(knowledge))
         facing = get_facing(knowledge)
