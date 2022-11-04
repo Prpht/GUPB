@@ -13,6 +13,7 @@ from gupb.model import tiles
 from gupb.model.arenas import Arena, ArenaDescription
 
 from gupb.controller.tuptus.map import Map
+from gupb.controller.tuptus.strategies import BaseStrategy, AggresiveStrategy
 from gupb.controller.tuptus.pathfinder import Pathfinder
 
 from typing import Optional, List
@@ -47,6 +48,8 @@ class TuptusController(controller.Controller):
         self.planned_actions: Optional[List] = None
         self.menhir_coords = None
         self.mist_tiles = np.array([])
+        self.stategy:AggresiveStrategy 
+        self.weapon_tier:int
         self.mist_directions: List[Optional[characters.Facing]] = None
 
     def __eq__(self, other: object) -> bool:
@@ -58,6 +61,7 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.planned_actions = self.stategy.fight(knowledge)
         if self.planned_actions:
             return self.planned_actions.pop(0)
         
@@ -133,6 +137,7 @@ class TuptusController(controller.Controller):
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
+        self.stategy = AggresiveStrategy(self.pathfinder, self.map, self.facing, arena_description=Arena.load(arena_description.name), weapon_tier = self.weapon_tier)
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
         facing_dct = {(0, -1): characters.Facing.UP,
@@ -178,6 +183,7 @@ class TuptusController(controller.Controller):
     def is_menhir(self, visible_tiles):
         for coords, tile in visible_tiles.items():
             if  tile == tiles.Menhir:
+                print(coords)
                 return coords 
         return None
 
