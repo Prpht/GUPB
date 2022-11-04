@@ -36,7 +36,7 @@ class MapKnowledge():
         self.weapons: Dict[Coords, str] = dict()
         self.initialize_weapons_positions()
         self.closest_mist_coords: Optional[Coords] = None
-        self.mist_coords: Optional[List[Coords]] = None
+        self.mist_coords: List[Coords] = []
         self.mists = set()
         self.opponents: Dict[str, Coords] = dict()
 
@@ -74,13 +74,10 @@ class MapKnowledge():
         self.weapons = {coords: tile.loot.description().name
                         for coords, tile in self.arena.terrain.items() if tile.loot is not None}
 
-    def update_weapons_positions(self, knowledge: ChampionKnowledge) -> None:
-        for coords, tile in knowledge.visible_tiles.items():
-            if tile.loot is not None:
-                self.weapons[Coords(*coords)] = tile.loot.name
-
     def get_closest_weapon_path(self, current_position: Coords, *weapon_types: str) -> List[Coords]:
         weapons_coords = [coords for coords, type in self.weapons.items() if type.startswith(weapon_types)]
+        if not weapons_coords:
+            return []
         return self.find_shortest_path(current_position, weapons_coords)
 
     def find_shortest_path(self, current_position: Coords, destinations: List[Coords]) -> List[Coords]:
@@ -90,11 +87,15 @@ class MapKnowledge():
     def find_closest_coords(self, current_position: Coords, destinations: List[Coords]) -> Coords:
         return min(destinations, key=lambda dest: len(self.find_path(current_position, dest)))
 
+    def is_any_opponent_in_range(self, knowledge: ChampionKnowledge) -> bool:
+        return any(self.can_attack(knowledge, pos) for pos in self.opponents.values())
+
     def can_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> bool:
         weapon = get_weapon(get_champion_weapon(knowledge))
         facing = get_facing(knowledge)
         weapon_cut_positions = weapon.cut_positions(self.arena.terrain, knowledge.position, facing)
-        return opponent_position in weapon_cut_positions
+        return is_opponent_at_coords(opponent_position, knowledge.visible_tiles) and \
+            opponent_position in weapon_cut_positions
 
     def get_facing_for_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> Optional[Facing]:
         for facing in Facing:
@@ -114,19 +115,21 @@ class MapKnowledge():
         return False
 
     def get_visible_mist(self, knowledge: ChampionKnowledge, coords, tile):
-            if coords in self.mists:
-                self.mists.remove(coords)
-            if is_mist(tile):
-                for i in (-1, 1):
-                    adj_coord_x = Coords(*coords) + Coords(i, 0)
-                    adj_coord_y = Coords(*coords) + Coords(0, i)
-                    if self.check_if_tile_is_mist_free(knowledge, adj_coord_x) or self.check_if_tile_is_mist_free(knowledge, adj_coord_y):
-                        self.mists.add(coords)
+        if coords in self.mists:
+            self.mists.remove(coords)
+        if is_mist(tile):
+            for i in (-1, 1):
+                adj_coord_x = Coords(*coords) + Coords(i, 0)
+                adj_coord_y = Coords(*coords) + Coords(0, i)
+                if self.check_if_tile_is_mist_free(knowledge, adj_coord_x) or \
+                        self.check_if_tile_is_mist_free(knowledge, adj_coord_y):
+                    self.mists.add(coords)
 
-    def update_map_knowledge(self, knowledge: ChampionKnowledge, visible_tiles: Dict[tuple, TileDescription]) -> None:
+    def update_map_knowledge(self, knowledge: ChampionKnowledge) -> None:
         self.opponents = dict()
-        self.mist_coords = []
-        for coords, tile in visible_tiles.items():
+        for coords, tile in knowledge.visible_tiles.items():
+            if is_weapon(tile.loot):
+                self.weapons[Coords(*coords)] = tile.loot.name
             if is_mist(tile):
                 self.mist_coords.append(Coords(*coords))
             if is_opponent(tile.character):
@@ -134,8 +137,10 @@ class MapKnowledge():
             if is_menhir(tile):
                 self.arena_menhir = Coords(*coords)
             self.get_visible_mist(knowledge, coords, tile)
-        mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords)) for coords in self.mist_coords]
-        self.closest_mist_coords = min(mist_coords_and_distances, key=lambda x: x[1])[0] if mist_coords_and_distances else None
+        mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords))
+                                     for coords in self.mist_coords]
+        self.closest_mist_coords = min(mist_coords_and_distances, key=lambda x: x[1])[0] \
+            if mist_coords_and_distances else None
 
     def calculate_menhir_center(self):
         from scipy import optimize
@@ -158,7 +163,17 @@ class MapKnowledge():
         xc_2, yc_2 = center_2
         Ri_2 = calc_R(*center_2)
         R_2 = Ri_2.mean()
-        return Coords(round(xc_2), round(yc_2))
+
+        x = max(0, min(self.arena.size[0] - 1, round(xc_2)))
+        y = max(0, min(self.arena.size[1] - 1, round(yc_2)))
+        for i in range(self.arena.size[0]):
+            for sign_x, sign_y in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
+                new_x = min(self.arena.size[0] - 1, max(0, x + i * sign_x))
+                new_y = min(self.arena.size[1] - 1, max(0, y + i * sign_y))
+                menhir = Coords(new_x, new_y)
+                if self.is_land(menhir):
+                    return menhir
+        raise RuntimeError("Could not find run destination")
 
 
 def follow_path(path: List[Coords], knowledge: ChampionKnowledge) -> Action:
@@ -184,14 +199,14 @@ def determine_rotation_action(current_facing: Facing, desired_facing: Facing) ->
     return TURN_ACTIONS[(current_facing, desired_facing)]
 
 
-def is_opponent_in_front(opponent_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+def is_opponent_at_coords(opponent_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
     if opponent_position not in visible_tiles:
         return False
     opponent = visible_tiles[opponent_position].character
     return is_opponent(opponent)
 
 
-def is_opponent(character: ChampionDescription) -> bool:
+def is_opponent(character: Optional[ChampionDescription]) -> bool:
     return not (character is None or character.controller_name.startswith("DartController"))
 
 
@@ -201,6 +216,10 @@ def is_mist(tile: TileDescription) -> bool:
 
 def is_menhir(tile: TileDescription) -> bool:
     return "menhir" == tile.type
+
+
+def is_weapon(loot: Optional[Weapon]):
+    return loot is not None
 
 
 def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
