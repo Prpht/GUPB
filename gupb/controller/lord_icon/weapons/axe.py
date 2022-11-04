@@ -25,5 +25,3 @@ class Axe(Weapon):
                 (forward_position_x, forward_position_y+1),
                 (forward_position_x, forward_position_y-1)
             ]
-
-
