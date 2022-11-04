@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    AksolotlController("Old")
+    AksolotlController("old")
 ]

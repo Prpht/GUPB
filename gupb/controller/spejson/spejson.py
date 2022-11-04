@@ -1,4 +1,5 @@
 import random
+import os
 import numpy as np
 
 from gupb import controller
@@ -7,8 +8,6 @@ from gupb.model import characters
 from gupb.model.characters import Action, Facing
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
-
-current_arena = arenas.Arena.load("lone_sanctum")
 
 POSSIBLE_ACTIONS = [
     Action.TURN_LEFT,
@@ -26,59 +25,6 @@ weapons = {
     'amulet': Amulet
 }
 
-clusters = np.array(
-    [[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-     [ 0, 18, 18, 18,  0, 11, 11, 11,  0,  0,  0, 23, 23, 23,  0, 24, 24, 24,  0],
-     [ 0, 18, 18, 18,  0, 11, 11, 17,  0,  0, 22, 23, 23, 20,  0, 24, 24, 24,  0],
-     [ 0, 18, 18, 18, 11, 11, 11, 17, 17,  0, 22, 22, 20, 20, 20, 24, 24, 24,  0],
-     [ 0,  0,  0,  0,  0, 11, 11, 17, 17, 22, 22, 20, 20, 20,  0,  0,  0,  0,  0],
-     [ 0, 10, 10,  6,  6,  6, 11, 17, 17, 22, 22,  0,  0, 13, 13, 13, 13, 13,  0],
-     [ 0, 10,  6,  6,  6,  0,  0,  0,  0,  0,  0,  0,  0,  7, 13,  7, 13,  7,  0],
-     [ 0, 10, 10,  6,  3,  3,  3,  3,  3,  1,  4,  4,  0,  7,  7,  7,  7,  7,  0],
-     [ 0,  0,  0, 12,  0,  0,  0,  3,  1,  1,  0,  4,  0,  0,  0,  7,  0,  0,  0],
-     [ 0,  0,  0, 12,  0,  0,  0,  3,  1,  1,  1,  4,  0,  0,  0,  7,  0,  0,  0],
-     [ 0,  0,  0, 12,  0,  0,  0,  2,  0,  1,  2,  4,  0,  0,  0,  7,  0,  0,  0],
-     [ 0, 19, 12, 12, 12, 19,  0,  2,  2,  2,  2,  2,  5,  5,  5,  5,  8,  0,  0],
-     [ 0, 19, 19, 12, 19, 19,  0,  0,  0,  0,  0,  0,  0,  0,  5,  5,  8,  0,  0],
-     [ 0, 19, 19, 19, 19, 19,  0,  0, 16, 16, 16,  9,  9,  9,  5,  8,  8,  8,  0],
-     [ 0,  0,  0,  0,  0, 21, 21, 21, 16, 16, 16, 14,  9,  9,  0,  0,  0,  0,  0],
-     [ 0, 26, 26, 25, 25, 25, 21, 21, 16,  0, 14, 14, 14,  9, 15, 15, 15, 15,  0],
-     [ 0, 26, 26, 26,  0, 25, 25, 21, 16,  0,  0, 14, 14,  9,  0, 15, 15, 15,  0],
-     [ 0, 26, 26, 26,  0, 25, 25, 21,  0,  0,  0, 14, 14,  9,  0, 15, 15, 15,  0],
-     [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]]
-)
-
-adj = {
-    1: [3, 2, 4],
-    2: [1, 5, 3, 4],
-    3: [6, 2, 1],
-    4: [1, 2],
-    5: [9, 8, 7, 2],
-    6: [10, 3, 11, 12],
-    7: [5, 13],
-    8: [5],
-    9: [15, 14, 16, 5],
-    10: [6],
-    11: [18, 17, 6],
-    12: [6, 19],
-    13: [7, 20],
-    14: [9, 16],
-    15: [9],
-    16: [9, 21, 14],
-    17: [11, 22],
-    18: [11],
-    19: [21, 12],
-    20: [13, 22, 23, 24],
-    21: [16, 19, 25],
-    22: [23, 20, 17],
-    23: [22, 20],
-    24: [20],
-    25: [26, 21],
-    26: [25]
-}
-
-menhir_location = Coords(9, 9)
-
 facings = {
     "U": ["L", "R"], "R": ["U", "D"], "D": ["R", "L"], "L": ["D", "U"]
 }
@@ -87,12 +33,6 @@ forwards = {
 }
 facing_to_letter = {
     Facing.UP: "U",Facing.RIGHT: "R", Facing.DOWN: "D", Facing.LEFT: "L"
-}
-weapons_knowledge = {
-    (1, 1): 'A', (1, 2): 'A', (2, 1): 'A',
-    (1, 16): 'B', (1, 17): 'B', (2, 17): 'B',
-    (16, 1): 'S', (17, 1): 'S', (17, 2): 'S',
-    (16, 17): 'M', (17, 16): 'M', (17, 17): 'M',
 }
 weapons_to_letter = {
     Knife: "K", Axe: "A", Bow: "B", Sword: "S", Amulet: "M"
@@ -123,7 +63,7 @@ def find_path(adjacency_dict, c_from, c_to):
     return path[::-1]
 
 
-def pathfinding_next_move(position, facing, next_cluster):
+def pathfinding_next_move(position, facing, next_cluster, clusters):
     stack = [(position, facing)]
     visited = {stack[0]: None}
     is_found = False
@@ -149,6 +89,8 @@ def pathfinding_next_move(position, facing, next_cluster):
         step = visited[path[-1]]
 
     path = path[::-1]
+    if len(path) < 2:
+        return None
 
     f_0 = path[0][1]
     f_1 = path[1][1]
@@ -161,7 +103,7 @@ def pathfinding_next_move(position, facing, next_cluster):
         return Action.TURN_RIGHT
 
 
-def pathfinding_next_move_in_cluster(position, facing, target_pos):
+def pathfinding_next_move_in_cluster(position, facing, target_pos, clusters):
     stack = [(position, facing)]
     visited = {stack[0]: None}
     is_found = False
@@ -187,6 +129,8 @@ def pathfinding_next_move_in_cluster(position, facing, target_pos):
         step = visited[path[-1]]
 
     path = path[::-1]
+    if len(path) < 2:
+        return None
 
     f_0 = path[0][1]
     f_1 = path[1][1]
@@ -199,14 +143,14 @@ def pathfinding_next_move_in_cluster(position, facing, target_pos):
         return Action.TURN_RIGHT
 
 
-def analyze_weapons_on_map(weapons_knowledge):
+def analyze_weapons_on_map(weapons_knowledge, clusters):
     stack_axe = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'A']
     stack_bow = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'B']
     stack_sword = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'S']
     stack_amulet = [pos for pos in weapons_knowledge if weapons_knowledge[pos] == 'M']
 
     def get_dists(stack, base=0):
-        dists = 99 * np.ones([19, 19], dtype=np.int32)
+        dists = 9999 * np.ones(clusters.shape, dtype=np.int32)
 
         for pos in stack:
             dists[pos] = base
@@ -228,7 +172,7 @@ def analyze_weapons_on_map(weapons_knowledge):
     dists_amulet = get_dists(stack_amulet)
 
     closest_weapon = np.argmin(np.stack(
-        [98 * np.ones([19, 19], dtype=np.int32),
+        [9998 * np.ones(clusters.shape, dtype=np.int32),
          dists_axe, dists_bow, dists_sword, dists_amulet,
         ], axis=-1), axis=-1)
 
@@ -244,7 +188,7 @@ def analyze_weapons_on_map(weapons_knowledge):
     return closest_weapon
 
 
-def find_closest_weapon(weapons_knowledge, position, weapon_letter):
+def find_closest_weapon(weapons_knowledge, position, weapon_letter, clusters, adj, menhir_location):
     closest_weapon_position = (menhir_location.y, menhir_location.x)
     closest_weapon_distance = 9999
 
@@ -257,23 +201,184 @@ def find_closest_weapon(weapons_knowledge, position, weapon_letter):
     return Coords(x=closest_weapon_position[1], y=closest_weapon_position[0])
 
 
+def analyze_map(arena_name):
+    arena_filepath = os.path.join('resources', 'arenas', f'{arena_name}.gupb')
+
+    txt = []
+
+    with open(arena_filepath, mode='r') as file:
+        for line in file:
+            txt += [line.strip("\n")]
+
+    island_ar = np.array([list(i) for i in txt])
+
+    height = island_ar.shape[0]
+    width = island_ar.shape[1]
+
+    traversable = np.logical_and(island_ar != '=', island_ar != '#').astype(np.int32)
+
+    start = ((height - 1) // 2, (width - 1) // 2)
+    best_pos = None
+    best_dist = 9999
+
+    for _ in range(150):
+        pos = (start[0] + np.random.randint(-8, 9), start[1] + np.random.randint(-8, 9))
+        if island_ar[pos] == '.':
+            dist = (start[0] - pos[0]) ** 2 + (start[1] - pos[1]) ** 2
+            if dist < best_dist:
+                best_pos = pos
+                best_dist = dist
+
+    start = best_pos
+
+    # Initial cluster calculation by BFS in BFS
+    clusters = np.zeros([height, width], dtype=np.int32)
+    current_cluster = 1
+    stack = [start]
+    directions = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
+
+    while stack:
+        pos = stack.pop(0)
+
+        if clusters[pos] == 0:
+            clusters[pos] = current_cluster
+
+            substack = [pos]
+            i = 0
+            while i < 6 and substack:
+                i += 1
+                pos = substack.pop(0)
+
+                for dxdy in directions:
+                    new_pos = tuple(pos + dxdy)
+                    if traversable[new_pos] and clusters[new_pos] == 0:
+                        clusters[new_pos] = current_cluster
+                        substack.append(new_pos)
+
+            for pos in substack:
+                clusters[pos] = 0
+
+            stack.extend(substack)
+            current_cluster += 1
+
+    # Get derivable cluster information in valid cells
+    c = clusters.reshape(-1)
+    xs = np.tile(np.arange(width), [width, 1]).reshape(-1)
+    ys = np.tile(np.arange(height).reshape(-1, 1), [1, height]).reshape(-1)
+
+    xs = xs[c > 0]
+    ys = ys[c > 0]
+    c = c[c > 0]
+
+    counts = np.zeros(np.max(c), dtype=np.int32)
+    np.add.at(counts, c - 1, 1)
+
+    proto_x = np.zeros(np.max(c), dtype=np.int32)
+    proto_y = np.zeros(np.max(c), dtype=np.int32)
+    np.put(proto_x, c - 1, xs)
+    np.put(proto_y, c - 1, ys)
+
+    # Merge tiny clusters into neighbors
+    for i in np.arange(counts.shape[0])[counts < 5]:
+        stack = [(proto_y[i], proto_x[i])]
+
+        j = 0
+        c_found = 0
+
+        while j < len(stack):
+            pos = stack[j]
+
+            for dxdy in directions:
+                new_pos = tuple(pos + dxdy)
+
+                if clusters[new_pos] == i + 1:
+                    if new_pos not in stack:
+                        stack.append(new_pos)
+                else:
+                    if c_found == 0:
+                        c_found = clusters[new_pos]
+
+            j += 1
+
+        counts[i] = 0
+        for pos in stack:
+            clusters[pos] = c_found
+
+    clusters = np.r_[0, np.cumsum(counts > 0) * (counts > 0)][clusters]
+
+    # Get derivable cluster information in valid cells again (final)
+    c = clusters.reshape(-1)
+    xs = np.tile(np.arange(width), [width, 1]).reshape(-1)
+    ys = np.tile(np.arange(height).reshape(-1, 1), [1, height]).reshape(-1)
+
+    xs = xs[c > 0]
+    ys = ys[c > 0]
+    c = c[c > 0]
+
+    counts = np.zeros(np.max(c), dtype=np.int32)
+    np.add.at(counts, c - 1, 1)
+
+    proto_x = np.zeros(np.max(c), dtype=np.int32)
+    proto_y = np.zeros(np.max(c), dtype=np.int32)
+    np.put(proto_x, c - 1, xs)
+    np.put(proto_y, c - 1, ys)
+
+    # Get neighbors pairs and construct adjacency dictionary
+    neighbors = np.concatenate([
+        np.stack([clusters[:, 1:], clusters[:, :-1]], axis=-1).reshape(-1, 2),
+        np.stack([clusters[1:, :], clusters[:-1, :]], axis=-1).reshape(-1, 2)
+    ], axis=0)
+
+    neighbors = neighbors[neighbors[:, 0] != neighbors[:, 1]]
+    neighbors = neighbors[np.logical_and(neighbors[:, 0] != 0, neighbors[:, 1] != 0)]
+    neighbors = list(
+        set(map(lambda x: tuple(x), np.vstack([neighbors, neighbors[:, ::-1]]).tolist())))
+
+    adj = {i: [] for i in range(1, counts.shape[0] + 1)}
+    for c_from, c_to in neighbors:
+        adj[c_from].append(c_to)
+
+    # Create initial weapons knowledge dict
+    weapons_knowledge = {}
+    for i in range(height):
+        for j in range(width):
+            if island_ar[i, j] == 'A':
+                weapons_knowledge[(i, j)] = 'A'
+            elif island_ar[i, j] == 'B':
+                weapons_knowledge[(i, j)] = 'B'
+            elif island_ar[i, j] == 'S':
+                weapons_knowledge[(i, j)] = 'S'
+            elif island_ar[i, j] == 'M':
+                weapons_knowledge[(i, j)] = 'M'
+
+    return start, clusters, adj, weapons_knowledge, height, width
+
+
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Spejson(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
+        self.position = None
         self.facing = None
         self.health = None
         self.weapon = None
         self.move_number = 0
-        self.menhir_found = True
-        self.target = Coords(9, 9)
+        self.menhir_found = False
+        self.menhir_location = Coords(16, 16)
+        self.target = Coords(16, 16)
         self.jitter = 0
-        self.weapons_knowledge = weapons_knowledge
+        self.weapons_knowledge = None
         self.closest_weapon = None
         self.mist_spotted = False
         self.panic_mode = 0
         self.touched_by_mist = False
+        self.clusters = None
+        self.adj = None
+        self.terrain = None
+        self.latest_states = []
+        self.map_height = 0
+        self.map_width = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -292,9 +397,22 @@ class Spejson(controller.Controller):
         available_actions = POSSIBLE_ACTIONS.copy()
 
         me = knowledge.visible_tiles[position].character
+        self.position = position
         self.facing = me.facing
         self.health = me.health
         self.weapon = me.weapon
+
+        self.latest_states = (self.latest_states + [(self.position, self.facing)])[-5:]
+        if len(self.latest_states) >= 5 and (
+                self.latest_states[0] == self.latest_states[1] == self.latest_states[2]
+                == self.latest_states[3] == self.latest_states[4]
+        ):
+            self.panic_mode = 6
+            for _ in range(50):  # Just to avoid while True lol
+                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
+                if self.clusters[(ry, rx)]:
+                    self.target = Coords(x=rx, y=ry)
+                    break
 
         to_del = []
         for pos in self.weapons_knowledge:
@@ -318,29 +436,30 @@ class Spejson(controller.Controller):
                     and tile.loot.name != 'knife':
                 self.weapons_knowledge[(tile_coord[1], tile_coord[0])] = weapons_name_to_letter[tile.loot.name]
 
-        self.closest_weapon = analyze_weapons_on_map(self.weapons_knowledge)
+        self.closest_weapon = analyze_weapons_on_map(self.weapons_knowledge, self.clusters)
 
         if not self.menhir_found:
             for tile_coord in visible_tiles:
                 if visible_tiles[tile_coord].type == 'menhir':
                     self.target = Coords(tile_coord[0], tile_coord[1])
                     self.menhir_found = True
+                    self.menhir_location = self.target
 
         if not self.mist_spotted:
             for tile_coord in visible_tiles:
                 if "mist" in list(map(lambda x: x.type, visible_tiles[tile_coord].effects)):
-                    self.target = menhir_location
+                    self.target = self.menhir_location
                     self.mist_spotted = True
 
         if self.panic_mode <= 0 and self.weapon.name == 'knife':
             self.target = find_closest_weapon(
-                self.weapons_knowledge, position, self.closest_weapon[(position.y, position.x)])
+                self.weapons_knowledge, position, self.closest_weapon[(position.y, position.x)], self.clusters, self.adj, self.menhir_location)
             if self.target == position:
-                self.target = menhir_location
+                self.target = self.menhir_location
                 return Action.STEP_FORWARD
             self.jitter = 0
         elif self.panic_mode <= 0:
-            self.target = menhir_location
+            self.target = self.menhir_location
             self.jitter = 0 if self.touched_by_mist else 10
 
         bad_neighborhood_factor = 0
@@ -362,19 +481,21 @@ class Spejson(controller.Controller):
         if bad_neighborhood_factor > 2 and self.panic_mode < 2:
             self.panic_mode = 6
             for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(19, size=[2])
-                if clusters[(ry, rx)]:
+                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
+                if self.clusters[(ry, rx)]:
                     self.target = Coords(x=rx, y=ry)
                     break
 
         # Positions in reach
-        in_reach = weapons[self.weapon.name].cut_positions(current_arena.terrain, position, self.facing)
+        in_reach = weapons[self.weapon.name].cut_positions(self.terrain, position, self.facing)
         if self.weapon.name != "bow_unloaded":
             for pos in in_reach:
                 if pos in visible_tiles and visible_tiles[pos].character is not None:
+                    self.latest_states += ["att"]
                     return Action.ATTACK
 
         if self.weapon.name == "bow_unloaded":
+            self.latest_states += ["att"]
             return Action.ATTACK
         available_actions = [x for x in available_actions if x not in [Action.ATTACK]]
 
@@ -387,7 +508,7 @@ class Spejson(controller.Controller):
         distance_from_target = self.target - position
         distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
 
-        if distance_from_target < self.jitter and self.target == menhir_location:
+        if distance_from_target < self.jitter and self.target == self.menhir_location:
             if Action.STEP_FORWARD in available_actions:
                 if np.random.rand() < 0.7:
                     return Action.STEP_FORWARD
@@ -404,22 +525,38 @@ class Spejson(controller.Controller):
 
         else:
             cluster_path_to_target = find_path(
-                adj, clusters[(position.y, position.x)], clusters[(self.target.y, self.target.x)])
+                self.adj, self.clusters[(position.y, position.x)], self.clusters[(self.target.y, self.target.x)])
 
             if len(cluster_path_to_target) > 1:
                 move = pathfinding_next_move(
-                    (position.y, position.x), facing_to_letter[self.facing], cluster_path_to_target[1])
-                available_actions = (
-                    ([move] if move in available_actions else [])
-                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                )
+                    (position.y, position.x), facing_to_letter[self.facing], cluster_path_to_target[1], self.clusters)
+                if move is None:
+                    self.panic_mode = 8
+                    for _ in range(50):  # Just to avoid while True lol
+                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
+                        if self.clusters[(ry, rx)]:
+                            self.target = Coords(x=rx, y=ry)
+                            break
+                else:
+                    available_actions = (
+                        ([move] if move in available_actions else [])
+                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                    )
             else:
                 move = pathfinding_next_move_in_cluster(
-                    (position.y, position.x), facing_to_letter[self.facing], (self.target.y, self.target.x))
-                available_actions = (
-                    ([move] if move in available_actions else [])
-                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                )
+                    (position.y, position.x), facing_to_letter[self.facing], (self.target.y, self.target.x), self.clusters)
+                if move is None:
+                    self.panic_mode = 8
+                    for _ in range(50):  # Just to avoid while True lol
+                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
+                        if self.clusters[(ry, rx)]:
+                            self.target = Coords(x=rx, y=ry)
+                            break
+                else:
+                    available_actions = (
+                        ([move] if move in available_actions else [])
+                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                    )
 
         if len(available_actions) == 0:
             return random.choice([Action.ATTACK, Action.TURN_LEFT])
@@ -430,17 +567,29 @@ class Spejson(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.position = None
         self.facing = None
         self.health = None
         self.weapon = None
         self.move_number = 0
-        self.menhir_found = True
-        self.target = Coords(9, 9)
-        self.weapons_knowledge = weapons_knowledge
+        self.menhir_found = False
+        self.menhir_location = Coords(16, 16)
         self.closest_weapon = None
         self.mist_spotted = False
         self.panic_mode = 0
         self.touched_by_mist = False
+        self.latest_states = []
+
+        self.arena_name = arena_description.name
+        self.terrain = arenas.Arena.load(self.arena_name).terrain
+        start, clusters, adj, weapons_knowledge, height, width = analyze_map(self.arena_name)
+        self.target = Coords(x=start[1], y=start[0])
+        self.menhir_location = self.target
+        self.clusters = clusters
+        self.adj = adj
+        self.weapons_knowledge = weapons_knowledge
+        self.map_height = height
+        self.map_width = width
 
     @property
     def name(self) -> str:
