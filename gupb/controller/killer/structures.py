@@ -1,7 +1,4 @@
 from numpy import random
-import logging
-
-verbose_logger = logging.getLogger("verbose")
 
 
 class Tree:
@@ -42,11 +39,9 @@ class Tree:
         while val_from <= node_val:
             path = self.get_path_to_marked(node_val)
             if path is not None:
-                verbose_logger.debug(f"INTEREST VAL: {node_val}")
                 return path
             else:
                 node_val -= 1
-        verbose_logger.debug("NO POINT OF INTEREST")
         nodes = list(self.edges.keys())
         random_node = nodes[random.choice(range(len(nodes)))]
         return self.get_path(to_node=random_node)
