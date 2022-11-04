@@ -31,4 +31,3 @@ class Map():
         for coords, tile in arena_description.terrain.items():
             if not tile.terrain_passable():
                 self.tuptable_map[coords] = 1
-        return self.tuptable_map

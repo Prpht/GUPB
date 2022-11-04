@@ -129,7 +129,7 @@ class TuptusController(controller.Controller):
         self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
-        self.arena = self.map._init_map(Arena.load(arena_description.name))
+        self.map._init_map(Arena.load(arena_description.name))
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
