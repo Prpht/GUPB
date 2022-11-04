@@ -39,13 +39,16 @@ class BarabaszController(controller.Controller):
         if in_front in knowledge.visible_tiles.keys():
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
                 return characters.Action.TURN_LEFT
+            # Load the bow
             if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
                 return characters.Action.ATTACK
+            # Calculate death zone for the weapon
             deathtiles = deathzone(weapon=self.weapon,
                                    position=self.position,
                                    facing=self.facing.value)
             for cords in deathtiles:
                 if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
+                    # TODO: Try to implement logging mechanism for weapon debugging 
                     # print("SMACK! ", self.weapon)
                     # print("Position: ", knowledge.position, "EnemyPos: ", cords)
                     return characters.Action.ATTACK
