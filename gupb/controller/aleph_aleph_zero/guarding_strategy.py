@@ -1,3 +1,5 @@
+from copy import copy
+
 from gupb.controller.aleph_aleph_zero.strategy import Strategy
 from gupb.model import characters
 
@@ -9,8 +11,9 @@ class GuardingStrategy(Strategy):  # primitive guarding strategy that dodges the
     LOOK_TO_THE_SIDE = [characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
     PATROL_CYCLE = STAB_REPEATEDLY+LOOK_TO_THE_SIDE
 
-    def __init__(self):
-        self.action_queue = GuardingStrategy.TURN_AROUND
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.action_queue = copy(GuardingStrategy.TURN_AROUND)
 
     def decide_and_proceed(self, knowledge, **kwargs):
         if len(self.action_queue)>0:

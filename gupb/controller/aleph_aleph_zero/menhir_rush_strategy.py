@@ -9,7 +9,8 @@ from gupb.model import characters
 
 
 class MenhirRushStrategy(Strategy):
-    def __init__(self, menhir_position):
+    def __init__(self, menhir_position, **kwargs):
+        super().__init__(**kwargs)
         self.menhir_position = menhir_position
 
     def decide_and_proceed(self, knowledge, graph=None, **kwargs):
@@ -26,6 +27,6 @@ class MenhirRushStrategy(Strategy):
             else:
                 return None, ScanningStrategy(self)
 
-        return TravelStrategy(best, self).decide_and_proceed(knowledge, graph=graph)[0], self  # let Travel decide the path, but keep on being in charge
+        return TravelStrategy(best, self, dodge=False).decide_and_proceed(knowledge, graph=graph)[0], self  # let Travel decide the path, but keep on being in charge
 
 

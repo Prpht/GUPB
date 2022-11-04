@@ -3,7 +3,7 @@ from gupb.controller import random
 
 CONFIGURATION = {
     'arenas': [
-        'fisher_island',
+        'lone_sanctum',
     ],
     'controllers': [
         keyboard.KeyboardController(),
