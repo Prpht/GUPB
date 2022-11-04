@@ -4,7 +4,8 @@ import numpy as np
 from gupb import controller
 from gupb.controller.spejson.static_map_processing import analyze_map
 from gupb.controller.spejson.dynamic_map_processing import analyze_weapons_on_map, find_closest_weapon
-from gupb.controller.spejson.pathfinding import find_path, pathfinding_next_move, pathfinding_next_move_in_cluster
+from gupb.controller.spejson.pathfinding import (
+    find_path, pathfinding_next_move, pathfinding_next_move_in_cluster, calculate_dists, proposed_moves_to_keypoints)
 from gupb.controller.spejson.utils import POSSIBLE_ACTIONS, weapons, facing_to_letter, weapons_name_to_letter
 from gupb.model import arenas
 from gupb.model import characters
@@ -37,6 +38,7 @@ class Spejson(controller.Controller):
         self.latest_states = []
         self.map_height = 0
         self.map_width = 0
+        self.analytics = {}
 
         self.scalars = {
             'my_hp': [0],  # Health points rescaled to 0-1
@@ -98,6 +100,15 @@ class Spejson(controller.Controller):
         self.health = me.health
         self.weapon = me.weapon
 
+        action_type = "FIND_TARGET"
+
+        distances, visited_from = calculate_dists(
+            position=(self.position.y, self.position.x),
+            facing=facing_to_letter[self.facing],
+            traversable=self.analytics['traversable'],
+        )
+
+        # Preventing getting stuck
         self.latest_states = (self.latest_states + [(self.position, self.facing)])[-5:]
         if len(self.latest_states) >= 5 and (
                 self.latest_states[0] == self.latest_states[1] == self.latest_states[2]
@@ -110,6 +121,7 @@ class Spejson(controller.Controller):
                     self.target = Coords(x=rx, y=ry)
                     break
 
+        # Update weapons knowledge
         to_del = []
         for pos in self.weapons_knowledge:
             pos = Coords(x=pos[1], y=pos[0])
@@ -132,8 +144,7 @@ class Spejson(controller.Controller):
                     and tile.loot.name != 'knife':
                 self.weapons_knowledge[(tile_coord[1], tile_coord[0])] = weapons_name_to_letter[tile.loot.name]
 
-        self.closest_weapon = analyze_weapons_on_map(self.weapons_knowledge, self.clusters)
-
+        # Deduce current path-finding target
         if not self.menhir_found:
             for tile_coord in visible_tiles:
                 if visible_tiles[tile_coord].type == 'menhir':
@@ -147,12 +158,15 @@ class Spejson(controller.Controller):
                     self.target = self.menhir_location
                     self.mist_spotted = True
 
+        move_recommendations = proposed_moves_to_keypoints(
+            distances=distances,
+            visited_from=visited_from,
+            menhir_pos=self.target,
+            weapons_knowledge=self.weapons_knowledge,
+        )
+
         if self.panic_mode <= 0 and self.weapon.name == 'knife':
-            self.target = find_closest_weapon(
-                self.weapons_knowledge, position, self.closest_weapon[(position.y, position.x)], self.clusters, self.adj, self.menhir_location)
-            if self.target == position:
-                self.target = self.menhir_location
-                return Action.STEP_FORWARD
+            action_type = "FIND_CLOSEST_WEAPON"
             self.jitter = 0
         elif self.panic_mode <= 0:
             self.target = self.menhir_location
@@ -204,7 +218,8 @@ class Spejson(controller.Controller):
         distance_from_target = self.target - position
         distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
 
-        if distance_from_target < self.jitter and self.target == self.menhir_location:
+        # Decide on move action
+        if distance_from_target < self.jitter and self.target == self.menhir_location and action_type == "FIND_TARGET":
             if Action.STEP_FORWARD in available_actions:
                 if np.random.rand() < 0.7:
                     return Action.STEP_FORWARD
@@ -220,39 +235,26 @@ class Spejson(controller.Controller):
                 return Action.TURN_RIGHT if np.random.rand() < 0.7 else Action.TURN_LEFT
 
         else:
-            cluster_path_to_target = find_path(
-                self.adj, self.clusters[(position.y, position.x)], self.clusters[(self.target.y, self.target.x)])
-
-            if len(cluster_path_to_target) > 1:
-                move = pathfinding_next_move(
-                    (position.y, position.x), facing_to_letter[self.facing], cluster_path_to_target[1], self.clusters)
-                if move is None:
-                    self.panic_mode = 8
-                    for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
-                        if self.clusters[(ry, rx)]:
-                            self.target = Coords(x=rx, y=ry)
-                            break
-                else:
-                    available_actions = (
-                        ([move] if move in available_actions else [])
-                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                    )
+            if action_type == "FIND_CLOSEST_WEAPON":
+                move = sorted(
+                    [val for key, val in move_recommendations.items() if key != "menhir" and val[0] is not None],
+                    key=lambda x: x[1]
+                )[0][0]
             else:
-                move = pathfinding_next_move_in_cluster(
-                    (position.y, position.x), facing_to_letter[self.facing], (self.target.y, self.target.x), self.clusters)
-                if move is None:
-                    self.panic_mode = 8
-                    for _ in range(50):  # Just to avoid while True lol
-                        rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
-                        if self.clusters[(ry, rx)]:
-                            self.target = Coords(x=rx, y=ry)
-                            break
-                else:
-                    available_actions = (
-                        ([move] if move in available_actions else [])
-                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                    )
+                move = move_recommendations['menhir'][0]
+
+            if move is None:
+                self.panic_mode = 8
+                for _ in range(50):  # Just to avoid while True lol
+                    rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
+                    if self.clusters[(ry, rx)]:
+                        self.target = Coords(x=rx, y=ry)
+                        break
+            else:
+                available_actions = (
+                    ([move] if move in available_actions else [])
+                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                )
 
         if len(available_actions) == 0:
             return random.choice([Action.ATTACK, Action.TURN_LEFT])
@@ -279,15 +281,15 @@ class Spejson(controller.Controller):
         self.arena_name = arena_description.name
         self.terrain = arenas.Arena.load(self.arena_name).terrain
 
-        analytics = analyze_map(self.arena_name)
+        self.analytics = analyze_map(self.arena_name)
 
-        self.target = Coords(x=analytics['start'][1], y=analytics['start'][0])
+        self.target = Coords(x=self.analytics['start'][1], y=self.analytics['start'][0])
         self.menhir_location = self.target
-        self.clusters = analytics['clusters']
-        self.adj = analytics['adj']
-        self.weapons_knowledge = analytics['weapons_knowledge']
-        self.map_height = analytics['height']
-        self.map_width = analytics['width']
+        self.clusters = self.analytics['clusters']
+        self.adj = self.analytics['adj']
+        self.weapons_knowledge = self.analytics['weapons_knowledge']
+        self.map_height = self.analytics['height']
+        self.map_width = self.analytics['width']
 
     @property
     def name(self) -> str:
