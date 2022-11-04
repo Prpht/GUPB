@@ -4,11 +4,8 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action, Facing
-from gupb.model.coordinates import Coords, add_coords
+from gupb.model.coordinates import add_coords
 from .utils import KillerInterest, PathConstants, find_paths, path_to_actions
-
-import logging
-verbose_logger = logging.getLogger("verbose")
 
 
 class KillerAction(Enum):
@@ -18,7 +15,6 @@ class KillerAction(Enum):
     FIND_MENHIR = 3  # Find path to menhir if one exists
     LEARN_MAP = 4  # Invoke learn_map method
     LOOK_AROUND = 5  # Perform ('turn right', 'learn_map') 4 times
-    SPIN_AROUND = 6  # Perform 'turn right' 4 times
 
 
 class KillerController(controller.Controller):
@@ -44,7 +40,8 @@ class KillerController(controller.Controller):
             if tile.type == "land":
                 self.game_map[coord[1], coord[0]] = PathConstants.WALKABLE.value
                 if tile.character is not None:
-                    self.game_map[coord[1], coord[0]] = KillerInterest.KILLING.value
+                    if tile.character.controller_name != self.first_name:
+                        self.game_map[coord[1], coord[0]] = KillerInterest.KILLING.value
 
             if self.menhir_pos is None:
                 if tile.type == "menhir":
@@ -100,8 +97,8 @@ class KillerController(controller.Controller):
 
     def find_path(self, knowledge: characters.ChampionKnowledge, interest: KillerInterest = None):
         # Path finding
-        current_position = knowledge.position
-        paths = find_paths(arr=self.game_map, curr_pos=current_position)
+        pos_x, pos_y = knowledge.position[0], knowledge.position[1]
+        paths = find_paths(arr=self.game_map, curr_pos=(pos_y, pos_x))
         if interest is not None:
             found_path = paths.get_best_path(val_from=interest.value,
                                              val_to=interest.value)
@@ -109,20 +106,16 @@ class KillerController(controller.Controller):
             found_path = paths.get_best_path(val_from=KillerInterest.POINT_ON_MAP.value,
                                              val_to=KillerInterest.MENHIR.value)
 
-        verbose_logger.debug(f"FOUND PATH: {found_path}")
         # Getting actions for found path
         facing = self.get_facing(knowledge)
         if facing == Facing.UP:
-            #curr_direction = -1, 0
-            curr_direction = 0, 1
-        elif facing == Facing.DOWN:
-            #curr_direction = 1, 0
-            curr_direction = 0, -1
-        elif facing == Facing.LEFT:
-            #curr_direction = 0, -1
             curr_direction = -1, 0
-        else:  # facing == Facing.RIGHT
+        elif facing == Facing.DOWN:
             curr_direction = 1, 0
+        elif facing == Facing.LEFT:
+            curr_direction = 0, -1
+        else:  # facing == Facing.RIGHT
+            curr_direction = 0, 1
         actions = path_to_actions(initial_direction=curr_direction, path=found_path)
         self.planned_actions += actions
 
@@ -132,9 +125,6 @@ class KillerController(controller.Controller):
 
         if action == KillerAction.LOOK_AROUND:
             self.planned_actions += 4 * [Action.TURN_RIGHT, KillerAction.LEARN_MAP]
-
-        if action == KillerAction.SPIN_AROUND:
-            self.planned_actions += 4 * [Action.TURN_RIGHT]
 
         if action == KillerAction.FIND_VICTIM:
             self.find_path(knowledge, interest=KillerInterest.KILLING)
@@ -165,16 +155,12 @@ class KillerController(controller.Controller):
             self.execute_action(KillerAction.LOOK_AROUND, knowledge)
 
         if self.menhir_pos == knowledge.position:
-            self.execute_action(KillerAction.SPIN_AROUND, knowledge)
+            return Action.TURN_RIGHT
 
         self.learn_map(knowledge)
 
         if len(self.planned_actions) == 0:
-            verbose_logger.debug("We need to find path")
             self.find_path(knowledge)
-        else:
-            verbose_logger.debug("No need for path finding")
-        verbose_logger.debug(f"CURRENT POS: {knowledge.position}")
         while len(self.planned_actions) > 0:
             action = self.planned_actions.pop(0)
             if isinstance(action, KillerAction):
@@ -188,7 +174,9 @@ class KillerController(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.game_map = np.zeros(shape=(50, 50))
+        self.menhir_pos = None
+        self.planned_actions = []
 
     @property
     def name(self) -> str:
