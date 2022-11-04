@@ -151,11 +151,3 @@ class AgressivePassiveStrategy(DefaultStrategy):
                 knowledge.position, opponent_coords) < 5:
             return RunAwayFromOpponentInstruction(opponent_coords)
         return None
-
-
-POSSIBLE_STRATEGIES = [
-    AgressiveAgressiveStrategy,
-    PassivePassiveStrategy,
-    PassiveAgressiveStrategy,
-    AgressivePassiveStrategy
-]

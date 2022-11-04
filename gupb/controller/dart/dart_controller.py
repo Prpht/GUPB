@@ -2,9 +2,10 @@ import random
 from typing import Optional
 from gupb.controller import Controller
 from gupb.controller.dart.movement_mechanics import MapKnowledge
-from gupb.controller.dart.strategies import DefaultStrategy, Strategy
+from gupb.controller.dart.strategies import DefaultStrategy, Strategy, AgressiveAgressiveStrategy, PassivePassiveStrategy, PassiveAgressiveStrategy, AgressivePassiveStrategy
 from gupb.model.arenas import ArenaDescription
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
+from gupb.controller.dart.k_armed_bandit import KArmedBandit
 
 POSSIBLE_ACTIONS = [
     Action.TURN_LEFT,
@@ -13,6 +14,12 @@ POSSIBLE_ACTIONS = [
     Action.ATTACK,
 ]
 
+POSSIBLE_STRATEGIES = [
+    PassiveAgressiveStrategy,
+    AgressiveAgressiveStrategy,
+    PassivePassiveStrategy,
+    AgressivePassiveStrategy
+]
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -21,6 +28,7 @@ class DartController(Controller):
         self.first_name: str = first_name
         self._map_knowledge: Optional[MapKnowledge] = None
         self._strategy: Strategy = DefaultStrategy()
+        # self._bandit = KArmedBandit()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DartController):
@@ -38,10 +46,13 @@ class DartController(Controller):
             return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
+        # self._bandit.reward(score)
         pass
 
     def reset(self, arena_description: ArenaDescription) -> None:
         self._map_knowledge = MapKnowledge(arena_description)
+        # strategy_index = self._bandit.pull_arm()
+        self._strategy = POSSIBLE_STRATEGIES[0]()
 
     @property
     def name(self) -> str:
