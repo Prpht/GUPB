@@ -28,7 +28,26 @@ COORDS_DIRS = {
     coo.Coords(0, 1): "DOWN",
     coo.Coords(-1, 0): "LEFT",
 }
-
+DIRECTIONS = {
+    "UP": coo.Coords(0, -100),
+    "RIGHT": coo.Coords(100, 0),
+    "DOWN": coo.Coords(0, 100),
+    "LEFT": coo.Coords(-100, 0),
+    "UPRIGHT": coo.Coords(100, -100),
+    "UPLEFT": coo.Coords(-100, -100),
+    "DOWNRIGHT": coo.Coords(100, 100),
+    "DOWNLEFT": coo.Coords(-100, 100),
+}
+DIRECTIONS_OPPOSITE = {
+    "UP": "DOWN",
+    "RIGHT": "LEFT",
+    "LEFT": "RIGHT",
+    "DOWN": "UP",
+    "UPRIGHT": "DOWNLEFT",
+    "UPLEFT": "DOWNRIGHT",
+    "DOWNRIGHT": "UPLEFT",
+    "DOWNLEFT": "UPRIGHT",
+}
 TILES_VALUES = {"sea": 0, "wall": 0, "menhir": 1, "land": 1, "weapon": 100}
 
 
@@ -38,6 +57,8 @@ class AksolotlController(controller.Controller):
         self.position = None
         self.knowledge = None
         self.facing = None
+        self.armed = False
+        self.attacked = False
         self.neighbors = []
         self.neighbors_types = dict()
         self.possible_tiles = []
@@ -108,7 +129,7 @@ class AksolotlController(controller.Controller):
                     self.temp_target = coo.Coords(position[0], position[1])
             if tile.loot and tile.loot != "knife":
                 self.map[y, x] = TILES_VALUES["weapon"]
-                if self.weapon_position is None:
+                if self.weapon_position is None and self.armed == False:
                     self.temp_target = coo.Coords(position[0], position[1])
                     self.weapon_position = coo.Coords(position[0], position[1])
             if tile.effects != []:
@@ -156,8 +177,8 @@ class AksolotlController(controller.Controller):
                 self.map = """
 
     def mist_strategy(self):
-        safe_boundaries = self.approximate_mist()
-        centre = (self.map.shape[1] // 2, self.map.shape[0] // 2)
+        # safe_boundaries = self.approximate_mist()
+        centre = coo.Coords(self.largest_x // 2, self.largest_y // 2)
         if self.menhir_position:
             self.calculate_path(self.menhir_position)
             if self.recommended_path != []:
@@ -226,6 +247,7 @@ class AksolotlController(controller.Controller):
             return
         self.rotation(COORDS_DIRS[diff])
         self.action_queue.append(Action.ATTACK)
+        self.attacked = True
 
     def rotation(self, direction):
         if self.facing == direction:
@@ -268,6 +290,80 @@ class AksolotlController(controller.Controller):
             self.recommended_path = []
             return act
 
+    def furthest_visible_tile_in_direction(self, direction):
+        curr_furthest_x = self.position[0]
+        curr_furthest_y = self.position[1]
+        corner = DIRECTIONS[direction]
+        diff_best = corner - coo.Coords(curr_furthest_x, curr_furthest_y)
+        for position, tile in self.knowledge.visible_tiles.items():
+            x, y = position[0], position[1]
+            temp_diff = corner - coo.Coords(x, y)
+            if tile.type == "wall" or tile.type == "menhir":
+                if (temp_diff.x + temp_diff.y) > (diff_best.x + diff_best.y):
+                    diff_best = temp_diff
+                    curr_furthest_x = x
+                    curr_furthest_y = y
+
+        return coo.Coords(curr_furthest_x, curr_furthest_y)
+
+    def check_within_square(self, middle_coords, half_width, point_to_check):
+        square_upper = coo.Coords(middle_coords[0], middle_coords[1]) + coo.Coords(
+            half_width, half_width
+        )
+        square_lower = coo.Coords(middle_coords[0], middle_coords[1]) - coo.Coords(
+            half_width, half_width
+        )
+        point_coords = coo.Coords(point_to_check[0], point_to_check[1])
+        if (square_upper[0] >= point_coords[0] >= square_lower[0]) and (
+            square_upper[1] >= point_coords[1] >= square_lower[1]
+        ):
+            return True
+        return False
+
+    def move_in_direction(self):
+        pass
+
+    def determine_object_direction(self, object_coords):
+        # determine object direction relative to our position
+        direction = ""
+        diff = coo.Coords(self.position[0], self.position[1]) - coo.Coords(
+            object_coords[0], object_coords[1]
+        )
+        if diff.y > 0:
+            direction = direction + "UP"
+        if diff.y < 0:
+            direction = direction + "DOWN"
+
+        if diff.x < 0:
+            direction = direction + "RIGHT"
+        if diff.x > 0:
+            direction = direction + "LEFT"
+        return direction
+
+    def run_from_opponent(self):
+        # determine opponents directions
+        # move in direction opposite to the most dangerous (closest) opponent
+        if len(self.opponents) > 0:
+            closest_opponent = self.opponents[0]
+        else:
+            return None
+        for opponent_position in self.opponents:
+            if self.check_within_square(self.position, 2, opponent_position):
+                if (
+                    self.further_point(closest_opponent, opponent_position)
+                    != opponent_position
+                ):
+                    closest_opponent = opponent_position
+
+        if closest_opponent != None:
+            direction_to_avoid = self.determine_object_direction(closest_opponent)
+            opposite_direction = DIRECTIONS_OPPOSITE[direction_to_avoid]
+            temp_targ = self.furthest_visible_tile_in_direction(opposite_direction)
+            self.temp_target = temp_targ
+            return temp_targ
+        else:
+            return None
+
     def calculate_path(self, destination):
         grid = Grid(matrix=self.map)
         start = grid.node(self.position[0], self.position[1])
@@ -285,14 +381,19 @@ class AksolotlController(controller.Controller):
             self.reached_target = True
 
     def act_update(self):
-        act = self.action_queue[0]
-        self.action_queue.pop(0)
+        if len(self.action_queue) > 0:
+            act = self.action_queue[0]
+            self.action_queue.pop(0)
+        else:
+            act = random.choice(POSSIBLE_ACTIONS)
         self.prev_facing = self.facing
         self.previous_position = self.position
         return act
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.opponents = []
         self.position = knowledge.position
+        self.health = knowledge.visible_tiles[self.position].character.health
         self.facing = knowledge.visible_tiles[self.position].character.facing.name
         self.knowledge = knowledge
         self.neighbors = self.update_neighbors()
@@ -315,6 +416,15 @@ class AksolotlController(controller.Controller):
 
             return self.mist_strategy()
 
+        if self.health < 5:
+            if self.run_from_opponent() != None:
+                self.calculate_path(self.temp_target)
+                if self.position == self.temp_target:
+                    self.act_when_blocked()
+                else:
+                    self.follow_path(self.recommended_path)
+                return self.act_update()
+
         if self.position == self.weapon_position:
             self.armed = True
             self.weapon_position = None  # make him drop looking for weapon
@@ -323,6 +433,8 @@ class AksolotlController(controller.Controller):
             return self.act_update()
 
         if self.detect_opponent() != None:  # high priority, we have to defend ourselves
+            if self.attacked:
+                return Action.ATTACK
             opponent_position = self.detect_opponent()
             self.move_to_opponent(opponent_position)
             return self.act_update()
@@ -401,6 +513,8 @@ class AksolotlController(controller.Controller):
         self.position = None
         self.knowledge = None
         self.facing = None
+        self.armed = False
+        self.attacked = False
         self.neighbors = []
         self.neighbors_types = dict()
         self.possible_tiles = []
@@ -409,6 +523,7 @@ class AksolotlController(controller.Controller):
         self.temp_target = None
         self.action_queue = []
         self.mist_positions = []
+        self.map = np.ones((100, 100))
         self.recommended_path = []
         self.blocked = False
         self.prev_facing = None
@@ -418,7 +533,9 @@ class AksolotlController(controller.Controller):
         self.recalculate_path = False
         self.on_menhir = False
         self.reached_target = False
-        self.map = np.ones((10, 10))
+        self.store_map_before_mist = None
+        self.largest_x = 0
+        self.largest_y = 0
 
     @property
     def name(self) -> str:
