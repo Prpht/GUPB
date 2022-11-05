@@ -6,7 +6,7 @@ from gupb.controller.tuptus.pathfinder import Pathfinder
 from gupb.controller.tuptus.map import Map
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Facing
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import numpy as np
 
 WEAPON_TIERS = {
@@ -107,10 +107,39 @@ class BaseStrategy:
 
 
 class PassiveStrategy(BaseStrategy):
+
+    def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
+        super().__init__(game_map, weapon_tier, position, facing)
+        self.planned_safe_spot: Tuple = ()
+
+
     def hide(self):
         """
         Analyze the map for safe spots and go to the nearest one
         """
+        min_distance = 200
+        return_path = []
+
+        for safe_coords in self.map.safe_spots:
+            raw_path = self.pathfinder.astar(self.position, safe_coords)
+
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+
+                if len(planned_path) < min_distance:
+                    min_distance = len(planned_path)
+                    return_path = planned_path
+                    self.planned_safe_spot = safe_coords
+        return return_path
+
+
+    @property
+    def is_hidden(self):
+        return self.position == self.planned_safe_spot
+
+
+    
+            
 
 
 class AggresiveStrategy(BaseStrategy):

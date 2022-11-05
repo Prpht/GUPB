@@ -24,6 +24,8 @@ from typing import Optional, List
     @TODO:
         1) Cleanup in decide method
         2) Move information from Controller to Map class
+        3) Fix fighting with the amulet
+        4) Tuptus crashes when standing on the menhir 
 
 """
 
@@ -55,10 +57,12 @@ class TuptusController(controller.Controller):
         self.weapon_tier: int = 6
         self.position: Optional[coordinates.Coords] = None
         self.facing: Optional[characters.Facing] = None
-        self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
+        # self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
+        self.strategy: PassiveStrategy = PassiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.planned_actions: Optional[List] = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
+        self.standing_counter: int = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TuptusController):
@@ -75,20 +79,38 @@ class TuptusController(controller.Controller):
         next_block = knowledge.visible_tiles[next_block_position]
 
         if next_block.character:
-            return POSSIBLE_ACTIONS[3]         
+            return POSSIBLE_ACTIONS[3]      
 
         if not self.is_mist_bool(knowledge.visible_tiles):
-            self.planned_actions = self.strategy.find_weapon()
             if self.planned_actions:
                 return self.planned_actions.pop(0)
-            else:
-                self.planned_actions = self.strategy.fight(knowledge)
-                if self.planned_actions:
-                    return self.planned_actions.pop(0)
-                else:
-                    self.planned_actions = self.strategy.explore()
-                    if self.planned_actions:
-                        return self.planned_actions.pop(0)
+
+        if self.strategy.is_hidden and not self.is_mist_bool(knowledge.visible_tiles):
+            self.standing_counter += 1
+            if self.standing_counter > 5:
+                self.planned_actions = [POSSIBLE_ACTIONS[0]] *4
+                self.standing_counter = 0
+            
+            if next_block.type != "land":
+                return POSSIBLE_ACTIONS[0]
+            return POSSIBLE_ACTIONS[3]
+        else:
+            self.planned_actions = self.strategy.hide()
+
+
+        # ! Commented for hidding testing 
+        # if not self.is_mist_bool(knowledge.visible_tiles):
+        #     self.planned_actions = self.strategy.find_weapon()
+        #     if self.planned_actions:
+        #         return self.planned_actions.pop(0)
+        #     else:
+        #         self.planned_actions = self.strategy.fight(knowledge)
+        #         if self.planned_actions:
+        #             return self.planned_actions.pop(0)
+        #         else:
+        #             self.planned_actions = self.strategy.explore()
+        #             if self.planned_actions:
+        #                 return self.planned_actions.pop(0)
 
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
@@ -135,11 +157,13 @@ class TuptusController(controller.Controller):
         self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
+        self.map.safe_spots = []
         self.map._init_map(Arena.load(arena_description.name))
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
         self.strategy.arena_description = Arena.load(arena_description.name)
+        self.map.menhir_position = None
 
 
 
