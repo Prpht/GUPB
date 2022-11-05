@@ -1,6 +1,8 @@
 import pathfinding as pth
 import numpy as np
 from typing import List
+import random
+from numpy import linspace, digitize
 
 from gupb.model.coordinates import Coords
 from gupb.model import arenas
@@ -41,6 +43,11 @@ class PathFinder():
         path, _ = finder.find_path(start,end, grid)
         return path[1:]
 
+
+def calculate_distance(self, self_position: Coords, other_position: Coords) -> int:
+    distance = math.sqrt((self_position[0] - other_position[0]) ** 2 + (self_position[1] - other_position[1]) ** 2)
+    return int(round(distance))
+
 def next_step(current_position: Coords, next_position: Coords, facing: characters.Facing) -> characters.Action:
     if (current_position + facing.value == next_position):
         return characters.Action.STEP_FORWARD
@@ -55,10 +62,33 @@ def get_weaponable_tiles(arena: arenas.Arena, pos: Coords, facing: characters.Fa
         weaponable_tiles = weapons.Knife.cut_positions(arena.terrain, pos, facing)
     elif weapon == 'sword':
         weaponable_tiles = weapons.Sword.cut_positions(arena.terrain, pos, facing)
-    elif weapon == 'bow':
+    elif weapon == 'bow_loaded':
         weaponable_tiles = weapons.Bow.cut_positions(arena.terrain, pos, facing)
     elif weapon == 'amulet':
         weaponable_tiles = weapons.Amulet.cut_positions(arena.terrain, pos, facing)
     else:
         weaponable_tiles = weapons.Axe.cut_positions(arena.terrain, pos, facing)
     return weaponable_tiles
+
+def set_random_destination(current_position, map_size, passable_tiles):
+    half_x = int(map_size[0] / 2)
+    half_y = int(map_size[1] / 2)
+    if current_position[0] <= half_x:
+        if current_position[1] <= half_y:
+            tiles_to_choose = list(filter(lambda t: t[0] > half_x or t[1] > half_y, passable_tiles))
+        else:
+            tiles_to_choose = list(filter(lambda t: t[0] > half_x or t[1] <= half_y, passable_tiles))
+    else:
+        if current_position[1] <= half_y:
+            tiles_to_choose = list(filter(lambda t: t[0] <= half_x or t[1] > half_y, passable_tiles))
+        else:
+            tiles_to_choose = list(filter(lambda t: t[0] <= half_x or t[1] <= half_y, passable_tiles))
+    return random.choice(tiles_to_choose)
+
+def find_safe_spot(current_position, dangerous_tiles, arena):
+    possible_spots = [current_position + Coords(1, 0), current_position + Coords(0, -1),
+                      current_position + Coords(0, 1), current_position + Coords(-1, 0)]
+    for spot in possible_spots:
+        if spot not in dangerous_tiles and arena.terrain[spot].passable:
+            return spot
+    return None
