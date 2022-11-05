@@ -226,7 +226,7 @@ class SnieznyKockodanController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.GREY
 
     @staticmethod
     def count_x_distance(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> int:

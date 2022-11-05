@@ -63,8 +63,8 @@ def path_to_actions(initial_direction: tuple, path: List[Tuple]) -> List[Action]
             else:
                 actions.append(Action.TURN_LEFT)
         if 2.5 <= angle:
-            print(d)
-            print(curr_d)
+            # print(d)
+            # print(curr_d)
             actions.append(Action.TURN_RIGHT)
             actions.append(Action.TURN_RIGHT)
         actions.append(Action.STEP_FORWARD)
