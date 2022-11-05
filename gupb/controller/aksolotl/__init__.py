@@ -1,4 +1,4 @@
-from gupb.controller.aksolotl import AksolotlController
+from .aksolotl import AksolotlController
 
 __all__ = [
     'aksolotl',
