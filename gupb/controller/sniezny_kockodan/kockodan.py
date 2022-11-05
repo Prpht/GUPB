@@ -43,6 +43,7 @@ WEAPON_RANKING = {
 
 # ARENA = arenas.Arena.load(TERRAIN_NAME)
 ARENA = (arena_generator.DEFAULT_HEIGHT, arena_generator.DEFAULT_WIDTH)
+
 # TERRAIN = ARENA.terrain
 
 MAX_HEALTH: int = characters.CHAMPION_STARTING_HP
@@ -225,7 +226,7 @@ class SnieznyKockodanController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.GREY
+        return characters.Tabard.WHITE
 
     @staticmethod
     def count_x_distance(tile_position: coordinates.Coords, current_position: coordinates.Coords) -> int:
@@ -344,10 +345,8 @@ class SnieznyKockodanController(controller.Controller):
         for tile in knowledge.visible_tiles:
             effects_on_tile = knowledge.visible_tiles[tile].effects
             for effect in effects_on_tile:
-                if isinstance(effect, effects.Mist):
+                if effect.type == 'mist':
                     mist_tiles += [tile]
-                    break
-
         return mist_tiles
 
     @staticmethod
