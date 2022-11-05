@@ -377,7 +377,6 @@ class SnieznyKockodanController(controller.Controller):
         # destination = coordinates.Coords(x=knowledge.position[0], y=knowledge.position[1])
         # difference = coordinates.Coords(x=x_distances[x_ind], y=y_distances[y_ind])
         # destination = coordinates.add_coords(destination, difference)
-        print(mist_tiles)
         euclidean_distances = [SnieznyKockodanController.euclidean_distance(knowledge.position, x) for x in mist_tiles]
         min_tile_ind = euclidean_distances.index(min(euclidean_distances))
 
