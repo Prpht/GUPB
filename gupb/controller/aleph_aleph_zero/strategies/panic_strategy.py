@@ -1,4 +1,4 @@
-from gupb.controller.aleph_aleph_zero.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy
 
 
 class PanicStrategy(Strategy):

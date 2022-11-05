@@ -543,7 +543,7 @@ class AksolotlController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.RED
+        return characters.Tabard.TURQUOISE
 
 
 POTENTIAL_CONTROLLERS = [
