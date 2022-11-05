@@ -52,10 +52,11 @@ class TuptusController(controller.Controller):
         self.first_name: str = first_name
         self.map: Map = Map()
         self.pathfinder: Pathfinder = Pathfinder(self.map)
+        self.weapon_tier: int = 6
         self.position: Optional[coordinates.Coords] = None
         self.facing: Optional[characters.Facing] = None
+        self.strategy: BaseStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.planned_actions: Optional[List] = None
-        self.weapon_tier: int = 6
         self.mist_tiles = np.array([])
         self.strategy: BaseStrategy = PassiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.mist_directions: List[Optional[characters.Facing]] = None
@@ -73,9 +74,7 @@ class TuptusController(controller.Controller):
         self.strategy.explore()
 
         if self.planned_actions:
-            return self.planned_actions.pop(0)
-        
-
+            return self.planned_actions.pop(0)    
 
         if self.weapon_tier != 1 and not self.is_mist_bool(knowledge.visible_tiles):
             self.planned_actions = self.strategy.find_weapon()
@@ -135,16 +134,21 @@ class TuptusController(controller.Controller):
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
+        self.strategy.arena_description = Arena.load(arena_description.name)
+
+
 
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
         self.map.decode_knowledge(knowledge)
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
         self.find_current_weapon_tier(knowledge)
-
+     
+        self.strategy.weapon_tier = self.weapon_tier
         self.strategy.facing = self.facing
         self.strategy.position = self.position
         self.strategy.map = self.map
+
 
     def find_current_weapon_tier(self, knowledge) -> None:
         for coord, tile in knowledge.visible_tiles.items():

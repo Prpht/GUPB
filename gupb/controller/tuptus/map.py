@@ -32,7 +32,7 @@ class Map():
                 self.menhir_position = coord
             #? Do i need 2 ifs? 
             if tile.effects:
-                if tile.effects.type == "mist":
+                if "mist" in tile.effects:
                     self.mist_map[coord] = 1
 
 

@@ -1,3 +1,6 @@
+from gupb.controller.tuptus.map import Map
+from gupb.model.arenas import Arena, ArenaDescription
+from gupb.model import characters, effects, weapons
 from gupb.controller.tuptus.pathfinder import Pathfinder
 # from gupb.controller.tuptus.tuptus import WEAPON_TIERS
 from gupb.controller.tuptus.map import Map
@@ -12,25 +15,39 @@ WEAPON_TIERS = {
     3: "amulet",
     4: "bow_unloaded",
     5: "bow_loaded",
-    6: "knife"
+    6: "knife",
+}
+WEAPON_CLASSES = {
+    "sword": weapons.Sword(),
+    "axe": weapons.Axe(),
+    "amulet": weapons.Amulet(),
+    "bow_loaded": weapons.Bow(),
+    "bow_unloaded": weapons.Bow(),
+    "knife": weapons.Knife(),
 }
 
 
-
-class BaseStrategy():
-
-    def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
+class BaseStrategy:
+    def __init__(
+        self,
+        game_map: Map,
+        weapon_tier: int,
+        position: Optional[Coords],
+        facing: Optional[Facing],
+    ):
         self.pathfinder: Pathfinder = Pathfinder(game_map)
         self.map: Map = game_map
         self.weapon_tier: int = weapon_tier
         self.position: Optional[Coords] = position
         self.facing: Optional[Facing] = facing
+        self.closest_opponent: tuple = (None, None)
+        self.arena_description: Arena
 
     def explore(self) -> List:
         """
-            Fancy name for wandering around...
+        Fancy name for wandering around...
 
-            Store information about seen parts of the map and go towards the unexplored?
+        Store information about seen parts of the map and go towards the unexplored?
         """
         height, width = self.map.known_map.shape
 
@@ -55,7 +72,7 @@ class BaseStrategy():
 
     def go_to_menhir(self) -> List:
         """
-            Go to menhir when the mist is approaching
+        Go to menhir when the mist is approaching
         """
 
         if self.map.menhir_position:
@@ -66,17 +83,17 @@ class BaseStrategy():
 
     def find_weapon(self) -> Optional[List]:
         """
-            If possible find the better weapon
+        If possible find the better weapon
         """
-        
+
         weapon_path = None
 
         for tier, name in WEAPON_TIERS.items():
-            
+
             # Hypothetical weapon is worse than what Tuptus currently has
             if tier >= self.weapon_tier:
                 continue
-            
+
             # Tuptus knows the position of the better weapon
             if name in self.map.weapons_position.keys():
                 weapon_coords = self.map.weapons_position[name]
@@ -89,19 +106,94 @@ class BaseStrategy():
         return weapon_path
 
 
-
-    
 class PassiveStrategy(BaseStrategy):
-    
     def hide(self):
         """
-            Analyze the map for safe spots and go to the nearest one 
+        Analyze the map for safe spots and go to the nearest one
         """
 
 
 class AggresiveStrategy(BaseStrategy):
+    def fight(self, knowledge):
+        """
+        Find the target and eliminate it (or run if will die)
+        """
+        if self.find_opponent(knowledge):
+            shortest_path = -1
+            good_spots = self.find_good_attacking_spot(knowledge)
+            if len(good_spots) == 0:
+                return None
+            for idx, good_spot in enumerate(good_spots):
+                if self.pathfinder.astar(knowledge.position, good_spot)!=0:
+                    path = self.pathfinder.plan_path(
+                        self.pathfinder.astar(knowledge.position, good_spot), self.facing
+                    )
+                    if len(path) < shortest_path or shortest_path==-1:
+                        shortest_path = len(path)
+                        chosen_path = path
+                if shortest_path == -1:
+                    return [characters.Action.TURN_LEFT]
+            return chosen_path+[characters.Action.ATTACK]
+        return None
 
-    def fight(self):
+    def find_opponent(self, knowledge):
         """
-            Find the target and eliminate it (or run if will die)
+        Find the closest opponent
         """
+        shortest_path = -1
+        opponent = None
+        for coords, tile in knowledge.visible_tiles.items():
+            if tile.character and coords != knowledge.position:
+                if self.pathfinder.astar(knowledge.position, coords)!= 0:
+                    path = self.pathfinder.plan_path(
+                        self.pathfinder.astar(knowledge.position, coords), self.facing
+                    )
+                    if shortest_path == -1 or len(path) < shortest_path:
+                        shortest_path = len(path)
+                        opponent = (coords, tile)
+        if opponent:
+            self.closest_opponent = opponent
+            return True
+        return False
+
+    def find_good_attacking_spot(self, knowledge):
+        tup_weapon = WEAPON_TIERS[self.weapon_tier]
+        opponent_range = WEAPON_CLASSES[
+            self.closest_opponent[1].character.weapon.name
+        ].cut_positions(
+            self.arena_description.terrain,
+            (Coords(self.closest_opponent[0][0], self.closest_opponent[0][1])),
+            self.closest_opponent[1].character.facing,
+        )
+        if tup_weapon in ["knife", "sword", "bow_unloaded", "bow_loaded"]:
+            tup_range = WEAPON_CLASSES[
+                knowledge.visible_tiles[knowledge.position].character.weapon.name
+            ].reach()
+            good_attacking_spots = [
+                tuple(map(sum, zip(self.closest_opponent[0], (0, tup_range)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (0, -tup_range)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-tup_range, 0)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (tup_range, 0)))),
+            ]
+        elif tup_weapon == "axe":
+            good_attacking_spots = [
+                tuple(map(sum, zip(self.closest_opponent[0], (1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (0, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (0, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 0)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 0)))),
+            ]
+        elif tup_weapon == "amulet":
+            good_attacking_spots = [
+                tuple(map(sum, zip(self.closest_opponent[0], (2, -2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-2, 2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-2, -2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (2, 2)))),
+            ]
+        good_attacking_spots = [
+            x for x in good_attacking_spots if x not in opponent_range
+        ]
+        return good_attacking_spots
