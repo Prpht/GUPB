@@ -55,10 +55,9 @@ class TuptusController(controller.Controller):
         self.weapon_tier: int = 6
         self.position: Optional[coordinates.Coords] = None
         self.facing: Optional[characters.Facing] = None
-        self.strategy: BaseStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
+        self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.planned_actions: Optional[List] = None
         self.mist_tiles = np.array([])
-        self.strategy: BaseStrategy = PassiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.mist_directions: List[Optional[characters.Facing]] = None
 
     def __eq__(self, other: object) -> bool:
@@ -71,20 +70,26 @@ class TuptusController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update(knowledge)
-        self.strategy.explore()
-
-        if self.planned_actions:
-            return self.planned_actions.pop(0)    
-
-        if self.weapon_tier != 1 and not self.is_mist_bool(knowledge.visible_tiles):
-            self.planned_actions = self.strategy.find_weapon()
-            
-            # ? Is it needed? 
-            if self.planned_actions:
-                return self.planned_actions.pop(0)
 
         next_block_position = knowledge.position + self.facing.value
-        next_block = knowledge.visible_tiles[next_block_position]        
+        next_block = knowledge.visible_tiles[next_block_position]
+
+        if next_block.character:
+            return POSSIBLE_ACTIONS[3]         
+
+        if not self.is_mist_bool(knowledge.visible_tiles):
+            self.planned_actions = self.strategy.find_weapon()
+            if self.planned_actions:
+                return self.planned_actions.pop(0)
+            else:
+                self.planned_actions = self.strategy.fight(knowledge)
+                if self.planned_actions:
+                    return self.planned_actions.pop(0)
+                else:
+                    self.planned_actions = self.strategy.explore()
+                    if self.planned_actions:
+                        return self.planned_actions.pop(0)
+
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
         elif self.is_mist_bool(knowledge.visible_tiles) > 0:

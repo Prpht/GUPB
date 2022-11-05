@@ -19,7 +19,7 @@ class Map():
     def __init__(self):
         self.tuptable_map: np.ndarray 
         self.weapons_position: Dict = {}
-        self.menhir_position: Optional[coordinates.Coords]
+        self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_map: np.ndarray
         self.known_map: np.ndarray
 
