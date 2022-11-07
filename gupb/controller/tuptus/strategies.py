@@ -25,6 +25,12 @@ WEAPON_CLASSES = {
     "bow_unloaded": weapons.Bow(),
     "knife": weapons.Knife(),
 }
+POSSIBLE_ACTIONS = [
+    characters.Action.TURN_LEFT,
+    characters.Action.TURN_RIGHT,
+    characters.Action.STEP_FORWARD,
+    characters.Action.ATTACK,
+]
 
 
 class BaseStrategy:
@@ -61,13 +67,12 @@ class BaseStrategy:
 
         # Find a random pair of coordinates to go to and check if it is possible 
         h = np.random.randint(h_min, h_max)
-        w = np.random.randint(w_min, w_max)        
+        w = np.random.randint(w_min, w_max)  
         while self.map.tuptable_map[h, w]:
             h = np.random.randint(h_min, h_max)
             w = np.random.randint(w_min, w_max)
 
         raw_path = self.pathfinder.astar(self.position, (h, w))
-          
         return self.pathfinder.plan_path(raw_path, self.facing) if raw_path else []
 
     def go_to_menhir(self) -> List:
@@ -105,14 +110,6 @@ class BaseStrategy:
         
         return weapon_path
 
-
-class PassiveStrategy(BaseStrategy):
-
-    def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
-        super().__init__(game_map, weapon_tier, position, facing)
-        self.planned_safe_spot: Tuple = ()
-
-
     def hide(self):
         """
         Analyze the map for safe spots and go to the nearest one
@@ -132,17 +129,57 @@ class PassiveStrategy(BaseStrategy):
                     self.planned_safe_spot = safe_coords
         return return_path
 
+class PassiveStrategy(BaseStrategy):
+
+    def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
+        super().__init__(game_map, weapon_tier, position, facing)
+        self.planned_safe_spot: Tuple = (),
+        self.standing_counter: int = 0
+
+
+    def decide(self, is_mist, knowledge, next_block):
+        if self.is_hidden and not is_mist:
+            self.standing_counter += 1
+            if self.standing_counter > 5:
+                self.planned_actions = [POSSIBLE_ACTIONS[0]] *4
+                self.standing_counter = 0
+            
+            if next_block.type != "land":
+                return POSSIBLE_ACTIONS[0]
+            return POSSIBLE_ACTIONS[3]
+        elif is_mist:
+            self.go_to_menhir().pop(0)
+        else:
+            return self.hide().pop(0)
 
     @property
     def is_hidden(self):
-        return self.position == self.planned_safe_spot
-
-
-    
-            
+        return self.position == self.planned_safe_spot  
 
 
 class AggresiveStrategy(BaseStrategy):
+    def decide(self, is_mist, knowledge, next_block):
+        if not is_mist:
+            planned_actions = self.find_weapon()
+            if planned_actions:
+                return planned_actions.pop(0)
+            else:
+                planned_actions = self.fight(knowledge)
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    planned_actions = self.explore()
+                    #print(f"Explore + {planned_actions}")
+                    if planned_actions:
+                        return planned_actions.pop(0)
+        else:
+            planned_actions = self.go_to_menhir()
+            if planned_actions:
+                return planned_actions.pop(0)
+            else:
+                return characters.Action.TURN_LEFT
+        return characters.Action.TURN_LEFT
+
     def fight(self, knowledge):
         """
         Find the target and eliminate it (or run if will die)
@@ -171,8 +208,9 @@ class AggresiveStrategy(BaseStrategy):
         """
         shortest_path = -1
         opponent = None
+        tup_health = knowledge.visible_tiles[knowledge.position].character.health
         for coords, tile in knowledge.visible_tiles.items():
-            if tile.character and coords != knowledge.position:
+            if tile.character and coords != knowledge.position and tup_health>knowledge.visible_tiles[coords].character.health:
                 if self.pathfinder.astar(knowledge.position, coords)!= 0:
                     path = self.pathfinder.plan_path(
                         self.pathfinder.astar(knowledge.position, coords), self.facing
