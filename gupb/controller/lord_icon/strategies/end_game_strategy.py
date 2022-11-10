@@ -18,11 +18,7 @@ class EndGameStrategy(Strategy):
         # Avoid attack range from enemies
         for enemy in knowledge.enemies:
             attack_range = enemy.get_attack_range(map)
-            for pos in attack_range:
-                EndGameStrategy.enemies_ranges.append(pos)
-
-        for enemy_range in EndGameStrategy.enemies_ranges:
-            map[enemy_range] = 1
+            EndGameStrategy.enemies_ranges.extend(attack_range)
 
         if EndGameStrategy.counter == 2:
             EndGameStrategy.enemies_ranges = []
@@ -32,7 +28,7 @@ class EndGameStrategy(Strategy):
 
         if knowledge.menhir:
             moves = find_path(map, knowledge.character.position, knowledge.menhir)
-            if len(moves) > 0:
+            if moves:
                 return MoveController.next_move(knowledge, moves[0])
 
         # Just to be sure :)
