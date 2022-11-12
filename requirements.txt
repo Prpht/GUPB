@@ -12,4 +12,5 @@ questionary==1.10.0
 scikit-learn==1.1.2
 scipy==1.9.2
 sortedcontainers==2.4.0
+tensorflow==2.7
 tqdm==4.64.1
