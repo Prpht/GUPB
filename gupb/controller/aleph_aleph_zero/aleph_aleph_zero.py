@@ -1,28 +1,24 @@
 import random
 from copy import copy
-from time import sleep
 
 import numpy as np
-from typing import List
 
 from gupb import controller
-from gupb.controller.aleph_aleph_zero.guarding_strategy import GuardingStrategy
-from gupb.controller.aleph_aleph_zero.one_action_strategys import AttackStrategy, RunStrategy
-from gupb.controller.aleph_aleph_zero.menhir_rush_strategy import MenhirRushStrategy
-from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
-from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, find_shortest_path, get_closest_points
-from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
-from gupb.controller.aleph_aleph_zero.strategy import StrategyPriority
-from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
-from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill, get_knowledge_from_file, get_save_spots
-from gupb.controller.aleph_aleph_zero.weapon_rush_strategy import WeaponRushStrategy
+from gupb.controller.aleph_aleph_zero.high_level_strategies.hide_run import HideRun
+from gupb.controller.aleph_aleph_zero.high_level_strategies.loot_conquer import LootConquer
+from gupb.controller.aleph_aleph_zero.high_level_strategies.loot_hide import LootHide
+from gupb.controller.aleph_aleph_zero.shortest_path import build_graph
+from gupb.controller.aleph_aleph_zero.strategies.weapon_rush_strategy import weapons_score
+from gupb.controller.aleph_aleph_zero.utils import get_knowledge_from_file, get_save_spots, get_height_width_from_file, \
+    if_character_to_kill
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.arenas import FIXED_MENHIRS
 
-from gupb.model.characters import Facing, Action
-from gupb.model.coordinates import sub_coords, Coords
+from gupb.model.characters import Facing
+from gupb.model.coordinates import sub_coords
+from gupb.model.tiles import TileDescription
 
 
 class Knowledge:
@@ -34,17 +30,20 @@ class Knowledge:
         self.facing = facing
         self.no_of_champions_alive = no_of_champions_alive
 
-EPOCH_TO_BE_IN_MELCHIR = 150
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class AlephAlephZeroBot(controller.Controller):
+    HLSs = (
+        HideRun,
+        LootHide,
+        LootConquer
+    )
+
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.mists = set()
         self.epoch = 0
-
-        self.strategy = ScoutingStrategy()
 
         self.knowledge = Knowledge()
 
@@ -56,6 +55,9 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.map_knowledge_cache = {}
         self.save_spots_cache = {}
+
+        self.rewards_dict = dict()
+
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AlephAlephZeroBot):
@@ -122,6 +124,15 @@ class AlephAlephZeroBot(controller.Controller):
                 return facing_vals[sub_coords(coord, new_knowledge.position)]
 
     def _update_knowledge(self, new_knowledge):
+
+        #forget all of the old character info
+        to_be_updated = dict()
+        for coords, tile_desc in self.knowledge.visible_tiles.items():
+            if tile_desc.character is not None:
+                to_be_updated[coords] = TileDescription(tile_desc[0],tile_desc[1],None,[])
+        for coords, tile_desc in to_be_updated.items():
+            self.knowledge.visible_tiles[coords] = tile_desc
+
         self.knowledge.position = new_knowledge.position
         for coords, tile_desc in new_knowledge.visible_tiles.items():
             self.knowledge.visible_tiles[coords] = tile_desc
@@ -153,42 +164,29 @@ class AlephAlephZeroBot(controller.Controller):
             except:
                 pass  # shouldn't go wrong, but just in case, do nothing
 
-        if self.menhir_pos_updated or self.menhir_seen:
-            curr = graph[(knowledge.position, self.knowledge.facing)]
-            shortest_path = find_shortest_path(curr, self.menhir_position)
-            if (not self.menhir_seen) or shortest_path is None or self.epoch + len(shortest_path) > EPOCH_TO_BE_IN_MELCHIR:
-                self.menhir_pos_updated = False
-                self.strategy = self.strategy.get_more_important(MenhirRushStrategy(self.menhir_position, priority=StrategyPriority.TIME_SENSITIVE))
 
-            elif self.menhir_seen: #widzielismy juz menhira, znamy do niego droge i mamy duzo czasu
-                if self.knowledge.visible_tiles[knowledge.position].character.weapon.name=="knife":
-                    self.strategy = self.strategy.get_more_important(WeaponRushStrategy(StrategyPriority.PURPOSEFUL))
-                else:
-                    self.strategy = self.strategy.get_more_important(
-                        TravelStrategy(
-                            get_closest_points(self.save_spots, self.graph, graph[knowledge.position,knowledge.facing])[0],
-                            GuardingStrategy(priority=StrategyPriority.PURPOSEFUL),
-                            priority=StrategyPriority.PURPOSEFUL
-                        ))
+        if if_character_to_kill(self.knowledge):
+            return characters.Action.ATTACK
 
-        if if_character_to_kill(knowledge):
-            self.strategy = self.strategy.get_more_important(AttackStrategy(priority=StrategyPriority.CRITICAL))
+        return self.high_level_strategy.decide()
 
-        if self.killed_now:
-            self.strategy = self.strategy.get_more_important(RunStrategy(self.strategy, priority=StrategyPriority.CRITICAL))
-            self.killed_now = False
-
-        i=0  # quick fix
-        while True:
-            action, self.strategy = self.strategy.decide_and_proceed(self.knowledge, graph=graph, map_knowlege=self.map_knowledge)
-            i+=1
-            if i==500:
-                return Action.DO_NOTHING
-            if action is not None:
-                return action
 
     def praise(self, score: int) -> None:
-        pass
+        n = self.rewards_dict[self.map_name][type(self.high_level_strategy)]["n"]
+        self.rewards_dict[self.map_name][type(self.high_level_strategy)]["reward_estimate"] = score/(n+1)+(n*self.rewards_dict[self.map_name][type(self.high_level_strategy)]["reward_estimate"])/(n+1)
+        self.rewards_dict[self.map_name][type(self.high_level_strategy)]["n"] = n+1
+
+    def _choose_hls(self, map_name, epsilon=0.15):
+        if random.uniform(0,1)<epsilon:  # take random
+            return random.choice(AlephAlephZeroBot.HLSs)(self)
+        else:  # take argmax
+            max_estimate = 0
+            best_hls = None
+            for hls in AlephAlephZeroBot.HLSs:
+                if self.rewards_dict[self.map_name][hls]["reward_estimate"]>=max_estimate:
+                    best_hls = hls
+                    max_estimate = self.rewards_dict[self.map_name][hls]["reward_estimate"]
+            return best_hls(self)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         if arena_description.name in self.map_knowledge_cache.keys():
@@ -210,7 +208,14 @@ class AlephAlephZeroBot(controller.Controller):
             self.menhir_seen = True
             self.menhir_pos_updated = True
 
-        self.strategy = ScoutingStrategy()
+        self.map_name = arena_description.name
+        if self.map_name not in self.rewards_dict.keys():
+            self.rewards_dict[self.map_name] = {hls:{"reward_estimate": 0, "n": 0} for hls in AlephAlephZeroBot.HLSs}
+
+        self.high_level_strategy = self._choose_hls(arena_description.name)
+
+        self.height_width = get_height_width_from_file(arena_description.name)
+
         self.epoch = 0
         self._first_estimate = False
         self.mists = set()
