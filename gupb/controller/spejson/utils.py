@@ -36,6 +36,22 @@ facing_onehot = {
     Facing.LEFT: np.array([0, 0, 0, 1]),
 }
 
+move_action_onehot = {
+    None: np.array([0, 0, 0]),
+    Action.TURN_LEFT: np.array([1, 0, 0]),
+    Action.TURN_RIGHT: np.array([0, 1, 0]),
+    Action.STEP_FORWARD: np.array([0, 0, 1]),
+}
+
+move_possible_action_onehot = {
+    None: np.array([0, 0, 0, 0, 0]),
+    Action.TURN_LEFT: np.array([1, 0, 0, 0, 0]),
+    Action.TURN_RIGHT: np.array([0, 1, 0, 0, 0]),
+    Action.STEP_FORWARD: np.array([0, 0, 1, 0, 0]),
+    Action.ATTACK: np.array([0, 0, 0, 1, 0]),
+    Action.DO_NOTHING: np.array([0, 0, 0, 0, 1]),
+}
+
 facings = {
     "U": ["L", "R"], "R": ["U", "D"], "D": ["R", "L"], "L": ["D", "U"]
 }
@@ -62,3 +78,21 @@ def get_random_place_on_a_map(traversable: np.array) -> Coords:
         ry = np.random.randint(traversable.shape[0])
         if traversable[(ry, rx)]:
             return Coords(x=rx, y=ry)
+
+
+def padded_slice(arr, center, height, width, rad=6, fill=0):
+    """
+    Take a zero-padded slice of an array.
+    """
+    center = np.array(center)
+    img_region = np.array([[0, height], [0, width]])
+    slice_region = np.vstack([center - rad, center + rad + 1]).T
+
+    pre_pad = np.abs(np.minimum(slice_region, 0))
+    post_pad = np.abs(np.maximum(slice_region - img_region[:, 1], 0))
+
+    slicing = np.vstack([np.maximum(slice_region[:, 0], 0), np.minimum(slice_region[:, 1], img_region[:, 1])]).T
+    slicing = tuple(map(lambda x: slice(*x), slicing))
+    padding = pre_pad + post_pad
+
+    return np.pad(arr[slicing[0], slicing[1]], pad_width=padding, mode="constant", constant_values=fill)

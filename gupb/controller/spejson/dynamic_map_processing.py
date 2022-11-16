@@ -1,5 +1,5 @@
 import numpy as np
-from gupb.controller.spejson.utils import weapons, weapons_onehot, facing_onehot
+from gupb.controller.spejson.utils import weapons, weapons_onehot, facing_onehot, padded_slice, move_action_onehot
 from gupb.model.coordinates import Coords
 
 
@@ -127,7 +127,13 @@ def get_state_summary(position, menhir_location, facing, hp, weapon, epoch, menh
     return state
 
 
-def get_map_derivables():
+def get_map_derivables(position, analytics, move_recommendations, distances):
+    """
+    Derive some feature maps from static data.
+    """
+    pos = (position.y, position.x)
+    height, width = analytics['height'], analytics['width']
+
     map_deriv = {
         'move_to_axe': np.array([0, 0, 0], dtype=float),  # [HALF-STATIC] One-hot encoding of move type (Left, Right, Forward) - to Axe
         'move_to_bow': np.array([0, 0, 0], dtype=float),  # [HALF-STATIC] One-hot encoding of move type (Left, Right, Forward) - to Bow
@@ -143,5 +149,29 @@ def get_map_derivables():
         'non_cluster_coeff': np.zeros([13, 13, 1], dtype=float),  # [STATIC] value
         'borderedness': np.zeros([13, 13, 1], dtype=float),  # [STATIC] value
     }
+
+    map_deriv['move_to_axe'][:3] = move_action_onehot[move_recommendations['A'][0]]
+    map_deriv['move_to_bow'][:3] = move_action_onehot[move_recommendations['B'][0]]
+    map_deriv['move_to_sword'][:3] = move_action_onehot[move_recommendations['S'][0]]
+    map_deriv['move_to_amulet'][:3] = move_action_onehot[move_recommendations['M'][0]]
+    map_deriv['move_to_menhir'][:3] = move_action_onehot[move_recommendations['menhir'][0]]
+    map_deriv['keypoint_dist'][:5] = 0.33 * np.sqrt(np.array([
+        move_recommendations['A'][1], move_recommendations['B'][1], move_recommendations['S'][1],
+        move_recommendations['M'][1], move_recommendations['menhir'][1]
+    ]))
+
+    map_deriv['walkability'][:, :, 0] = padded_slice(analytics['traversable'], pos, height, width)
+    map_deriv['is_wall'][:, :, 0] = padded_slice(analytics['is_wall'], pos, height, width)
+    map_deriv['min_distance'][:, :, 0] = 0.33 * np.sqrt(padded_slice(distances, pos, height, width, fill=-1) + 1)
+
+    map_deriv['attackability_fct'][:, :, 0] = 0.02 * padded_slice(analytics['attackability_bow'], pos, height, width)
+    map_deriv['attackability_fct'][:, :, 1] = 0.25 * padded_slice(analytics['attackability_knife'], pos, height, width)
+    map_deriv['attackability_fct'][:, :, 2] = 0.1 * padded_slice(analytics['attackability_axe'], pos, height, width)
+    map_deriv['attackability_fct'][:, :, 3] = 0.1 * padded_slice(analytics['attackability_sword'], pos, height, width)
+    map_deriv['attackability_fct'][:, :, 4] = 0.04 * padded_slice(analytics['attackability_amulet'], pos, height, width)
+
+    map_deriv['betweenness_centr'][:, :, 0] = padded_slice(analytics['betweenness'], pos, height, width)
+    map_deriv['non_cluster_coeff'][:, :, 0] = padded_slice(analytics['non_clustering'], pos, height, width)
+    map_deriv['borderedness'][:, :, 0] = padded_slice(analytics['borderedness'], pos, height, width)
 
     return map_deriv
