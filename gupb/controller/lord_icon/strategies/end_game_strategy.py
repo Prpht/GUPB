@@ -1,6 +1,3 @@
-import numpy as np
-from scipy import signal
-
 from gupb.controller.lord_icon.distance import find_path, dist
 from gupb.controller.lord_icon.knowledge import Knowledge
 from gupb.controller.lord_icon.move import MoveController
