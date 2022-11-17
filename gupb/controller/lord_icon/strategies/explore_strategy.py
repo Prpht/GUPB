@@ -27,13 +27,12 @@ class ExploreStrategy(Strategy):
         # Avoid attack range from enemies
         for enemy in knowledge.enemies:
             attack_range = enemy.get_attack_range(map)
-            for pos in attack_range:
-                ExploreStrategy.enemies_ranges.append(pos)
+            ExploreStrategy.enemies_ranges.extend(attack_range)
 
         for enemy_range in ExploreStrategy.enemies_ranges:
             map[enemy_range] = 1
 
-        if ExploreStrategy.counter == 2:
+        if ExploreStrategy.counter:
             ExploreStrategy.enemies_ranges = []
             ExploreStrategy.counter = 0
 
@@ -43,10 +42,8 @@ class ExploreStrategy(Strategy):
         for weapon in sorted_weapons.keys():
             x, y = weapon[0], weapon[1]
             moves = find_path(map, knowledge.character.position, (x, y))
-            if len(moves) > 0:
+            if moves:
                 return MoveController.next_move(knowledge, moves[0])
-            else:
-                knowledge.weapons[weapon] = 1000
 
         # Just to be sure :)
         return random.choice(POSSIBLE_ACTIONS)

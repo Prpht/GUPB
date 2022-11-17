@@ -47,7 +47,7 @@ class Pathfinder():
         # Adding a stop condition
         outer_iterations = 0
         # max_iterations = (len(self.map.tuptable_map[0]) * len(self.map.tuptable_map) // 2)
-        max_iterations = 30
+        max_iterations = 90
         # what squares do we search
         adjacent_squares = ((0, -1), (0, 1), (-1, 0), (1, 0),)
 

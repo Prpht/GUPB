@@ -82,6 +82,7 @@ def get_knowledge_from_file(map_name):
                     []
                 )
 
+
     if map_name in FIXED_MENHIRS.keys():
         vis_tiles[FIXED_MENHIRS[map_name]] = tiles.Menhir().description()
     return ChampionKnowledge(None, 0, visible_tiles=vis_tiles)
@@ -101,3 +102,11 @@ def get_save_spots(map_knowledge):
             if unaccessible == 3:
                 save_spots.append(coords)
     return save_spots
+
+def get_height_width_from_file(map_name):
+    arena_file_path = os.path.join('resources', 'arenas', f'{map_name}.gupb')
+
+    with open(arena_file_path, "r") as file:
+        lines = file.readlines()
+
+    return coordinates.Coords(len(lines), len(lines[0]))

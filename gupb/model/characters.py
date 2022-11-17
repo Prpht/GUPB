@@ -148,7 +148,7 @@ class Champion:
 
     def die(self) -> None:
         self.arena.terrain[self.position].character = None
-        self.arena.terrain[self.position].loot = self.weapon
+        self.arena.terrain[self.position].loot = self.weapon if self.weapon.droppable() else None
         verbose_logger.debug(f"Champion {self.controller.name} died.")
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 

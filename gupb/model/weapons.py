@@ -30,6 +30,10 @@ class Weapon(ABC):
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         raise NotImplementedError
 
+    @classmethod
+    def droppable(cls) -> bool:
+        return True
+
     @staticmethod
     def cut_transparent(arena: arenas.Arena, position: coordinates.Coords) -> None:
         if position in arena.terrain and arena.terrain[position].terrain_transparent():
@@ -69,6 +73,10 @@ class Knife(LineWeapon):
     @staticmethod
     def reach() -> int:
         return 1
+
+    @classmethod
+    def droppable(cls) -> bool:
+        return False
 
 
 class Sword(LineWeapon):
@@ -115,7 +123,6 @@ class Axe(Weapon):
 
 
 class Amulet(Weapon):
-
     @classmethod
     def cut_positions(
             cls,
