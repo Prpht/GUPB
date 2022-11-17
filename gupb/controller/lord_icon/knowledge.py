@@ -92,7 +92,7 @@ class Knowledge:
 
         # Load weapons only once after restart, during first update
         for pos, name in self.initial_weapons_positions:
-            if pos not in self.weapons.keys():
+            if pos not in self.weapons.keys() and name in ALL_WEAPONS:
                 self.weapons[pos] = heuristic(pos, self.position) - ALL_WEAPONS[name].value
 
         self.enemies = []
@@ -106,7 +106,7 @@ class Knowledge:
             else:
                 if tile.character:
                     self.enemies.append(CharacterInfo.from_tile(tile, (x, y)))
-                elif tile.loot and self.character and ALL_WEAPONS[tile.loot.name].value < ALL_WEAPONS[self.character.weapon].value:
+                elif tile.loot and self.character and tile.loot.name in ALL_WEAPONS:
                     self.weapons[(x, y)] = heuristic((x, y), self.position) - ALL_WEAPONS[tile.loot.name].value
             if tile.type == "menhir":
                 self.menhir = (x, y)
@@ -118,8 +118,6 @@ class Knowledge:
 
             # Update map
             self.map[x, y] = MAPPER[tile.type]
-            # if tile.loot and self.character and ALL_WEAPONS[tile.loot.name].value <= ALL_WEAPONS[self.character.weapon].value:
-            #     self.map[x, y] = 1
 
     def reset(self, arena_name):
         self.arena = Arena.load(arena_name)
