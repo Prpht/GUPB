@@ -36,8 +36,7 @@ class Knowledge:
 class AlephAlephZeroBot(controller.Controller):
     HLSs = (
         HideRun,
-        LootHide,
-        LootConquer
+        LootHide
     )
 
     def __init__(self, first_name: str):
@@ -183,9 +182,12 @@ class AlephAlephZeroBot(controller.Controller):
             max_estimate = 0
             best_hls = None
             for hls in AlephAlephZeroBot.HLSs:
-                if self.rewards_dict[self.map_name][hls]["reward_estimate"]>=max_estimate:
+                general_estimate = sum(self.rewards_dict[map_name][hls]["reward_estimate"] for map_name in self.rewards_dict.keys())
+                map_specific_estimate = self.rewards_dict[self.map_name][hls]["reward_estimate"]
+                estimate = (general_estimate + map_specific_estimate)/2
+                if estimate>=max_estimate:
                     best_hls = hls
-                    max_estimate = self.rewards_dict[self.map_name][hls]["reward_estimate"]
+                    max_estimate = estimate
             return best_hls(self)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
