@@ -12,7 +12,7 @@ class Bandit:
     def __init__(self, arms, epsilon):
         self.arms = arms
         self.epsilon = epsilon
-        self.Q = np.zeros(arms)
+        self.Q = np.ones(arms)
         self.rewards = [[] for _ in range(0, self.arms)]
         self.chosen_action = None
         self.rewards_list = []
@@ -34,12 +34,7 @@ class Bandit:
         self.rewards_list.append((self.chosen_action, score)) 
         self.rewards[self.chosen_action].append(score)
         self.Q[self.chosen_action] = self.Q[self.chosen_action] + (1/len(self.rewards[self.chosen_action])) * (score - self.Q[self.chosen_action])
-        with open("rewards03.txt", 'w') as f:
-            f.write(str(self.rewards)) 
-        with open("rewards_kolejnosc03.txt", 'w') as f:
-            f.write(str(self.rewards_list))       
-        with open("Q03.txt", 'w') as f:
-            f.write(str(self.Q)) 
-
+        if self.epsilon > 0.05:
+            self.epsilon = self.epsilon - 0.005
 
     

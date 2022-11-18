@@ -69,7 +69,7 @@ class TuptusController(controller.Controller):
         self.planned_actions: Optional[List] = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
-        self.bandit: Bandit = Bandit(arms=2, epsilon=0.3)
+        self.bandit: Bandit = Bandit(arms=2, epsilon=1.0)
         self.bandit_choice: int = None
 
     def __eq__(self, other: object) -> bool:
