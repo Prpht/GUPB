@@ -28,7 +28,7 @@ class ShrekController:
         self.goal = None
         self.map_corners = []
         self.hiding_spot = None
-        self.emergency_steps =[]
+        self.emergency_steps = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ShrekController):
@@ -50,10 +50,7 @@ class ShrekController:
         self.menhir = None
         self.hiding_spot = None
         self.tactic_spots = []
-        self.emergency_steps =[]
-
-       
-
+        self.emergency_steps = []
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.position = knowledge.position
@@ -77,13 +74,11 @@ class ShrekController:
                 if facing_tile3 in knowledge.visible_tiles:
                     if knowledge.visible_tiles[facing_tile3].character:
                         return characters.Action.ATTACK
-            
-            
+
             if self.should_attack(self.position, knowledge):
                 return characters.Action.ATTACK
-              
-              
-        if  len(self.emergency_steps) > 0:
+
+        if len(self.emergency_steps) > 0:
             wanted_field = coordinates.Coords(self.emergency_steps[0][0], self.emergency_steps[0][1])
             substract_points = coordinates.sub_coords(wanted_field, self.position)
             needed_facing = Facing(substract_points)
@@ -93,15 +88,13 @@ class ShrekController:
             else:
                 return characters.Action.TURN_RIGHT
 
-
         if self.am_i_on_hiding_spot():
             if self.mist_comes(knowledge):
                 self.emergency_steps = self.find_path(self.menhir)
             return characters.Action.TURN_RIGHT
 
-        
         try:
-            if self.am_i_on_menhir() and not  self.hiding_spot:
+            if self.am_i_on_menhir() and not self.hiding_spot:
                 return characters.Action.TURN_RIGHT
 
             else:
@@ -111,7 +104,7 @@ class ShrekController:
                         if self.hiding_spot:
                             self.goal = self.hiding_spot
                         else:
-                            
+
                             self.do_i_see_menhir(knowledge.visible_tiles, knowledge.position)
                         self.set_path(knowledge)
                 elif self.mist_comes(knowledge):
@@ -126,7 +119,6 @@ class ShrekController:
                     self.find_closest_weapon()
                     self.set_path(knowledge)
 
-                    
             if self.path:
                 wanted_field = coordinates.Coords(self.path[0][0], self.path[0][1])
                 substract_points = coordinates.sub_coords(wanted_field, self.position)
@@ -136,15 +128,15 @@ class ShrekController:
                     return characters.Action.STEP_FORWARD
                 else:
                     return characters.Action.TURN_RIGHT
-            
-        
+
+
             else:
                 self.goal = self.find_closest_point()
                 if self.goal in self.points_to_visit:
                     self.points_to_visit.remove(self.goal)
 
                 self.set_path(knowledge)
-        except:    
+        except:
             if not self.goal:
                 self.goal = self.find_further_point()
                 self.set_path(knowledge)
@@ -154,7 +146,8 @@ class ShrekController:
     """
     Here are the functions we use:
     """
-    def  take_step_from_path(self, path):
+
+    def take_step_from_path(self, path):
         wanted_field = coordinates.Coords(path[0][0], path[0][1])
         substract_points = coordinates.sub_coords(wanted_field, self.position)
         needed_facing = Facing(substract_points)
@@ -166,19 +159,18 @@ class ShrekController:
             return characters.Action.TURN_RIGHT
 
     def find_hiding_spot_around(self, position):
-        width_map = len(self.map[0]) 
-        height_map = len(self.map) 
+        width_map = len(self.map[0])
+        height_map = len(self.map)
 
-        x_1 = max(0, position[0] - int(width_map//7))
-        x_2 = min( width_map, position[0] + int(width_map//7))
+        x_1 = max(0, position[0] - int(width_map // 7))
+        x_2 = min(width_map, position[0] + int(width_map // 7))
 
-        y_1 = max(0, position[1] - int(height_map//7))
-        y_2 = min( height_map,position[1] + int(height_map//7))
-
+        y_1 = max(0, position[1] - int(height_map // 7))
+        y_2 = min(height_map, position[1] + int(height_map // 7))
 
         sub_optimal = None
 
-        for i in range(x_1, x_2 + 1) :
+        for i in range(x_1, x_2 + 1):
             for j in range(y_1, y_2 + 1):
                 if self.map[j][i] == 1:
                     neighbouring_walls = 0
@@ -186,16 +178,16 @@ class ShrekController:
                     for dx, dy in [[0, 1], [0, -1], [1, 0], [-1, 0]]:
                         nx, ny = j + dx, i + dy
                         if self.map[nx][ny] == 0:
-                        #  nx not in range(width_map) or ny not in range(height_map) or self.map[nx][ny] == 0:
+                            #  nx not in range(width_map) or ny not in range(height_map) or self.map[nx][ny] == 0:
                             neighbouring_walls += 1
-                    
+
                     if neighbouring_walls == 3:
                         return i, j
-            
+
                 # if neighbouring_walls == 2:
                 #     sub_optimal = i, j
 
-        return sub_optimal 
+        return sub_optimal
 
     def should_attack(self, self_pos: coordinates.Coords, knowledge: characters.ChampionKnowledge):
         if self.weapon_name in ['bow_loaded', 'bow_unloaded']:
@@ -218,15 +210,12 @@ class ShrekController:
                             coordinates.Coords(self.position.x - 2, self.position.y - 2),
                             coordinates.Coords(self.position.x + 2, self.position.y - 2),
                             coordinates.Coords(self.position.x + 2, self.position.y + 2)]
-           
+
             for tile, description in knowledge.visible_tiles.items():
                 if tile in attack_tiles and description.character:
                     return True
             return False
 
-       
-        
-                
     def is_enemy_around(self, knowledge: characters.ChampionKnowledge):
         """
         Check if any enemies in sight
@@ -254,7 +243,6 @@ class ShrekController:
 
     def get_max_distance(self, cord1: coordinates.Coords, cord2: coordinates.Coords):
         return max(abs(cord1[0] - cord2[0]), abs(cord1[1] - cord2[1]))
-
 
     def am_i_on_menhir(self):
         """
@@ -341,7 +329,7 @@ class ShrekController:
             map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
             if tile.description().loot:
                 # map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow_unloaded"] else 1
-                if tile.description().loot.name in ["axe","sword",'bow_loaded', 'bow_unloaded']:
+                if tile.description().loot.name in ["axe", "sword", 'bow_loaded', 'bow_unloaded']:
                     tactic_spots.append((cords.x, cords.y))
         return map_matrix, tactic_spots
 
@@ -398,7 +386,7 @@ class ShrekController:
             facing_tile += self.facing.value
         return False
 
-    def do_i_see_mist(self,knowledge: characters.ChampionKnowledge):
+    def do_i_see_mist(self, knowledge: characters.ChampionKnowledge):
         for tile in knowledge.visible_tiles:
             if knowledge.visible_tiles[tile].effects:
                 for effect in knowledge.visible_tiles[tile].effects:
@@ -418,14 +406,15 @@ class ShrekController:
         border = []
         for mist in data:
             add = False
-            neighbours = [(mist[0], mist[1]+1), (mist[0], mist[1]-1), (mist[0]+1, mist[1]),(mist[0]-1, mist[1])]
+            neighbours = [(mist[0], mist[1] + 1), (mist[0], mist[1] - 1), (mist[0] + 1, mist[1]),
+                          (mist[0] - 1, mist[1])]
             for n in neighbours:
                 if n in knowledge.visible_tiles:
                     if not knowledge.visible_tiles[n].effects:
                         add = True
             if add:
-                border.append((mist[0], height-mist[1]))
-        if len(border)>0:
+                border.append((mist[0], height - mist[1]))
+        if len(border) > 0:
             r, c = self.nsphere_fit(border)
             coords = (int(c[0]), int(c[1]))
             if 0 < coords[0] < width and 0 < coords[1] < height:
@@ -456,8 +445,8 @@ class ShrekController:
     def go_nuts(self):
         width = len(self.map[0]) - 1
         height = len(self.map) - 1
-        for t in range(0,10):
-            coords = (self.menhir[0]+random.randint(0, 4), self.menhir[1] + random.randint(0, 4))
+        for t in range(0, 10):
+            coords = (self.menhir[0] + random.randint(0, 4), self.menhir[1] + random.randint(0, 4))
             if 0 < coords[0] < width and 0 < coords[1] < height:
                 if self.map[coords[0]][coords[1]] == 0:
                     return coords
