@@ -10,9 +10,9 @@ from .utils import KillerInterest, PathConstants, find_paths, path_to_actions
 
 class KillerAction(Enum):
     DISCOVER = 0  # Find new point of interest on map
-    FIND_PATH = 1  # Find actions to get to the destination
-    FIND_VICTIM = 2  # Find path to enemy
-    FIND_MENHIR = 3  # Find path to menhir if one exists
+    #FIND_PATH = 1  # Find actions to get to the destination
+    #FIND_VICTIM = 2  # Find path to enemy
+    #FIND_MENHIR = 3  # Find path to menhir if one exists
     LEARN_MAP = 4  # Invoke learn_map method
     LOOK_AROUND = 5  # Perform ('turn right', 'learn_map') 4 times
 
@@ -24,6 +24,8 @@ class KillerController(controller.Controller):
         self.game_map = None
         self.menhir_pos = None
         self.planned_actions = []
+        self.got_weapon = False
+        self.saw_mist = False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KillerController):
@@ -38,7 +40,13 @@ class KillerController(controller.Controller):
         for coord, tile in knowledge.visible_tiles.items():
             if "mist" in list(map(lambda eff: eff.type, tile.effects)):
                 self.game_map[coord[1], coord[0]] = PathConstants.MIST.value
+                self.saw_mist = True
                 continue
+
+            if tile.loot is not None:
+                if tile.loot.name in ("axe", "sword"):
+                    self.game_map[coord[1], coord[0]] = KillerInterest.ITEM.value
+                    continue
 
             if tile.type == "land":
                 self.game_map[coord[1], coord[0]] = PathConstants.WALKABLE.value
@@ -51,43 +59,37 @@ class KillerController(controller.Controller):
                     self.game_map[coord[1], coord[0]] = KillerInterest.MENHIR.value
                     self.menhir_pos = coord[0], coord[1]
 
-    def update_map(self,
-                   knowledge: characters.ChampionKnowledge,
-                   current_interest: KillerInterest) -> None:
-        # to do: Update only player locations (not the whole map)
-        pass
-
-    def find_new_interest(self, curr_position):
-        x_max, y_max = self.game_map.shape
-        map = self.game_map.copy()
-        map[curr_position] = 0
-        stack = [curr_position]
-        distances = []
-        get_distance = lambda z: np.sqrt(z[0]**2 + z[1]**2)
-        while stack:
-            coords = stack.pop()
-            if coords[0] - 1 >= 0 and map[coords[0] - 1, coords[1]] == 1:
-                new_coords = coords[0] - 1, coords[1]
-                map[new_coords] = 0
-                distances.append((new_coords, get_distance(new_coords)))
-                stack.append(new_coords)
-            if coords[0] + 1 < x_max and map[coords[0] + 1, coords[1]] == 1:
-                new_coords = coords[0] + 1, coords[1]
-                map[new_coords] = 0
-                distances.append((new_coords, get_distance(new_coords)))
-                stack.append(new_coords)
-            if coords[1] - 1 >= 0 and map[coords[0], coords[1] - 1] == 1:
-                new_coords = coords[0], coords[1] - 1
-                map[new_coords] = 0
-                distances.append((new_coords, get_distance(new_coords)))
-                stack.append(new_coords)
-            if coords[1] + 1 < y_max and map[coords[0], coords[1] + 1] == 1:
-                new_coords = coords[0], coords[1] + 1
-                map[new_coords] = 0
-                distances.append((new_coords, get_distance(new_coords)))
-                stack.append(new_coords)
-        if distances:
-            self.game_map[sorted(distances, key=lambda x: x[1])[-1][0]] = 2
+    # def find_new_interest(self, curr_position):
+    #     x_max, y_max = self.game_map.shape
+    #     map = self.game_map.copy()
+    #     map[curr_position] = 0
+    #     stack = [curr_position]
+    #     distances = []
+    #     get_distance = lambda z: np.sqrt(z[0]**2 + z[1]**2)
+    #     while stack:
+    #         coords = stack.pop()
+    #         if coords[0] - 1 >= 0 and map[coords[0] - 1, coords[1]] == 1:
+    #             new_coords = coords[0] - 1, coords[1]
+    #             map[new_coords] = 0
+    #             distances.append((new_coords, get_distance(new_coords)))
+    #             stack.append(new_coords)
+    #         if coords[0] + 1 < x_max and map[coords[0] + 1, coords[1]] == 1:
+    #             new_coords = coords[0] + 1, coords[1]
+    #             map[new_coords] = 0
+    #             distances.append((new_coords, get_distance(new_coords)))
+    #             stack.append(new_coords)
+    #         if coords[1] - 1 >= 0 and map[coords[0], coords[1] - 1] == 1:
+    #             new_coords = coords[0], coords[1] - 1
+    #             map[new_coords] = 0
+    #             distances.append((new_coords, get_distance(new_coords)))
+    #             stack.append(new_coords)
+    #         if coords[1] + 1 < y_max and map[coords[0], coords[1] + 1] == 1:
+    #             new_coords = coords[0], coords[1] + 1
+    #             map[new_coords] = 0
+    #             distances.append((new_coords, get_distance(new_coords)))
+    #             stack.append(new_coords)
+    #     if distances:
+    #         self.game_map[sorted(distances, key=lambda x: x[1])[-1][0]] = 2
 
     @staticmethod
     def get_facing(knowledge: characters.ChampionKnowledge):
@@ -98,14 +100,21 @@ class KillerController(controller.Controller):
         return knowledge.visible_tiles[add_coords(knowledge.position,
                                                   KillerController.get_facing(knowledge).value)]
 
-    def find_path(self, knowledge: characters.ChampionKnowledge, interest: KillerInterest = None):
+    def find_path(self,
+                  knowledge: characters.ChampionKnowledge,
+                  interest: KillerInterest = None,
+                  otherwise: KillerInterest = None):
         # Path finding
         pos_x, pos_y = knowledge.position[0], knowledge.position[1]
         paths = find_paths(arr=self.game_map, curr_pos=(pos_y, pos_x))
+        found_path = None
         if interest is not None:
             found_path = paths.get_best_path(val_from=interest.value,
                                              val_to=interest.value)
-        else:
+        if found_path is None:
+            found_path = paths.get_best_path(val_from=otherwise.value,
+                                             val_to=otherwise.value)
+        if found_path is None:
             found_path = paths.get_best_path(val_from=KillerInterest.POINT_ON_MAP.value,
                                              val_to=KillerInterest.MENHIR.value)
 
@@ -129,27 +138,24 @@ class KillerController(controller.Controller):
         if action == KillerAction.LOOK_AROUND:
             self.planned_actions += 4 * [Action.TURN_RIGHT, KillerAction.LEARN_MAP]
 
-        if action == KillerAction.FIND_VICTIM:
-            self.find_path(knowledge, interest=KillerInterest.KILLING)
+        # if action == KillerAction.FIND_VICTIM:
+        #     self.find_path(knowledge, interest=KillerInterest.KILLING)
+        #
+        # if action == KillerAction.FIND_MENHIR:
+        #     self.find_path(knowledge, interest=KillerInterest.MENHIR)
 
-        if action == KillerAction.FIND_MENHIR:
-            self.find_path(knowledge, interest=KillerInterest.MENHIR)
-
-        if action == KillerAction.DISCOVER:
-            self.find_new_interest(curr_position=knowledge.position)
-            self.find_path(knowledge, interest=KillerInterest.POINT_ON_MAP)
-
-    # def check_for_enemies(self, knowledge: characters.ChampionKnowledge):
-    #     #mark enemies
-    #     are_enemies = False
-    #     for coords, value in knowledge.visible_tiles.items():
-    #         if value.character is not None and value.character.controller_name != 'Killer':
-    #             self.game_map[coords] = KillerInterest.KILLING.value
-    #             are_enemies = True
-    #     return are_enemies
+        # if action == KillerAction.DISCOVER:
+        #     self.find_new_interest(curr_position=knowledge.position)
+        #     self.find_path(knowledge, interest=KillerInterest.POINT_ON_MAP)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         facing_element = self.get_facing_element(knowledge)
+
+        if facing_element.loot is not None:
+            if (facing_element.loot.name in ("axe", "sword"))\
+                    and (self.planned_actions[0] == characters.Action.STEP_FORWARD):
+                self.got_weapon = True
+
         if facing_element.character is not None:
             return Action.ATTACK
 
@@ -158,12 +164,24 @@ class KillerController(controller.Controller):
             self.execute_action(KillerAction.LOOK_AROUND, knowledge)
 
         self.learn_map(knowledge)
-
-        if self.menhir_pos == knowledge.position:
+        if (self.got_weapon or self.saw_mist) and self.menhir_pos == knowledge.position:
             return Action.TURN_RIGHT
 
         if len(self.planned_actions) == 0:
-            self.find_path(knowledge)
+            if not self.got_weapon:
+                if not self.saw_mist:
+                    self.find_path(knowledge,
+                                   interest=KillerInterest.ITEM,
+                                   otherwise=KillerInterest.POINT_ON_MAP)
+                else:
+                    self.find_path(knowledge,
+                                   interest=KillerInterest.MENHIR,
+                                   otherwise=KillerInterest.POINT_ON_MAP)
+            else:
+                self.find_path(knowledge,
+                               interest=KillerInterest.MENHIR,
+                               otherwise=KillerInterest.KILLING)
+
         while len(self.planned_actions) > 0:
             action = self.planned_actions.pop(0)
             if isinstance(action, KillerAction):
@@ -180,6 +198,8 @@ class KillerController(controller.Controller):
         self.game_map = None
         self.menhir_pos = None
         self.planned_actions = []
+        self.got_weapon = False
+        self.saw_mist = False
 
     @property
     def name(self) -> str:
