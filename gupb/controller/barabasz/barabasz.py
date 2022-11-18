@@ -45,7 +45,8 @@ class BarabaszController(controller.Controller):
             # Calculate death zone for the weapon
             deathtiles = deathzone(weapon=self.weapon,
                                    position=self.position,
-                                   facing=self.facing.value)
+                                   facing=self.facing,
+                                   terrain=self.map_info.arena.terrain)
             for cords in deathtiles:
                 if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character: 
                     # print("SMACK! ", self.weapon)
