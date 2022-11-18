@@ -25,6 +25,12 @@ WEAPON_CLASSES = {
     "bow_unloaded": weapons.Bow(),
     "knife": weapons.Knife(),
 }
+POSSIBLE_ACTIONS = [
+    characters.Action.TURN_LEFT,
+    characters.Action.TURN_RIGHT,
+    characters.Action.STEP_FORWARD,
+    characters.Action.ATTACK,
+]
 
 
 class BaseStrategy:
@@ -51,23 +57,22 @@ class BaseStrategy:
         """
         height, width = self.map.known_map.shape
 
-        least_explored_quadron = np.argwhere(self.map.quadron_exploration() == np.min(self.map.quadron_exploration()))[0]
+        least_explored_quadron = np.argwhere(
+            self.map.quadron_exploration() == np.min(self.map.quadron_exploration()))[0]
 
         h_min = least_explored_quadron[0] * height//2
         h_max = (least_explored_quadron[0]+1) * height//2 - 1
         w_min = least_explored_quadron[1] * width//2
-        w_max = (least_explored_quadron[1]+1) * width//2 - 1 
+        w_max = (least_explored_quadron[1]+1) * width//2 - 1
 
-
-        # Find a random pair of coordinates to go to and check if it is possible 
+        # Find a random pair of coordinates to go to and check if it is possible
         h = np.random.randint(h_min, h_max)
-        w = np.random.randint(w_min, w_max)        
+        w = np.random.randint(w_min, w_max)
         while self.map.tuptable_map[h, w]:
             h = np.random.randint(h_min, h_max)
             w = np.random.randint(w_min, w_max)
 
         raw_path = self.pathfinder.astar(self.position, (h, w))
-          
         return self.pathfinder.plan_path(raw_path, self.facing) if raw_path else []
 
     def go_to_menhir(self) -> List:
@@ -76,7 +81,8 @@ class BaseStrategy:
         """
 
         if self.map.menhir_position:
-            raw_path = self.pathfinder.astar(self.position, self.map.menhir_position)
+            raw_path = self.pathfinder.astar(
+                self.position, self.map.menhir_position)
             return self.pathfinder.plan_path(raw_path, self.facing) if raw_path else []
         else:
             return self.explore()
@@ -98,11 +104,12 @@ class BaseStrategy:
             if name in self.map.weapons_position.keys():
                 weapon_coords = self.map.weapons_position[name]
                 raw_path = self.pathfinder.astar(self.position, weapon_coords)
-                weapon_path = self.pathfinder.plan_path(raw_path, self.facing) if raw_path else []
+                weapon_path = self.pathfinder.plan_path(
+                    raw_path, self.facing) if raw_path else []
 
                 # No reason to continue looking for a different weapon
                 break
-        
+
         return weapon_path
 
 
@@ -110,8 +117,23 @@ class PassiveStrategy(BaseStrategy):
 
     def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
         super().__init__(game_map, weapon_tier, position, facing)
-        self.planned_safe_spot: Tuple = ()
+        self.planned_safe_spot: Tuple = (),
+        self.standing_counter: int = 0
 
+    def decide(self, is_mist, knowledge, next_block):
+        if self.is_hidden and not is_mist:
+            self.standing_counter += 1
+            if self.standing_counter > 5:
+                self.standing_counter = 0
+                return POSSIBLE_ACTIONS[1]
+
+            if next_block.type != "land":
+                return POSSIBLE_ACTIONS[0]
+            return POSSIBLE_ACTIONS[3]
+        elif is_mist:
+            self.go_to_menhir().pop(0)
+        else:
+            return self.hide().pop(0)
 
     def hide(self):
         """
@@ -134,17 +156,34 @@ class PassiveStrategy(BaseStrategy):
         print(return_path)
         return return_path
 
-
     @property
     def is_hidden(self):
         return self.position == self.planned_safe_spot
 
 
-    
-            
-
-
 class AggresiveStrategy(BaseStrategy):
+    def decide(self, is_mist, knowledge, next_block):
+        if not is_mist:
+            planned_actions = self.find_weapon()
+            if planned_actions:
+                return planned_actions.pop(0)
+            else:
+                planned_actions = self.fight(knowledge)
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    planned_actions = self.explore()
+                    #print(f"Explore + {planned_actions}")
+                    if planned_actions:
+                        return planned_actions.pop(0)
+        else:
+            planned_actions = self.go_to_menhir()
+            if planned_actions:
+                return planned_actions.pop(0)
+            else:
+                return characters.Action.TURN_LEFT
+        return characters.Action.TURN_LEFT
+
     def fight(self, knowledge):
         """
         Find the target and eliminate it (or run if will die)
@@ -155,11 +194,12 @@ class AggresiveStrategy(BaseStrategy):
             if len(good_spots) == 0:
                 return None
             for idx, good_spot in enumerate(good_spots):
-                if self.pathfinder.astar(knowledge.position, good_spot)!=0:
+                if self.pathfinder.astar(knowledge.position, good_spot) != 0:
                     path = self.pathfinder.plan_path(
-                        self.pathfinder.astar(knowledge.position, good_spot), self.facing
+                        self.pathfinder.astar(
+                            knowledge.position, good_spot), self.facing
                     )
-                    if len(path) < shortest_path or shortest_path==-1:
+                    if len(path) < shortest_path or shortest_path == -1:
                         shortest_path = len(path)
                         chosen_path = path
                 if shortest_path == -1:
@@ -173,11 +213,13 @@ class AggresiveStrategy(BaseStrategy):
         """
         shortest_path = -1
         opponent = None
+        tup_health = knowledge.visible_tiles[knowledge.position].character.health
         for coords, tile in knowledge.visible_tiles.items():
-            if tile.character and coords != knowledge.position:
-                if self.pathfinder.astar(knowledge.position, coords)!= 0:
+            if tile.character and coords != knowledge.position and tup_health > knowledge.visible_tiles[coords].character.health:
+                if self.pathfinder.astar(knowledge.position, coords) != 0:
                     path = self.pathfinder.plan_path(
-                        self.pathfinder.astar(knowledge.position, coords), self.facing
+                        self.pathfinder.astar(
+                            knowledge.position, coords), self.facing
                     )
                     if shortest_path == -1 or len(path) < shortest_path:
                         shortest_path = len(path)
@@ -200,12 +242,10 @@ class AggresiveStrategy(BaseStrategy):
             tup_range = WEAPON_CLASSES[
                 knowledge.visible_tiles[knowledge.position].character.weapon.name
             ].reach()
-            good_attacking_spots = [
-                tuple(map(sum, zip(self.closest_opponent[0], (0, tup_range)))),
-                tuple(map(sum, zip(self.closest_opponent[0], (0, -tup_range)))),
-                tuple(map(sum, zip(self.closest_opponent[0], (-tup_range, 0)))),
-                tuple(map(sum, zip(self.closest_opponent[0], (tup_range, 0)))),
-            ]
+            good_attacking_spots = []
+            for i in range(1, tup_range):
+                good_attacking_spots = good_attacking_spots + [tuple(map(sum, zip(self.closest_opponent[0], (0, i)))), tuple(map(sum, zip(
+                    self.closest_opponent[0], (0, -i)))), tuple(map(sum, zip(self.closest_opponent[0], (-i, 0)))), tuple(map(sum, zip(self.closest_opponent[0], (i, 0))))]
         elif tup_weapon == "axe":
             good_attacking_spots = [
                 tuple(map(sum, zip(self.closest_opponent[0], (1, -1)))),
@@ -223,6 +263,10 @@ class AggresiveStrategy(BaseStrategy):
                 tuple(map(sum, zip(self.closest_opponent[0], (-2, 2)))),
                 tuple(map(sum, zip(self.closest_opponent[0], (-2, -2)))),
                 tuple(map(sum, zip(self.closest_opponent[0], (2, 2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 1)))),
             ]
         good_attacking_spots = [
             x for x in good_attacking_spots if x not in opponent_range

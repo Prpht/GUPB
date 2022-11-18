@@ -15,6 +15,7 @@ from gupb.model.arenas import Arena, ArenaDescription
 from gupb.controller.tuptus.map import Map
 from gupb.controller.tuptus.pathfinder import Pathfinder
 from gupb.controller.tuptus.strategies import BaseStrategy, PassiveStrategy, AggresiveStrategy
+from gupb.controller.tuptus.tuptajacy_bandit import Bandit
 
 from typing import Optional, List
 
@@ -47,6 +48,11 @@ WEAPON_TIERS = {
     6: "knife"
 }
 
+STRATEGIES = {
+    0 : AggresiveStrategy,
+    1 : PassiveStrategy
+}
+
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class TuptusController(controller.Controller):
@@ -57,12 +63,14 @@ class TuptusController(controller.Controller):
         self.weapon_tier: int = 6
         self.position: Optional[coordinates.Coords] = None
         self.facing: Optional[characters.Facing] = None
-        # self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
-        self.strategy: PassiveStrategy = PassiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
+        self.strategy: BaseStrategy
+        #self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
+        #self.strategy: PassiveStrategy = PassiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.planned_actions: Optional[List] = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
-        self.standing_counter: int = 0
+        self.bandit: Bandit = Bandit(arms=2, epsilon=1.0)
+        self.bandit_choice: int = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TuptusController):
@@ -80,30 +88,24 @@ class TuptusController(controller.Controller):
 
         if next_block.character:
             return POSSIBLE_ACTIONS[3]      
+        choice = self.strategy.decide(self.is_mist_bool(knowledge.visible_tiles), knowledge, next_block)
+        #print(choice)
+        # if not self.is_mist_bool(knowledge.visible_tiles):
+        #     if self.planned_actions:
+        #         return self.planned_actions.pop(0)
 
-        if not self.is_mist_bool(knowledge.visible_tiles):
-            if self.planned_actions:
-                tmp = self.planned_actions.pop(0)
-                print(f"There are {len(self.planned_actions)} actions left")
-                return tmp
-
-        if self.strategy.is_hidden and not self.is_mist_bool(knowledge.visible_tiles):
-            print("I am hidden")
-            self.standing_counter += 1
-            if self.standing_counter > 5:
-                self.planned_actions = [POSSIBLE_ACTIONS[0]] *4
-                self.standing_counter = 0
+        # if self.strategy.is_hidden and not self.is_mist_bool(knowledge.visible_tiles):
+        #     self.standing_counter += 1
+        #     if self.standing_counter > 5:
+        #         self.planned_actions = [POSSIBLE_ACTIONS[0]] *4
+        #         self.standing_counter = 0
             
-            if next_block.type != "land":
-                return POSSIBLE_ACTIONS[0]
-            return POSSIBLE_ACTIONS[3]
-        else:
-            self.planned_actions = self.strategy.hide()
-            print("I am going to hide")
-            return POSSIBLE_ACTIONS[3]
+        #     if next_block.type != "land":
+        #         return POSSIBLE_ACTIONS[0]
+        #     return POSSIBLE_ACTIONS[3]
+        # else:
+        #     self.planned_actions = self.strategy.hide()
 
-        print("RANDOM BULSHIT GO")
-        # ! Commented for hidding testing 
         # if not self.is_mist_bool(knowledge.visible_tiles):
         #     self.planned_actions = self.strategy.find_weapon()
         #     if self.planned_actions:
@@ -117,49 +119,50 @@ class TuptusController(controller.Controller):
         #             if self.planned_actions:
         #                 return self.planned_actions.pop(0)
 
-        if next_block.type in ["wall", "sea"]: 
-            choice = POSSIBLE_ACTIONS[random.randint(0,1)]
-        elif self.is_mist_bool(knowledge.visible_tiles) > 0:
-            if self.map.menhir_position:
-                self._raw_path = self.pathfinder.astar(knowledge.position, self.map.menhir_position)
-                if self._raw_path:
-                    self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
-                    return self.planned_actions.pop(0)
+        # if next_block.type in ["wall", "sea"]: 
+        #     choice = POSSIBLE_ACTIONS[random.randint(0,1)]
+        # elif self.is_mist_bool(knowledge.visible_tiles) > 0:
+        #     if self.map.menhir_position:
+        #         self._raw_path = self.pathfinder.astar(knowledge.position, self.map.menhir_position)
+        #         if self._raw_path:
+        #             self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
+        #             return self.planned_actions.pop(0)
 
-            self.mist_directions.append(self.facing)
-            if self.facing == characters.Facing.UP and characters.Facing.RIGHT in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[1]
-            elif self.facing == characters.Facing.UP and characters.Facing.LEFT in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[0]
-            elif self.facing == characters.Facing.DOWN and characters.Facing.RIGHT in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[0]
-            elif self.facing == characters.Facing.DOWN and characters.Facing.LEFT in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[1]
-            elif self.facing == characters.Facing.RIGHT and characters.Facing.UP in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[1]
-            elif self.facing == characters.Facing.RIGHT and characters.Facing.DOWN in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[0]
-            elif self.facing == characters.Facing.LEFT and characters.Facing.UP in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[0]
-            elif self.facing == characters.Facing.LEFT and characters.Facing.DOWN in self.mist_directions:
-                choice = POSSIBLE_ACTIONS[1]
-            else:
-                choice = POSSIBLE_ACTIONS[1]
-        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health >= next_block.character.health):
-            choice = POSSIBLE_ACTIONS[3]
-        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health) and not (self.are_opposite(next_block.character.facing, self.facing)):
-            choice = POSSIBLE_ACTIONS[3]
-        elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health):
-            choice = POSSIBLE_ACTIONS[random.randint(0,1)]
-        else:
-            choice = POSSIBLE_ACTIONS[2]
+        #     self.mist_directions.append(self.facing)
+        #     if self.facing == characters.Facing.UP and characters.Facing.RIGHT in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[1]
+        #     elif self.facing == characters.Facing.UP and characters.Facing.LEFT in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[0]
+        #     elif self.facing == characters.Facing.DOWN and characters.Facing.RIGHT in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[0]
+        #     elif self.facing == characters.Facing.DOWN and characters.Facing.LEFT in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[1]
+        #     elif self.facing == characters.Facing.RIGHT and characters.Facing.UP in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[1]
+        #     elif self.facing == characters.Facing.RIGHT and characters.Facing.DOWN in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[0]
+        #     elif self.facing == characters.Facing.LEFT and characters.Facing.UP in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[0]
+        #     elif self.facing == characters.Facing.LEFT and characters.Facing.DOWN in self.mist_directions:
+        #         choice = POSSIBLE_ACTIONS[1]
+        #     else:
+        #         choice = POSSIBLE_ACTIONS[1]
+        # elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health >= next_block.character.health):
+        #     choice = POSSIBLE_ACTIONS[3]
+        # elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health) and not (self.are_opposite(next_block.character.facing, self.facing)):
+        #     choice = POSSIBLE_ACTIONS[3]
+        # elif next_block.character and (knowledge.visible_tiles[knowledge.position].character.health < next_block.character.health):
+        #     choice = POSSIBLE_ACTIONS[random.randint(0,1)]
+        # else:
+        #     choice = POSSIBLE_ACTIONS[2]
+        self.update(knowledge)
         return choice
 
     def praise(self, score: int) -> None:
-        pass
+        print(score)
+        self.bandit.get_reward(score)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
         self.map.safe_spots = []
@@ -167,8 +170,12 @@ class TuptusController(controller.Controller):
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
+        self.bandit_choice = self.bandit.choose_action()
+        print(self.bandit_choice)
+        self.strategy = STRATEGIES[self.bandit_choice](game_map = self.map, weapon_tier = self.weapon_tier, position = self.position, facing = self.facing)
         self.strategy.arena_description = Arena.load(arena_description.name)
         self.map.menhir_position = None
+     
 
 
 
