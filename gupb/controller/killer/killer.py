@@ -152,7 +152,7 @@ class KillerController(controller.Controller):
         facing_element = self.get_facing_element(knowledge)
 
         if facing_element.loot is not None:
-            if (facing_element.loot.name in ("axe", "sword"))\
+            if (facing_element.loot.name in ("axe", "sword")) and len(self.planned_actions) > 0\
                     and (self.planned_actions[0] == characters.Action.STEP_FORWARD):
                 self.got_weapon = True
 
