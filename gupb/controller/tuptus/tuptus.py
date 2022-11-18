@@ -82,7 +82,7 @@ class TuptusController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update(knowledge)
-
+        print(f"Facing in controller = {self.facing}")
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]
 

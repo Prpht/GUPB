@@ -141,7 +141,7 @@ class PassiveStrategy(BaseStrategy):
         """
         min_distance = 200
         return_path = []
-
+        print(f"Facing in strategies: {self.facing}")
         for safe_coords in self.map.safe_spots:
             raw_path = self.pathfinder.astar(self.position, safe_coords)
 
@@ -149,9 +149,11 @@ class PassiveStrategy(BaseStrategy):
                 planned_path = self.pathfinder.plan_path(raw_path, self.facing)
 
                 if len(planned_path) < min_distance:
+                    print(f"Found a better spot! Distance: {min_distance}")
                     min_distance = len(planned_path)
                     return_path = planned_path
                     self.planned_safe_spot = safe_coords
+        print(return_path)
         return return_path
 
     @property
