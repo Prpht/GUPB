@@ -47,10 +47,10 @@ class BarabaszController(controller.Controller):
                                    position=self.position,
                                    facing=self.facing.value)
             for cords in deathtiles:
-                if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character:
-                    # TODO: Try to implement logging mechanism for weapon debugging 
+                if cords in knowledge.visible_tiles.keys() and knowledge.visible_tiles[cords].character: 
                     # print("SMACK! ", self.weapon)
-                    # print("Position: ", knowledge.position, "EnemyPos: ", cords)
+                    # print("Facing:", self.facing)
+                    # print("Position:", knowledge.position, "EnemyPos:", cords)
                     return characters.Action.ATTACK
 
         weighted_random = random.choices(POSSIBLE_ACTIONS, weights=(1, 1, 3))[0]

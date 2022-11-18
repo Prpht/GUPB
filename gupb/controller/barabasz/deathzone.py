@@ -26,7 +26,7 @@ def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coor
 
     elif isinstance(weapon, weapons.Amulet):
         amulet_range = 2
-        for i in range(amulet_range):
+        for i in range(1, amulet_range+1, 1):
             for x in [-i, i]:
                 for y in [-i, i]:
                     death_coords.append(coordinates.add_coords(position, coordinates.Coords(x, y)))
