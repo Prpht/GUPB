@@ -94,7 +94,6 @@ class SnieznyKockodanController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
-            print(self.random_walk_destination)
             self.decrement_menhir_movement_counter(knowledge)
             tiles_in_radius_esc = self.tiles_in_max_radius_esc(knowledge)
             if knowledge.position == self.random_walk_destination:
