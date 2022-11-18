@@ -17,8 +17,8 @@ class PathConstants(Enum):
 
 class KillerInterest(Enum):
     POINT_ON_MAP = 2
-    ITEM = 3
-    KILLING = 4
+    KILLING = 3
+    ITEM = 4
     MENHIR = 5
 
 
