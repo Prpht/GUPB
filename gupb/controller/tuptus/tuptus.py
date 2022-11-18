@@ -74,7 +74,7 @@ class TuptusController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update(knowledge)
-
+        print(f"Facing in controller = {self.facing}")
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]
 
@@ -83,9 +83,12 @@ class TuptusController(controller.Controller):
 
         if not self.is_mist_bool(knowledge.visible_tiles):
             if self.planned_actions:
-                return self.planned_actions.pop(0)
+                tmp = self.planned_actions.pop(0)
+                print(f"There are {len(self.planned_actions)} actions left")
+                return tmp
 
         if self.strategy.is_hidden and not self.is_mist_bool(knowledge.visible_tiles):
+            print("I am hidden")
             self.standing_counter += 1
             if self.standing_counter > 5:
                 self.planned_actions = [POSSIBLE_ACTIONS[0]] *4
@@ -96,8 +99,10 @@ class TuptusController(controller.Controller):
             return POSSIBLE_ACTIONS[3]
         else:
             self.planned_actions = self.strategy.hide()
+            print("I am going to hide")
+            return POSSIBLE_ACTIONS[3]
 
-
+        print("RANDOM BULSHIT GO")
         # ! Commented for hidding testing 
         # if not self.is_mist_bool(knowledge.visible_tiles):
         #     self.planned_actions = self.strategy.find_weapon()
