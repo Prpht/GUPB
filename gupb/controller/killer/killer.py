@@ -174,7 +174,7 @@ class KillerController(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.game_map = np.zeros(shape=(50, 50))
+        self.game_map = None
         self.menhir_pos = None
         self.planned_actions = []
 
