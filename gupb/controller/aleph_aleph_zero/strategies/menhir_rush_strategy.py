@@ -1,11 +1,9 @@
-from gupb.controller.aleph_aleph_zero.guarding_strategy import GuardingStrategy
-from gupb.controller.aleph_aleph_zero.scanning_strategy import ScanningStrategy
-from gupb.controller.aleph_aleph_zero.scouting_strategy import ScoutingStrategy
+from gupb.controller.aleph_aleph_zero.strategies.guarding_strategy import GuardingStrategy
+from gupb.controller.aleph_aleph_zero.strategies.scanning_strategy import ScanningStrategy
 from gupb.controller.aleph_aleph_zero.shortest_path import build_graph, get_reachable
-from gupb.controller.aleph_aleph_zero.strategy import Strategy
-from gupb.controller.aleph_aleph_zero.travel_strategy import TravelStrategy
+from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy
+from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelStrategy
 from gupb.controller.aleph_aleph_zero.utils import taxicab_distance
-from gupb.model import characters
 
 
 class MenhirRushStrategy(Strategy):
@@ -23,7 +21,7 @@ class MenhirRushStrategy(Strategy):
 
         if best==knowledge.position:
             if knowledge.position==self.menhir_position:
-                return None, GuardingStrategy()
+                return None, GuardingStrategy(signature="guarding menhir")
             else:
                 return None, ScanningStrategy(self)
 

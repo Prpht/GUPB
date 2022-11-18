@@ -14,6 +14,7 @@ from gupb.model.arenas import Arena, ArenaDescription
 
 from gupb.controller.tuptus.map import Map
 from gupb.controller.tuptus.pathfinder import Pathfinder
+from gupb.controller.tuptus.strategies import BaseStrategy, PassiveStrategy, AggresiveStrategy
 
 from typing import Optional, List
 
@@ -35,6 +36,14 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
+WEAPON_TIERS = {
+    1: "sword",
+    2: "axe",
+    3: "amulet",
+    4: "bow_unloaded",
+    5: "bow_loaded",
+    6: "knife"
+}
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
@@ -43,9 +52,11 @@ class TuptusController(controller.Controller):
         self.first_name: str = first_name
         self.map: Map = Map()
         self.pathfinder: Pathfinder = Pathfinder(self.map)
+        self.weapon_tier: int = 6
+        self.position: Optional[coordinates.Coords] = None
         self.facing: Optional[characters.Facing] = None
+        self.strategy: AggresiveStrategy = AggresiveStrategy(self.map, self.weapon_tier, self.position, self.facing)
         self.planned_actions: Optional[List] = None
-        self.menhir_coords = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
 
@@ -58,37 +69,32 @@ class TuptusController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        if self.planned_actions:
-            return self.planned_actions.pop(0)
-        
-
-        self.map.decode_knowledge(knowledge)
-        self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
-        if not self.menhir_coords:
-            self.menhir_coords = self.is_menhir(knowledge.visible_tiles)
-
-
-        if self.map.weapons_position and not self.is_mist_bool(knowledge.visible_tiles):
-
-            for name, pos in self.map.weapons_position.items():
-                weapon_pos = pos
-                weapon_name = name
-            del self.map.weapons_position[weapon_name]
-            self._raw_path = self.pathfinder.astar(knowledge.position, weapon_pos)
-            
-            if self._raw_path:
-                if len(self._raw_path) > 1:
-                    self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
-                    self._raw_path = None
-                    return self.planned_actions.pop(0)
+        self.update(knowledge)
 
         next_block_position = knowledge.position + self.facing.value
-        next_block = knowledge.visible_tiles[next_block_position]        
+        next_block = knowledge.visible_tiles[next_block_position]
+
+        if next_block.character:
+            return POSSIBLE_ACTIONS[3]         
+
+        if not self.is_mist_bool(knowledge.visible_tiles):
+            self.planned_actions = self.strategy.find_weapon()
+            if self.planned_actions:
+                return self.planned_actions.pop(0)
+            else:
+                self.planned_actions = self.strategy.fight(knowledge)
+                if self.planned_actions:
+                    return self.planned_actions.pop(0)
+                else:
+                    self.planned_actions = self.strategy.explore()
+                    if self.planned_actions:
+                        return self.planned_actions.pop(0)
+
         if next_block.type in ["wall", "sea"]: 
             choice = POSSIBLE_ACTIONS[random.randint(0,1)]
         elif self.is_mist_bool(knowledge.visible_tiles) > 0:
-            if self.menhir_coords:
-                self._raw_path = self.pathfinder.astar(knowledge.position, self.menhir_coords)
+            if self.map.menhir_position:
+                self._raw_path = self.pathfinder.astar(knowledge.position, self.map.menhir_position)
                 if self._raw_path:
                     self.planned_actions = self.pathfinder.plan_path(self._raw_path, self.facing)
                     return self.planned_actions.pop(0)
@@ -129,9 +135,32 @@ class TuptusController(controller.Controller):
         self.facing = None
         self.mist_tiles = np.array([])
         self.mist_directions = []
+        self.map._init_map(Arena.load(arena_description.name))
         self.map.weapons_position = {}
         self.planned_actions = None
         self._raw_path = None
+        self.strategy.arena_description = Arena.load(arena_description.name)
+
+
+
+    def update(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.position = knowledge.position
+        self.map.decode_knowledge(knowledge)
+        self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
+        self.find_current_weapon_tier(knowledge)
+     
+        self.strategy.weapon_tier = self.weapon_tier
+        self.strategy.facing = self.facing
+        self.strategy.position = self.position
+        self.strategy.map = self.map
+
+
+    def find_current_weapon_tier(self, knowledge) -> None:
+        for coord, tile in knowledge.visible_tiles.items():
+            if coord == knowledge.position:
+                weapon_name = tile.character.weapon.name
+                
+                self.weapon_tier = [tier for tier in WEAPON_TIERS if WEAPON_TIERS[tier]==weapon_name][0]
 
 
     def find_facing_direction(self, position, visible_tiles_positions) -> None:
@@ -157,7 +186,6 @@ class TuptusController(controller.Controller):
                 elif np.array(coords) not in self.mist_tiles:
                     self.mist_tiles = np.vstack((self.mist_tiles, np.array(np.array(coords))))  
                 self.map.tuptable_map[coords] = 1
-
         return self.mist_tiles
     
     def are_opposite(self, opponent_facing, character_facing):
@@ -175,15 +203,6 @@ class TuptusController(controller.Controller):
             if effects.EffectDescription(type='mist') in tile.effects:
                 return True  
         return False
-    
-    def is_menhir(self, visible_tiles):
-        for coords, tile in visible_tiles.items():
-            if  tile == tiles.Menhir:
-                return coords 
-        return None
-
-
-
 
     @property
     def name(self) -> str:

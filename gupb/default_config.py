@@ -18,4 +18,3 @@ CONFIGURATION = {
     'runs_no': 5,
     'profiling_metrics': [],
 }
-
