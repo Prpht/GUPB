@@ -11,6 +11,7 @@ _DIR = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 
 # Land descriptions
 class PathConstants(Enum):
+    MIST = -1
     WALL = 0
     WALKABLE = 1
 

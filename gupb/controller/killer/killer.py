@@ -36,6 +36,9 @@ class KillerController(controller.Controller):
     def learn_map(self, knowledge: characters.ChampionKnowledge) -> None:
 
         for coord, tile in knowledge.visible_tiles.items():
+            if "mist" in list(map(lambda eff: eff.type, tile.effects)):
+                self.game_map[coord[1], coord[0]] = PathConstants.MIST.value
+                continue
 
             if tile.type == "land":
                 self.game_map[coord[1], coord[0]] = PathConstants.WALKABLE.value
@@ -154,10 +157,10 @@ class KillerController(controller.Controller):
             self.game_map = np.zeros(shape=(50, 50))
             self.execute_action(KillerAction.LOOK_AROUND, knowledge)
 
+        self.learn_map(knowledge)
+
         if self.menhir_pos == knowledge.position:
             return Action.TURN_RIGHT
-
-        self.learn_map(knowledge)
 
         if len(self.planned_actions) == 0:
             self.find_path(knowledge)
