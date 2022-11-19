@@ -48,6 +48,7 @@ class BaseStrategy:
         self.facing: Optional[Facing] = facing
         self.closest_opponent: tuple = (None, None)
         self.arena_description: Arena
+        self.explore_path: Optional[List] = None
 
     def explore(self) -> List:
         """
@@ -71,9 +72,8 @@ class BaseStrategy:
         while self.map.tuptable_map[h, w]:
             h = np.random.randint(h_min, h_max)
             w = np.random.randint(w_min, w_max)
-
         raw_path = self.pathfinder.astar(self.position, (h, w))
-        return self.pathfinder.plan_path(raw_path, self.facing) if raw_path else []
+        return self.pathfinder.plan_path(raw_path, self.facing) if raw_path else [POSSIBLE_ACTIONS[np.random.randint(0, 4)]]
 
     def go_to_menhir(self) -> List:
         """
@@ -120,6 +120,7 @@ class PassiveStrategy(BaseStrategy):
         self.planned_safe_spot: Tuple = (),
         self.standing_counter: int = 0
 
+
     def decide(self, is_mist, knowledge, next_block):
         if self.is_hidden and not is_mist:
             self.standing_counter += 1
@@ -131,7 +132,7 @@ class PassiveStrategy(BaseStrategy):
                 return POSSIBLE_ACTIONS[0]
             return POSSIBLE_ACTIONS[3]
         elif is_mist:
-            self.go_to_menhir().pop(0)
+            return self.go_to_menhir().pop(0)
         else:
             return self.hide().pop(0)
 
@@ -141,7 +142,6 @@ class PassiveStrategy(BaseStrategy):
         """
         min_distance = 200
         return_path = []
-        print(f"Facing in strategies: {self.facing}")
         for safe_coords in self.map.safe_spots:
             raw_path = self.pathfinder.astar(self.position, safe_coords)
 
@@ -149,11 +149,9 @@ class PassiveStrategy(BaseStrategy):
                 planned_path = self.pathfinder.plan_path(raw_path, self.facing)
 
                 if len(planned_path) < min_distance:
-                    print(f"Found a better spot! Distance: {min_distance}")
                     min_distance = len(planned_path)
                     return_path = planned_path
                     self.planned_safe_spot = safe_coords
-        print(return_path)
         return return_path
 
     @property

@@ -82,7 +82,7 @@ class TuptusController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update(knowledge)
-        print(f"Facing in controller = {self.facing}")
+
         next_block_position = knowledge.position + self.facing.value
         next_block = knowledge.visible_tiles[next_block_position]
 
@@ -159,7 +159,7 @@ class TuptusController(controller.Controller):
         return choice
 
     def praise(self, score: int) -> None:
-        print(score)
+        #print(score)
         self.bandit.get_reward(score)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
@@ -171,7 +171,7 @@ class TuptusController(controller.Controller):
         self.planned_actions = None
         self._raw_path = None
         self.bandit_choice = self.bandit.choose_action()
-        print(self.bandit_choice)
+        # print(self.bandit_choice)
         self.strategy = STRATEGIES[self.bandit_choice](game_map = self.map, weapon_tier = self.weapon_tier, position = self.position, facing = self.facing)
         self.strategy.arena_description = Arena.load(arena_description.name)
         self.map.menhir_position = None

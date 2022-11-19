@@ -77,8 +77,6 @@ class Map():
                 if sum(neighbours_passable) == 3:
                     self.safe_spots.append((x, y))
 
-        print(self.safe_spots)
-
 
     @property
     def is_mist(self) -> bool:
