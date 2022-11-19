@@ -60,7 +60,7 @@ class Tile(ABC):
     def enter(self, champion: characters.Champion) -> None:
         self.character = champion
         if self.loot:
-            champion.weapon, self.loot = self.loot, champion.weapon
+            champion.weapon, self.loot = self.loot, champion.weapon if champion.weapon.droppable() else None
             verbose_logger.debug(
                 f"Champion {champion.controller.name} picked up a {champion.weapon.description().name}.")
             ChampionPickedWeaponReport(champion.controller.name, champion.weapon.description().name).log(logging.DEBUG)
