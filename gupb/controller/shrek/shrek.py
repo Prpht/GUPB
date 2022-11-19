@@ -13,9 +13,6 @@ from gupb.model import coordinates
 from numpy import empty, sqrt, square
 from scipy.linalg import lstsq
 
-# HIDING_SPOTS = [(7, 11), (11, 7)]
-# WEAPON_SPOTS = []  #now its aelf.tactic_spots
-
 
 class ShrekController:
     def __init__(self, first_name: str):
@@ -27,12 +24,11 @@ class ShrekController:
         self.path = []
         self.tactic_spots = []
         self.facing = None
-        self.weapon_name = 'knife'
         self.map = None
         self.goal = None
         self.map_corners = []
-        self.saw_menhir = False
-        self.menhir_achieved = False
+        self.hiding_spot = None
+        self.emergency_steps = []
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ShrekController):
@@ -52,8 +48,9 @@ class ShrekController:
         self.points_to_visit = self.find_spots_to_visit()
         self.map_corners = self.points_to_visit[:]
         self.menhir = None
-        self.saw_menhir = False
-        self.menhir_achieved = False
+        self.hiding_spot = None
+        self.tactic_spots = []
+        self.emergency_steps = []
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.position = knowledge.position
@@ -63,61 +60,161 @@ class ShrekController:
 
         if self.is_enemy_around(knowledge):
             facing_tile = self.position + self.facing.value  # if we face character we fight
-            if knowledge.visible_tiles[facing_tile].character:
+            if knowledge.visible_tiles[facing_tile].character and self.weapon_name != 'amulet':
                 return characters.Action.ATTACK
+
             if self.weapon_name == 'sword':  # if we have sword we fight the characters if they are 3 tiles in front of us
                 facing_tile2 = facing_tile + self.facing.value
                 facing_tile3 = facing_tile2 + self.facing.value
+
                 if facing_tile2 in knowledge.visible_tiles:
                     if knowledge.visible_tiles[facing_tile2].character:
                         return characters.Action.ATTACK
+
                 if facing_tile3 in knowledge.visible_tiles:
                     if knowledge.visible_tiles[facing_tile3].character:
                         return characters.Action.ATTACK
 
-        if self.am_i_on_menhir() or self.menhir_achieved:
-            # print(f'menhir: {self.position}')
+            if self.should_attack(self.position, knowledge):
+                return characters.Action.ATTACK
 
-            self.menhir_achieved = True
-            if not self.path:
-                self.path=self.find_path(self.go_nuts())
-            return characters.Action.TURN_RIGHT
-        else:
-            if self.do_i_see_menhir(knowledge.visible_tiles, knowledge.position):
-                self.set_path(knowledge)
-            elif self.mist_comes(knowledge):
-                self.goal = self.find_further_point()
-                self.set_path(knowledge)
-            elif self.do_i_see_mist(knowledge):
-                self.run_from_mist(knowledge)
-                self.set_path(knowledge)
-            if self.tactic_spots and self.goal is None:
-                self.find_closest_weapon()
-                self.set_path(knowledge)
-        if self.path:
-            wanted_field = coordinates.Coords(self.path[0][0], self.path[0][1])
+        if len(self.emergency_steps) > 0:
+            wanted_field = coordinates.Coords(self.emergency_steps[0][0], self.emergency_steps[0][1])
             substract_points = coordinates.sub_coords(wanted_field, self.position)
-            if str(substract_points) not in ['Coords(x=0, y=1)','Coords(x=1, y=0)', 'Coords(x=-1, y=0)','Coords(x=0, y=-1)']:
-                print(substract_points)
             needed_facing = Facing(substract_points)
             if self.facing == needed_facing:
-                self.path.pop(0)
-                # check 3 fields next to goal if someone is there:
+                self.emergency_steps.pop(0)
                 return characters.Action.STEP_FORWARD
             else:
                 return characters.Action.TURN_RIGHT
 
-        else:
-            self.goal = self.find_closest_point()
-            if self.goal in self.points_to_visit:
-                self.points_to_visit.remove(self.goal)
-            self.set_path(knowledge)
+        if self.am_i_on_hiding_spot():
+            if self.mist_comes(knowledge):
+                self.emergency_steps = self.find_path(self.menhir)
+            return characters.Action.TURN_RIGHT
+
+        try:
+            if self.am_i_on_menhir() and not self.hiding_spot:
+                return characters.Action.TURN_RIGHT
+
+            else:
+                if not self.hiding_spot:
+                    if self.do_i_see_menhir(knowledge.visible_tiles, knowledge.position):
+                        self.hiding_spot = self.find_hiding_spot_around(self.menhir)
+                        if self.hiding_spot:
+                            self.goal = self.hiding_spot
+                        else:
+
+                            self.do_i_see_menhir(knowledge.visible_tiles, knowledge.position)
+                        self.set_path(knowledge)
+                elif self.mist_comes(knowledge):
+                    self.goal = self.find_further_point()
+                    self.set_path(knowledge)
+                    self.hiding_spot = None
+                elif self.do_i_see_mist(knowledge):
+                    self.run_from_mist(knowledge)
+                    self.set_path(knowledge)
+                    self.hiding_spot = None
+                if self.tactic_spots and self.goal is None:
+                    self.find_closest_weapon()
+                    self.set_path(knowledge)
+
+            if self.path:
+                wanted_field = coordinates.Coords(self.path[0][0], self.path[0][1])
+                substract_points = coordinates.sub_coords(wanted_field, self.position)
+                needed_facing = Facing(substract_points)
+                if self.facing == needed_facing:
+                    self.path.pop(0)
+                    return characters.Action.STEP_FORWARD
+                else:
+                    return characters.Action.TURN_RIGHT
+
+
+            else:
+                self.goal = self.find_closest_point()
+                if self.goal in self.points_to_visit:
+                    self.points_to_visit.remove(self.goal)
+
+                self.set_path(knowledge)
+        except:
+            if not self.goal:
+                self.goal = self.find_further_point()
+                self.set_path(knowledge)
 
         return characters.Action.TURN_RIGHT
 
     """
     Here are the functions we use:
     """
+
+    def take_step_from_path(self, path):
+        wanted_field = coordinates.Coords(path[0][0], path[0][1])
+        substract_points = coordinates.sub_coords(wanted_field, self.position)
+        needed_facing = Facing(substract_points)
+        if self.facing == needed_facing:
+            path.pop(0)
+            # check 3 fields next to goal if someone is there:
+            return characters.Action.STEP_FORWARD
+        else:
+            return characters.Action.TURN_RIGHT
+
+    def find_hiding_spot_around(self, position):
+        width_map = len(self.map[0])
+        height_map = len(self.map)
+
+        x_1 = max(0, position[0] - int(width_map // 7))
+        x_2 = min(width_map, position[0] + int(width_map // 7))
+
+        y_1 = max(0, position[1] - int(height_map // 7))
+        y_2 = min(height_map, position[1] + int(height_map // 7))
+
+        sub_optimal = None
+
+        for i in range(x_1, x_2 + 1):
+            for j in range(y_1, y_2 + 1):
+                if self.map[j][i] == 1:
+                    neighbouring_walls = 0
+
+                    for dx, dy in [[0, 1], [0, -1], [1, 0], [-1, 0]]:
+                        nx, ny = j + dx, i + dy
+                        if self.map[nx][ny] == 0:
+                            #  nx not in range(width_map) or ny not in range(height_map) or self.map[nx][ny] == 0:
+                            neighbouring_walls += 1
+
+                    if neighbouring_walls == 3:
+                        return i, j
+
+                # if neighbouring_walls == 2:
+                #     sub_optimal = i, j
+
+        return sub_optimal
+
+    def should_attack(self, self_pos: coordinates.Coords, knowledge: characters.ChampionKnowledge):
+        if self.weapon_name in ['bow_loaded', 'bow_unloaded']:
+            for tile, description in knowledge.visible_tiles.items():
+                distance = self.get_distance(tile, self_pos)
+                if distance == 0 or description.character is None:
+                    continue
+                if (self.facing == Facing.UP or self.facing == Facing.DOWN) and (tile[0] - self_pos[0]) == 0:
+                    return True
+                if (self.facing == Facing.LEFT or self.facing == Facing.RIGHT) and (tile[1] - self_pos[1]) == 0:
+                    return True
+            return False
+
+        if self.weapon_name == 'amulet':
+            attack_tiles = [coordinates.Coords(self.position.x + 1, self.position.y + 1),
+                            coordinates.Coords(self.position.x - 1, self.position.y - 1),
+                            coordinates.Coords(self.position.x + 1, self.position.y - 1),
+                            coordinates.Coords(self.position.x - 1, self.position.y + 1),
+                            coordinates.Coords(self.position.x - 2, self.position.y + 2),
+                            coordinates.Coords(self.position.x - 2, self.position.y - 2),
+                            coordinates.Coords(self.position.x + 2, self.position.y - 2),
+                            coordinates.Coords(self.position.x + 2, self.position.y + 2)]
+
+            for tile, description in knowledge.visible_tiles.items():
+                if tile in attack_tiles and description.character:
+                    return True
+            return False
 
     def is_enemy_around(self, knowledge: characters.ChampionKnowledge):
         """
@@ -127,6 +224,25 @@ class ShrekController:
             if tile_descr.character and coord != (self.position.x, self.position.y):
                 return True
         return False
+
+    def am_i_on_hiding_spot(self):
+        """
+               Check if bot is on the hiding_spot
+        """
+        if self.hiding_spot:
+            cords = coordinates.Coords(self.hiding_spot[0], self.hiding_spot[1])
+            if self.position.x == cords.x and self.position.y == cords.y:
+                return True
+        return False
+
+    def get_distance(self, cord1: coordinates.Coords, cord2: coordinates.Coords):
+        if not cord1 or not cord2:
+            return 0
+        dist = abs(cord1[0] - cord2[0]) + abs(cord1[1] - cord2[1])
+        return dist
+
+    def get_max_distance(self, cord1: coordinates.Coords, cord2: coordinates.Coords):
+        return max(abs(cord1[0] - cord2[0]), abs(cord1[1] - cord2[1]))
 
     def am_i_on_menhir(self):
         """
@@ -146,7 +262,6 @@ class ShrekController:
             if tile_descr.type == 'menhir':
                 self.goal = coordinate[0], coordinate[1]
                 self.menhir = self.goal
-                self.saw_menhir = True
                 return True
         return False
 
@@ -214,7 +329,7 @@ class ShrekController:
             map_matrix[cords.y][cords.x] = 0 if tile.description().type in ['wall', 'sea'] else 1
             if tile.description().loot:
                 # map_matrix[cords.x][cords.y] = 0 if tile.description().loot.name in ["knife", "amulet", "bow_unloaded"] else 1
-                if tile.description().loot.name in ["axe","sword"]:
+                if tile.description().loot.name in ["axe", "sword", 'bow_loaded', 'bow_unloaded']:
                     tactic_spots.append((cords.x, cords.y))
         return map_matrix, tactic_spots
 
@@ -271,7 +386,7 @@ class ShrekController:
             facing_tile += self.facing.value
         return False
 
-    def do_i_see_mist(self,knowledge: characters.ChampionKnowledge):
+    def do_i_see_mist(self, knowledge: characters.ChampionKnowledge):
         for tile in knowledge.visible_tiles:
             if knowledge.visible_tiles[tile].effects:
                 for effect in knowledge.visible_tiles[tile].effects:
@@ -291,14 +406,15 @@ class ShrekController:
         border = []
         for mist in data:
             add = False
-            neighbours = [(mist[0], mist[1]+1), (mist[0], mist[1]-1), (mist[0]+1, mist[1]),(mist[0]-1, mist[1])]
+            neighbours = [(mist[0], mist[1] + 1), (mist[0], mist[1] - 1), (mist[0] + 1, mist[1]),
+                          (mist[0] - 1, mist[1])]
             for n in neighbours:
                 if n in knowledge.visible_tiles:
                     if not knowledge.visible_tiles[n].effects:
                         add = True
             if add:
-                border.append((mist[0], height-mist[1]))
-        if len(border)>0:
+                border.append((mist[0], height - mist[1]))
+        if len(border) > 0:
             r, c = self.nsphere_fit(border)
             coords = (int(c[0]), int(c[1]))
             if 0 < coords[0] < width and 0 < coords[1] < height:
@@ -329,8 +445,8 @@ class ShrekController:
     def go_nuts(self):
         width = len(self.map[0]) - 1
         height = len(self.map) - 1
-        for t in range(0,10):
-            coords = (self.menhir[0]+random.randint(0, 4), self.menhir[1] + random.randint(0, 4))
+        for t in range(0, 10):
+            coords = (self.menhir[0] + random.randint(0, 4), self.menhir[1] + random.randint(0, 4))
             if 0 < coords[0] < width and 0 < coords[1] < height:
                 if self.map[coords[0]][coords[1]] == 0:
                     return coords
