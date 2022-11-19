@@ -51,6 +51,9 @@ class Strategy(enum.Enum):
     MINIMIZE_RISK = 'minimize_risk'
     ANTI_IDLE = 'anti_idle'
     CHANGE_CLUSTER = 'change_cluster'
+    MOVE_TO_CENTER_OF_CLUSTER = 'move_to_center_of_cluster'
+    # COMBAT = 'combat'  # TO REMOVE
+    # GO_TO_ENEMY = 'go_to_enemy'  # TO REMOVE
 
 
 # noinspection PyUnusedLocal
@@ -90,6 +93,13 @@ class DodgeController(controller.Controller):
         self.current_grand_strategy = 5
         self.exploration_multiplier = EXPLORATION_MULTIPLIER
 
+        # self.model = ActorCriticController(0.0001, 0.99)
+        # self.combat_mode = 0
+        # self.closest_enemy_coords = None
+        # self.distance_to_closest_enemy = INFINITY
+        # self.old_inputs = []
+        # self.my_enemy = None
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DodgeController):
             return self.first_name == other.first_name
@@ -100,6 +110,7 @@ class DodgeController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         # Gather information from seen tiles
+        # self.distance_to_closest_enemy = INFINITY  # TO REMOVE
         self.turn += 1
         self.last_facing = self.facing
         self.last_position = self.position
@@ -151,6 +162,12 @@ class DodgeController(controller.Controller):
             elif knowledge.visible_tiles[tile].character is not None:
                 self.known_enemies[knowledge.visible_tiles[tile].character.controller_name] \
                     = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
+                # _, distance_to_enemy = self.find_path(self.position, Coords(tile[0], tile[1]), self.facing)  # TO REMOVE
+                # if distance_to_enemy < self.distance_to_closest_enemy:  # TO REMOVE
+                #     self.distance_to_closest_enemy = distance_to_enemy  # TO REMOVE
+                #     self.closest_enemy_coords = Coords(tile[0], tile[1])  # TO REMOVE
+                #     if abs(self.position.x - self.closest_enemy_coords.x) < 3 and abs(self.position.y - self.closest_enemy_coords.y) < 3 and self.combat_mode == 0:
+                #         self.my_enemy = knowledge.visible_tiles[tile].character
                 for cluster in self.clusters:
                     if Coords(tile[0], tile[1]) in cluster.tiles:
                         cluster.extra_danger[knowledge.visible_tiles[tile].character.controller_name] = 1.0
@@ -216,9 +233,15 @@ class DodgeController(controller.Controller):
         strategy: Strategy = Strategy.RANDOM
         if self.idle_time == PENALISED_IDLE_TIME - 1:
             strategy = Strategy.ANTI_IDLE
+        # TO REMOVE
+        # elif self.combat_mode > 0 or (abs(self.position.x - self.closest_enemy_coords.x) < 3 and abs(self.position.y - self.closest_enemy_coords.y) < 3):
+        #     strategy = Strategy.COMBAT
+        # elif self.distance_to_closest_enemy < INFINITY:
+        #     strategy = Strategy.GO_TO_ENEMY
+        # TO REMOVE
         elif not all(enemy[2] >= 2 or not self.is_in_range(enemy[0]) for enemy in self.known_enemies.values()):
             strategy = Strategy.ATTACK
-        elif self.run > 0 and self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir'):
+        elif self.run > 0 and self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir') and not ((self.menhir is not None and TURNS_TO_FOG * 1.3 < self.turn) or (self.menhir is None and TURNS_TO_FOG * self.exploration_multiplier < self.turn)):
             strategy = Strategy.ESCAPE
         elif self.spinning_stage < 4:
             strategy = Strategy.SPIN
@@ -226,6 +249,8 @@ class DodgeController(controller.Controller):
             strategy = Strategy.MOVE_TO_CENTER
         elif self.current_grand_strategy % 2 == 1 and len(self.clusters[self.current_cluster].neighbors) > 0 and (min([self.clusters[x].danger_sum for x in self.clusters[self.current_cluster].neighbors]) < (self.clusters[self.current_cluster].danger_sum - 0.5)):
             strategy = Strategy.CHANGE_CLUSTER
+        elif self.current_grand_strategy % 2 == 1 and self.current_cluster not in self.explored_clusters:
+            strategy = Strategy.MOVE_TO_CENTER_OF_CLUSTER
         elif random.random() * 100 < best_rating:
             strategy = Strategy.RANDOM
         else:
@@ -243,6 +268,82 @@ class DodgeController(controller.Controller):
         if strategy == Strategy.ANTI_IDLE:
             self.idle_time = 0
             return characters.Action.TURN_LEFT
+        # TO REMOVE
+        # if strategy == Strategy.COMBAT:
+        #     if abs(self.position.x - self.closest_enemy_coords.x) < 3 and abs(self.position.y - self.closest_enemy_coords.y) < 3:
+        #         self.combat_mode = 5
+        #     else:
+        #         self.combat_mode -= 0
+        #
+        #     model_input = np.zeros((49,))
+        #
+        #     for i in range(25):
+        #         x = self.position.x - 2 + i // 5
+        #         y = self.position.y - 2 + i % 5
+        #         model_input[i] = 1 if self.tiles[Coords(x, y)].type in ('land', 'menhir') else 0
+        #
+        #     model_input[25] = self.health
+        #     model_input[26] = self.known_enemies[self.my_enemy][1].health
+        #
+        #     if self.weapon.name == 'knife':
+        #         model_input[27] = 1.0
+        #     if self.weapon.name == 'sword':
+        #         model_input[28] = 1.0
+        #     if self.weapon.name == 'axe':
+        #         model_input[29] = 1.0
+        #     if self.weapon.name == 'bow_unloaded':
+        #         model_input[30] = 1.0
+        #     if self.weapon.name == 'bow_loaded':
+        #         model_input[31] = 1.0
+        #     if self.weapon.name == 'amulet':
+        #         model_input[32] = 1.0
+        #
+        #     enemy_weapon = self.known_enemies[self.my_enemy][1].weapon.name
+        #     if enemy_weapon == 'knife':
+        #         model_input[33] = 1.0
+        #     if enemy_weapon == 'sword':
+        #         model_input[34] = 1.0
+        #     if enemy_weapon == 'axe':
+        #         model_input[35] = 1.0
+        #     if enemy_weapon == 'bow_unloaded':
+        #         model_input[36] = 1.0
+        #     if enemy_weapon == 'bow_loaded':
+        #         model_input[37] = 1.0
+        #     if enemy_weapon == 'amulet':
+        #         model_input[38] = 1.0
+        #
+        #     model_input[39] = self.known_enemies[self.my_enemy][0].x - self.position.x
+        #     model_input[40] = self.known_enemies[self.my_enemy][0].y - self.position.y
+        #
+        #     if self.facing == Facing.UP:
+        #         model_input[41] = 1.0
+        #     if self.facing == Facing.DOWN:
+        #         model_input[42] = 1.0
+        #     if self.facing == Facing.LEFT:
+        #         model_input[43] = 1.0
+        #     if self.facing == Facing.RIGHT:
+        #         model_input[44] = 1.0
+        #
+        #     if self.known_enemies[self.my_enemy][1].facing == Facing.UP:
+        #         model_input[45] = 1.0
+        #     if self.known_enemies[self.my_enemy][1].facing == Facing.DOWN:
+        #         model_input[46] = 1.0
+        #     if self.known_enemies[self.my_enemy][1].facing == Facing.LEFT:
+        #         model_input[47] = 1.0
+        #     if self.known_enemies[self.my_enemy][1].facing == Facing.RIGHT:
+        #         model_input[48] = 1.0
+        #
+        #     if len(self.old_inputs) >= 5:
+        #         self.old_inputs.pop(0)
+        #     self.old_inputs.append(model_input)
+        #
+        #     if len(self.old_inputs) == 5:
+        #         full_input = np.concatenate((self.old_inputs[0], self.old_inputs[1], self.old_inputs[2], self.old_inputs[3], self.old_inputs[4],), axis=0)
+        #
+        # if strategy == Strategy.GO_TO_ENEMY:
+        #     self.path = self.find_path(self.position, self.closest_enemy_coords, self.facing)[0]
+        #     return self.get_action_to_move_in_path()
+        # TO REMOVE
         if strategy == Strategy.ATTACK:
             return characters.Action.ATTACK
         elif strategy == Strategy.ESCAPE:
@@ -253,6 +354,27 @@ class DodgeController(controller.Controller):
             if self.menhir is not None:
                 if self.position == self.menhir:
                     return characters.Action.TURN_LEFT
+                # elif self.tiles[self.menhir].character is not None and self.weapon.name in ["axe", "amulet"]: TODO
+                #     if abs(sub_coords(self.position, self.menhir).x) == 1 and abs(sub_coords(self.position, self.menhir).y) == 1:
+                #         if self.weapon.name == "amulet":
+                #             return characters.Action.ATTACK
+                #         else:
+                #             self.path = self.find_path(self.position, self.menhir, self.facing)[0][1:]
+                #             return self.get_action_to_move_in_path()
+                #     self.path = self.find_path(self.position, self.menhir, self.facing)[0]
+                #     tile_before_menhir = self.path[-2]
+                #     self.path = self.path[1:]
+                #     possible_tiles = [Coords(tile_before_menhir.x + 1, tile_before_menhir.y),
+                #                       Coords(tile_before_menhir.x - 1, tile_before_menhir.y),
+                #                       Coords(tile_before_menhir.x, tile_before_menhir.y - 1),
+                #                       Coords(tile_before_menhir.x, tile_before_menhir.y + 1)]
+                #     possible_tiles.remove(self.menhir)
+                #     diff = sub_coords(tile_before_menhir, self.menhir)
+                #     for tile in possible_tiles:
+                #         if self.tiles[tile].type == "land" and diff != sub_coords(tile, tile_before_menhir):
+                #             self.path[-1] = tile
+                #             break
+                #     return self.get_action_to_move_in_path()
                 else:
                     self.path = self.find_path(self.position, self.menhir, self.facing)[0][1:]
                     return self.get_action_to_move_in_path()
@@ -286,6 +408,20 @@ class DodgeController(controller.Controller):
                     return self.get_action_to_move_in_path()
 
             return self.pick_action(best_move)
+        elif strategy == Strategy.MOVE_TO_CENTER_OF_CLUSTER:
+            self.path = self.find_path(self.position, self.clusters[self.current_cluster].central_point, self.facing)[0][1:]
+            enemy_in_sight = False
+            if self.path is not None and len(self.path) > 0:
+                for enemy in self.known_enemies.values():
+                    if enemy[2] < 5 and np.sqrt(np.power(enemy[0].x - self.path[0].x, 2) + np.power(enemy[0].y - self.path[0].y, 2)) < 3.0:
+                        enemy_in_sight = True
+            else:
+                enemy_in_sight = True
+
+            if enemy_in_sight:
+                return self.pick_action(best_move)
+            else:
+                return self.get_action_to_move_in_path()
         elif strategy == Strategy.RANDOM:
             return random.choice(POSSIBLE_ACTIONS)
         else:
@@ -311,7 +447,7 @@ class DodgeController(controller.Controller):
         self.turn: int = 0
         self.round += 1
         self.current_grand_strategy = self.select_grand_strategy(arena_description.name)
-        self.exploration_multiplier = 0.6 if self.current_grand_strategy < 4 else (0.8 if self.current_grand_strategy < 6 else 1.0)
+        self.exploration_multiplier = 0.6 if self.current_grand_strategy < 4 else (0.7 if self.current_grand_strategy < 6 else 1.0)
         self.health: int = 8
         self.run: int = 0
         self.idle_time = 0
