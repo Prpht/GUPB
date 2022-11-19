@@ -26,6 +26,7 @@ class KillerController(controller.Controller):
         self.planned_actions = []
         self.got_weapon = False
         self.saw_mist = False
+        self.weapon_type = "dagger"
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KillerController):
@@ -148,16 +149,24 @@ class KillerController(controller.Controller):
         #     self.find_new_interest(curr_position=knowledge.position)
         #     self.find_path(knowledge, interest=KillerInterest.POINT_ON_MAP)
 
+    # def in_range(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    #     if self.weapon_type == "sword":
+    #         if add_coords()
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+
         facing_element = self.get_facing_element(knowledge)
 
-        if facing_element.loot is not None:
-            if (facing_element.loot.name in ("axe", "sword")) and len(self.planned_actions) > 0\
-                    and (self.planned_actions[0] == characters.Action.STEP_FORWARD):
-                self.got_weapon = True
+        # if facing_element.loot is not None:
+        #     if (facing_element.loot.name in ("axe", "sword")) and len(self.planned_actions) > 0\
+        #             and (self.planned_actions[0] == characters.Action.STEP_FORWARD):
+        #         self.got_weapon = True
+        #         self.weapon_type = "axe" if facing_element.loot.name == "axe" else "sword"
 
         if facing_element.character is not None:
             return Action.ATTACK
+
+        return Action.TURN_RIGHT
 
         if self.game_map is None:
             self.game_map = np.zeros(shape=(50, 50))
