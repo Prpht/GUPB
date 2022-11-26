@@ -11,14 +11,15 @@ _DIR = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 
 # Land descriptions
 class PathConstants(Enum):
+    MIST = -1
     WALL = 0
     WALKABLE = 1
 
 
 class KillerInterest(Enum):
     POINT_ON_MAP = 2
-    ITEM = 3
-    KILLING = 4
+    KILLING = 3
+    ITEM = 4
     MENHIR = 5
 
 

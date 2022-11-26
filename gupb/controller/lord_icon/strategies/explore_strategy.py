@@ -4,7 +4,6 @@ from gupb.controller.lord_icon.knowledge import Knowledge
 from gupb.controller.lord_icon.move import MoveController
 from gupb.controller.lord_icon.strategies.core import Strategy
 from gupb.model import characters
-from gupb.model.characters import Action
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,

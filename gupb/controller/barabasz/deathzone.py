@@ -2,8 +2,13 @@ from gupb.model import coordinates
 from gupb.model import weapons
 
 
-def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coordinates.Coords):
+def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing, terrain):
+    return auto_deathzone(weapon, position, facing, terrain)
+
+
+def manual_deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing):
     death_coords = []
+    facing = facing.value
 
     if isinstance(weapon, weapons.Knife):
         death_coords.append(coordinates.add_coords(position, facing))
@@ -26,7 +31,7 @@ def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coor
 
     elif isinstance(weapon, weapons.Amulet):
         amulet_range = 2
-        for i in range(amulet_range):
+        for i in range(1, amulet_range+1, 1):
             for x in [-i, i]:
                 for y in [-i, i]:
                     death_coords.append(coordinates.add_coords(position, coordinates.Coords(x, y)))
@@ -40,3 +45,7 @@ def deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing: coor
                 death_coords.append(attacked_position)
 
     return death_coords
+
+
+def auto_deathzone(weapon: weapons.Weapon, position: coordinates.Coords, facing, terrain):
+    return weapon.cut_positions(terrain, position, facing)

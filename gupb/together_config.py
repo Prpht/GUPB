@@ -16,13 +16,13 @@ from gupb.scripts import arena_generator
 CONFIGURATION = {
     'arenas': arena_generator.generate_arenas(30),
     'controllers': [
-        aksolotl.AksolotlController("Old"),
+        # aksolotl.AksolotlController("Old"),
         aleph_aleph_zero.AlephAlephZeroBot("AA0"),
         barabasz.BarabaszController("BenadrylowyBarabasz"),
         dart.DartController("Dart"),
         dzikie_borsuki.DzikieBorsuki("DzikieBorsuki"),
         elvis.DodgeController("Elvis"),
-        intercontinental_bajers.IntercontinentalBajers("IntercontinentalBajers"),
+        # intercontinental_bajers.IntercontinentalBajers("IntercontinentalBajers"),
         killer.KillerController("Killer"),
         lord_icon.LordIcon("Marko"),
         shrek.ShrekController("Fiona"),
