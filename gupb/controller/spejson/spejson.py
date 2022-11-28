@@ -1,5 +1,9 @@
 import random
 import numpy as np
+import tensorflow as tf
+import os
+import logging
+import traceback
 
 from gupb import controller
 from gupb.controller.spejson.dynamic_map_processing import analyze_visible_region, get_state_summary, get_map_derivables
@@ -7,6 +11,7 @@ from gupb.controller.spejson.static_map_processing import analyze_map
 from gupb.controller.spejson.pathfinding import calculate_dists, proposed_moves_to_keypoints
 from gupb.controller.spejson.utils import (
     POSSIBLE_ACTIONS, facing_to_letter, weapons_name_to_letter, get_random_place_on_a_map, move_possible_action_onehot)
+from gupb.controller.spejson.filedump_utils import create_dump_folder, dump_numpy_array
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action
@@ -53,6 +58,7 @@ class Spejson(controller.Controller):
         self.move_number += 1
         self.panic_mode -= 1
         position = knowledge.position
+        players_left = knowledge.no_of_champions_alive
         visible_tiles = knowledge.visible_tiles
 
         available_actions = POSSIBLE_ACTIONS.copy()
@@ -117,7 +123,8 @@ class Spejson(controller.Controller):
             to_del += [(position.y, position.x)]
 
         for pos in to_del:
-            del self.weapons_knowledge[pos]
+            if pos in self.weapons_knowledge:
+                del self.weapons_knowledge[pos]
 
         for tile_coord in visible_tiles:
             tile = visible_tiles[tile_coord]
@@ -235,8 +242,20 @@ class Spejson(controller.Controller):
         if not decision:
             decision = random.choice(available_actions)
 
-        epoch_id = f"{self.first_name}/epoch_{self.move_number}"
-        all_feature_maps['decision'] = move_possible_action_onehot[decision]
+        state_tensor = []
+
+        for key in sorted(all_feature_maps.keys()):
+            feature = all_feature_maps[key]
+
+            if len(feature.shape) > 1:
+                state_tensor += [feature]
+            else:
+                state_tensor += [np.tile(feature.reshape(1, 1, -1), [13, 13, 1])]
+
+        state_tensor = tf.constant(np.concatenate(state_tensor, axis=-1).astype(np.float32))
+
+        dest_path = os.path.join('..', 'dump', self.first_name, f'epoch_{self.move_number}_{players_left}.npy')
+        dump_numpy_array(dest_path, state_tensor)
 
         return decision
 
@@ -269,6 +288,8 @@ class Spejson(controller.Controller):
         self.weapons_knowledge = self.analytics['weapons_knowledge']
         self.map_height = self.analytics['height']
         self.map_width = self.analytics['width']
+
+        create_dump_folder(self.first_name)
 
     @property
     def name(self) -> str:
