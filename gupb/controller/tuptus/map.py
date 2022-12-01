@@ -22,6 +22,7 @@ class Map():
         self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_map: np.ndarray
         self.known_map: np.ndarray
+        self.safe_spots: List = []
 
     def decode_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
         for coord, tile in knowledge.visible_tiles.items():
@@ -43,6 +44,7 @@ class Map():
         for coords, tile in arena_description.terrain.items():
             if not tile.terrain_passable():
                 self.tuptable_map[coords] = 1
+        self._find_safe_spots()
 
     def quadron_exploration(self) -> np.ndarray:       
         height, width = self.known_map.shape
@@ -59,6 +61,21 @@ class Map():
 
 
         return np.array([[q2_proc, q1_proc], [q3_proc, q4_proc]])
+
+    def _find_safe_spots(self) -> None:
+        height, width = self.tuptable_map.shape
+
+        for x in range(height):
+            for y in range(width):
+                
+                # Skip non-passable terrain
+                if self.tuptable_map[x, y]:
+                    continue
+
+                neighbours_passable = [self.tuptable_map[x+1, y], self.tuptable_map[x-1, y], self.tuptable_map[x, y+1], self.tuptable_map[x, y-1]]
+
+                if sum(neighbours_passable) == 3:
+                    self.safe_spots.append((x, y))
 
 
     @property
