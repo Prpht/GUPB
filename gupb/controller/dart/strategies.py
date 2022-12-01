@@ -1,6 +1,7 @@
 from typing import Optional, Protocol, Type
 from gupb.controller.dart.instructions import AttackOpponentInstruction, CollectClosestWeaponInstruction, GoToMenhirInstruction, Instruction, RotateAndAttackInstruction, RunAwayFromOpponentInstruction
-from gupb.controller.dart.movement_mechanics import MapKnowledge, euclidean_distance, get_champion_weapon, is_opponent_at_coords
+from gupb.controller.dart.movement_mechanics import MapKnowledge, euclidean_distance, is_opponent_at_coords
+from gupb.controller.dart.weapons import get_champion_weapon
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
 
