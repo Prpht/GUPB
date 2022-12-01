@@ -1,17 +1,16 @@
+import os
 import random
 import numpy as np
 import tensorflow as tf
-import os
-import logging
-import traceback
 
 from gupb import controller
 from gupb.controller.spejson.dynamic_map_processing import analyze_visible_region, get_state_summary, get_map_derivables
 from gupb.controller.spejson.static_map_processing import analyze_map
 from gupb.controller.spejson.pathfinding import calculate_dists, proposed_moves_to_keypoints
 from gupb.controller.spejson.utils import (
-    POSSIBLE_ACTIONS, facing_to_letter, weapons_name_to_letter, get_random_place_on_a_map, move_possible_action_onehot)
+    POSSIBLE_ACTIONS, facing_to_letter, weapons_name_to_letter, get_random_place_on_a_map)
 from gupb.controller.spejson.filedump_utils import create_dump_folder, dump_numpy_array
+from gupb.controller.spejson.deepspejson_utils import load_model_and_make_servable
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action
@@ -21,7 +20,7 @@ from gupb.model.coordinates import Coords
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Spejson(controller.Controller):
-    def __init__(self, first_name: str):
+    def __init__(self, first_name: str, experiment_rate=0.3, serve_greedy=False, deepspejson=True):
         self.first_name: str = first_name
         self.position = None
         self.facing = None
@@ -44,6 +43,12 @@ class Spejson(controller.Controller):
         self.map_height = 0
         self.map_width = 0
         self.analytics = {}
+        self.model = None
+        self.rec_h = None
+        self.rec_c = None
+        self.experiment_rate = experiment_rate
+        self.serve_greedy = serve_greedy
+        self.deepspejson = deepspejson
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
@@ -254,10 +259,35 @@ class Spejson(controller.Controller):
 
         state_tensor = tf.constant(np.concatenate(state_tensor, axis=-1).astype(np.float32))
 
-        dest_path = os.path.join('..', 'dump', self.first_name, f'epoch_{self.move_number}_{players_left}.npy')
+        chosen_move = -1
+
+        if self.deepspejson:
+            out, self.rec_h, self.rec_c = self.model(
+                state_tensor[tf.newaxis, tf.newaxis, ...],
+                self.rec_h, self.rec_c, tf.ones([1, 1], dtype=tf.float32)
+            )
+
+            out = np.squeeze(out)
+
+            if self.serve_greedy:
+                chosen_move = np.argmax(out)
+            else:
+                chosen_move = np.random.choice(
+                    range(4),
+                    p=self.experiment_rate * 0.25 + (1.0 - self.experiment_rate) * out
+                )
+        else:
+            for i, action in enumerate(POSSIBLE_ACTIONS):
+                if decision == action:
+                    chosen_move = i
+
+        dest_path = os.path.join(
+            '..', 'dump', self.first_name,
+            f'epoch_{self.move_number}_{players_left}_{chosen_move}.npy'
+        )
         dump_numpy_array(dest_path, state_tensor)
 
-        return decision
+        return POSSIBLE_ACTIONS[chosen_move]
 
     def praise(self, score: int) -> None:
         pass
@@ -290,6 +320,12 @@ class Spejson(controller.Controller):
         self.map_width = self.analytics['width']
 
         create_dump_folder(self.first_name)
+
+        if self.deepspejson and not self.model:
+            self.model = load_model_and_make_servable()
+
+        self.rec_h = tf.zeros([1, 256], dtype=tf.float32)
+        self.rec_c = tf.zeros([1, 256], dtype=tf.float32)
 
     @property
     def name(self) -> str:
