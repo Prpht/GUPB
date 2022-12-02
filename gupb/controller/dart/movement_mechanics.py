@@ -7,7 +7,7 @@ from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
-from gupb.model.weapons import Amulet, Axe, Bow, Knife, Sword, Weapon
+from gupb.model.weapons import Weapon
 import numpy as np
 
 ArenaMatrix = List[List[bool]]
@@ -86,22 +86,6 @@ class MapKnowledge():
 
     def find_closest_coords(self, current_position: Coords, destinations: List[Coords]) -> Coords:
         return min(destinations, key=lambda dest: len(self.find_path(current_position, dest)))
-
-    def is_any_opponent_in_range(self, knowledge: ChampionKnowledge) -> bool:
-        return any(self.can_attack(knowledge, pos) for pos in self.opponents.values())
-
-    def can_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> bool:
-        weapon = get_weapon(get_champion_weapon(knowledge))
-        facing = get_facing(knowledge)
-        weapon_cut_positions = weapon.cut_positions(self.arena.terrain, knowledge.position, facing)
-        return is_opponent_at_coords(opponent_position, knowledge.visible_tiles) and \
-            opponent_position in weapon_cut_positions
-
-    def get_facing_for_attack(self, knowledge: ChampionKnowledge, opponent_position: Coords) -> Optional[Facing]:
-        for facing in Facing:
-            if self.can_attack(knowledge, opponent_position):
-                return facing
-        return None
 
     def is_land(self, coords: Coords) -> bool:
         return self.arena_matrix[coords.y][coords.x]
@@ -222,22 +206,9 @@ def is_weapon(loot: Optional[Weapon]):
     return loot is not None
 
 
-def get_champion_weapon(knowledge: ChampionKnowledge) -> str:
-    return knowledge.visible_tiles[knowledge.position].character.weapon.name
-
-
-def get_weapon(weapon_name: str) -> Weapon:
-    if weapon_name == "knife":
-        return Knife()
-    if weapon_name == "sword":
-        return Sword()
-    if weapon_name.startswith("bow"):
-        return Bow()
-    if weapon_name == "axe":
-        return Axe()
-    if weapon_name == "amulet":
-        return Amulet()
-
-
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
     return math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
+
+
+def manhattan_distance(c1: Coords, c2: Coords) -> float:
+    return abs(c1.x - c2.x) + abs(c1.y - c2.y)

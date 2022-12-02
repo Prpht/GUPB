@@ -3,7 +3,7 @@ from .axe import Axe
 from .bow_loaded import BowLoaded
 from .bow_unloaded import BowUnloaded
 from .sword import Sword
-from .amulet import Amulet
+# from .amulet import Amulet
 
 
 ALL_WEAPONS = {
@@ -12,5 +12,5 @@ ALL_WEAPONS = {
     BowLoaded.name: BowLoaded,
     BowUnloaded.name: BowUnloaded,
     Sword.name: Sword,
-    Amulet.name: Amulet
+    # Amulet.name: Amulet
 }
