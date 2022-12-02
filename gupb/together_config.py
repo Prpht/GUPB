@@ -35,4 +35,3 @@ CONFIGURATION = {
     'show_sight': None,
     'runs_no': 1000,
 }
-
