@@ -11,14 +11,15 @@ _DIR = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 
 # Land descriptions
 class PathConstants(Enum):
+    MIST = -1
     WALL = 0
     WALKABLE = 1
 
 
 class KillerInterest(Enum):
     POINT_ON_MAP = 2
-    ITEM = 3
-    KILLING = 4
+    KILLING = 3
+    ITEM = 4
     MENHIR = 5
 
 
@@ -63,8 +64,8 @@ def path_to_actions(initial_direction: tuple, path: List[Tuple]) -> List[Action]
             else:
                 actions.append(Action.TURN_LEFT)
         if 2.5 <= angle:
-            print(d)
-            print(curr_d)
+            # print(d)
+            # print(curr_d)
             actions.append(Action.TURN_RIGHT)
             actions.append(Action.TURN_RIGHT)
         actions.append(Action.STEP_FORWARD)

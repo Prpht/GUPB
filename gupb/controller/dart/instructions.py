@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from gupb.controller.dart.movement_mechanics import MapKnowledge, determine_rotation_action, follow_path, get_facing, is_opponent_at_coords
+from gupb.controller.dart.weapons import get_champion_weapon, get_weapon
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
 
@@ -48,13 +49,15 @@ class CollectClosestWeaponInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
         if self._path and knowledge.position in self._path:
             return None
-        self._path = map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword')
+        self._path = map_knowledge.get_closest_weapon_path(knowledge.position, 'axe', 'sword', 'amulet', 'bow')
         return self._action_follow_path(knowledge)
 
 
 class GoToMenhirInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
-        if map_knowledge.is_any_opponent_in_range(knowledge):
+        weapon = get_weapon(get_champion_weapon(knowledge), map_knowledge.arena.terrain)
+        opponents = list(map_knowledge.opponents.values())
+        if weapon.is_any_opponent_in_range(knowledge, opponents):
             return Action.ATTACK
         self._path = map_knowledge.find_path(knowledge.position, map_knowledge.find_menhir())
         return self._action_follow_path(knowledge)
@@ -91,13 +94,16 @@ class AttackOpponentInstruction(Instruction):
         self._opponent_coords = opponent_coords
 
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
-        if map_knowledge.can_attack(knowledge, self._opponent_coords):
+        weapon = get_weapon(get_champion_weapon(knowledge), map_knowledge.arena.terrain)
+
+        if weapon.can_attack(knowledge, self._opponent_coords):
             return Action.ATTACK
 
-        desired_facing = map_knowledge.get_facing_for_attack(knowledge, self._opponent_coords)
+        desired_facing = weapon.get_facing_for_attack(knowledge, self._opponent_coords)
         if desired_facing:
             current_facing = get_facing(knowledge)
             return determine_rotation_action(current_facing, desired_facing)
 
-        self._path = map_knowledge.find_path(knowledge.position, self._opponent_coords)
+        attack_position = weapon.get_best_attack_position(knowledge, map_knowledge, self._opponent_coords)
+        self._path = map_knowledge.find_path(knowledge.position, attack_position)
         return self._action_follow_path(knowledge)

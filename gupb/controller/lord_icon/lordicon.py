@@ -57,7 +57,7 @@ class LordIcon(controller.Controller):
 
             return random.choice(POSSIBLE_ACTIONS)
         except Exception as e:  # noqa
-            print(e)
+            # print(e)
             return random.choice(POSSIBLE_ACTIONS)
 
     def praise(self, score: int) -> None:
