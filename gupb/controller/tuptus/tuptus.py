@@ -177,12 +177,14 @@ class TuptusController(controller.Controller):
         self.strategy = STRATEGIES[self.bandit_choice](game_map = self.map, weapon_tier = self.weapon_tier, position = self.position, facing = self.facing)
         self.strategy.arena_description = Arena.load(arena_description.name)
         self.map.menhir_position = None
+        self.map.potions_position = []
      
 
 
 
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
+        self.map.potions_position = []
         self.map.decode_knowledge(knowledge)
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
         self.find_current_weapon_tier(knowledge)
@@ -225,6 +227,7 @@ class TuptusController(controller.Controller):
                     self.mist_tiles = np.vstack((self.mist_tiles, np.array(np.array(coords))))  
                 self.map.tuptable_map[coords] = 1
         return self.mist_tiles
+
     
     def are_opposite(self, opponent_facing, character_facing):
         opposites = [(characters.Facing.UP, characters.Facing.DOWN),

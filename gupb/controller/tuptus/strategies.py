@@ -122,6 +122,11 @@ class PassiveStrategy(BaseStrategy):
 
 
     def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
         if self.is_hidden and not is_mist:
             self.standing_counter += 1
             if self.standing_counter > 5:
@@ -161,6 +166,12 @@ class PassiveStrategy(BaseStrategy):
 
 class AggresiveStrategy(BaseStrategy):
     def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
+
         if not is_mist:
             planned_actions = self.find_weapon()
             if planned_actions:
@@ -272,6 +283,12 @@ class AggresiveStrategy(BaseStrategy):
 
 class MediumStrategy5(BaseStrategy):
     def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
+
         if knowledge.visible_tiles[knowledge.position].character.health >=5:
             if not is_mist:
                 planned_actions = self.find_weapon()
