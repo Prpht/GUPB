@@ -49,6 +49,6 @@ class LootHide(HighLevelStrategy):
                                                                      map_knowledge=self.bot.map_knowledge)
             i += 1
             if i == 20:
-                return Action.DO_NOTHING
+                return Action.TURN_LEFT
             if action is not None:
                 return action
