@@ -66,6 +66,8 @@ class DzikieBorsuki:
         self.weapon = 'knife'
         self.better_weapon = 'knife'
         self.better_weapon_coords = None
+
+        self.nearest_potion_coords = None
         
         self.gps = utils.PathFinder(arena_description)
         self.arena = arenas.Arena.load(arena_description.name)
@@ -91,13 +93,20 @@ class DzikieBorsuki:
         if len(self.path) != 0:
             if position == self.path[0]:
                 self.path.pop(0)
-                
+
+        #ten kawałek tylko jeśli przejdzie commit z potkami w TileDescription
+        """
+        if self.nearest_potion_coords is not None and self.nearest_potion_coords in visible_tiles.keys():
+            if visible_tiles[self.nearest_potion_coords].consumable is None:
+                self.nearest_potion_coords == None
+                current_dist_to_potion = 35000
+        else:
+            current_dist_to_potion = len(self.gps.find_path(position, coordinates.Coords(self.nearest_potion_coords[0], \
+                                                                                     self.nearest_potion_coords[1])))
+        """
+
         # Badanie pola widzenia
         for visible_position in visible_tiles.keys():
-            # Jesli nie mamy menhira, ale go widzimy
-            if self.menhir_coords is None and visible_tiles[visible_position].type == 'menhir':
-                self.menhir_coords = visible_position
-
             # Jesli widzimy jakas bron
             if visible_tiles[visible_position].loot is not None:
                 other_weapon = visible_tiles[visible_position].loot.name
@@ -108,6 +117,11 @@ class DzikieBorsuki:
                         # To ja sobie zapisujemy
                         self.better_weapon_coords = visible_position
                         self.better_weapon = other_weapon
+
+            # Jesli nie mamy menhira, ale go widzimy
+            if self.menhir_coords is None and visible_tiles[visible_position].type == 'menhir':
+                self.menhir_coords = visible_position
+
                     
             # Zbieranie info o tym ktore pola atakuje przeciwnik
             if visible_tiles[visible_position].character is not None and visible_position != position:
@@ -115,6 +129,16 @@ class DzikieBorsuki:
                 enemy_weapon = enemy.weapon.name
                 danger_zone = utils.get_weaponable_tiles(self.arena, visible_position, enemy.facing, enemy_weapon)
                 self.dangerous_tiles += danger_zone
+
+            # Szukanie pobliskich eliksirów - tylko jeśli commit poszedł
+            """
+            if visible_tiles[visible_position].consumable is not None \
+                    and visible_position not in self.dangerous_tiles and\
+                    visible_tiles[visible_position].effects = []:
+                dist_to_new_potion = len(self.gps.find_path(position, visible_position))
+                if dist_to_new_potion < 5 and dist_to_new_potion < :
+                    self.nearest_potion_coords = visible_position
+            """
 
         # Odrzucamy "zobaczone" pola z listy do odkrycia
         self.possible_menhir_coords = [coord for coord in self.possible_menhir_coords if coord not in visible_tiles.keys()]
@@ -155,47 +179,55 @@ class DzikieBorsuki:
                     path_to_weapon = self.gps.find_path(position, coordinates.Coords(self.better_weapon_coords[0], \
                                                                                      self.better_weapon_coords[1]))
                     self.path = path_to_weapon
-                
-                elif self.menhir_coords is not None:
-                    path_to_menhir = self.gps.find_path(position, coordinates.Coords(self.menhir_coords[0], \
-                                                                                     self.menhir_coords[1]))
-                    self.path = path_to_menhir
 
-                else:
-                    random_destination = random.choice(self.possible_menhir_coords)
-                    path_to_destination = self.gps.find_path(position, random_destination)
-                    self.path = path_to_destination
+                #tylko jeśli commit poszedł
+                """
+                elif self.nearest_potion_coords is not None:
+                    path_to_potion = self.gps.find_path(position, coordinates.Coords(self.nearest_potion_coords[0], \
+                                                                                     self.nearest_potion_coords[1]))
+                    self.path = path_to_potion
+                """
 
-            next_action = utils.next_step(position, coordinates.Coords(*self.path[0]), facing)
-            if next_action == characters.Action.STEP_FORWARD:
-                if (position + facing.value) in self.dangerous_tiles \
-                        or visible_tiles[(position + facing.value)].character is not None:
-                    safe_spot = utils.find_safe_spot(position, self.dangerous_tiles, self.arena)
-                    if safe_spot is not None:
-                        self.path = self.gps.find_path(position, safe_spot)
-                        next_action = utils.next_step(position, coordinates.Coords(*self.path[0]), facing)
-            return next_action
+            elif self.menhir_coords is not None and self.weapon != "knife":
+                path_to_menhir = self.gps.find_path(position, coordinates.Coords(self.menhir_coords[0], \
+                                                                                 self.menhir_coords[1]))
+                self.path = path_to_menhir
+
+            else:
+                random_destination = random.choice(self.possible_menhir_coords)
+                path_to_destination = self.gps.find_path(position, random_destination)
+                self.path = path_to_destination
+
+        next_action = utils.next_step(position, coordinates.Coords(*self.path[0]), facing)
+        if next_action == characters.Action.STEP_FORWARD:
+            if (position + facing.value) in self.dangerous_tiles \
+                    or visible_tiles[(position + facing.value)].character is not None:
+                safe_spot = utils.find_safe_spot(position, self.dangerous_tiles, self.arena)
+                if safe_spot is not None:
+                    self.path = self.gps.find_path(position, safe_spot)
+                    next_action = utils.next_step(position, coordinates.Coords(*self.path[0]), facing)
+        return next_action
 
 
-            # jeśli napiszemy iście do celu i jakieś startegie odkrywania mapy, to ten kawałek kodu nie będzie potrzebny
-            type_of_tile = tile_in_front.type
-            if type_of_tile in ["sea", "wall"]:
-                return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
-            elif type_of_tile == "menhir":
-                return characters.Action.STEP_FORWARD
+        # jeśli napiszemy iście do celu i jakieś startegie odkrywania mapy, to ten kawałek kodu nie będzie potrzebny
+        type_of_tile = tile_in_front.type
+        if type_of_tile in ["sea", "wall"]:
+            return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
+        elif type_of_tile == "menhir":
+            return characters.Action.STEP_FORWARD
         return random.choices(population=list(ACTIONS_WITH_WEIGHTS.keys()),
-                                weights=list(ACTIONS_WITH_WEIGHTS.values()),
-                                k=1)[0]
+                            weights=list(ACTIONS_WITH_WEIGHTS.values()),
+                            k=1)[0]
 
-    @property
-    def name(self) -> str:
-        return f'DzikiController{self.first_name}'
+@property
+def name(self) -> str:
+    return f'DzikiController{self.first_name}'
 
-    @property
-    def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.VIOLET
+@property
+def preferred_tabard(self) -> characters.Tabard:
+    return characters.Tabard.VIOLET
 
 
 POTENTIAL_CONTROLLERS = [
-    DzikieBorsuki("Borsuk"),
+DzikieBorsuki("Borsuk"),
 ]
