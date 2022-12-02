@@ -2,11 +2,11 @@ import random
 import numpy as np
 
 from gupb import controller
+from gupb.controller.spejson.dynamic_map_processing import analyze_visible_region, get_state_summary, get_map_derivables
 from gupb.controller.spejson.static_map_processing import analyze_map
-from gupb.controller.spejson.dynamic_map_processing import analyze_weapons_on_map, find_closest_weapon
-from gupb.controller.spejson.pathfinding import (
-    find_path, pathfinding_next_move, pathfinding_next_move_in_cluster, calculate_dists, proposed_moves_to_keypoints)
-from gupb.controller.spejson.utils import POSSIBLE_ACTIONS, weapons, facing_to_letter, weapons_name_to_letter
+from gupb.controller.spejson.pathfinding import calculate_dists, proposed_moves_to_keypoints
+from gupb.controller.spejson.utils import (
+    POSSIBLE_ACTIONS, facing_to_letter, weapons_name_to_letter, get_random_place_on_a_map, move_possible_action_onehot)
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action
@@ -40,44 +40,6 @@ class Spejson(controller.Controller):
         self.map_width = 0
         self.analytics = {}
 
-        self.scalars = {
-            'my_hp': [0],  # Health points rescaled to 0-1
-            'my_weapon': [0, 0, 0, 0, 0],  # One-hot encoding of current weapon (Knife, Axe, Bow, Sword, Amulet)
-            'someone_in_range': [0],  # 1 if yes, 0 otherwise
-            'me_in_dmg_range': [0],  # 1 if yes, 0 otherwise
-            'epoch_num': [0],  # Rescaled by 0.02 factor
-            'move_to_axe': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Axe
-            'move_to_bow': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Bow
-            'move_to_sword': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Sword
-            'move_to_amulet': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward) - to Amulet
-            'move_to_menhir': [0, 0, 0],  # One-hot encoding of move type (Left, Right, Forward)
-            'keypoint_dist': [0, 0, 0, 0, 0],  # Graph-hop dists to each weapon type and menhir
-            'menhir_found': [0],  # 1 if yes, 0 otherwise
-            'mist_spotted': [0],  # 1 if yes, 0 otherwise
-            'mist_close': [0],  # 1 if yes, 0 otherwise
-            'bow_unloaded': [0],  # 1 if yes, 0 otherwise
-        }
-
-        self.matrices = {
-            'walkability': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'visibility': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'is_wall': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'someone_here': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'character_hp': np.zeros([13, 13, 1], dtype=float),  # Health points rescaled to 0-1
-            'character_weapon': np.zeros([13, 13, 5], dtype=float),  # One-hot encoding of current weapon (Knife, Axe, Bow, Sword, Amulet)
-            'menhir_loc': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'weapon_loc': np.zeros([13, 13, 5], dtype=float),  # 1 if yes, 0 otherwise (Knife, Axe, Bow, Sword, Amulet)
-            'mist_effect': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'damage_effect': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'my_dmg_range': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'others_dmg_range': np.zeros([13, 13, 1], dtype=float),  # 1 if yes, 0 otherwise
-            'min_distance': np.zeros([13, 13, 1], dtype=float),  # log(1 + value) of graph-hop distance
-            'attackability_fct': np.zeros([13, 13, 5], dtype=float),  # value
-            'betweenness_centr': np.zeros([13, 13, 1], dtype=float),  # value
-            'non_cluster_coeff': np.zeros([13, 13, 1], dtype=float),  # value
-            'borderedness': np.zeros([13, 13, 1], dtype=float),  # value
-        }
-
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Spejson):
             return self.first_name == other.first_name
@@ -87,6 +49,7 @@ class Spejson(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        decision = None
         self.move_number += 1
         self.panic_mode -= 1
         position = knowledge.position
@@ -108,6 +71,28 @@ class Spejson(controller.Controller):
             traversable=self.analytics['traversable'],
         )
 
+        visibility, menhir_seen, menhir_loc, mist_seen = analyze_visible_region(
+            visible_tiles=visible_tiles,
+            position=position,
+            terrain=self.terrain,
+            facing=self.facing,
+            weapon=self.weapon,
+        )
+
+        if not self.menhir_found and menhir_seen:
+            self.menhir_found = True
+            self.target = menhir_loc
+            self.menhir_location = menhir_loc
+
+        if not self.mist_spotted and mist_seen:
+            self.mist_spotted = True
+            self.target = self.menhir_location
+
+        if not self.touched_by_mist:
+            self.touched_by_mist = (np.sum(visibility['mist_effect'][4:9, 4:9]) > 0)
+
+        someone_in_range = visibility['someone_in_range'][0]
+
         # Preventing getting stuck
         self.latest_states = (self.latest_states + [(self.position, self.facing)])[-5:]
         if len(self.latest_states) >= 5 and (
@@ -115,11 +100,7 @@ class Spejson(controller.Controller):
                 == self.latest_states[3] == self.latest_states[4]
         ):
             self.panic_mode = 6
-            for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
-                if self.clusters[(ry, rx)]:
-                    self.target = Coords(x=rx, y=ry)
-                    break
+            self.target = get_random_place_on_a_map(self.analytics['traversable'])
 
         # Update weapons knowledge
         to_del = []
@@ -144,20 +125,6 @@ class Spejson(controller.Controller):
                     and tile.loot.name != 'knife':
                 self.weapons_knowledge[(tile_coord[1], tile_coord[0])] = weapons_name_to_letter[tile.loot.name]
 
-        # Deduce current path-finding target
-        if not self.menhir_found:
-            for tile_coord in visible_tiles:
-                if visible_tiles[tile_coord].type == 'menhir':
-                    self.target = Coords(tile_coord[0], tile_coord[1])
-                    self.menhir_found = True
-                    self.menhir_location = self.target
-
-        if not self.mist_spotted:
-            for tile_coord in visible_tiles:
-                if "mist" in list(map(lambda x: x.type, visible_tiles[tile_coord].effects)):
-                    self.target = self.menhir_location
-                    self.mist_spotted = True
-
         move_recommendations = proposed_moves_to_keypoints(
             distances=distances,
             visited_from=visited_from,
@@ -165,101 +132,113 @@ class Spejson(controller.Controller):
             weapons_knowledge=self.weapons_knowledge,
         )
 
-        if self.panic_mode <= 0 and self.weapon.name == 'knife':
-            action_type = "FIND_CLOSEST_WEAPON"
-            self.jitter = 0
-        elif self.panic_mode <= 0:
-            self.target = self.menhir_location
-            self.jitter = 0 if self.touched_by_mist else 10
+        derivables = get_map_derivables(
+            position=position,
+            analytics=self.analytics,
+            move_recommendations=move_recommendations,
+            distances=distances,
+        )
+
+        if self.panic_mode <= 0:
+            if self.weapon.name == 'knife':
+                action_type = "FIND_CLOSEST_WEAPON"
+                self.jitter = 0
+            else:
+                self.target = self.menhir_location
+                self.jitter = 0 if self.touched_by_mist else 10
 
         bad_neighborhood_factor = 0
         if not self.mist_spotted:
-            for i in range(-3, 4):
-                for j in range(-3, 4):
-                    pos = Coords(x=position.x + i, y=position.y + j)
-                    if pos in visible_tiles:
-                        if visible_tiles[pos].character is not None:
-                            bad_neighborhood_factor += 1
-        else:
-            for i in range(-2, 3):
-                for j in range(-2, 3):
-                    pos = Coords(x=position.x + i, y=position.y + j)
-                    if pos in visible_tiles:
-                        if "mist" in list(map(lambda x: x.type, visible_tiles[pos].effects)):
-                            self.touched_by_mist = True
+            bad_neighborhood_factor = int(np.sum(visibility['someone_here'][3:10, 3:10]) - 1)
 
         if bad_neighborhood_factor > 2 and self.panic_mode < 2:
             self.panic_mode = 6
-            for _ in range(50):  # Just to avoid while True lol
-                rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
-                if self.clusters[(ry, rx)]:
-                    self.target = Coords(x=rx, y=ry)
-                    break
+            self.target = get_random_place_on_a_map(self.analytics['traversable'])
 
         # Positions in reach
-        in_reach = weapons[self.weapon.name].cut_positions(self.terrain, position, self.facing)
-        if self.weapon.name != "bow_unloaded":
-            for pos in in_reach:
-                if pos in visible_tiles and visible_tiles[pos].character is not None:
-                    self.latest_states += ["att"]
-                    return Action.ATTACK
-
         if self.weapon.name == "bow_unloaded":
             self.latest_states += ["att"]
-            return Action.ATTACK
+            decision = Action.ATTACK
+        else:
+            if someone_in_range:
+                self.latest_states += ["att"]
+                decision = Action.ATTACK
+
         available_actions = [x for x in available_actions if x not in [Action.ATTACK]]
 
-        # Rule out stupid moves
-        next_block = position + self.facing.value
-        if next_block in visible_tiles:
-            if visible_tiles[next_block].type in ['sea', 'wall'] or visible_tiles[next_block].character is not None:
-                available_actions = [x for x in available_actions if x not in [Action.STEP_FORWARD]]
+        state = get_state_summary(
+            position=position,
+            menhir_location=self.menhir_location,
+            facing=self.facing,
+            hp=self.health,
+            weapon=self.weapon,
+            epoch=self.move_number,
+            menhir_found=self.menhir_found,
+            mist_spotted=self.mist_spotted,
+            mist_close=self.touched_by_mist,
+        )
 
-        distance_from_target = self.target - position
-        distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
+        all_feature_maps = {
+            **visibility,
+            **state,
+            **derivables,
+        }
 
-        # Decide on move action
-        if distance_from_target < self.jitter and self.target == self.menhir_location and action_type == "FIND_TARGET":
-            if Action.STEP_FORWARD in available_actions:
-                if np.random.rand() < 0.7:
-                    return Action.STEP_FORWARD
+        if not decision:
+            # Rule out stupid moves
+            next_block = position + self.facing.value
+            if next_block in visible_tiles:
+                if visible_tiles[next_block].type in ['sea', 'wall'] or visible_tiles[next_block].character is not None:
+                    available_actions = [x for x in available_actions if x not in [Action.STEP_FORWARD]]
 
-            left_ahead = self.target - (position + self.facing.turn_left().value)
-            left_ahead = left_ahead.x ** 2 + left_ahead.y ** 2
-            right_ahead = self.target - (position + self.facing.turn_right().value)
-            right_ahead = right_ahead.x ** 2 + right_ahead.y ** 2
+            distance_from_target = self.target - position
+            distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
 
-            if left_ahead < right_ahead:
-                return Action.TURN_LEFT if np.random.rand() < 0.7 else Action.TURN_RIGHT
+            # Decide on move action
+            if distance_from_target < self.jitter and self.target == self.menhir_location and action_type == "FIND_TARGET":
+                if Action.STEP_FORWARD in available_actions:
+                    if np.random.rand() < 0.7:
+                        decision = Action.STEP_FORWARD
+
+                    else:
+                        left_ahead = self.target - self.position - self.facing.turn_left().value
+                        left_ahead = left_ahead.x ** 2 + left_ahead.y ** 2
+                        right_ahead = self.target - self.position - self.facing.turn_right().value
+                        right_ahead = right_ahead.x ** 2 + right_ahead.y ** 2
+
+                        if left_ahead < right_ahead:
+                            decision = Action.TURN_LEFT if np.random.rand() < 0.7 else Action.TURN_RIGHT
+                        else:
+                            decision = Action.TURN_RIGHT if np.random.rand() < 0.7 else Action.TURN_LEFT
+
             else:
-                return Action.TURN_RIGHT if np.random.rand() < 0.7 else Action.TURN_LEFT
+                if action_type == "FIND_CLOSEST_WEAPON":
+                    move = sorted(
+                        [val for key, val in move_recommendations.items() if key != "menhir" and val[0] is not None],
+                        key=lambda x: x[1]
+                    )[0][0]
+                else:
+                    move = move_recommendations['menhir'][0]
 
-        else:
-            if action_type == "FIND_CLOSEST_WEAPON":
-                move = sorted(
-                    [val for key, val in move_recommendations.items() if key != "menhir" and val[0] is not None],
-                    key=lambda x: x[1]
-                )[0][0]
-            else:
-                move = move_recommendations['menhir'][0]
+                if move is None:
+                    self.panic_mode = 8
+                    self.target = get_random_place_on_a_map(self.analytics['traversable'])
+                else:
+                    available_actions = (
+                        ([move] if move in available_actions else [])
+                        + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
+                    )
 
-            if move is None:
-                self.panic_mode = 8
-                for _ in range(50):  # Just to avoid while True lol
-                    rx, ry = np.random.randint(min(self.map_height, self.map_width), size=[2])
-                    if self.clusters[(ry, rx)]:
-                        self.target = Coords(x=rx, y=ry)
-                        break
-            else:
-                available_actions = (
-                    ([move] if move in available_actions else [])
-                    + ([Action.ATTACK] if Action.ATTACK in available_actions else [])
-                )
+            if not decision and len(available_actions) == 0:
+                decision = random.choice([Action.ATTACK, Action.TURN_LEFT])
 
-        if len(available_actions) == 0:
-            return random.choice([Action.ATTACK, Action.TURN_LEFT])
+        if not decision:
+            decision = random.choice(available_actions)
 
-        return random.choice(available_actions)
+        epoch_id = f"{self.first_name}/epoch_{self.move_number}"
+        all_feature_maps['decision'] = move_possible_action_onehot[decision]
+
+        return decision
 
     def praise(self, score: int) -> None:
         pass
