@@ -166,7 +166,9 @@ class KillerController(controller.Controller):
         if facing_element.character is not None:
             return Action.ATTACK
 
-        return Action.TURN_RIGHT
+        #if not self.saw_mist:
+        #    self.learn_map(knowledge)
+        #    return Action.TURN_RIGHT
 
         if self.game_map is None:
             self.game_map = np.zeros(shape=(50, 50))
@@ -181,7 +183,7 @@ class KillerController(controller.Controller):
                 if not self.saw_mist:
                     self.find_path(knowledge,
                                    interest=KillerInterest.ITEM,
-                                   otherwise=KillerInterest.POINT_ON_MAP)
+                                   otherwise=KillerInterest.KILLING) # UWAGA: Wcześnie było tutaj 'point on map'
                 else:
                     self.find_path(knowledge,
                                    interest=KillerInterest.MENHIR,
