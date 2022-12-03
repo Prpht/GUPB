@@ -424,6 +424,7 @@ class SnieznyKockodanController(controller.Controller):
         return self._move(knowledge, destination)
 
     def find_eligible_tiles_in_neighbourhood(self, knowledge: characters.ChampionKnowledge):
+        exploration_probability = 0.4
         current_position = knowledge.position
         spots = []
         for x in range(self.map.size[0]):
@@ -431,13 +432,18 @@ class SnieznyKockodanController(controller.Controller):
                 if self.arena[y][x] == 1:
                     spots.append((x, y))
         eligible_spots = []
+        eligible_spots_not_in_neighbourhood = []
         for spot in spots:
             destination = coordinates.Coords(spot[0], spot[1])
             distance = self.euclidean_distance(current_position, destination)
             path = self.find_path(current_position, destination)
-            if distance <= EUCLIDEAN_MAX_RADIUS and destination != current_position and path:
-                eligible_spots.append(spot)
-        return eligible_spots
+            if destination != current_position and path:
+                if distance <= EUCLIDEAN_MAX_RADIUS:
+                    eligible_spots.append(spot)
+                else:
+                    eligible_spots_not_in_neighbourhood.append(spot)
+
+        return eligible_spots if random.random() > exploration_probability else eligible_spots_not_in_neighbourhood
 
     @staticmethod
     def euclidean_distance(position1: coordinates.Coords, position2: coordinates.Coords) -> float:
