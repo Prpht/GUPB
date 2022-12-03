@@ -155,7 +155,7 @@ class SnieznyKockodanController(controller.Controller):
             elif attack_eligible and not start_conditions:
                 return self.attack()
             elif self.need_to_escape(enemies_seen, tiles_in_radius_esc)[0] and not start_conditions:
-                self.escape(enemies_seen, knowledge)
+                return self.escape(enemies_seen, knowledge)
             elif self.random_walk_destination is not None:
                 return self._move(knowledge, self.random_walk_destination)
             elif not self.menhir_eligible():
