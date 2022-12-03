@@ -4,7 +4,7 @@ from gupb.controller.dart.movement_mechanics import MapKnowledge, euclidean_dist
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
 
-
+# Very important comment
 class Strategy(Protocol):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Action:
         ...
