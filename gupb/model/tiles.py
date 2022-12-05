@@ -19,8 +19,8 @@ class TileDescription(NamedTuple):
     type: str
     loot: Optional[weapons.WeaponDescription]
     character: Optional[characters.ChampionDescription]
+    consumable: Optional[consumables.ConsumableDescription]
     effects: List[effects.EffectDescription]
-    #consumable: Optional[consumables.ConsumableDescription]
 
 
 class Tile(ABC):
@@ -35,8 +35,8 @@ class Tile(ABC):
             self.__class__.__name__.lower(),
             self.loot.description() if self.loot else None,
             self.character.description() if self.character else None,
-            [effect.description() for effect in self.effects]
-            #self.consumable.description() if self.consumable else None
+            self.consumable.description() if self.consumable else None,
+            [effect.description() for effect in self.effects],
         )
 
     @property
