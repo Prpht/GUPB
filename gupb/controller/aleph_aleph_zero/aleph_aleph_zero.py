@@ -16,7 +16,7 @@ from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.arenas import FIXED_MENHIRS
 
-from gupb.model.characters import Facing
+from gupb.model.characters import Facing, PENALISED_IDLE_TIME
 from gupb.model.coordinates import sub_coords
 from gupb.model.tiles import TileDescription
 
@@ -35,8 +35,8 @@ class Knowledge:
 # noinspection PyMethodMayBeStatic
 class AlephAlephZeroBot(controller.Controller):
     HLSs = (
-        HideRun,
-        LootHide
+        # HideRun,
+        LootHide,
     )
 
     def __init__(self, first_name: str):
@@ -132,6 +132,10 @@ class AlephAlephZeroBot(controller.Controller):
         for coords, tile_desc in to_be_updated.items():
             self.knowledge.visible_tiles[coords] = tile_desc
 
+        if self.knowledge.position == new_knowledge.position and self.knowledge.facing == self._calculate_facing(new_knowledge):
+            self.time_since_moved +=1
+        else:
+            self.time_since_moved = 0
         self.knowledge.position = new_knowledge.position
         for coords, tile_desc in new_knowledge.visible_tiles.items():
             self.knowledge.visible_tiles[coords] = tile_desc
@@ -164,10 +168,16 @@ class AlephAlephZeroBot(controller.Controller):
                 pass  # shouldn't go wrong, but just in case, do nothing
 
 
+        strategic_choice = self.high_level_strategy.decide()  # let the strategy run through it's logic, so that it may update it's internal state
+
+
         if if_character_to_kill(self.knowledge):
             return characters.Action.ATTACK
+        elif PENALISED_IDLE_TIME-1 == self.time_since_moved:
+            return characters.Action.TURN_LEFT
+        else:
+            return strategic_choice
 
-        return self.high_level_strategy.decide()
 
 
     def praise(self, score: int) -> None:
@@ -228,6 +238,8 @@ class AlephAlephZeroBot(controller.Controller):
 
         self.life_points = 8
         self.killed_now = False
+
+        self.time_since_moved = 0
 
     @property
     def name(self) -> str:

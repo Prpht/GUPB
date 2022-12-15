@@ -122,6 +122,11 @@ class PassiveStrategy(BaseStrategy):
 
 
     def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
         if self.is_hidden and not is_mist:
             self.standing_counter += 1
             if self.standing_counter > 5:
@@ -161,6 +166,12 @@ class PassiveStrategy(BaseStrategy):
 
 class AggresiveStrategy(BaseStrategy):
     def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
+
         if not is_mist:
             planned_actions = self.find_weapon()
             if planned_actions:
@@ -171,7 +182,6 @@ class AggresiveStrategy(BaseStrategy):
                     return planned_actions.pop(0)
                 else:
                     planned_actions = self.explore()
-                    #print(f"Explore + {planned_actions}")
                     if planned_actions:
                         return planned_actions.pop(0)
         else:
@@ -270,3 +280,201 @@ class AggresiveStrategy(BaseStrategy):
             x for x in good_attacking_spots if x not in opponent_range
         ]
         return good_attacking_spots
+
+class MediumStrategy5(BaseStrategy):
+    def decide(self, is_mist, knowledge, next_block):
+        if self.map.potions_position:
+            raw_path = self.pathfinder.astar(self.position, self.map.potions_position[0])
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+                return planned_path[0]
+
+        if knowledge.visible_tiles[knowledge.position].character.health >=5:
+            if not is_mist:
+                planned_actions = self.find_weapon()
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    planned_actions = self.fight(knowledge)
+                    if planned_actions:
+                        return planned_actions.pop(0)
+                    else:
+                        planned_actions = self.explore()
+                        #print(f"Explore + {planned_actions}")
+                        if planned_actions:
+                            return planned_actions.pop(0)
+            else:
+                planned_actions = self.go_to_menhir()
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    return characters.Action.TURN_LEFT
+            return characters.Action.TURN_LEFT
+        else:
+            if self.is_hidden and not is_mist:
+                self.standing_counter += 1
+                if self.standing_counter > 5:
+                    self.standing_counter = 0
+                    return POSSIBLE_ACTIONS[1]
+
+                if next_block.type != "land":
+                    return POSSIBLE_ACTIONS[0]
+                return POSSIBLE_ACTIONS[3]
+            elif is_mist:
+                return self.go_to_menhir().pop(0)
+            else:
+                return self.hide().pop(0)
+
+    def fight(self, knowledge):
+        """
+        Find the target and eliminate it (or run if will die)
+        """
+        if self.find_opponent(knowledge):
+            shortest_path = -1
+            good_spots = self.find_good_attacking_spot(knowledge)
+            if len(good_spots) == 0:
+                return None
+            for idx, good_spot in enumerate(good_spots):
+                if self.pathfinder.astar(knowledge.position, good_spot) != 0:
+                    path = self.pathfinder.plan_path(
+                        self.pathfinder.astar(
+                            knowledge.position, good_spot), self.facing
+                    )
+                    if len(path) < shortest_path or shortest_path == -1:
+                        shortest_path = len(path)
+                        chosen_path = path
+                if shortest_path == -1:
+                    return [characters.Action.TURN_LEFT]
+            return chosen_path+[characters.Action.ATTACK]
+        return None
+
+    def find_opponent(self, knowledge):
+        """
+        Find the closest opponent
+        """
+        shortest_path = -1
+        opponent = None
+        tup_health = knowledge.visible_tiles[knowledge.position].character.health
+        for coords, tile in knowledge.visible_tiles.items():
+            if tile.character and coords != knowledge.position and tup_health > knowledge.visible_tiles[coords].character.health:
+                if self.pathfinder.astar(knowledge.position, coords) != 0:
+                    path = self.pathfinder.plan_path(
+                        self.pathfinder.astar(
+                            knowledge.position, coords), self.facing
+                    )
+                    if shortest_path == -1 or len(path) < shortest_path:
+                        shortest_path = len(path)
+                        opponent = (coords, tile)
+        if opponent:
+            self.closest_opponent = opponent
+            return True
+        return False
+
+    def find_good_attacking_spot(self, knowledge):
+        tup_weapon = WEAPON_TIERS[self.weapon_tier]
+        opponent_range = WEAPON_CLASSES[
+            self.closest_opponent[1].character.weapon.name
+        ].cut_positions(
+            self.arena_description.terrain,
+            (Coords(self.closest_opponent[0][0], self.closest_opponent[0][1])),
+            self.closest_opponent[1].character.facing,
+        )
+        if tup_weapon in ["knife", "sword", "bow_unloaded", "bow_loaded"]:
+            tup_range = WEAPON_CLASSES[
+                knowledge.visible_tiles[knowledge.position].character.weapon.name
+            ].reach()
+            good_attacking_spots = []
+            for i in range(1, tup_range):
+                good_attacking_spots = good_attacking_spots + [tuple(map(sum, zip(self.closest_opponent[0], (0, i)))), tuple(map(sum, zip(
+                    self.closest_opponent[0], (0, -i)))), tuple(map(sum, zip(self.closest_opponent[0], (-i, 0)))), tuple(map(sum, zip(self.closest_opponent[0], (i, 0))))]
+        elif tup_weapon == "axe":
+            good_attacking_spots = [
+                tuple(map(sum, zip(self.closest_opponent[0], (1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (0, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (0, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 0)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 0)))),
+            ]
+        elif tup_weapon == "amulet":
+            good_attacking_spots = [
+                tuple(map(sum, zip(self.closest_opponent[0], (2, -2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-2, 2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-2, -2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (2, 2)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, 1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (-1, -1)))),
+                tuple(map(sum, zip(self.closest_opponent[0], (1, 1)))),
+            ]
+        good_attacking_spots = [
+            x for x in good_attacking_spots if x not in opponent_range
+        ]
+        return good_attacking_spots
+
+    def __init__(self, game_map: Map, weapon_tier: int, position: Optional[Coords], facing: Optional[Facing]):
+        super().__init__(game_map, weapon_tier, position, facing)
+        self.planned_safe_spot: Tuple = (),
+        self.standing_counter: int = 0
+
+    def hide(self):
+        """
+        Analyze the map for safe spots and go to the nearest one
+        """
+        min_distance = 200
+        return_path = []
+        for safe_coords in self.map.safe_spots:
+            raw_path = self.pathfinder.astar(self.position, safe_coords)
+
+            if raw_path:
+                planned_path = self.pathfinder.plan_path(raw_path, self.facing)
+
+                if len(planned_path) < min_distance:
+                    min_distance = len(planned_path)
+                    return_path = planned_path
+                    self.planned_safe_spot = safe_coords
+        return return_path
+
+    @property
+    def is_hidden(self):
+        return self.position == self.planned_safe_spot
+
+class MediumStrategy3(MediumStrategy5):
+    def decide(self, is_mist, knowledge, next_block):
+        if knowledge.visible_tiles[knowledge.position].character.health >=3:
+            if not is_mist:
+                planned_actions = self.find_weapon()
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    planned_actions = self.fight(knowledge)
+                    if planned_actions:
+                        return planned_actions.pop(0)
+                    else:
+                        planned_actions = self.explore()
+                        #print(f"Explore + {planned_actions}")
+                        if planned_actions:
+                            return planned_actions.pop(0)
+            else:
+                planned_actions = self.go_to_menhir()
+                if planned_actions:
+                    return planned_actions.pop(0)
+                else:
+                    return characters.Action.TURN_LEFT
+            return characters.Action.TURN_LEFT
+        else:
+            if self.is_hidden and not is_mist:
+                self.standing_counter += 1
+                if self.standing_counter > 5:
+                    self.standing_counter = 0
+                    return POSSIBLE_ACTIONS[1]
+
+                if next_block.type != "land":
+                    return POSSIBLE_ACTIONS[0]
+                return POSSIBLE_ACTIONS[3]
+            elif is_mist:
+                return self.go_to_menhir().pop(0)
+            else:
+                return self.hide().pop(0)

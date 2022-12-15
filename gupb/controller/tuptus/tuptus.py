@@ -14,7 +14,7 @@ from gupb.model.arenas import Arena, ArenaDescription
 
 from gupb.controller.tuptus.map import Map
 from gupb.controller.tuptus.pathfinder import Pathfinder
-from gupb.controller.tuptus.strategies import BaseStrategy, PassiveStrategy, AggresiveStrategy
+from gupb.controller.tuptus.strategies import BaseStrategy, PassiveStrategy, AggresiveStrategy, MediumStrategy5, MediumStrategy3
 from gupb.controller.tuptus.tuptajacy_bandit import Bandit
 
 from typing import Optional, List
@@ -50,7 +50,9 @@ WEAPON_TIERS = {
 
 STRATEGIES = {
     0 : AggresiveStrategy,
-    1 : PassiveStrategy
+    1 : PassiveStrategy,
+    2: MediumStrategy5,
+    3: MediumStrategy3
 }
 
 # noinspection PyUnusedLocal
@@ -69,7 +71,7 @@ class TuptusController(controller.Controller):
         self.planned_actions: Optional[List] = None
         self.mist_tiles = np.array([])
         self.mist_directions: List[Optional[characters.Facing]] = None
-        self.bandit: Bandit = Bandit(arms=2, epsilon=1.0)
+        self.bandit: Bandit = Bandit(arms=4, epsilon=1.0)
         self.bandit_choice: int = None
 
     def __eq__(self, other: object) -> bool:
@@ -175,12 +177,14 @@ class TuptusController(controller.Controller):
         self.strategy = STRATEGIES[self.bandit_choice](game_map = self.map, weapon_tier = self.weapon_tier, position = self.position, facing = self.facing)
         self.strategy.arena_description = Arena.load(arena_description.name)
         self.map.menhir_position = None
+        self.map.potions_position = []
      
 
 
 
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
+        self.map.potions_position = []
         self.map.decode_knowledge(knowledge)
         self.find_facing_direction(knowledge.position, knowledge.visible_tiles.keys())
         self.find_current_weapon_tier(knowledge)
@@ -223,6 +227,7 @@ class TuptusController(controller.Controller):
                     self.mist_tiles = np.vstack((self.mist_tiles, np.array(np.array(coords))))  
                 self.map.tuptable_map[coords] = 1
         return self.mist_tiles
+
     
     def are_opposite(self, opponent_facing, character_facing):
         opposites = [(characters.Facing.UP, characters.Facing.DOWN),
