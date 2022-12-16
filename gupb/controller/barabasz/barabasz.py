@@ -36,6 +36,7 @@ class BarabaszController(controller.Controller):
         # Check position, check which side one is facing, check tile description
         in_front = coordinates.add_coords(knowledge.position, self.facing.value)
 
+        # Meaningful commit
         if in_front in knowledge.visible_tiles.keys():
             if knowledge.visible_tiles[in_front].type == "wall" or knowledge.visible_tiles[in_front].type == "sea":
                 return characters.Action.TURN_LEFT
