@@ -21,6 +21,7 @@ class KillerInterest(Enum):
     KILLING = 3
     ITEM = 4
     MENHIR = 5
+    POTION = 6
 
 
 def find_paths(arr: np.ndarray, curr_pos: tuple) -> Tree:

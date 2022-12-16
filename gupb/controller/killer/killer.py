@@ -60,6 +60,9 @@ class KillerController(controller.Controller):
                     self.game_map[coord[1], coord[0]] = KillerInterest.MENHIR.value
                     self.menhir_pos = coord[0], coord[1]
 
+            if tile.consumable:
+                self.game_map[coord[1], coord[0]] = KillerInterest.POTION.value
+
     # def find_new_interest(self, curr_position):
     #     x_max, y_max = self.game_map.shape
     #     map = self.game_map.copy()
@@ -213,7 +216,7 @@ class KillerController(controller.Controller):
                 if not self.saw_mist:
                     self.find_path(knowledge,
                                    interest=KillerInterest.ITEM,
-                                   otherwise=KillerInterest.KILLING) # UWAGA: Wcześnie było tutaj 'point on map'
+                                   otherwise=KillerInterest.POTION) # UWAGA: Wcześnie było tutaj 'point on map'
                 else:
                     self.find_path(knowledge,
                                    interest=KillerInterest.MENHIR,
