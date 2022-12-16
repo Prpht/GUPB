@@ -274,19 +274,19 @@ class SnieznyKockodanController(controller.Controller):
         if len(self.terrain) == 0:
             return False
 
-        health = champion_info.health
-        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
-        if any(enemy_stronger_health):
-            return False
+        # health = champion_info.health
+        # enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        # if any(enemy_stronger_health):
+        #     return False
         # if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
         #     return False
 
         weapon = champion_info.weapon.name
-        enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
-                                  > WEAPON_RANKING[weapon]
-                                  for enemy in enemies]
-        if any(enemy_stronger_weapons):
-            return False
+        # enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
+        #                           > WEAPON_RANKING[weapon]
+        #                           for enemy in enemies]
+        # if any(enemy_stronger_weapons):
+        #     return False
         try:
             weapon_coordinates = WEAPON_DICT[weapon].cut_positions(self.terrain, knowledge.position, facing)
         except TypeError:
