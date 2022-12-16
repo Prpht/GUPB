@@ -5,7 +5,7 @@ from gupb.controller.dart.weapons import get_champion_weapon
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
 
-
+# Very important comment
 class Strategy(Protocol):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Action:
         ...
