@@ -6,7 +6,7 @@ from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import Arena, Terrain
 from gupb.model.characters import CHAMPION_STARTING_HP, Champion, Facing
-from gupb.model.coordinates import Coords
+from gupb.model.coordinates import Coords, sub_coords, add_coords
 from gupb.model.weapons import Knife
 
 POSSIBLE_ACTIONS = [
@@ -30,7 +30,8 @@ TerrainDescription = Dict[coordinates.Coords, tiles.TileDescription]
 LOW_TRESHOLD_HIDDEN_FACTOR = 200
 HIGH_TRESHOLD_HIDDEN_FACTOR = 1200
 
-TO_MENHIR_ITERATION = 50
+TO_MENHIR_ITERATION = 400
+CLOSEST_MIST_ESCAPE = 20
 
 class IntercontinentalBajers(controller.Controller):
     def __init__(self, first_name: str):
@@ -44,7 +45,8 @@ class IntercontinentalBajers(controller.Controller):
         self.iteration = 0
         self.arena: Arena = None
         self.hidden_factor_map = dict()
-
+        self.no_of_enemies = None
+        self.mist_coords = set()
     def __eq__(self, other: object) -> bool:
         if isinstance(other, IntercontinentalBajers):
             return self.first_name == other.first_name
@@ -58,11 +60,19 @@ class IntercontinentalBajers(controller.Controller):
         self._update_discovered_arena(knowledge.visible_tiles)
         self.position = knowledge.position
         self.champion = knowledge.visible_tiles[knowledge.position].character
+        self.no_of_enemies = knowledge.no_of_champions_alive
+
+        if len(self.mist_coords) > 5:
+            min_dist, min_coords = self.find_closest_mist()
+            if min_dist < CLOSEST_MIST_ESCAPE:
+                vector_to_move = sub_coords(self.position, min_coords)
+                target = add_coords(self.position, vector_to_move)
+                return self.go_to_target(self.position, target)
 
         if self.is_enemy_in_front_of() and self.champion.health >= 0.3 * CHAMPION_STARTING_HP:
             return characters.Action.ATTACK
 
-        if self.iteration < TO_MENHIR_ITERATION:
+        if self.iteration > TO_MENHIR_ITERATION or self.no_of_enemies > 4:
             closest_spot = self.get_closest_from()
             return self.go_to_target(closest_spot)
         elif self.menhir_coords:
@@ -91,9 +101,23 @@ class IntercontinentalBajers(controller.Controller):
             self.discovered_arena[coords] = description
             if not self.menhir_coords and self.check_menhir(coords):
                 self.menhir_coords = coords
-
+            if self.check_mist(coords):
+                self.mist_coords.add(coords)
     def check_menhir(self, coords: coordinates.Coords):
         return self.discovered_arena[coords].type == 'menhir'
+
+    def find_closest_mist(self):
+        min_dist = self.arena.size[0] * 2
+        min_coords = None
+        for coords in self.mist_coords:
+            dist = distance(self.position, coords)
+            if dist < min_dist:
+                min_dist = dist
+                min_coords = coords
+        return min_dist, min_coords
+    def check_mist(self, coords: coordinates.Coords):
+        return self.discovered_arena[coords].type == 'mist'
+
     def _is_available_step_forward(self):
         next_position_coords = self.position + self.champion.facing.value
         return self.is_passable_discovered(next_position_coords)
@@ -116,6 +140,8 @@ class IntercontinentalBajers(controller.Controller):
         self.discovered_arena: TerrainDescription = dict()
         self.arena = Arena.load(arena_description.name)
         self.create_hidden_factor_map()
+        self.iteration = 0
+        self.mist_coords = set()
 
     def create_hidden_factor_map(self):
         self.hidden_factor_map = dict()
