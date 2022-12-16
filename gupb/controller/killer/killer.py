@@ -111,8 +111,9 @@ class KillerController(controller.Controller):
         # Path finding
         pos_x, pos_y = knowledge.position[0], knowledge.position[1]
         paths = find_paths(arr=self.game_map, curr_pos=(pos_y, pos_x))
-        found_path = None
-        if interest is not None:
+        found_path = paths.get_best_path(val_from=KillerInterest.POTION.value,
+                                         val_to=KillerInterest.POTION.value)
+        if (interest is not None) and (found_path is None):
             found_path = paths.get_best_path(val_from=interest.value,
                                              val_to=interest.value)
         if found_path is None:
@@ -216,7 +217,7 @@ class KillerController(controller.Controller):
                 if not self.saw_mist:
                     self.find_path(knowledge,
                                    interest=KillerInterest.ITEM,
-                                   otherwise=KillerInterest.POTION) # UWAGA: Wcześnie było tutaj 'point on map'
+                                   otherwise=KillerInterest.KILLING) # UWAGA: Wcześnie było tutaj 'point on map'
                 else:
                     self.find_path(knowledge,
                                    interest=KillerInterest.MENHIR,
