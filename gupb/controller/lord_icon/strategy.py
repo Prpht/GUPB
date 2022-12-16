@@ -27,6 +27,7 @@ class ClassicStrategyController(NamedTuple):
                 return KillerStrategy.get_action(knowledge)
 
         if knowledge.seen_mist or knowledge.menhir is not None and knowledge.character.weapon != 'knife':
+            # TO DO: Fix running away from mist
             return EndGameStrategy.get_action(knowledge)
 
         if knowledge.character.weapon == 'knife':

@@ -52,6 +52,7 @@ class Strategy(enum.Enum):
     ANTI_IDLE = 'anti_idle'
     CHANGE_CLUSTER = 'change_cluster'
     MOVE_TO_CENTER_OF_CLUSTER = 'move_to_center_of_cluster'
+    MOVE_TO_POTION = 'move_to_potion'
     # COMBAT = 'combat'  # TO REMOVE
     # GO_TO_ENEMY = 'go_to_enemy'  # TO REMOVE
 
@@ -93,6 +94,9 @@ class DodgeController(controller.Controller):
         self.current_grand_strategy = 5
         self.exploration_multiplier = EXPLORATION_MULTIPLIER
 
+        self.consumable_coords = None
+        self.low_hp_enemies: {str: Tuple[Coords, ChampionDescription, int]} = {}
+
         # self.model = ActorCriticController(0.0001, 0.99)
         # self.combat_mode = 0
         # self.closest_enemy_coords = None
@@ -116,6 +120,9 @@ class DodgeController(controller.Controller):
         self.last_position = self.position
         self.position = knowledge.position
         self.number_of_enemies = knowledge.no_of_champions_alive
+
+        if self.consumable_coords is not None and (self.position == self.consumable_coords or (knowledge.visible_tiles.get((self.consumable_coords.x, self.consumable_coords.y)) is not None and knowledge.visible_tiles[(self.consumable_coords.x, self.consumable_coords.y)].character is not None)):
+            self.consumable_coords = None
 
         for i in range(len(self.clusters)):
             if self.position in self.clusters[i].tiles.keys():
@@ -149,10 +156,28 @@ class DodgeController(controller.Controller):
                 else:
                     self.clusters[i].extra_danger[danger] += danger_changes[i][danger]
 
+        if hasattr(list(knowledge.visible_tiles.values())[0], 'consumable'):
+            if self.consumable_coords is None:
+                for low_hp_enemy in self.low_hp_enemies.values():
+                    tile = (low_hp_enemy[0].x, low_hp_enemy[0].y)
+                    if knowledge.visible_tiles.get(tile) is not None and knowledge.visible_tiles[tile].character is None:
+                        next_step = self.forward(low_hp_enemy[0], low_hp_enemy[1].facing)
+                        tile = (next_step.x, next_step.y)
+                        if knowledge.visible_tiles.get(tile) is not None and (knowledge.visible_tiles[tile].character is None or knowledge.visible_tiles[tile].character.controller_name == self.name):
+                            self.consumable_coords = low_hp_enemy[0]
+
         for tile in knowledge.visible_tiles:
+            if hasattr(knowledge.visible_tiles[tile], 'consumable'):
+                if knowledge.visible_tiles[tile].consumable is not None:
+                    self.consumable_coords = Coords(tile[0], tile[1])
+            else:
+                if self.tiles[Coords(tile[0], tile[1])].loot is None and knowledge.visible_tiles.get(tile) is not None and knowledge.visible_tiles.get(tile).loot is not None and self.consumable_coords is None:
+                    self.consumable_coords = Coords(tile[0], tile[1])
+
             self.tiles[Coords(tile[0], tile[1])] = knowledge.visible_tiles[tile]
             if (Coords(tile[0], tile[1])) in self.unexplored.tiles.keys():
                 self.unexplored.tiles.pop(Coords(tile[0], tile[1]))
+            self.low_hp_enemies = {}
             if tile == self.position:
                 self.facing = knowledge.visible_tiles[tile].character.facing
                 self.weapon = knowledge.visible_tiles[tile].character.weapon
@@ -162,6 +187,9 @@ class DodgeController(controller.Controller):
             elif knowledge.visible_tiles[tile].character is not None:
                 self.known_enemies[knowledge.visible_tiles[tile].character.controller_name] \
                     = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
+                if knowledge.visible_tiles[tile].character.health <= 2:
+                    self.low_hp_enemies[knowledge.visible_tiles[tile].character.controller_name] \
+                        = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
                 # _, distance_to_enemy = self.find_path(self.position, Coords(tile[0], tile[1]), self.facing)  # TO REMOVE
                 # if distance_to_enemy < self.distance_to_closest_enemy:  # TO REMOVE
                 #     self.distance_to_closest_enemy = distance_to_enemy  # TO REMOVE
@@ -247,6 +275,8 @@ class DodgeController(controller.Controller):
             strategy = Strategy.SPIN
         elif self.current_grand_strategy > 2 and (self.menhir is not None and TURNS_TO_FOG * 1.3 < self.turn) or (self.menhir is None and TURNS_TO_FOG * self.exploration_multiplier < self.turn):
             strategy = Strategy.MOVE_TO_CENTER
+        elif self.consumable_coords is not None:
+            strategy = Strategy.MOVE_TO_POTION
         elif self.current_grand_strategy % 2 == 1 and len(self.clusters[self.current_cluster].neighbors) > 0 and (min([self.clusters[x].danger_sum for x in self.clusters[self.current_cluster].neighbors]) < (self.clusters[self.current_cluster].danger_sum - 0.5)):
             strategy = Strategy.CHANGE_CLUSTER
         elif self.current_grand_strategy % 2 == 1 and self.current_cluster not in self.explored_clusters:
@@ -382,6 +412,9 @@ class DodgeController(controller.Controller):
                 self.unexplored.find_central_point()
                 self.path = self.find_path(self.position, self.unexplored.central_point, self.facing)[0][1:]
                 return self.get_action_to_move_in_path()
+        elif strategy == Strategy.MOVE_TO_POTION:
+            self.path = self.find_path(self.position, self.consumable_coords, self.facing)[0][1:]
+            return self.get_action_to_move_in_path()
         elif strategy == Strategy.CHANGE_CLUSTER:
             neighbors = []
             for neighbor in self.clusters[self.current_cluster].neighbors:
@@ -462,6 +495,9 @@ class DodgeController(controller.Controller):
         self.unexplored = Cluster(0)
         self.load_arena()
         self.create_clusters()
+
+        self.consumable_coords = None
+        self.low_hp_enemies: {str: Tuple[Coords, ChampionDescription, int]} = {}
 
     @property
     def name(self) -> str:

@@ -23,10 +23,13 @@ class Map():
         self.mist_map: np.ndarray
         self.known_map: np.ndarray
         self.safe_spots: List = []
+        self.potions_position: List = []
 
     def decode_knowledge(self, knowledge: characters.ChampionKnowledge) -> None:
         for coord, tile in knowledge.visible_tiles.items():
             self.known_map[coord] = 1
+            if tile.consumable:
+                self.potions_position.append(coord)
             if tile.loot and tile.loot.name != "knife":
                 self.weapons_position[tile.loot.name] = coord
             if tile.type == "menhir":
