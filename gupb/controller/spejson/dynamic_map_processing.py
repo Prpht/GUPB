@@ -16,6 +16,7 @@ def analyze_visible_region(visible_tiles, position, terrain, facing, weapon):
         'character_hp': np.zeros([13, 13, 1], dtype=float),  # [VISIBLE] Health points rescaled to 0-1
         'character_weapon': np.zeros([13, 13, 5], dtype=float), # [VISIBLE] One-hot encoding of current weapon (Knife, Axe, Bow, Sword, Amulet)
         'weapon_loc': np.zeros([13, 13, 5], dtype=float), # [VISIBLE] 1 if yes, 0 otherwise (Knife, Axe, Bow, Sword, Amulet)
+        'potion': np.zeros([13, 13, 1], dtype=float),  # [VISIBLE] 1 if yes, 0 otherwise
         'mist_effect': np.zeros([13, 13, 1], dtype=float),  # [VISIBLE] 1 if yes, 0 otherwise
         'my_dmg_range': np.zeros([13, 13, 1], dtype=float),  # [VISIBLE] 1 if yes, 0 otherwise
         'others_dmg_range': np.zeros([13, 13, 1], dtype=float),  # [VISIBLE] 1 if yes, 0 otherwise
@@ -81,6 +82,9 @@ def analyze_visible_region(visible_tiles, position, terrain, facing, weapon):
 
         if tile.loot:
             visibility['weapon_loc'][idx] = weapons_onehot[tile.loot.name]
+
+        if tile.consumable:
+            visibility['potion'][idx] = 1
 
         if tile.effects:
             effects = list(map(lambda x: x.type, tile.effects))
