@@ -22,9 +22,9 @@ POSSIBLE_ACTIONS = [
 ]
 
 TILE_ENCODING = {
-    '=': TileDescription(type='sea', loot=None, character=None, effects=[]),
-    '.': TileDescription(type='land', loot=None, character=None, effects=[]),
-    '#': TileDescription(type='wall', loot=None, character=None, effects=[]),
+    '=': TileDescription(type='sea', loot=None, character=None, effects=[], consumable=None),
+    '.': TileDescription(type='land', loot=None, character=None, effects=[], consumable=None),
+    '#': TileDescription(type='wall', loot=None, character=None, effects=[], consumable=None),
 }
 
 WEAPON_ENCODING = {
@@ -93,9 +93,9 @@ class DodgeController(controller.Controller):
         self.grand_strategy_counters = {}
         self.current_grand_strategy = 5
         self.exploration_multiplier = EXPLORATION_MULTIPLIER
-
         self.consumable_coords = None
-        self.low_hp_enemies: {str: Tuple[Coords, ChampionDescription, int]} = {}
+        self.dangerous_tiles: List[Coords] = []
+        self.misty_tiles: List[Coords] = []
 
         # self.model = ActorCriticController(0.0001, 0.99)
         # self.combat_mode = 0
@@ -120,8 +120,9 @@ class DodgeController(controller.Controller):
         self.last_position = self.position
         self.position = knowledge.position
         self.number_of_enemies = knowledge.no_of_champions_alive
+        self.dangerous_tiles = []
 
-        if self.consumable_coords is not None and (self.position == self.consumable_coords or (knowledge.visible_tiles.get((self.consumable_coords.x, self.consumable_coords.y)) is not None and knowledge.visible_tiles[(self.consumable_coords.x, self.consumable_coords.y)].character is not None)):
+        if self.consumable_coords is not None and knowledge.visible_tiles.get((self.consumable_coords.x, self.consumable_coords.y)) is not None and knowledge.visible_tiles[(self.consumable_coords.x, self.consumable_coords.y)].consumable is None:
             self.consumable_coords = None
 
         for i in range(len(self.clusters)):
@@ -156,28 +157,19 @@ class DodgeController(controller.Controller):
                 else:
                     self.clusters[i].extra_danger[danger] += danger_changes[i][danger]
 
-        if hasattr(list(knowledge.visible_tiles.values())[0], 'consumable'):
-            if self.consumable_coords is None:
-                for low_hp_enemy in self.low_hp_enemies.values():
-                    tile = (low_hp_enemy[0].x, low_hp_enemy[0].y)
-                    if knowledge.visible_tiles.get(tile) is not None and knowledge.visible_tiles[tile].character is None:
-                        next_step = self.forward(low_hp_enemy[0], low_hp_enemy[1].facing)
-                        tile = (next_step.x, next_step.y)
-                        if knowledge.visible_tiles.get(tile) is not None and (knowledge.visible_tiles[tile].character is None or knowledge.visible_tiles[tile].character.controller_name == self.name):
-                            self.consumable_coords = low_hp_enemy[0]
-
         for tile in knowledge.visible_tiles:
-            if hasattr(knowledge.visible_tiles[tile], 'consumable'):
-                if knowledge.visible_tiles[tile].consumable is not None:
-                    self.consumable_coords = Coords(tile[0], tile[1])
-            else:
-                if self.tiles[Coords(tile[0], tile[1])].loot is None and knowledge.visible_tiles.get(tile) is not None and knowledge.visible_tiles.get(tile).loot is not None and self.consumable_coords is None:
-                    self.consumable_coords = Coords(tile[0], tile[1])
+            if knowledge.visible_tiles[tile].effects is not None \
+                    and knowledge.visible_tiles[tile].effects != [] \
+                    and Coords(tile[0], tile[1]) not in self.misty_tiles:
+                self.misty_tiles.append(Coords(tile[0], tile[1]))
+            self.dangerous_tiles = self.misty_tiles.copy()
+
+            if knowledge.visible_tiles[tile].consumable is not None:
+                self.consumable_coords = Coords(tile[0], tile[1])
 
             self.tiles[Coords(tile[0], tile[1])] = knowledge.visible_tiles[tile]
             if (Coords(tile[0], tile[1])) in self.unexplored.tiles.keys():
                 self.unexplored.tiles.pop(Coords(tile[0], tile[1]))
-            self.low_hp_enemies = {}
             if tile == self.position:
                 self.facing = knowledge.visible_tiles[tile].character.facing
                 self.weapon = knowledge.visible_tiles[tile].character.weapon
@@ -187,9 +179,12 @@ class DodgeController(controller.Controller):
             elif knowledge.visible_tiles[tile].character is not None:
                 self.known_enemies[knowledge.visible_tiles[tile].character.controller_name] \
                     = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
-                if knowledge.visible_tiles[tile].character.health <= 2:
-                    self.low_hp_enemies[knowledge.visible_tiles[tile].character.controller_name] \
-                        = (Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character, -1)
+                dangerous_tiles = self.tiles_in_range(Coords(tile[0], tile[1]), knowledge.visible_tiles[tile].character.facing, knowledge.visible_tiles[tile].character.weapon)
+                if Coords(tile[0], tile[1]) not in dangerous_tiles:
+                    dangerous_tiles.append(Coords(tile[0], tile[1]))
+                for dangerous_tile in dangerous_tiles:
+                    if dangerous_tile not in self.dangerous_tiles:
+                        self.dangerous_tiles.append(dangerous_tile)
                 # _, distance_to_enemy = self.find_path(self.position, Coords(tile[0], tile[1]), self.facing)  # TO REMOVE
                 # if distance_to_enemy < self.distance_to_closest_enemy:  # TO REMOVE
                 #     self.distance_to_closest_enemy = distance_to_enemy  # TO REMOVE
@@ -269,7 +264,7 @@ class DodgeController(controller.Controller):
         # TO REMOVE
         elif not all(enemy[2] >= 2 or not self.is_in_range(enemy[0]) for enemy in self.known_enemies.values()):
             strategy = Strategy.ATTACK
-        elif self.run > 0 and self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir') and not ((self.menhir is not None and TURNS_TO_FOG * 1.3 < self.turn) or (self.menhir is None and TURNS_TO_FOG * self.exploration_multiplier < self.turn)):
+        elif self.run > 0 and not ((self.menhir is not None and TURNS_TO_FOG * 1.3 < self.turn) or (self.menhir is None and TURNS_TO_FOG * self.exploration_multiplier < self.turn)):
             strategy = Strategy.ESCAPE
         elif self.spinning_stage < 4:
             strategy = Strategy.SPIN
@@ -377,7 +372,24 @@ class DodgeController(controller.Controller):
         if strategy == Strategy.ATTACK:
             return characters.Action.ATTACK
         elif strategy == Strategy.ESCAPE:
-            return characters.Action.STEP_FORWARD
+            if self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir') \
+                    and self.forward(self.position, self.facing) not in self.dangerous_tiles:
+                return characters.Action.STEP_FORWARD
+            elif self.tiles[self.forward(self.position, self.facing.turn_right())].type in ('land', 'menhir') \
+                    and self.forward(self.position, self.facing.turn_right()) not in self.dangerous_tiles:
+                return characters.Action.TURN_RIGHT
+            elif self.tiles[self.forward(self.position, self.facing.turn_left())].type in ('land', 'menhir') \
+                    and self.forward(self.position, self.facing.turn_left()) not in self.dangerous_tiles:
+                return characters.Action.TURN_LEFT
+            elif self.tiles[self.forward(self.position, self.facing.turn_left().turn_left())].type in ('land', 'menhir') \
+                    and self.forward(self.position, self.facing.turn_left().turn_left()) not in self.dangerous_tiles:
+                return characters.Action.TURN_LEFT
+            elif self.tiles[self.forward(self.position, self.facing)].type in ('land', 'menhir'):
+                return characters.Action.STEP_FORWARD
+            elif self.tiles[self.forward(self.position, self.facing.turn_right())].type in ('land', 'menhir'):
+                return characters.Action.TURN_RIGHT
+            else:
+                return characters.Action.TURN_LEFT
         elif strategy == Strategy.SPIN:
             return characters.Action.TURN_LEFT
         elif strategy == Strategy.MOVE_TO_CENTER:
@@ -495,9 +507,9 @@ class DodgeController(controller.Controller):
         self.unexplored = Cluster(0)
         self.load_arena()
         self.create_clusters()
-
         self.consumable_coords = None
-        self.low_hp_enemies: {str: Tuple[Coords, ChampionDescription, int]} = {}
+        self.dangerous_tiles: List[Coords] = []
+        self.misty_tiles: List[Coords] = []
 
     @property
     def name(self) -> str:
@@ -771,7 +783,8 @@ class DodgeController(controller.Controller):
                             self.tiles[position] = TileDescription(type=TILE_ENCODING['.'].type,
                                                                    loot=WEAPON_ENCODING[character],
                                                                    character=None,
-                                                                   effects=[])
+                                                                   effects=[],
+                                                                   consumable=None)
                             if self.tiles[position].type in ('menhir', 'land'):
                                 self.unexplored.tiles[position] = self.tiles[position]
 
@@ -819,6 +832,47 @@ class DodgeController(controller.Controller):
         if direction == Facing.DOWN:
             return Coords(current_coords.x, current_coords.y + 1)
 
+
+    def tiles_in_range(self, position: Coords, facing: Facing, weapon: WeaponDescription) -> List[Coords]:
+        if weapon.name == 'knife':
+            return [add_coords(position, facing.value)]
+        if weapon.name == 'sword':
+            return [add_coords(position, facing.value),
+                               Coords(position.x + 2 * facing.value.x, position.y + 2 * facing.value.y),
+                               Coords(position.x + 3 * facing.value.x, position.y + 3 * facing.value.y)]
+        if weapon.name == 'axe':
+            return [add_coords(position, facing.value),
+                               Coords(position.x - facing.value.y, position.y - facing.value.x),
+                               Coords(position.x + facing.value.y, position.y + facing.value.x)]
+        if weapon.name == 'bow_loaded':
+            return_coords = []
+            current_position = Coords(position.x + 1, position.y)
+            while current_position in self.tiles.keys():
+                return_coords.append(current_position)
+                current_position = Coords(current_position.x + 1, current_position.y)
+            current_position = Coords(position.x - 1, position.y)
+            while current_position in self.tiles.keys():
+                return_coords.append(current_position)
+                current_position = Coords(current_position.x - 1, current_position.y)
+            current_position = Coords(position.x, position.y + 1)
+            while current_position in self.tiles.keys():
+                return_coords.append(current_position)
+                current_position = Coords(current_position.x, current_position.y + 1)
+            current_position = Coords(position.x, position.y - 1)
+            while current_position in self.tiles.keys():
+                return_coords.append(current_position)
+                current_position = Coords(current_position.x, current_position.y - 1)
+            return return_coords
+        if weapon.name == 'amulet':
+            return [Coords(position.x + 1, position.y + 1),
+                           Coords(position.x - 1, position.y - 1),
+                           Coords(position.x + 1, position.y - 1),
+                           Coords(position.x - 1, position.y + 1),
+                           Coords(position.x - 2, position.y + 2),
+                           Coords(position.x - 2, position.y - 2),
+                           Coords(position.x + 2, position.y - 2),
+                           Coords(position.x + 2, position.y + 2)]
+        return []
     def is_in_range(self, enemy_coords: Coords) -> bool:
         if self.weapon.name == 'knife':
             return enemy_coords in [add_coords(self.position, self.facing.value)]
@@ -862,7 +916,7 @@ class DodgeController(controller.Controller):
         elif f_coords == Coords(-1, 0):
             return Facing.RIGHT
 
-    def find_path(self, start: Coords, end: Coords, facing: Facing) -> (Optional[List[Coords]], int):
+    def find_path(self, start: Coords, end: Coords, facing: Facing, dangerous=False) -> (Optional[List[Coords]], int):
         def get_h_cost(h_start: Coords, h_end: Coords, h_facing: Facing) -> int:
             distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
             direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
@@ -902,8 +956,10 @@ class DodgeController(controller.Controller):
                                    add_coords(current.coords, (Coords(-1, 0)))]
 
             for neighbor in neighbors:
-                if neighbor in self.tiles.keys() and (self.tiles[neighbor].type == 'land' or self.tiles[
-                    neighbor].type == 'menhir') and neighbor not in closed_coords.keys():
+                if neighbor in self.tiles.keys()\
+                        and (self.tiles[neighbor].type == 'land' or self.tiles[neighbor].type == 'menhir')\
+                        and neighbor not in closed_coords.keys()\
+                        and (dangerous or neighbor not in self.dangerous_tiles):
                     neighbor_direction: Coords = Coords(neighbor.x - current.coords.x, neighbor.y - current.coords.y)
                     neighbor_g_cost = (1 if neighbor_direction == current.facing.value else
                                        3 if add_coords(neighbor_direction, current.facing.value) == Coords(0, 0) else 2) \
@@ -920,6 +976,8 @@ class DodgeController(controller.Controller):
                                                 current.coords,
                                                 self.get_facing(neighbor_direction)))
 
+        if not dangerous:
+            return self.find_path(start, end, facing, True)
         trace: Optional[List[Coords]] = None
         return trace, INFINITY
 
