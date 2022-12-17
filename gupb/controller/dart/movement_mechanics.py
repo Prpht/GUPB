@@ -4,6 +4,7 @@ from pathfinding.core.grid import Grid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.a_star import AStarFinder
 from gupb.model.arenas import FIXED_MENHIRS, Arena, ArenaDescription
+from gupb.model.consumables import Consumable
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Action, ChampionDescription, ChampionKnowledge, Facing
 from gupb.model.tiles import TileDescription
@@ -39,6 +40,7 @@ class MapKnowledge():
         self.mist_coords: List[Coords] = []
         self.mists = set()
         self.opponents: Dict[str, Coords] = dict()
+        self.consumables: Dict[Coords, str] = dict()
 
     def _create_arena_matrix(self) -> ArenaMatrix:
         arena_matrix = [[1 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
@@ -80,6 +82,12 @@ class MapKnowledge():
             return []
         return self.find_shortest_path(current_position, weapons_coords)
 
+    def get_closest_consumable_path(self, current_position: Coords, *consumable_types: str) -> List[Coords]:
+        consumables_coords = [coords for coords, type in self.consumables.items() if type.startswith(consumable_types)]
+        if not consumables_coords:
+            return []
+        return self.find_shortest_path(current_position, consumables_coords)
+
     def find_shortest_path(self, current_position: Coords, destinations: List[Coords]) -> List[Coords]:
         paths = [self.find_path(current_position, dest) for dest in destinations]
         return min(paths, key=lambda p: len(p) if p else float("inf"))
@@ -120,6 +128,10 @@ class MapKnowledge():
                 self.opponents[tile.character.controller_name] = Coords(*coords)
             if is_menhir(tile):
                 self.arena_menhir = Coords(*coords)
+            if is_consumable(tile.consumable):
+                self.consumables[Coords(*coords)] = tile.consumable.name
+            if coords in self.consumables and not is_consumable(tile.consumable):
+                del self.consumables[Coords(*coords)]
             self.get_visible_mist(knowledge, coords, tile)
         mist_coords_and_distances = [(coords, euclidean_distance(knowledge.position, coords))
                                      for coords in self.mist_coords]
@@ -190,6 +202,13 @@ def is_opponent_at_coords(opponent_position: Coords, visible_tiles: Dict[Coords,
     return is_opponent(opponent)
 
 
+def is_potion_at_coords(potion_position: Coords, visible_tiles: Dict[Coords, TileDescription]) -> bool:
+    if potion_position not in visible_tiles:
+        return False
+    consumable = visible_tiles[potion_position].consumable
+    return is_consumable(consumable)
+
+
 def is_opponent(character: Optional[ChampionDescription]) -> bool:
     return not (character is None or character.controller_name.startswith("DartController"))
 
@@ -204,6 +223,10 @@ def is_menhir(tile: TileDescription) -> bool:
 
 def is_weapon(loot: Optional[Weapon]):
     return loot is not None
+
+
+def is_consumable(consumable: Optional[Consumable]):
+    return consumable is not None
 
 
 def euclidean_distance(c1: Coords, c2: Coords) -> float:
