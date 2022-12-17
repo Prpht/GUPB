@@ -128,7 +128,7 @@ class AlephAlephZeroBot(controller.Controller):
         to_be_updated = dict()
         for coords, tile_desc in self.knowledge.visible_tiles.items():
             if tile_desc.character is not None:
-                to_be_updated[coords] = TileDescription(tile_desc[0],tile_desc[1],None,[])
+                to_be_updated[coords] = TileDescription(tile_desc[0],tile_desc[1],None,[], tile_desc[3])
         for coords, tile_desc in to_be_updated.items():
             self.knowledge.visible_tiles[coords] = tile_desc
 
