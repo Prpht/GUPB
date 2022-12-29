@@ -4,6 +4,7 @@ from gupb.controller.aleph_aleph_zero.shortest_path import find_shortest_path, g
 from gupb.controller.aleph_aleph_zero.strategies.guarding_strategy import GuardingStrategy
 from gupb.controller.aleph_aleph_zero.strategies.menhir_rush_strategy import MenhirRushStrategy
 from gupb.controller.aleph_aleph_zero.strategies.one_action_strategys import AttackStrategy, RunStrategy
+from gupb.controller.aleph_aleph_zero.strategies.potion_rush_strategy import PotionRushStrategy
 from gupb.controller.aleph_aleph_zero.strategies.scouting_strategy import ScoutingStrategy
 from gupb.controller.aleph_aleph_zero.strategies.strategy import StrategyPriority
 from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelStrategy
@@ -34,13 +35,7 @@ class LootHide(HighLevelStrategy):
                     self.strategy = self.strategy.get_more_important(WeaponRushStrategy(StrategyPriority.PURPOSEFUL))
                 else:
                     self.strategy = self.strategy.get_more_important(
-                        TravelStrategy(
-                            get_closest_points(self.bot.save_spots, self.bot.graph,
-                                               self.bot.graph[self.bot.knowledge.position, self.bot.knowledge.facing])[0],
-                            GuardingStrategy(priority=StrategyPriority.PURPOSEFUL, signature="guarding safespot"),
-                            priority=StrategyPriority.PURPOSEFUL
-                        ),
-                        exception_signature="guarding safespot"
+                        PotionRushStrategy(StrategyPriority.PURPOSEFUL)
                     )
 
         i = 0  # quick fix

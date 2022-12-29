@@ -4,10 +4,9 @@ from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy, Strat
 from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelStrategy
 from gupb.model.characters import Action
 
-weapons_score = {"knife": 1, "sword": 2, "amulet": 0, "axe": 4, "bow": 0, "bow_unloaded": 0, "bow_loaded": 0}
 
 
-class WeaponRushStrategy(Strategy):
+class PotionRushStrategy(Strategy):
 
     def decide_and_proceed(self, knowledge, graph=None, map_knowledge=None, **kwargs):
         if map_knowledge is None:
@@ -18,28 +17,20 @@ class WeaponRushStrategy(Strategy):
         reachable = list(get_reachable(graph[(knowledge.position, knowledge.facing)]))
 
         current_weapon = knowledge.visible_tiles[knowledge.position].character.weapon.name
-        weapons = []
+        potions = []
         for coord in knowledge.visible_tiles:
-            if knowledge.visible_tiles[coord].loot is not None and coord != knowledge.position:
-                if weapons_score[knowledge.visible_tiles[coord].loot.name] > weapons_score[current_weapon]:
-                    if coord in reachable:
-                        weapons.append(coord)
+            if knowledge.visible_tiles[coord].consumable is not None:
+                potions.append(coord)
 
-        if len(weapons) == 0:
-            for coord in map_knowledge.visible_tiles:
-                if map_knowledge.visible_tiles[coord].loot is not None:
-                    if weapons_score[map_knowledge.visible_tiles[coord].loot.name] > weapons_score[current_weapon]:
-                        if coord in reachable:
-                            weapons.append(coord)
 
-        if len(weapons) == 0:
+        if len(potions) == 0:
             return None, ScoutingStrategy(priority=StrategyPriority.IDLE)
 
         curr = graph[(knowledge.position, knowledge.facing)]
 
-        weapons.sort(key=lambda x: len(find_shortest_path(curr, x)))
+        potions.sort(key=lambda x: len(find_shortest_path(curr, x)))
 
-        travel_strategy = TravelStrategy(weapons[0], self)
+        travel_strategy = TravelStrategy(potions[0], self)
         i=0
         while True:
             i+=1

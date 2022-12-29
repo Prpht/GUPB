@@ -155,7 +155,7 @@ class SnieznyKockodanController(controller.Controller):
             elif attack_eligible and not start_conditions:
                 return self.attack()
             elif self.need_to_escape(enemies_seen, tiles_in_radius_esc)[0] and not start_conditions:
-                self.escape(enemies_seen, knowledge)
+                return self.escape(enemies_seen, knowledge)
             elif self.random_walk_destination is not None:
                 return self._move(knowledge, self.random_walk_destination)
             elif not self.menhir_eligible():
@@ -274,19 +274,19 @@ class SnieznyKockodanController(controller.Controller):
         if len(self.terrain) == 0:
             return False
 
-        health = champion_info.health
-        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
-        if any(enemy_stronger_health):
-            return False
+        # health = champion_info.health
+        # enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        # if any(enemy_stronger_health):
+        #     return False
         # if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
         #     return False
 
         weapon = champion_info.weapon.name
-        enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
-                                  > WEAPON_RANKING[weapon]
-                                  for enemy in enemies]
-        if any(enemy_stronger_weapons):
-            return False
+        # enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
+        #                           > WEAPON_RANKING[weapon]
+        #                           for enemy in enemies]
+        # if any(enemy_stronger_weapons):
+        #     return False
         try:
             weapon_coordinates = WEAPON_DICT[weapon].cut_positions(self.terrain, knowledge.position, facing)
         except TypeError:
