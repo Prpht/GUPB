@@ -84,6 +84,8 @@ class IntercontinentalBajers(controller.Controller):
 
         # if len(self.threat_coords) > 0:
         #     closest_spot = self.get_closest_from()
+        #       if self.closest_spot == self.position:
+        #           return characters.Action.TURN_LEFT
         #     self.find_path(closest_spot)
         #     return self.next_action(Coords(*self.path[0]))
 
