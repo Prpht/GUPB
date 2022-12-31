@@ -27,6 +27,7 @@ from typing import Optional, List
         2) Move information from Controller to Map class
         3) Fix fighting with the amulet
         4) Tuptus crashes when standing on the menhir 
+        5) :)
 
 """
 

@@ -67,6 +67,8 @@ class DzikieBorsuki:
         self.better_weapon = 'knife'
         self.better_weapon_coords = None
 
+        self.nearest_potion_coords = None
+
         self.gps = utils.PathFinder(arena_description)
         self.arena = arenas.Arena.load(arena_description.name)
         self.path = []
@@ -92,6 +94,16 @@ class DzikieBorsuki:
             if position == self.path[0]:
                 self.path.pop(0)
 
+        if self.nearest_potion_coords is not None and self.nearest_potion_coords in visible_tiles.keys():
+            if visible_tiles[self.nearest_potion_coords].consumable is None:
+                self.nearest_potion_coords = None
+
+        if self.nearest_potion_coords is None:
+            current_dist_to_potion = 3500
+        else:
+            current_dist_to_potion = len(self.gps.find_path(position, coordinates.Coords(self.nearest_potion_coords[0], \
+                                                                                     self.nearest_potion_coords[1])))
+
         # Badanie pola widzenia
         for visible_position in visible_tiles.keys():
             # Jesli nie mamy menhira, ale go widzimy
@@ -115,6 +127,11 @@ class DzikieBorsuki:
                 enemy_weapon = enemy.weapon.name
                 danger_zone = utils.get_weaponable_tiles(self.arena, visible_position, enemy.facing, enemy_weapon)
                 self.dangerous_tiles += danger_zone
+
+            if visible_tiles[visible_position].consumable is not None and visible_position not in self.dangerous_tiles:
+                new_dist_to_potion = len(self.gps.find_path(position, visible_position))
+                if new_dist_to_potion < min(5, current_dist_to_potion):
+                    self.nearest_potion_coords = visible_position
 
         # Odrzucamy "zobaczone" pola z listy do odkrycia
         self.possible_menhir_coords = [coord for coord in self.possible_menhir_coords if
@@ -149,19 +166,25 @@ class DzikieBorsuki:
                     next_action = utils.next_step(position, coordinates.Coords(*self.path[0]), facing)
                     return next_action
 
-            if visible_tiles[position].type == "menhir":
+            if self.nearest_potion_coords is not None:
+                if len(self.path) == 0 or self.path[-1] != self.nearest_potion_coords:
+                    path_to_potion = self.gps.find_path(position, coordinates.Coords(self.nearest_potion_coords[0], \
+                                                                                         self.nearest_potion_coords[1]))
+                    self.path = path_to_potion
+
+            if visible_tiles[position].type == "menhir" and self.weapon != "knife":
                 return characters.Action.TURN_RIGHT
 
             if len(self.path) == 0:
-                if self.better_weapon_coords is not None:
-                    path_to_weapon = self.gps.find_path(position, coordinates.Coords(self.better_weapon_coords[0], \
-                                                                                     self.better_weapon_coords[1]))
-                    self.path = path_to_weapon
-
-                elif self.menhir_coords is not None and self.weapon != "knife":
+                if self.menhir_coords is not None and self.weapon != "knife":
                     path_to_menhir = self.gps.find_path(position, coordinates.Coords(self.menhir_coords[0], \
                                                                                      self.menhir_coords[1]))
                     self.path = path_to_menhir
+
+                elif self.better_weapon_coords is not None:
+                    path_to_weapon = self.gps.find_path(position, coordinates.Coords(self.better_weapon_coords[0], \
+                                                                                     self.better_weapon_coords[1]))
+                    self.path = path_to_weapon
 
                 else:
                     random_destination = random.choice(self.possible_menhir_coords)

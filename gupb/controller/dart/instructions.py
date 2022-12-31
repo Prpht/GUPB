@@ -53,6 +53,14 @@ class CollectClosestWeaponInstruction(Instruction):
         return self._action_follow_path(knowledge)
 
 
+class CollectClosestPotionInstruction(Instruction):
+    def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
+        if self._path and knowledge.position in self._path:
+            return None
+        self._path = map_knowledge.get_closest_consumable_path(knowledge.position, 'potion')
+        return self._action_follow_path(knowledge)
+
+
 class GoToMenhirInstruction(Instruction):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Optional[Action]:
         weapon = get_weapon(get_champion_weapon(knowledge), map_knowledge.arena.terrain)
