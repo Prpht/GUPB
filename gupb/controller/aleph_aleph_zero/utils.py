@@ -79,6 +79,7 @@ def get_knowledge_from_file(map_name):
                     "land",
                     WEAPON_ENCODING[character]().description(),
                     None,
+                    [],
                     []
                 )
 
