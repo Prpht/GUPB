@@ -13,4 +13,4 @@ class ScanningStrategy(Strategy):
     def __init__(self, proceeding_strategy, **kwargs):
         super().__init__(**kwargs)
         self.proceeding_strategy = proceeding_strategy
-        self.turns_to_do=3
+        self.turns_to_do=0
