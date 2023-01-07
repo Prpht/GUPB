@@ -53,6 +53,7 @@ ESCAPE_MAX_COUNT: int = 2
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class SnieznyKockodanController(controller.Controller):
+    """May the will of God happen."""
     weapon_distance = 5
 
     def __init__(self, first_name: str):
