@@ -11,6 +11,7 @@ from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelSt
 from gupb.controller.aleph_aleph_zero.strategies.weapon_rush_strategy import WeaponRushStrategy
 from gupb.controller.aleph_aleph_zero.utils import if_character_to_kill
 from gupb.model.characters import Action
+from gupb.model.coordinates import add_coords, Coords
 
 
 class LootHide(HighLevelStrategy):
@@ -26,7 +27,7 @@ class LootHide(HighLevelStrategy):
                     shortest_path) > EPOCH_TO_BE_IN_MELCHIR:
                 self.bot.menhir_pos_updated = False
                 self.strategy = self.strategy.get_more_important(
-                    MenhirRushStrategy(self.bot.menhir_position, priority=StrategyPriority.TIME_SENSITIVE),
+                    MenhirRushStrategy(add_coords(self.bot.menhir_position,Coords(2,2)), priority=StrategyPriority.TIME_SENSITIVE),
                     exception_signature="guarding menhir"
                 )
 
