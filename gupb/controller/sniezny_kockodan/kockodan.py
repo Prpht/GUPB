@@ -155,7 +155,7 @@ class SnieznyKockodanController(controller.Controller):
             elif attack_eligible and not start_conditions:
                 return self.attack()
             elif self.need_to_escape(enemies_seen, tiles_in_radius_esc)[0] and not start_conditions:
-                self.escape(enemies_seen, knowledge)
+                return self.escape(enemies_seen, knowledge)
             elif self.random_walk_destination is not None:
                 return self._move(knowledge, self.random_walk_destination)
             elif not self.menhir_eligible():
@@ -274,19 +274,19 @@ class SnieznyKockodanController(controller.Controller):
         if len(self.terrain) == 0:
             return False
 
-        health = champion_info.health
-        enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
-        if any(enemy_stronger_health):
-            return False
+        # health = champion_info.health
+        # enemy_stronger_health = [knowledge.visible_tiles[enemy].character.health > health for enemy in enemies]
+        # if any(enemy_stronger_health):
+        #     return False
         # if health < HEALTH_ATTACK_THRESHOLD * MAX_HEALTH:
         #     return False
 
         weapon = champion_info.weapon.name
-        enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
-                                  > WEAPON_RANKING[weapon]
-                                  for enemy in enemies]
-        if any(enemy_stronger_weapons):
-            return False
+        # enemy_stronger_weapons = [WEAPON_RANKING[knowledge.visible_tiles[enemy].character.weapon.name]
+        #                           > WEAPON_RANKING[weapon]
+        #                           for enemy in enemies]
+        # if any(enemy_stronger_weapons):
+        #     return False
         try:
             weapon_coordinates = WEAPON_DICT[weapon].cut_positions(self.terrain, knowledge.position, facing)
         except TypeError:
@@ -424,6 +424,7 @@ class SnieznyKockodanController(controller.Controller):
         return self._move(knowledge, destination)
 
     def find_eligible_tiles_in_neighbourhood(self, knowledge: characters.ChampionKnowledge):
+        exploration_probability = 0.4
         current_position = knowledge.position
         spots = []
         for x in range(self.map.size[0]):
@@ -431,13 +432,18 @@ class SnieznyKockodanController(controller.Controller):
                 if self.arena[y][x] == 1:
                     spots.append((x, y))
         eligible_spots = []
+        eligible_spots_not_in_neighbourhood = []
         for spot in spots:
             destination = coordinates.Coords(spot[0], spot[1])
             distance = self.euclidean_distance(current_position, destination)
             path = self.find_path(current_position, destination)
-            if distance <= EUCLIDEAN_MAX_RADIUS and destination != current_position and path:
-                eligible_spots.append(spot)
-        return eligible_spots
+            if destination != current_position and path:
+                if distance <= EUCLIDEAN_MAX_RADIUS:
+                    eligible_spots.append(spot)
+                else:
+                    eligible_spots_not_in_neighbourhood.append(spot)
+
+        return eligible_spots if random.random() > exploration_probability else eligible_spots_not_in_neighbourhood
 
     @staticmethod
     def euclidean_distance(position1: coordinates.Coords, position2: coordinates.Coords) -> float:

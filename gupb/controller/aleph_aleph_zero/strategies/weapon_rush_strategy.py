@@ -4,7 +4,7 @@ from gupb.controller.aleph_aleph_zero.strategies.strategy import Strategy, Strat
 from gupb.controller.aleph_aleph_zero.strategies.travel_strategy import TravelStrategy
 from gupb.model.characters import Action
 
-weapons_score = {"knife": 1, "sword": 2, "amulet": 0, "axe": 4, "bow": 5, "bow_unloaded": 5, "bow_loaded": 5}
+weapons_score = {"knife": 1, "sword": 2, "amulet": 0, "axe": 4, "bow": 0, "bow_unloaded": 0, "bow_loaded": 0}
 
 
 class WeaponRushStrategy(Strategy):

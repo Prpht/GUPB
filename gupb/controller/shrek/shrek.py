@@ -59,6 +59,7 @@ class ShrekController:
         self.weapon_name = info.weapon.name
 
         if self.is_enemy_around(knowledge):
+            #very important comment line
             facing_tile = self.position + self.facing.value  # if we face character we fight
             if knowledge.visible_tiles[facing_tile].character and self.weapon_name != 'amulet':
                 return characters.Action.ATTACK
@@ -86,6 +87,11 @@ class ShrekController:
                 self.emergency_steps.pop(0)
                 return characters.Action.STEP_FORWARD
             else:
+                if (self.facing == Facing.UP and needed_facing == Facing.LEFT) or (
+                        self.facing == Facing.RIGHT and needed_facing == Facing.UP) or (
+                        self.facing == Facing.DOWN and needed_facing == Facing.UP) or (
+                        self.facing == Facing.LEFT and needed_facing == Facing.DOWN):
+                    return characters.Action.TURN_LEFT
                 return characters.Action.TURN_RIGHT
 
         if self.am_i_on_hiding_spot():
@@ -127,8 +133,13 @@ class ShrekController:
                     self.path.pop(0)
                     return characters.Action.STEP_FORWARD
                 else:
-                    return characters.Action.TURN_RIGHT
+                    if (self.facing == Facing.UP and needed_facing == Facing.LEFT) or (
+                            self.facing == Facing.RIGHT and needed_facing == Facing.UP) or (
+                            self.facing == Facing.DOWN and needed_facing == Facing.UP) or (
+                            self.facing == Facing.LEFT and needed_facing == Facing.DOWN):
+                        return characters.Action.TURN_LEFT
 
+                    return characters.Action.TURN_RIGHT
 
             else:
                 self.goal = self.find_closest_point()

@@ -1,10 +1,9 @@
 from typing import Optional, Protocol, Type
-from gupb.controller.dart.instructions import AttackOpponentInstruction, CollectClosestWeaponInstruction, GoToMenhirInstruction, Instruction, RotateAndAttackInstruction, RunAwayFromOpponentInstruction
-from gupb.controller.dart.movement_mechanics import MapKnowledge, euclidean_distance, is_opponent_at_coords
+from gupb.controller.dart.instructions import AttackOpponentInstruction, CollectClosestPotionInstruction, CollectClosestWeaponInstruction, GoToMenhirInstruction, Instruction, RotateAndAttackInstruction, RunAwayFromOpponentInstruction
+from gupb.controller.dart.movement_mechanics import MapKnowledge, euclidean_distance, is_opponent_at_coords, is_potion_at_coords
 from gupb.controller.dart.weapons import get_champion_weapon
 from gupb.model.characters import Action, ChampionKnowledge
 from gupb.model.coordinates import Coords
-
 
 class Strategy(Protocol):
     def decide(self, knowledge: ChampionKnowledge, map_knowledge: MapKnowledge) -> Action:
@@ -20,6 +19,10 @@ class DefaultStrategy:
         # Handle mist observed
         if map_knowledge.closest_mist_coords and not map_knowledge.find_menhir() == knowledge.position:
             self._instruction = GoToMenhirInstruction()
+
+        # Handle potion found
+        elif len(map_knowledge.consumables):
+            self._instruction = CollectClosestPotionInstruction()
 
         # Handle opponent found
         elif self._handle_opponent_instruction(knowledge, map_knowledge):

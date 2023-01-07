@@ -4,7 +4,7 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.characters import Action, Facing
-from gupb.model.coordinates import add_coords
+from gupb.model.coordinates import add_coords, Coords
 from .utils import KillerInterest, PathConstants, find_paths, path_to_actions
 
 
@@ -26,7 +26,7 @@ class KillerController(controller.Controller):
         self.planned_actions = []
         self.got_weapon = False
         self.saw_mist = False
-        self.weapon_type = "dagger"
+
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KillerController):
@@ -59,6 +59,9 @@ class KillerController(controller.Controller):
                 if tile.type == "menhir":
                     self.game_map[coord[1], coord[0]] = KillerInterest.MENHIR.value
                     self.menhir_pos = coord[0], coord[1]
+
+            if tile.consumable:
+                self.game_map[coord[1], coord[0]] = KillerInterest.POTION.value
 
     # def find_new_interest(self, curr_position):
     #     x_max, y_max = self.game_map.shape
@@ -108,8 +111,9 @@ class KillerController(controller.Controller):
         # Path finding
         pos_x, pos_y = knowledge.position[0], knowledge.position[1]
         paths = find_paths(arr=self.game_map, curr_pos=(pos_y, pos_x))
-        found_path = None
-        if interest is not None:
+        found_path = paths.get_best_path(val_from=KillerInterest.POTION.value,
+                                         val_to=KillerInterest.POTION.value)
+        if (interest is not None) and (found_path is None):
             found_path = paths.get_best_path(val_from=interest.value,
                                              val_to=interest.value)
         if found_path is None:
@@ -118,6 +122,8 @@ class KillerController(controller.Controller):
         if found_path is None:
             found_path = paths.get_best_path(val_from=KillerInterest.POINT_ON_MAP.value,
                                              val_to=KillerInterest.MENHIR.value)
+        if self.saw_mist:
+            found_path = found_path[:2]
 
         # Getting actions for found path
         facing = self.get_facing(knowledge)
@@ -149,11 +155,36 @@ class KillerController(controller.Controller):
         #     self.find_new_interest(curr_position=knowledge.position)
         #     self.find_path(knowledge, interest=KillerInterest.POINT_ON_MAP)
 
-    # def in_range(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-    #     if self.weapon_type == "sword":
-    #         if add_coords()
+
+    def in_range(self, knowledge: characters.ChampionKnowledge, facing) -> characters.Action:
+        enemy_located = False
+        current_weapon = knowledge.visible_tiles[knowledge.position].character.weapon.name
+        if current_weapon == 'sword':
+            self.got_weapon = True
+            enemy_location = [add_coords(knowledge.position, facing.value),
+                              Coords(knowledge.position.x + 2*facing.value.x, knowledge.position.y + 2*facing.value.y),
+                              Coords(knowledge.position.x + 3*facing.value.x, knowledge.position.y + 3*facing.value.y)]
+            enemy_located = KillerController.check_for_enemy(knowledge, enemy_location)
+        if current_weapon == 'axe':
+            self.got_weapon = True
+            enemy_location = [add_coords(knowledge.position, facing.value),
+                              Coords(knowledge.position.x - facing.value.y, knowledge.position.y - facing.value.x),
+                              Coords(knowledge.position.x - facing.value.y, knowledge.position.y - facing.value.x)]
+            enemy_located = KillerController.check_for_enemy(knowledge, enemy_location)
+        if current_weapon != 'sword' and current_weapon != 'axe':
+            self.got_weapon = False
+        return enemy_located
+
+    @staticmethod
+    def check_for_enemy(knowledge: characters.ChampionKnowledge, locations):
+        for location in locations:
+            if location in knowledge.visible_tiles.keys():
+                if knowledge.visible_tiles[location].character is not None:
+                    return True
+        return False
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        facing = KillerController.get_facing(knowledge)
 
         facing_element = self.get_facing_element(knowledge)
 
@@ -163,10 +194,15 @@ class KillerController(controller.Controller):
         #         self.got_weapon = True
         #         self.weapon_type = "axe" if facing_element.loot.name == "axe" else "sword"
 
+        if self.in_range(knowledge, facing):
+            return Action.ATTACK
+
         if facing_element.character is not None:
             return Action.ATTACK
 
-        return Action.TURN_RIGHT
+        #if not self.saw_mist:
+        #    self.learn_map(knowledge)
+        #    return Action.TURN_RIGHT
 
         if self.game_map is None:
             self.game_map = np.zeros(shape=(50, 50))
@@ -181,7 +217,7 @@ class KillerController(controller.Controller):
                 if not self.saw_mist:
                     self.find_path(knowledge,
                                    interest=KillerInterest.ITEM,
-                                   otherwise=KillerInterest.POINT_ON_MAP)
+                                   otherwise=KillerInterest.KILLING) # UWAGA: Wcześnie było tutaj 'point on map'
                 else:
                     self.find_path(knowledge,
                                    interest=KillerInterest.MENHIR,
