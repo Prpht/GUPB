@@ -359,7 +359,7 @@ class ShrekController:
 
     def move(self):
         """
-        Take a step forward, or turn
+        Take a step forward, or turn left or right
         """
         rand_num = random.random()
         if rand_num <= 0.8:
