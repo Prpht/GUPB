@@ -28,6 +28,7 @@ from typing import Optional, List
         3) Fix fighting with the amulet
         4) Tuptus crashes when standing on the menhir 
         5) :)
+        6) :c
 
 """
 
