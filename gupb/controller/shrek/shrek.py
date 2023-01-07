@@ -59,6 +59,7 @@ class ShrekController:
         self.weapon_name = info.weapon.name
 
         if self.is_enemy_around(knowledge):
+            #very important comment line
             facing_tile = self.position + self.facing.value  # if we face character we fight
             if knowledge.visible_tiles[facing_tile].character and self.weapon_name != 'amulet':
                 return characters.Action.ATTACK

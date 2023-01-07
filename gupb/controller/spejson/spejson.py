@@ -20,7 +20,7 @@ from gupb.model.coordinates import Coords
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Spejson(controller.Controller):
-    def __init__(self, first_name: str, experiment_rate=0.3, serve_greedy=False, deepspejson=True):
+    def __init__(self, first_name: str, experiment_rate=0.33, serve_greedy=True, deepspejson=True):
         self.first_name: str = first_name
         self.position = None
         self.facing = None
@@ -267,10 +267,13 @@ class Spejson(controller.Controller):
                 self.rec_h, self.rec_c, tf.ones([1, 1], dtype=tf.float32)
             )
 
-            out = np.squeeze(out)
+            out = np.squeeze(tf.nn.softmax(out, axis=-1))
 
             if self.serve_greedy:
-                chosen_move = np.argmax(out)
+                if np.random.rand() < self.experiment_rate:
+                    chosen_move = np.random.choice(range(4))
+                else:
+                    chosen_move = np.argmax(out)
             else:
                 chosen_move = np.random.choice(
                     range(4),
