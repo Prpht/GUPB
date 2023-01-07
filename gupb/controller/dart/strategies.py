@@ -10,6 +10,7 @@ class Strategy(Protocol):
         ...
 
 
+#
 class DefaultStrategy:
     def __init__(self) -> None:
         self._instruction: Instruction = CollectClosestWeaponInstruction()
