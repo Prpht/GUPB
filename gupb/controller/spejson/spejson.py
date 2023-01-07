@@ -20,7 +20,7 @@ from gupb.model.coordinates import Coords
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Spejson(controller.Controller):
-    def __init__(self, first_name: str, experiment_rate=0.33, serve_greedy=True, deepspejson=True):
+    def __init__(self, first_name: str, experiment_rate=0.16, serve_greedy=True, deepspejson=True):
         self.first_name: str = first_name
         self.position = None
         self.facing = None
@@ -196,12 +196,15 @@ class Spejson(controller.Controller):
             **derivables,
         }
 
+        is_move_forward_stupid = False
+
         if not decision:
             # Rule out stupid moves
             next_block = position + self.facing.value
             if next_block in visible_tiles:
                 if visible_tiles[next_block].type in ['sea', 'wall'] or visible_tiles[next_block].character is not None:
                     available_actions = [x for x in available_actions if x not in [Action.STEP_FORWARD]]
+                    is_move_forward_stupid = True
 
             distance_from_target = self.target - position
             distance_from_target = distance_from_target.x ** 2 + distance_from_target.y ** 2
@@ -271,14 +274,17 @@ class Spejson(controller.Controller):
 
             if self.serve_greedy:
                 if np.random.rand() < self.experiment_rate:
-                    chosen_move = np.random.choice(range(4))
-                else:
-                    chosen_move = np.argmax(out)
-            else:
-                chosen_move = np.random.choice(
-                    range(4),
-                    p=self.experiment_rate * 0.25 + (1.0 - self.experiment_rate) * out
-                )
+                    out = np.random.uniform(0, 1, [4])
+
+                moves_sorted = np.argsort(out)[::-1]
+                if is_move_forward_stupid:
+                    moves_sorted = list(filter(lambda x: x != 2, moves_sorted))
+                if not someone_in_range:
+                    moves_sorted = list(filter(lambda x: x != 3, moves_sorted))
+                if someone_in_range:
+                    moves_sorted = [3]
+
+                chosen_move = moves_sorted[0]
         else:
             for i, action in enumerate(POSSIBLE_ACTIONS):
                 if decision == action:
