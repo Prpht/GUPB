@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
-from enum import auto, Enum
+from enum import auto, StrEnum
 import functools
 from typing import NamedTuple
 
@@ -19,7 +19,7 @@ class EffectDescription(NamedTuple):
     type: str
 
 
-class EffectLifetime(Enum):
+class EffectLifetime(StrEnum):
     INSTANT = auto()
     ETERNAL = auto()
 

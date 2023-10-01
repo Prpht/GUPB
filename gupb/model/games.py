@@ -43,7 +43,7 @@ class Game(statemachine.StateMachine):
         self.episodes_since_mist_increase: int = 0
         self.deaths: list[ChampionDeath] = []
         self.finished = False
-        super(statemachine.StateMachine, self).__init__()
+        super().__init__()
 
     def on_enter_actions_done(self) -> None:
         if not self.action_queue:

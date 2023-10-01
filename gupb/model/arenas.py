@@ -71,8 +71,8 @@ class Arena:
     def description(self) -> ArenaDescription:
         return ArenaDescription(self.name)
 
-    def empty_coords(self) -> set[coordinates.Coords]:
-        return set(coords for coords, tile in self.terrain.items() if tile.empty)
+    def empty_coords(self) -> list[coordinates.Coords]:
+        return sorted(set(coords for coords, tile in self.terrain.items() if tile.empty))
 
     def visible_coords(self, champion: characters.Champion) -> set[coordinates.Coords]:
         def estimate_border_point() -> tuple[coordinates.Coords, int]:
