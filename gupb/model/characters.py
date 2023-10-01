@@ -10,6 +10,7 @@ from gupb import controller
 from gupb.logger import core as logger_core
 from gupb.model import arenas
 from gupb.model import coordinates
+from gupb.model import consumables
 from gupb.model import tiles
 from gupb.model import weapons
 
@@ -22,6 +23,7 @@ IDLE_DAMAGE_PENALTY = 1
 
 class ChampionKnowledge(NamedTuple):
     position: coordinates.Coords
+    no_of_champions_alive: int
     visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]
 
 
@@ -36,10 +38,13 @@ class Tabard(Enum):
     BLUE = 'Blue'
     BROWN = 'Brown'
     GREY = 'Grey'
+    GREEN = 'Green'
     LIME = 'Lime'
     ORANGE = 'Orange'
     PINK = 'Pink'
     RED = 'Red'
+    STRIPPED = 'Stripped'
+    TURQUOISE = 'Turquoise'
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
@@ -96,7 +101,7 @@ class Champion:
     def pick_action(self) -> Action:
         if self.controller:
             visible_tiles = self.arena.visible_tiles(self)
-            knowledge = ChampionKnowledge(self.position, visible_tiles)
+            knowledge = ChampionKnowledge(self.position, self.arena.no_of_champions_alive, visible_tiles)
             try:
                 action = self.controller.decide(knowledge)
                 if action is None:
@@ -144,7 +149,8 @@ class Champion:
 
     def die(self) -> None:
         self.arena.terrain[self.position].character = None
-        self.arena.terrain[self.position].loot = self.weapon
+        self.arena.terrain[self.position].consumable = consumables.Potion()
+        self.arena.terrain[self.position].loot = self.weapon if self.weapon.droppable() else None
         verbose_logger.debug(f"Champion {self.controller.name} died.")
         ChampionDeathReport(self.controller.name).log(logging.DEBUG)
 

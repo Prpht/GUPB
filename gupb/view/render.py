@@ -8,6 +8,7 @@ import pygame.freetype
 
 from gupb.controller import keyboard
 from gupb.model import characters
+from gupb.model import consumables
 from gupb.model import effects
 from gupb.model import games
 from gupb.model import tiles
@@ -17,11 +18,14 @@ pygame.init()
 
 Sprite = TypeVar('Sprite')
 
-INIT_TILE_SIZE = 16
+INIT_TILE_SIZE = 32
 KEEP_TILE_RATIO = False
 
 HEALTH_BAR_HEIGHT = 4
 HEALTH_BAR_UNIT_WIDTH = 2
+HEALTH_BAR_FULL_COLOR = (250, 0, 0)
+HEALTH_BAR_OVERFILL_COLOR = (150, 0, 0)
+HEALTH_BAR_EMPTY_COLOR = (0, 0, 0)
 
 BLACK = pygame.Color('black')
 GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
@@ -52,13 +56,18 @@ class SpriteRepository:
             weapons.Bow: load_sprite('weapons', 'bow', BLACK),
             weapons.Amulet: load_sprite('weapons', 'amulet', BLACK),
 
+            consumables.Potion: load_sprite('consumables', 'potion', BLACK),
+
             characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
             characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
             characters.Tabard.GREY: load_sprite('characters', 'champion_grey', BLACK),
+            characters.Tabard.GREEN: load_sprite('characters', 'champion_green', BLACK),
             characters.Tabard.LIME: load_sprite('characters', 'champion_lime', BLACK),
             characters.Tabard.ORANGE: load_sprite('characters', 'champion_orange', BLACK),
             characters.Tabard.PINK: load_sprite('characters', 'champion_pink', BLACK),
             characters.Tabard.RED: load_sprite('characters', 'champion_red', BLACK),
+            characters.Tabard.STRIPPED: load_sprite('characters', 'champion_stripped', BLACK),
+            characters.Tabard.TURQUOISE: load_sprite('characters', 'champion_turquoise', BLACK),
             characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
@@ -79,10 +88,13 @@ class SpriteRepository:
                     characters.Tabard.BLUE,
                     characters.Tabard.BROWN,
                     characters.Tabard.GREY,
+                    characters.Tabard.GREEN,
                     characters.Tabard.LIME,
                     characters.Tabard.ORANGE,
                     characters.Tabard.PINK,
                     characters.Tabard.RED,
+                    characters.Tabard.STRIPPED,
+                    characters.Tabard.TURQUOISE,
                     characters.Tabard.VIOLET,
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
@@ -202,8 +214,21 @@ class Renderer:
 
             character_sprite = self.sprite_repository.match_sprite(tile.character)
             background.blit(character_sprite, blit_destination)
-            pygame.draw.rect(background, (0, 0, 0), prepare_heath_bar_rect(characters.CHAMPION_STARTING_HP))
-            pygame.draw.rect(background, (250, 0, 0), prepare_heath_bar_rect(tile.character.health))
+            pygame.draw.rect(
+                background,
+                HEALTH_BAR_OVERFILL_COLOR,
+                prepare_heath_bar_rect(tile.character.health)
+            )
+            pygame.draw.rect(
+                background,
+                HEALTH_BAR_EMPTY_COLOR,
+                prepare_heath_bar_rect(characters.CHAMPION_STARTING_HP)
+            )
+            pygame.draw.rect(
+                background,
+                HEALTH_BAR_FULL_COLOR,
+                prepare_heath_bar_rect(min(characters.CHAMPION_STARTING_HP, tile.character.health))
+            )
 
         for i, j in game.arena.terrain:
             blit_destination = (i * self.sprite_repository.size[0], j * self.sprite_repository.size[1])
@@ -213,6 +238,9 @@ class Renderer:
             if tile.loot:
                 loot_sprite = self.sprite_repository.match_sprite(tile.loot)
                 background.blit(loot_sprite, blit_destination)
+            if tile.consumable:
+                consumable_sprite = self.sprite_repository.match_sprite(tile.consumable)
+                background.blit(consumable_sprite, blit_destination)
             if tile.character:
                 render_character()
             if tile.effects:

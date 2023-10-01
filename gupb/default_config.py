@@ -1,10 +1,9 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 
-
 CONFIGURATION = {
     'arenas': [
-        'fisher_island',
+        'lone_sanctum',
     ],
     'controllers': [
         keyboard.KeyboardController(),
@@ -19,4 +18,3 @@ CONFIGURATION = {
     'runs_no': 5,
     'profiling_metrics': [],
 }
-
