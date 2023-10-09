@@ -139,7 +139,7 @@ class SpriteRepository:
 class Renderer:
     def __init__(self, ms_per_time_unit: int = 5):
         pygame.display.set_caption('GUPB')
-        self.screen = pygame.display.set_mode((100, 100), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
         self.sprite_repository = SpriteRepository()
         self.clock = pygame.time.Clock()
         self.time_passed = 0
