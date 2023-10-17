@@ -48,6 +48,7 @@ class Tabard(Enum):
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
+    R2D2 = 'R2D2'
 
 
 class Champion:
