@@ -4,7 +4,7 @@ import numpy as np
 
 from typing import List, Optional, Sequence, Tuple, Union
 
-from gupb.controller.rl_agent import RlAgentController
+from gupb.controller.batman import BatmanController
 from gupb.model.characters import Action
 
 
@@ -18,7 +18,7 @@ class GUPBEnv(gym.Env):
 
     def __init__(
         self,
-        controller: RlAgentController,
+        controller: BatmanController,
         grid_shape: Sequence[int],
         num_tiles_types: int,
     ):

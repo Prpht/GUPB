@@ -1,7 +1,7 @@
 import stable_baselines3.dqn as dqn
 import stable_baselines3.dqn.policies as policies
 
-from gupb.controller.rl.environment.gupb import GUPBEnv
+from gupb.controller.batman.environment.gupb import GUPBEnv
 
 
 class Algo:
