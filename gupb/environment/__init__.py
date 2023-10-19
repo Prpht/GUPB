@@ -2,13 +2,13 @@ import gym
 import gym.spaces
 import numpy as np
 
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Sequence
 
-from gupb.controller.rl_agent import RlAgentController
-from gupb.model.characters import Action
+from gupb.environment.observer import Observer, Observable
+from gupb.model.characters import Action, ChampionKnowledge
 
 
-class GUPBEnv(gym.Env):
+class GUPBEnv(gym.Env, Observer[ChampionKnowledge], Observable[Action]):
     metadata = {
         "render.modes": ["human", "rgb_array"],
     }
@@ -18,7 +18,6 @@ class GUPBEnv(gym.Env):
 
     def __init__(
         self,
-        controller: RlAgentController,
         grid_shape: Sequence[int],
         num_tiles_types: int,
     ):
@@ -33,25 +32,28 @@ class GUPBEnv(gym.Env):
             dtype=np.int8,
         )
 
-        self._controller = controller
+        self._ignore_action = True
 
     def render(self, *args, **kwargs):
         return self._observation()
 
     def step(self, action: int):
-        # TODO apply action
-
+        if not self._ignore_action:
+            self.observable_state = Action(action)
+        knowledge = self.wait_for_observed()
+        # TODO use knowledge ito update observation and rward
+        self._ignore_action = False
         return self._observation(), self._reward(), self._is_termination_state(), {}
 
     def reset(self):
-        return self._observation()
+        pass
 
     def _reward(self):
         # TODO
         return 0
 
     def _observation(self):
-        # TODO use self._controller.knowledge to compute observation
+        # TODO
         return np.zeros_like(self.observation_space.shape)
 
     def _is_termination_state(self):
