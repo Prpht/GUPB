@@ -4,11 +4,12 @@ import numpy as np
 
 from typing import Sequence
 
-from gupb.environment.observer import Observer, Observable
-from gupb.model.characters import Action, ChampionKnowledge
+from gupb.controller.batman.environment.knowledge import Knowledge
+from gupb.controller.batman.environment.observer import Observer, Observable
+from gupb.model.characters import Action
 
 
-class GUPBEnv(gym.Env, Observer[ChampionKnowledge], Observable[Action]):
+class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
     metadata = {
         "render.modes": ["human", "rgb_array"],
     }
