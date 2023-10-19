@@ -1,4 +1,4 @@
-from gupb.controller import keyboard
+from gupb.controller import keyboard, our
 from gupb.controller import random
 
 CONFIGURATION = {
@@ -6,11 +6,8 @@ CONFIGURATION = {
         'lone_sanctum',
     ],
     'controllers': [
-        keyboard.KeyboardController(),
+        our.OurController("OOSOS"),
         random.RandomController("Alice"),
-        random.RandomController("Bob"),
-        random.RandomController("Cecilia"),
-        random.RandomController("Darius"),
     ],
     'start_balancing': False,
     'visualise': True,
