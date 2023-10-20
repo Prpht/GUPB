@@ -1,4 +1,5 @@
 from typing import TypeVar, Generic
+import threading
 
 
 T = TypeVar("T")
@@ -6,16 +7,21 @@ T = TypeVar("T")
 
 class Observer(Generic[T]):
     def __init__(self) -> None:
-        self.__state: T | None
+        self.__state: T | None = None
+        self.__cv = threading.Condition()
 
     def update(self, state: T) -> None:
-        self.__state = state
+        with self.__cv:
+            self.__state = state
+            self.__cv.notify_all()
 
     def wait_for_observed(self) -> T:
-        while self.__state is None:
-            pass
-        state = self.__state
-        self.__state = None
+        with self.__cv:
+            while self.__state is None:
+                self.__cv.wait()
+            state = self.__state
+            self.__state = None
+
         return state
 
 
