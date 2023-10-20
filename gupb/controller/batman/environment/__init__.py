@@ -2,10 +2,10 @@ import gym
 import gym.spaces
 import numpy as np
 
-from typing import Sequence
-
 from gupb.controller.batman.environment.knowledge import Knowledge
+from gupb.controller.batman.environment.observation import SomeObservation
 from gupb.controller.batman.environment.observer import Observer, Observable
+from gupb.controller.batman.environment.reward import SomeReward
 from gupb.model.characters import Action
 
 
@@ -17,46 +17,44 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
     def name():
         return "custom/gupb-env-v0"
 
-    def __init__(
-        self,
-        grid_shape: Sequence[int],
-        num_tiles_types: int,
-    ):
+    def __init__(self, reward: SomeReward, observation: SomeObservation):
         super().__init__()
+        Observer.__init__(self)
+        Observable.__init__(self)
 
         self.action_space = gym.spaces.Discrete(len(Action))
 
         self.observation_space = gym.spaces.Box(
             low=-0,
-            high=num_tiles_types,
-            shape=grid_shape,
-            dtype=np.int8,
+            high=1,
+            shape=observation.observation_shape,
+            dtype=np.float16,
         )
 
         self._ignore_action = True
 
+        self._reward = reward
+        self._observation = observation
+
     def render(self, *args, **kwargs):
-        return self._observation()
+        pass
 
     def step(self, action: int):
         if not self._ignore_action:
             self.observable_state = Action(action)
-        knowledge = self.wait_for_observed()
-        # TODO use knowledge ito update observation and rward
         self._ignore_action = False
-        return self._observation(), self._reward(), self._is_termination_state(), {}
+
+        knowledge = self.wait_for_observed()
+
+        return (
+            self._observation(knowledge),
+            self._reward(knowledge),
+            self._is_termination_state(),
+            {},
+        )
 
     def reset(self):
         pass
 
-    def _reward(self):
-        # TODO
-        return 0
-
-    def _observation(self):
-        # TODO
-        return np.zeros_like(self.observation_space.shape)
-
     def _is_termination_state(self):
-        # TODO
         return False

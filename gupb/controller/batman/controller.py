@@ -10,6 +10,8 @@ from gupb.model.characters import Action, ChampionKnowledge, Tabard
 class BatmanController(controller.Controller, Observer[Action], Observable[Knowledge]):
     def __init__(self, name: str) -> None:
         super().__init__()
+        Observer.__init__(self)
+        Observable.__init__(self)
         self._name = name
         self._episode = 0
         self._knowledge: Optional[Knowledge] = None
