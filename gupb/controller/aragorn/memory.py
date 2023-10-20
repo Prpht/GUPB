@@ -25,7 +25,6 @@ class Map:
     def __init__(self, name: str, terrain: arenas.Terrain) -> None:
         self.name = name
         self.terrain: arenas.Terrain = terrain
-        self.tiles_with_instant_effects: set[tiles.Tile] = set()
         self.size: tuple[int, int] = arenas.terrain_size(self.terrain)
         self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1

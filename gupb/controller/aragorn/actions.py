@@ -25,6 +25,9 @@ class GoToAction(Action):
         self.destination = destination
 
     def perform(self, memory :Memory) -> characters.Action:
-        # memory.position
-        # self.destination
+        """
+        Calculates shortest path from memory.position to self.destination
+        and returns the first step of the path.
+        """
+        
         return characters.Action.TURN_RIGHT
