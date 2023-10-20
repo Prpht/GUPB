@@ -1,9 +1,10 @@
 import random
 from typing import Dict
+from xmlrpc.client import Boolean
 
 from gupb import controller
 
-from gupb.model import arenas, tiles
+from gupb.model import arenas, effects, tiles
 from gupb.model import characters
 from gupb.model import coordinates
 from gupb.model.coordinates import Coords
@@ -43,13 +44,20 @@ class CynamonkaController(controller.Controller):
         self._update_discovered_terrain(knowledge.visible_tiles)
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
-        #visible_tiles = knowledge.visible_tiles
+        visible_tiles = knowledge.visible_tiles
 
         next_position = self.position + self.facing.value
         if self.discovered_arena[next_position].character:
-            return POSSIBLE_ACTIONS[3]
+            if self.discovered_arena[next_position].character.health < self.discovered_arena[self.position].character.health:
+                return POSSIBLE_ACTIONS[3]
+            else:
+                return random.choice(POSSIBLE_ACTIONS[:2])
+        if self.is_mist(knowledge.visible_tiles):
+            return random.choice(POSSIBLE_ACTIONS[:2])
+        else: pass
+
         if self.discovered_arena[next_position].type != 'sea' and self.discovered_arena[next_position].type != 'wall':
-            return POSSIBLE_ACTIONS[2]
+            return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
         else:
             return random.choice(POSSIBLE_ACTIONS[:2])
 
@@ -63,6 +71,13 @@ class CynamonkaController(controller.Controller):
 
     def check_menhir(self, coords: coordinates.Coords):
         return self.discovered_arena[coords].type == 'menhir'
+
+    def is_mist(self, visible_tiles) -> Boolean:
+        for tile in visible_tiles.values():
+            if effects.EffectDescription(type='mist') in tile.effects:
+                return True
+        return False
+
 
     def praise(self, score: int) -> None:
         pass
