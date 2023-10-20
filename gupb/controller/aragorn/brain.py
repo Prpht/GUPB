@@ -1,8 +1,8 @@
 from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 
-from gupb.controller.botv1.memory import Memory
-from gupb.controller.botv1.actions import *
+from gupb.controller.aragorn.memory import Memory
+from gupb.controller.aragorn.actions import *
 
 
 
@@ -17,3 +17,6 @@ class Brain:
         self.memory.update(knowledge)
         actionToPerform = self.actions['spin']
         return actionToPerform.perform(self.memory)
+    
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.memory.reset(arena_description)

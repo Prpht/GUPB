@@ -2,10 +2,10 @@ from gupb import controller
 from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 
-from gupb.controller.botv1.brain import Brain
+from gupb.controller.aragorn.brain import Brain
 
 
-class Botv1Controller(controller.Controller):
+class AragornController(controller.Controller):
     def __init__(self, first_name :str):
         self.first_name = first_name
         self.brain = Brain()
@@ -17,12 +17,12 @@ class Botv1Controller(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.brain.reset(arena_description)
     
     @property
     def name(self) -> str:
-        return 'BotV1_' + self.first_name
+        return 'Aragorn'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.BLUE
+        return characters.Tabard.YELLOW
