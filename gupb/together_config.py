@@ -14,7 +14,7 @@ from gupb.controller import shrek
 from gupb.controller import sniezny_kockodan
 # from gupb.controller import spejson
 from gupb.controller import tuptus
-from gupb.controller import botv1
+from gupb.controller import aragorn
 
 """
         aksolotl.AksolotlController("Old"),
@@ -37,7 +37,7 @@ CONFIGURATION = {
         'ordinary_chaos',
     ],
     'controllers': [
-        botv1.Botv1Controller("a"),
+        aragorn.AragornController("Aragorn"),
         elvis.DodgeController("Elvis"),
     ],
     'start_balancing': False,
