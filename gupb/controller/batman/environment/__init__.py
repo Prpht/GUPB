@@ -19,6 +19,8 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
 
     def __init__(self, reward: SomeReward, observation: SomeObservation):
         super().__init__()
+        Observer.__init__(self)
+        Observable.__init__(self)
 
         self.action_space = gym.spaces.Discrete(len(Action))
 
@@ -55,5 +57,4 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         pass
 
     def _is_termination_state(self):
-        # TODO
         return False

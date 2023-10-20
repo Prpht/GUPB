@@ -3,6 +3,7 @@ import numpy as np
 import scipy.stats as stats
 
 from gupb.controller.batman.environment.knowledge import Knowledge
+from gupb.model.coordinates import Coords
 
 
 class SomeReward(ABC):
@@ -30,9 +31,6 @@ class AccumulatedReward(SomeReward):
             sum([reward(knowledge) * weight for reward, weight in self._wighted_reward])
             / self._total_weight
         )
-
-
-Coords = tuple[int, int]
 
 
 def distance(a: Coords, b: Coords) -> float:
