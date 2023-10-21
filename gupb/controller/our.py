@@ -162,9 +162,6 @@ class OurController(controller.Controller):
                     mist_coords.append(coords)
         return mist_coords
 
-    def find_enemies_coords(self):
-        
-
     def find_nearest_mist_coords(self, mist_coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
         min_distance_squared = 2 * MAX_SIZE**2
         nearest_mist_coords = None
@@ -175,9 +172,12 @@ class OurController(controller.Controller):
                 nearest_mist_coords = coords
         return min_distance_squared
 
-
-
-
+    def find_enemies_coords(self):
+        enemies_coords = []
+        for coords, tile in tiles.items():
+            if tile.character:
+                enemies_coords.append(coords)
+        return enemies_coords
     @property
     def name(self) -> str:
         return f'OurController{self.first_name}'
