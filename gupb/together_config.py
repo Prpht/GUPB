@@ -1,15 +1,17 @@
 from gupb.controller import random
-from gupb.scripts import arena_generator
+from gupb.controller import keyboard
+from gupb.controller.mongolek import mongolek
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(30),
+    'arenas': [
+        'lone_sanctum',
+    ],
     'controllers': [
-        random.RandomController("Alice"),
-        random.RandomController("Bob"),
-        random.RandomController("Cecilia"),
+        mongolek.Mongolek("Mongolek"),
+
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 1000,
+    'runs_no': 1,
 }
