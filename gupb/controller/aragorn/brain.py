@@ -11,11 +11,13 @@ class Brain:
         self.memory = Memory()
         self.actions = {
             'spin': SpinAction(),
+            'go_to': GoToAction(),
+            'random': RandomAction()
         }
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
-        actionToPerform = self.actions['spin']
+        actionToPerform = self.actions['go_to']
         return actionToPerform.perform(self.memory)
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
