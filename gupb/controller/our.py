@@ -30,7 +30,7 @@ class SeenWeapon(NamedTuple):
 class OurController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.current_position = Optional[coordinates.Coords] = None
+        self.current_position: Optional[coordinates.Coords] = None
         # remembering map
         self.epoch: int = 0
         self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
