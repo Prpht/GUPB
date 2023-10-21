@@ -28,21 +28,27 @@ class TileAnalyzer:
     def tile_type(self) -> str:
         return self.tile_knowledge.type
 
+    @property
     def is_wall(self) -> bool:
         return self.tile_type == "wall"
 
+    @property
     def is_water(self) -> bool:
         return self.tile_type == "water"
 
+    @property
     def is_manhir(self) -> bool:
         return self.tile_type == "manhir"
 
+    @property
     def is_attacked(self) -> bool:
         return self.tile_knowledge.attacked
 
+    @property
     def has_mist(self) -> bool:
         return self.tile_knowledge.mist
 
+    @property
     def last_seen(self) -> int:
         return self.tile_knowledge.last_seen
 
@@ -51,26 +57,33 @@ class TileAnalyzer:
     def weapon(self) -> str:
         return self.tile_knowledge.weapon.name if self.tile_knowledge.weapon is not None else "none"
 
+    @property
     def has_knife(self) -> bool:
         return self.weapon == "knife"
 
+    @property
     def has_sword(self) -> bool:
         return self.weapon == "sword"
 
+    @property
     def has_bow(self) -> bool:
         return self.weapon == "bow"
 
+    @property
     def has_axe(self) -> bool:
         return self.weapon == "axe"
 
+    @property
     def has_amulet(self) -> bool:
         return self.weapon == "amulet"
 
     # characters
+    @property
     def has_enemy(self) -> bool:
         return self.tile_knowledge.character is not None \
             and self.position != self.knowledge.position
 
+    @property
     def character_health(self) -> int:
         character = self.tile_knowledge.character
         return character.health if character is not None else 0
@@ -80,18 +93,23 @@ class TileAnalyzer:
         character = self.tile_knowledge.character
         return character.weapon.name if character is not None else "none"
 
+    @property
     def has_character_with_knife(self) -> bool:
         return self.character_weapon == "knife"
 
+    @property
     def has_character_with_sword(self) -> bool:
         return self.character_weapon == "sword"
 
+    @property
     def has_character_with_bow(self) -> bool:
         return self.character_weapon == "bow"
 
+    @property
     def has_character_with_axe(self) -> bool:
         return self.character_weapon == "axe"
 
+    @property
     def has_character_with_amulet(self) -> bool:
         return self.character_weapon == "amulet"
 
@@ -100,15 +118,19 @@ class TileAnalyzer:
         character = self.tile_knowledge.character
         return character.facing if character is not None else None
 
+    @property
     def has_character_facing_up(self) -> bool:
         return self.character_facing == Facing.UP
 
+    @property
     def has_character_facing_down(self) -> bool:
         return self.character_facing == Facing.DOWN
 
+    @property
     def has_character_facing_left(self) -> bool:
         return self.character_facing == Facing.LEFT
 
+    @property
     def has_character_facing_right(self) -> bool:
         return self.character_facing == Facing.RIGHT
 
@@ -117,5 +139,6 @@ class TileAnalyzer:
     def consumable(self) -> str:
         return self.tile_knowledge.consumable.name if self.tile_knowledge.consumable is not None else "none"
 
+    @property
     def has_potion(self) -> bool:
         return self.consumable == "potion"

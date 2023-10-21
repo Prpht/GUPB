@@ -131,7 +131,7 @@ def run_training(config: TrainingConfig):
 
     games = threading.Thread(
         target=run_games,
-        args=[1, config.games_per_epoch, config.areans, controllers],
+        args=[1, config.games_per_epoch, config.areans, controllers_for_games],
     )
     games.start()
 

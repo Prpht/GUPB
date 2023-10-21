@@ -22,6 +22,13 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         Observer.__init__(self)
         Observable.__init__(self)
 
+        self.action_map = [
+            Action.TURN_LEFT,
+            Action.TURN_RIGHT,
+            Action.STEP_FORWARD,
+            Action.ATTACK,
+            Action.DO_NOTHING
+        ]
         self.action_space = gym.spaces.Discrete(len(Action))
 
         self.observation_space = gym.spaces.Box(
@@ -41,7 +48,7 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
 
     def step(self, action: int):
         if not self._ignore_action:
-            self.observable_state = Action(action)
+            self.observable_state = self.action_map[action]
         self._ignore_action = False
 
         knowledge = self.wait_for_observed()
