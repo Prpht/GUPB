@@ -21,15 +21,26 @@ class SomeAlgo(ABC):
     def __init__(self, env: GUPBEnv, config: AlgoConfig) -> None:
         self._algo = self._build_algo(env, config)
 
-    def train(self, time_steps: int) -> None:
+    @property
+    def timesteps_limit(self) -> int:
+        # just in case, TODO need to investigate
+        return 5
+
+    def train(self) -> None:
         """where time steps is number of env steps"""
-        self._algo.learn(time_steps)
+
+        self._algo.learn(self.timesteps_limit)
+
+    def set_timesteps(self, timesteps: int):
+        self._algo.num_timesteps = timesteps
 
     def save(self, path: str) -> None:
         self._algo.save(path)
+        self._algo.save_replay_buffer(f"{path}_reply_buffer")
 
     def load(self, path: str) -> None:
         self._algo.load(path)
+        self._algo.load_replay_buffer(f"{path}_reply_buffer")
 
     @abstractmethod
     def _build_algo(self, env, config: AlgoConfig) -> OffPolicyAlgorithm:

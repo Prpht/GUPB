@@ -17,7 +17,9 @@ from gupb.controller.batman.environment.reward import (
 
 
 class Trainer:
-    def __init__(self, controller) -> None:
+    def __init__(self, controller, path_to_algo: str) -> None:
+        self._path_to_algo = path_to_algo
+
         # TODO observation config
         # observation
         neighborhood_range = 8
@@ -41,11 +43,25 @@ class Trainer:
         # algo
         self._algo = DQN(self._env, AlgoConfig())
 
-        # training
-        self._trainig = Thread(target=self._training_function)
-
     def start(self):
+        try:
+            self._algo.load(self._path_to_algo)
+        except:
+            pass
+        self._trainig = Thread(target=self._training_function)
         self._trainig.start()
 
+    def next_step(self):
+        self._algo.set_timesteps(0)
+
+    def stop(self, knowledge_to_terminate):
+        # TODO is any other way?
+        self._env.update(knowledge_to_terminate)
+        self._algo.set_timesteps(self._algo.timesteps_limit)
+        while self._trainig.is_alive():
+            self._env.update(knowledge_to_terminate)
+        self._trainig.join()
+        self._algo.save(self._path_to_algo)
+
     def _training_function(self):
-        self._algo.train(10_000)
+        self._algo.train()
