@@ -4,7 +4,7 @@ import random
 
 from typing import Protocol, Dict
 from gupb.model.characters import ChampionKnowledge, Action, Tabard, ChampionDescription
-from gupb.model import weapons
+from gupb.model import weapons, tiles
 from gupb.model.arenas import ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
@@ -26,14 +26,24 @@ WEAPONS_TIER_LIST = [
     weapons.Amulet
 ]
 
+WEAPONS_MAPPING = {
+    'axe': weapons.Axe,
+    'bow': weapons.Bow,
+    'sword': weapons.Sword,
+    'amulet': weapons.Amulet,
+    'knife': weapons.Knife
+}
+
+TERRAIN_MAPPING = {
+    'land': tiles.Land,
+    'sea': tiles.Sea,
+    'wall': tiles.Wall,
+    'menhir': tiles.Menhir
+}
+
 
 class Strategy(Protocol):
-    def perform(self, curren_pos: Coords) -> Action:
-        pass
-
-
-class GoToStrategy(Strategy):
-    def __init__(self, target: Coords):
+    def perform(self, champion: ChampionDescription, knowledge: ChampionKnowledge) -> Action:
         pass
 
 
@@ -41,8 +51,12 @@ class RandomStrategy(Strategy):
     def __init__(self):
         pass
 
-    def perform(self, curren_pos: Coords) -> Action:
-        return random.choice(POSSIBLE_RANDOM_ACTIONS)
+    def perform(self, champion: ChampionDescription, knowledge: ChampionKnowledge) -> Action:
+        options = [Action.TURN_RIGHT]
+        forward_pos = champion.facing.value + knowledge.position
+        if TERRAIN_MAPPING[knowledge.visible_tiles[forward_pos].type].passable:
+            options.extend([Action.STEP_FORWARD] * 2 + [Action.TURN_RIGHT])
+        return random.choice(options)
 
 
 class FSMBot(Controller):
@@ -76,19 +90,30 @@ class FSMBot(Controller):
                 res['enemies'].append((coord, tile.character))
             if tile.type == 'menhir':
                 res['menhir'].append(coord)
-            if tile.effects is not None:
+            if len(tile.effects) > 0:
                 res['effects'].append((coord, tile.effects))
         return res
 
-    # def can_attack_someone(self, enemies_loc, tiles) -> bool:
-    #     weapons_range = self.champ_data.weapon.cut_positions()
+    def should_attack(self, knowledge: ChampionKnowledge) -> bool:
+        weapon_obj = WEAPONS_MAPPING[self.champ_data.weapon.name]
+        tiles_map = {
+            pos: TERRAIN_MAPPING[tile.type]
+            for pos, tile in knowledge.visible_tiles.items()
+        }
+        attacked_tiles = weapon_obj.cut_positions(tiles_map, knowledge.position, self.champ_data.facing)
+        for tile in attacked_tiles:
+            if tile in knowledge.visible_tiles and knowledge.visible_tiles[tile].character is not None:
+                return True
+        return False
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         champ_pos = knowledge.position
         self.champ_data = knowledge.visible_tiles[champ_pos].character
-        points_of_interest = self.analyse_field(champ_pos, knowledge.visible_tiles)
 
-        return self.current_strategy.perform(champ_pos)
+        if self.should_attack(knowledge):
+            return Action.ATTACK
+
+        return self.current_strategy.perform(self.champ_data, knowledge)
 
     def praise(self, score: int) -> None:
         pass
