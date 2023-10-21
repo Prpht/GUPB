@@ -58,7 +58,7 @@ class OurController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
-            self.update_state(self, knowledge)
+            self.update_state(knowledge)
 
             x, y = self.current_position
             path = self.finder.find_path(self.grid.node(x, y), self.grid.node(6, 4), self.grid)
