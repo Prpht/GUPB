@@ -7,9 +7,7 @@ class TileKnowledge:
     def __init__(self, coords: coordinates.Coords):
         self.coords = coords
         self.type: Optional[str] = None
-        self.last_seen: Optional[
-            int
-        ] = None  # TODO should we store it as -1 instead of None?
+        self.last_seen: Optional[int] = -1
         self.weapon: Optional[weapons.WeaponDescription] = None
         self.character: Optional[characters.ChampionDescription] = None
         self.consumable: Optional[consumables.ConsumableDescription] = None

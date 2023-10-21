@@ -3,6 +3,7 @@ import numpy as np
 from typing import Sequence
 
 from gupb.controller.batman.environment.knowledge import Knowledge, TileKnowledge
+from gupb.controller.batman.environment.analyzers.knowledge_analyzer import KnowledgeAnalyzer
 from gupb.model.coordinates import Coords, sub_coords, add_coords
 
 
@@ -24,41 +25,64 @@ class SimpleObservation(SomeObservation):
         self._range_vec = Coords(neighborhood_range, neighborhood_range)
 
     @property
-    def num_types(self) -> int:
-        # TODO
-        return 1
+    def embedding_size(self) -> int:
+        """
+        Embedding size is the number of various features, which encode all the information about a single tile.
+        """
+        return 24  # TODO do we need to extract this to a separate class to make this value automatically updated?
 
     @property
     def observation_shape(self) -> Sequence[int]:
         return (
-            self.num_types,
+            self.embedding_size,
             2 * self._range_vec.x + 1,
             2 * self._range_vec.y + 1,
         )
 
+    def _tile_embedding(self, knowledge: Knowledge, position: Coords) -> np.ndarray:
+        analyzer = KnowledgeAnalyzer(knowledge)
+        tile_analyzer = analyzer.tile_analyzer(position)
+
+        embedding = np.array([
+            # tile properties (7)
+            tile_analyzer.is_out_of_map,
+            tile_analyzer.is_wall,
+            tile_analyzer.is_water,
+            tile_analyzer.is_manhir,
+            tile_analyzer.is_attacked,
+            tile_analyzer.has_mist,
+            tile_analyzer.last_seen,
+
+            # weapons (5)
+            tile_analyzer.has_knife,
+            tile_analyzer.has_sword,
+            tile_analyzer.has_bow,
+            tile_analyzer.has_axe,
+            tile_analyzer.has_amulet,
+
+            # characters (11)
+            tile_analyzer.has_enemy,
+            tile_analyzer.character_health,
+            tile_analyzer.has_character_with_knife,
+            tile_analyzer.has_character_with_sword,
+            tile_analyzer.has_character_with_bow,
+            tile_analyzer.has_character_with_axe,
+            tile_analyzer.has_character_with_amulet,
+            tile_analyzer.has_character_facing_up,
+            tile_analyzer.has_character_facing_down,
+            tile_analyzer.has_character_facing_left,
+            tile_analyzer.has_character_facing_right,
+
+            # consumables (1)
+            tile_analyzer.has_potion,
+        ])
+
+        return embedding.astype(np.float32)
+
     def _observation(self, knowledge: Knowledge) -> np.ndarray:
         observation = np.zeros(self.observation_shape)
-        for tile in knowledge.arena.explored_map.values():
-            position = self._position(knowledge.position, tile.coords)
-            if tile.type is not None and position is not None:
-                type = self._tile_type_mapping(tile)
-                observation[type, position.x, position.y] = 1
+        top_left_position = sub_coords(knowledge.position, self._range_vec)
+        for x, y in np.ndindex(observation.shape[1:]):
+            map_position = add_coords(Coords(x, y), top_left_position)
+            observation[:, x, y] = self._tile_embedding(knowledge, map_position)
         return observation
-
-    def _position(self, champion: Coords, other: Coords) -> Coords | None:
-        diff = sub_coords(other, champion)
-        position = add_coords(diff, self._range_vec)
-        limit = position.x < self.observation_shape[1]
-        if (
-            position.x >= 0
-            and position.y >= 0
-            and position.x < limit
-            and position.y < limit
-        ):
-            return position
-        else:
-            return None
-
-    def _tile_type_mapping(self, tile: TileKnowledge) -> int:
-        # TODO
-        return 0
