@@ -111,7 +111,7 @@ class OurController(controller.Controller):
             return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
 
     def praise(self, score: int) -> None:
-        self.maps[self.current_map_name].update(self.seen_tiles) # todo czy nietrzeba usunąć czegoś co się zmienia?
+        self.maps[self.current_map_name].update(self.seen_tiles)  # todo czy nietrzeba usunąć czegoś co się zmienia?
 
 
 
