@@ -40,7 +40,7 @@ class OurController(controller.Controller):
         self.maps: Dict[str]
 
         self.menhir_coords: Optional[coordinates.Coords] = None
-        self.wapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
+        self.weapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
         self.finder: Optional[AStarFinder] = None
         self.paths = {
             'to_menhir': None,
@@ -111,9 +111,20 @@ class OurController(controller.Controller):
             return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
 
     def praise(self, score: int) -> None:
-        self.maps[self.current_map_name].update(self.seen_tiles)  # todo czy nietrzeba usunąć czegoś co się zmienia?
+        self.remember_map()
 
+    def remember_map(self):
+        self.reset_seen_tiles()
+        self.maps[self.current_map_name].update(self.seen_tiles)
 
+    def reset_seen_tiles(self) -> None:
+        for coords, tile_round in self.seen_tiles.items():
+            self.seen_tiles[coords] = self.get_reset_seen_tile(tile_round)
+
+    def get_reset_seen_tile(self, tile: Tuple[tiles.TileDescription, int]) -> Tuple[tiles.TileDescription, int]:
+        epoch = 0
+        tile = tiles.TileDescription(tile[0].type, tile[0].loot, None, None)  # todo czy nietrzeba usunąć czegoś co się zmienia?
+        return tile, epoch
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         print(
@@ -150,17 +161,17 @@ class OurController(controller.Controller):
 
     def look_up_for_weapons(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, tile in tiles.items():
-            if self.wapons_coords[coords]:
+            if self.weapons_coords[coords]:
                 self._update_waepon(coords, tile)
             if tile.loot:
                 self._add_weapon(coords, tile)
 
     def _add_weapon(self, coords, tile):
-        self.wapons_coords[coords] = SeenWeapon(tile.loot.name, self.epoch)
+        self.weapons_coords[coords] = SeenWeapon(tile.loot.name, self.epoch)
 
     def _update_waepon(self, coords, tile):
         if not tile.loot:
-            del self.wapons_coords[coords]
+            del self.weapons_coords[coords]
 
     def find_mist(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> List[coordinates.Coords]:
         mist_coords = []
