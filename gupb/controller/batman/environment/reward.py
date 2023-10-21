@@ -69,6 +69,8 @@ class UpdatedKnowledgeReward(SomeReward):
         episodes = np.array(
             [tile.last_seen for tile in knowledge.arena.explored_map.values()]
         )
+        if episodes.size == 0:
+            return 0
         penalty = np.mean((episodes - knowledge.episode) / self._uptodate_till)
         return float(1 - 2 * penalty**2)
 
