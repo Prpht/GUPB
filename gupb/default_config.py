@@ -1,14 +1,14 @@
-from gupb.controller import cynamonka
+from gupb.controller import keyboard
 from gupb.controller import random
 
-cynamonka_controller = cynamonka.CynamonkaController("cynamonka")
+keyboard_controller = keyboard.KeyboardController()
 
 CONFIGURATION = {
     'arenas': [
         'ordinary_chaos',
     ],
     'controllers': [
-        cynamonka_controller,
+        keyboard_controller,
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
@@ -16,7 +16,7 @@ CONFIGURATION = {
     ],
     'start_balancing': False,
     'visualise': True,
-    'show_sight': cynamonka_controller,
+    'show_sight': keyboard_controller,
     'runs_no': 1,
     'profiling_metrics': [],
 }

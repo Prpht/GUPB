@@ -1,6 +1,7 @@
 import random
 from typing import Dict
 from xmlrpc.client import Boolean
+from math import sqrt
 
 from gupb import controller
 
@@ -16,20 +17,17 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
 ]
-TerrainDescription = Dict[coordinates.Coords, tiles.TileDescription]
+ArenaDescription = Dict[coordinates.Coords, tiles.TileDescription]
 
-# noinspection PyUnusedLocal
-# noinspection PyMethodMayBeStatic
 class CynamonkaController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.weapon = Knife
         self.champion = None
         self.position = None
-
-        self.menhir_coords = None
-        self.discovered_arena: TerrainDescription = dict()
-        self.target = Coords(25, 25)
+        self.facing = None
+        self.menhir_position = None
+        self.discovered_arena: ArenaDescription = dict()
         self.move_count = 0
 
     def __eq__(self, other: object) -> bool:
@@ -41,10 +39,10 @@ class CynamonkaController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self._update_discovered_terrain(knowledge.visible_tiles)
+        self.move_count+=1
+        self.update_discovered_arena(knowledge.visible_tiles)
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
-        visible_tiles = knowledge.visible_tiles
 
         next_position = self.position + self.facing.value
         if self.discovered_arena[next_position].character:
@@ -52,31 +50,33 @@ class CynamonkaController(controller.Controller):
                 return POSSIBLE_ACTIONS[3]
             else:
                 return random.choice(POSSIBLE_ACTIONS[:2])
-        if self.is_mist(knowledge.visible_tiles):
-            return random.choice(POSSIBLE_ACTIONS[:2])
-        else: pass
-
-        if self.discovered_arena[next_position].type != 'sea' and self.discovered_arena[next_position].type != 'wall':
+        if self.menhir_position:
+            print(f"{distance(next_position, self.menhir_position)}")
+            if (distance(next_position, self.menhir_position) < distance(self.position, self.menhir_position)) and self.can_i_move_forward():
+                return POSSIBLE_ACTIONS[2]
+        if self.can_i_move_forward():
             return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
         else:
             return random.choice(POSSIBLE_ACTIONS[:2])
 
-        
-    def _update_discovered_terrain(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
+    def can_i_move_forward(self):
+        next_position = self.position + self.facing.value
+        return self.discovered_arena[next_position].type != 'sea' and self.discovered_arena[next_position].type != 'wall'
+            
+    def update_discovered_arena(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, description in visible_tiles.items():
             self.discovered_arena[coords] = description
-            # o chuj chodzi
-            if not self.menhir_coords and self.check_menhir(coords):
-                self.menhir_coords = coords
+            if not self.menhir_position and self.is_menhir(coords):
+                self.menhir_position = coords
 
-    def check_menhir(self, coords: coordinates.Coords):
+    def is_menhir(self, coords: coordinates.Coords) -> Boolean:
         return self.discovered_arena[coords].type == 'menhir'
 
-    def is_mist(self, visible_tiles) -> Boolean:
-        for tile in visible_tiles.values():
-            if effects.EffectDescription(type='mist') in tile.effects:
-                return True
-        return False
+    # def is_mist(self, visible_tiles) -> Boolean:
+    #     for tile in visible_tiles.values():
+    #         if effects.EffectDescription(type='mist') in tile.effects:
+    #             return True
+    #     return False
 
 
     def praise(self, score: int) -> None:
@@ -87,10 +87,10 @@ class CynamonkaController(controller.Controller):
         self.champion = None
         self.position = None
         self.facing = None
-        self.discovered_arena: TerrainDescription = dict()
-        self.menhir_coords = None
+        self.discovered_arena: ArenaDescription = dict()
+        self.menhir_position = None
         self.move_count = 0
-        self.target = Coords(25, 25)
+        self.target = Coords(25,25)
 
     @property
     def name(self) -> str:
@@ -99,6 +99,9 @@ class CynamonkaController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.PINK
+
+def distance(coords, other_coords):
+    return sqrt((coords[0] - other_coords[0]) ** 2 + (coords[1] - other_coords[1]) ** 2)
 
 
 
