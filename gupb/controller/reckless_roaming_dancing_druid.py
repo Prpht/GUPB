@@ -54,16 +54,10 @@ class R2D2StateMachine(StateMachine):
     searching_for_menhir = State('SearchingForMenhir', value="SearchingForMenhir", initial=True)
     approaching_menhir = State('ApproachingMenhir', value="ApproachingMenhir")
     defending = State('Defending', value="Defending")
-    defending_turn = State('DefendingTurn', value="Defending")
-    defending_attack = State('DefendingAttack', value="Defending")
 
     # Define the transitions of the StateMachine
     approach_menhir = searching_for_menhir.to(approaching_menhir)
-    defend = \
-        approaching_menhir.to(defending) | \
-        defending.to(defending_attack) | \
-        defending_attack.to(defending_turn) | \
-        defending_turn.to(defending_attack)
+    defend = approaching_menhir.to(defending)
 
 
 class RecklessRoamingDancingDruid(controller.Controller):
@@ -141,7 +135,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         for coords, tile_description in champion_knowledge.visible_tiles.items():
             self.decay_mask[coords[1], coords[0]] = self.decay
 
-    def __init__(self, first_name: str, decay: int = 1):
+    def __init__(self, first_name: str, decay: int = 1, menhir_eps=0):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
@@ -161,6 +155,8 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.champion_position = None
         self.initial_facing = None
         self.facing = None
+        self.menhir_eps = menhir_eps
+        self.defending_attack = False # TODO This is a hack, use the state machine instead
         self.finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
 
         # This is the representation of the map state that will be returned as the observation
@@ -194,54 +190,64 @@ class RecklessRoamingDancingDruid(controller.Controller):
         delta = next_tile_coords - self.champion_position
         facing = knowledge.visible_tiles[self.champion_position].character.facing
 
-        if facing == characters.Facing.UP:
-            if delta == characters.Facing.UP:
+        if facing.value == characters.Facing.UP.value:
+            if delta == characters.Facing.UP.value:
                 return self.action_step_forward()
-            if delta == characters.Facing.LEFT:
+            if delta == characters.Facing.LEFT.value:
                 return self.action_turn_left()
             return self.action_turn_right()
         
-        if facing == characters.Facing.RIGHT:
-            if delta == characters.Facing.RIGHT:
+        if facing.value == characters.Facing.RIGHT.value:
+            if delta == characters.Facing.RIGHT.value:
                 return self.action_step_forward()
-            if delta == characters.Facing.UP:
+            if delta == characters.Facing.UP.value:
                 return self.action_turn_left()
             return self.action_turn_right()
         
-        if facing == characters.Facing.DOWN:
-            if delta == characters.Facing.DOWN:
+        if facing.value == characters.Facing.DOWN.value:
+            if delta == characters.Facing.DOWN.value:
                 return self.action_step_forward()
-            if delta == characters.Facing.RIGHT:
+            if delta == characters.Facing.RIGHT.value:
                 return self.action_turn_left()
             return self.action_turn_right()
         
-        if facing == characters.Facing.LEFT:
-            if delta == characters.Facing.LEFT:
+        if facing.value == characters.Facing.LEFT.value:
+            if delta == characters.Facing.LEFT.value:
                 return self.action_step_forward()
-            if delta == characters.Facing.DOWN:
+            if delta == characters.Facing.DOWN.value:
                 return self.action_turn_left()
             return self.action_turn_right()
 
     def _searching_for_menhir(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return self.action_turn_right()
     
-    def _approaching_menhir(self, knowledge: characters.ChampionKnowledge, eps = 0) -> characters.Action:
-        
+    def _approaching_menhir(self, knowledge: characters.ChampionKnowledge, eps = 1) -> characters.Action:
+
         delta = self.champion_position - self.menhir_position
         delta = abs(delta[0]) + abs(delta[1])
         if delta <= eps:
             self.state_machine.defend()
+            self.defending_attack = True
             return self._defending(knowledge)
         
         return self._move_to(self.menhir_position, knowledge)
 
     def _defending(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-
-        self.state_machine.defend()
-        if self.state_machine.current_state == self.state_machine.defending_attack:
+        
+        if self.defending_attack:
+            self.defending_attack = False
             return self.action_attack()
-        if self.state_machine.current_state == self.state_machine.defending_turn:
-            return self.action_turn_right()
+        
+        self.defending_attack = True
+        return self.action_turn_right()
+
+        # TODO Does not work, no matter what I do, the agent always turns
+        # if self.state_machine.current_state == self.state_machine.defending_attack:
+        #     # self.state_machine.defend_turn()
+        #     return self.action_attack()
+        # # if self.state_machine.current_state == self.state_machine.defending_turn:
+        # #     # self.state_machine.defend_attack()
+        # #     return self.action_turn_right()
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         
@@ -260,10 +266,9 @@ class RecklessRoamingDancingDruid(controller.Controller):
             return self._searching_for_menhir(knowledge)
         
         if self.state_machine.current_state.value == self.state_machine.approaching_menhir.value:
-            action = self._approaching_menhir(knowledge)
-            return action
+            return self._approaching_menhir(knowledge, eps=self.menhir_eps)
         
-        if self.state_machine.current_state.value == self.state_machine.defending.value:
+        if self.state_machine.current_state.value == "Defending":
             return self._defending(knowledge)
 
     def praise(self, score: int) -> None:
