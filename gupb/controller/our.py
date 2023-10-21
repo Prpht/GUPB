@@ -37,10 +37,11 @@ class OurController(controller.Controller):
 
         # pathfinding
         self.grid: Optional[Grid] = None
+        self.maps: Dict[str]
 
         self.menhir_coords: Optional[coordinates.Coords] = None
         self.wapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
-
+        self.finder: Optional[AStarFinder] = None
         self.paths = {
             'to_menhir': None,
             'to_nearest_weapon': None
@@ -57,6 +58,8 @@ class OurController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        for coords, tile in knowledge.visible_tiles.items():
+            print("c", coords)
         try:
             self.update_state(knowledge)
 
@@ -69,11 +72,10 @@ class OurController(controller.Controller):
                 action = self.actions[self.actions_iterator]
                 self.actions_iterator += 1
             else:
-                action = random.choice(POSSIBLE_ACTIONS)
+                action = random.choice(POSSIBLE_ACTIONS) #TODO add tab
             print(self.actions)
         except Exception as e:
             print(e)
-        print(action)
         return action
 
     # naliczyć najkrótsze ścieżki po aktualizacji mapy oraz po dotarciu do punktu
@@ -96,7 +98,7 @@ class OurController(controller.Controller):
             actions.extend(self.map_facings_to_actions(a, b))
         return actions
 
-    def map_facings_to_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
+    def xxmap_facings_to_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
         if f1 == f2:
             return [characters.Action.STEP_FORWARD]
         elif f1.turn_left() == f2:
@@ -162,22 +164,41 @@ class OurController(controller.Controller):
                     mist_coords.append(coords)
         return mist_coords
 
-    def find_nearest_mist_coords(self, mist_coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
-        min_distance_squared = 2 * MAX_SIZE**2
-        nearest_mist_coords = None
-        for coords in mist_coords:
-            distance_squared = (coords.x - self.current_position.x) ** 2 + (coords.y - self.current_position.y) ** 2
-            if distance_squared < min_distance_squared:
-                min_distance_squared = distance_squared
-                nearest_mist_coords = coords
-        return min_distance_squared
+    def find_nearest_mist_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> Optional[coordinates.Coords]:
+        mist_coords = self.find_mist(tiles)
+        if mist_coords:
+            nearest_mist_coords = self.find_nearest_coords(self.current_position, mist_coords)
+            return nearest_mist_coords
+        else:
+            return None
 
-    def find_enemies_coords(self):
+    def find_nearest_enemy_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> Optional[coordinates.Coords]:
+        enemies_coords = self.find_enemies_coords(tiles)
+        if enemies_coords:
+            nearest_enemy_coords = self.find_nearest_coords(self.current_position, enemies_coords)
+            return nearest_enemy_coords
+        else:
+            return None
+
+    def find_enemies_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> List[coordinates.Coords]:
         enemies_coords = []
         for coords, tile in tiles.items():
             if tile.character:
                 enemies_coords.append(coords)
         return enemies_coords
+
+    def find_nearest_coords(self, point_coords: coordinates.Coords, coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
+        min_distance_squared = 2 * MAX_SIZE ** 2
+        nearest_coords = None
+        for coords in coords:
+            distance_squared = self.calc_distance(point_coords, coords)
+            if distance_squared < min_distance_squared:
+                min_distance_squared = distance_squared
+                nearest_coords = coords
+        return nearest_coords
+
+    def calc_distance(self, coords_1: coordinates.Coords, coords_2: coordinates.Coords) -> int:
+        return (coords_1.x - coords_2.x) ** 2 + (coords_1.y - coords_2.y) ** 2
     @property
     def name(self) -> str:
         return f'OurController{self.first_name}'
