@@ -48,6 +48,8 @@ class OurController(controller.Controller):
         }
         self.actions_iterator = 0
         self.actions = []
+        self.current_map_name = None
+        self.maps: Dict[str, Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]]] = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, OurController):
@@ -109,12 +111,16 @@ class OurController(controller.Controller):
             return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
 
     def praise(self, score: int) -> None:
-        pass
+        self.maps[self.current_map_name].update(self.seen_tiles) # todo czy nietrzeba usunąć czegoś co się zmienia?
+
+
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         print(
-            arena_description)  # dostajemy to także przed pierwszą turą - możemy zapamiętywać mapy między rozgrywkami po ich nazwie
+            arena_description)
         # reset roud unique variables
+        self.seen_tiles = self.maps.get(arena_description.name, dict())
+        self.current_map_name = arena_description.name
         self.epoch = 0
         self.actions = []
         self.actions_iterator = 0
