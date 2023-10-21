@@ -38,8 +38,8 @@ class OurController(controller.Controller):
         # pathfinding
         self.grid: Optional[Grid] = None
 
-        self.menhir_chords: Optional[coordinates.Coords] = None
-        self.wapons_chords: Dict[coordinates.Coords, SeenWeapon] = {}
+        self.menhir_coords: Optional[coordinates.Coords] = None
+        self.wapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
 
         self.paths = {
             'to_menhir': None,
@@ -73,6 +73,7 @@ class OurController(controller.Controller):
             print(self.actions)
         except Exception as e:
             print(e)
+        print(action)
         return action
 
     # naliczyć najkrótsze ścieżki po aktualizacji mapy oraz po dotarciu do punktu
@@ -133,42 +134,45 @@ class OurController(controller.Controller):
             print(e)
 
     def look_up_for_menhir(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
-        if not self.menhir_chords:
-            for chords, tile in tiles.items():
+        if not self.menhir_coords:
+            for coords, tile in tiles.items():
                 if tile.type == 'menhir':
-                    self.menhir_chords = chords
+                    self.menhir_coords = coords
                     break
 
     def look_up_for_weapons(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
-        for chords, tile in tiles.items():
-            if self.wapons_chords[chords]:
-                self._update_waepon(chords, tile)
+        for coords, tile in tiles.items():
+            if self.wapons_coords[coords]:
+                self._update_waepon(coords, tile)
             if tile.loot:
-                self._add_weapon(chords, tile)
+                self._add_weapon(coords, tile)
 
-    def _add_weapon(self, chords, tile):
-        self.wapons_chords[chords] = SeenWeapon(tile.loot.name, self.epoch)
+    def _add_weapon(self, coords, tile):
+        self.wapons_coords[coords] = SeenWeapon(tile.loot.name, self.epoch)
 
-    def _update_waepon(self, chords, tile):
+    def _update_waepon(self, coords, tile):
         if not tile.loot:
-            del self.wapons_chords[chords]
+            del self.wapons_coords[coords]
 
     def find_mist(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> List[coordinates.Coords]:
-        mist_chords = []
-        for chords, tile in tiles.items():
+        mist_coords = []
+        for coords, tile in tiles.items():
             for effect in tile.effects:
                 if effect.type == 'fog':
-                    mist_chords.append(chords)
-        return mist_chords
+                    mist_coords.append(coords)
+        return mist_coords
 
-    def find_nearest_mist_chords(self, mist_chords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
+    def find_enemies_coords(self):
+        
+
+    def find_nearest_mist_coords(self, mist_coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
         min_distance_squared = 2 * MAX_SIZE**2
-        nearest_mist_chords = None
-        for chords in mist_chords:
-            distance_squared = (chords.x - self.current_position.x) ** 2 + (chords.y - self.current_position.y) ** 2
+        nearest_mist_coords = None
+        for coords in mist_coords:
+            distance_squared = (coords.x - self.current_position.x) ** 2 + (coords.y - self.current_position.y) ** 2
             if distance_squared < min_distance_squared:
                 min_distance_squared = distance_squared
-                nearest_mist_chords = chords
+                nearest_mist_coords = coords
         return min_distance_squared
 
 
