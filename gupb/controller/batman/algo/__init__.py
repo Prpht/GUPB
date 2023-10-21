@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import namedtuple
+from dataclasses import dataclass
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.vec_env import DummyVecEnv
 import stable_baselines3.dqn as dqn
@@ -7,32 +7,40 @@ import stable_baselines3.dqn as dqn
 from gupb.controller.batman.environment import GUPBEnv
 
 
-AlgoConfig = namedtuple(
-    "TrainingConfig",
-    [
-        "learning_rate",
-        "batch_size",
-        "buffer_size",
-        "learning_starts",
-        "tau",
-        "gamma",
-    ],
-)
+@dataclass
+class AlgoConfig:
+    learning_rate: float = 0.005
+    batch_size: int = 32
+    buffer_size: int = 1000
+    learning_starts: int = 100
+    tau: float = 0.05
+    gamma: float = 0.98
 
 
 class SomeAlgo(ABC):
-    def __init__(self, envs: list[GUPBEnv], config: AlgoConfig) -> None:
-        env = DummyVecEnv([lambda: e for e in envs])
+    def __init__(self, env: GUPBEnv, config: AlgoConfig) -> None:
         self._algo = self._build_algo(env, config)
 
-    def train(self, epochs: int) -> None:
-        self._algo.learn(epochs)
+    @property
+    def timesteps_limit(self) -> int:
+        # just in case, TODO need to investigate
+        return 5
+
+    def train(self) -> None:
+        """where time steps is number of env steps"""
+
+        self._algo.learn(self.timesteps_limit)
+
+    def set_timesteps(self, timesteps: int):
+        self._algo.num_timesteps = timesteps
 
     def save(self, path: str) -> None:
         self._algo.save(path)
+        self._algo.save_replay_buffer(f"{path}_reply_buffer")
 
     def load(self, path: str) -> None:
         self._algo.load(path)
+        self._algo.load_replay_buffer(f"{path}_reply_buffer")
 
     @abstractmethod
     def _build_algo(self, env, config: AlgoConfig) -> OffPolicyAlgorithm:

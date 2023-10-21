@@ -70,6 +70,7 @@ class Knowledge:
         # self.champions: dict[str, tuple[characters.ChampionDescription]] = dict()
         # self.champions_positions: dict[str, coordinates.Coords] = dict()
         self.champions_alive: int = 0
+        self.episode = 0
         self.position = coordinates.Coords(0, 0)
 
     def update(self, knowledge: characters.ChampionKnowledge, episode: int) -> None:

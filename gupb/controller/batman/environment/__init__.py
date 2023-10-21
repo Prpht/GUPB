@@ -1,6 +1,8 @@
-import gym
-import gym.spaces
+import gymnasium as gym
+from gymnasium.envs.registration import register
+
 import numpy as np
+from typing import Any
 
 from gupb.controller.batman.environment.knowledge import Knowledge
 from gupb.controller.batman.environment.observation import SomeObservation
@@ -10,25 +12,11 @@ from gupb.model.characters import Action
 
 
 class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
-    metadata = {
-        "render.modes": ["human", "rgb_array"],
-    }
-
-    def name():
-        return "custom/gupb-env-v0"
-
     def __init__(self, reward: SomeReward, observation: SomeObservation):
         super().__init__()
         Observer.__init__(self)
         Observable.__init__(self)
 
-        self.action_map = [
-            Action.TURN_LEFT,
-            Action.TURN_RIGHT,
-            Action.STEP_FORWARD,
-            Action.ATTACK,
-            Action.DO_NOTHING
-        ]
         self.action_space = gym.spaces.Discrete(len(Action))
 
         self.observation_space = gym.spaces.Box(
@@ -38,30 +26,37 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
             dtype=np.float16,
         )
 
-        self._ignore_action = True
-
         self._reward = reward
         self._observation = observation
+
+        self._actions = [action for action in Action]
 
     def render(self, *args, **kwargs):
         pass
 
-    def step(self, action: int):
-        if not self._ignore_action:
-            self.observable_state = self.action_map[action]
-        self._ignore_action = False
-
+    def step(self, action_idx: int):
+        self.observable_state = self._actions[action_idx]
         knowledge = self.wait_for_observed()
 
-        return (
-            self._observation(knowledge),
-            self._reward(knowledge),
-            self._is_termination_state(),
-            {},
-        )
+        obs = self._observation(knowledge)
+        reward = self._reward(knowledge)
+        done = knowledge.episode == 0
+        truncated = False
+        info = {}
 
-    def reset(self):
-        pass
+        return obs, reward, done, truncated, info
 
-    def _is_termination_state(self):
-        return False
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[Any, dict[str, Any]]:
+        knowledge = self.wait_for_observed()
+        obs = self._observation(knowledge)
+        info = {}
+
+        return obs, info
+
+
+register(
+    id="GUPBBatman-v0",
+    entry_point="gupb.controller.batman.environment:GUPBEnv",
+)
