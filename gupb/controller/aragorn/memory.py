@@ -9,16 +9,19 @@ from gupb.model import characters, consumables, effects
 class Memory:
     def __init__(self):
         self.position: coordinates.Coords = None
+        self.facing: characters.Facing = characters.Facing.random()
         no_of_champions_alive: int = 0
         self.map: Map = None
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.position: coordinates.Coords = None
+        self.facing: characters.Facing = characters.Facing.random()
         no_of_champions_alive: int = 0
         self.map = Map.load(arena_description.name)
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.position = knowledge.position
+        self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
         for coords in knowledge.visible_tiles:
