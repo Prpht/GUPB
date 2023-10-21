@@ -5,6 +5,7 @@ from typing import Sequence
 from gupb.controller.batman.environment.knowledge import Knowledge, TileKnowledge
 from gupb.controller.batman.environment.analyzers.knowledge_analyzer import KnowledgeAnalyzer
 from gupb.model.coordinates import Coords, sub_coords, add_coords
+from gupb.model.characters import CHAMPION_STARTING_HP
 
 
 class SomeObservation(ABC):
@@ -39,6 +40,19 @@ class SimpleObservation(SomeObservation):
             2 * self._range_vec.y + 1,
         )
 
+    def _map_zero_infinity_to_zero_one(self, value: float, t: float = 0.2) -> float:
+        """
+        Maps values from [0, inf] to [0, 1] range.
+        https://www.desmos.com/calculator/y6hc2skmi4
+        """
+        return 1 - (1 / (t * value + 1))
+
+    def _normalize_to_zero_one(self, value: float, min_value: float, max_value: float) -> float:
+        """
+        Maps values from [min_value, max_value] to [0, 1] range.
+        """
+        return (value - min_value) / (max_value - min_value)
+
     def _tile_embedding(self, knowledge: Knowledge, position: Coords) -> np.ndarray:
         analyzer = KnowledgeAnalyzer(knowledge)
         tile_analyzer = analyzer.tile_analyzer(position)
@@ -51,7 +65,7 @@ class SimpleObservation(SomeObservation):
             tile_analyzer.is_manhir,
             tile_analyzer.is_attacked,
             tile_analyzer.has_mist,
-            tile_analyzer.last_seen,
+            self._map_zero_infinity_to_zero_one(tile_analyzer.last_seen, t=0.2),
 
             # weapons (5)
             tile_analyzer.has_knife,
@@ -62,7 +76,7 @@ class SimpleObservation(SomeObservation):
 
             # characters (11)
             tile_analyzer.has_enemy,
-            tile_analyzer.character_health,
+            self._normalize_to_zero_one(tile_analyzer.character_health, min_value=0, max_value=CHAMPION_STARTING_HP),
             tile_analyzer.has_character_with_knife,
             tile_analyzer.has_character_with_sword,
             tile_analyzer.has_character_with_bow,

@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.vec_env import DummyVecEnv
 import stable_baselines3.dqn as dqn
 
 from gupb.controller.batman.environment import GUPBEnv
+from gupb.controller.batman.environment.feature_extractors import NeighborhoodCNN
 
 
 @dataclass
@@ -12,9 +14,10 @@ class AlgoConfig:
     learning_rate: float = 0.005
     batch_size: int = 32
     buffer_size: int = 1000
-    learning_starts: int = 100
+    learning_starts: int = 10
     tau: float = 0.05
     gamma: float = 0.98
+    feature_extractor_class: BaseFeaturesExtractor = NeighborhoodCNN
 
 
 class SomeAlgo(ABC):
@@ -50,7 +53,7 @@ class SomeAlgo(ABC):
 class DQN(SomeAlgo):
     def _build_algo(self, env, config: AlgoConfig) -> OffPolicyAlgorithm:
         return dqn.DQN(
-            policy=dqn.MlpPolicy,
+            policy=dqn.CnnPolicy,
             env=env,
             learning_rate=config.learning_rate,
             batch_size=config.batch_size,
@@ -59,4 +62,7 @@ class DQN(SomeAlgo):
             tau=config.tau,
             gamma=config.gamma,
             verbose=1,
+            policy_kwargs={
+                'features_extractor_class': config.feature_extractor_class,
+            }
         )
