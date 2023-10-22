@@ -71,7 +71,10 @@ class SpriteRepository:
             characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
+            characters.Tabard.ANCYMON: load_sprite("characters", "champion_ancymon", BLACK),
             characters.Tabard.ARAGORN: load_sprite('characters', 'champion_aragorn', BLACK),
+            characters.Tabard.PIKACHU: load_sprite('characters', 'champion_pikachu', BLACK),
+            characters.Tabard.R2D2: load_sprite('characters', 'champion_r2d2', BLACK),
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
@@ -99,7 +102,10 @@ class SpriteRepository:
                     characters.Tabard.VIOLET,
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
+                    characters.Tabard.ANCYMON,
                     characters.Tabard.ARAGORN
+                    characters.Tabard.PIKACHU,
+                    characters.Tabard.R2D2,
                 ],
                 [
                     characters.Facing.RIGHT,
