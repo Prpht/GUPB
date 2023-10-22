@@ -1,62 +1,62 @@
-import gym
-import gym.spaces
-import numpy as np
+import gymnasium as gym
+from gymnasium.envs.registration import register
 
-from typing import Sequence
+import numpy as np
+from typing import Any
 
 from gupb.controller.batman.environment.knowledge import Knowledge
+from gupb.controller.batman.environment.observation import SomeObservation
 from gupb.controller.batman.environment.observer import Observer, Observable
+from gupb.controller.batman.environment.reward import SomeReward
 from gupb.model.characters import Action
 
 
 class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
-    metadata = {
-        "render.modes": ["human", "rgb_array"],
-    }
-
-    def name():
-        return "custom/gupb-env-v0"
-
-    def __init__(
-        self,
-        grid_shape: Sequence[int],
-        num_tiles_types: int,
-    ):
+    def __init__(self, reward: SomeReward, observation: SomeObservation):
         super().__init__()
+        Observer.__init__(self)
+        Observable.__init__(self)
 
         self.action_space = gym.spaces.Discrete(len(Action))
 
         self.observation_space = gym.spaces.Box(
             low=-0,
-            high=num_tiles_types,
-            shape=grid_shape,
-            dtype=np.int8,
+            high=1,
+            shape=observation.observation_shape,
+            dtype=np.float16,
         )
 
-        self._ignore_action = True
+        self._reward = reward
+        self._observation = observation
+
+        self._actions = [action for action in Action]
 
     def render(self, *args, **kwargs):
-        return self._observation()
-
-    def step(self, action: int):
-        if not self._ignore_action:
-            self.observable_state = Action(action)
-        knowledge = self.wait_for_observed()
-        # TODO use knowledge ito update observation and rward
-        self._ignore_action = False
-        return self._observation(), self._reward(), self._is_termination_state(), {}
-
-    def reset(self):
         pass
 
-    def _reward(self):
-        # TODO
-        return 0
+    def step(self, action_idx: int):
+        self.observable_state = self._actions[action_idx]
+        knowledge = self.wait_for_observed()
 
-    def _observation(self):
-        # TODO
-        return np.zeros_like(self.observation_space.shape)
+        obs = self._observation(knowledge)
+        reward = self._reward(knowledge)
+        done = knowledge.episode == 0
+        truncated = False
+        info = {}
 
-    def _is_termination_state(self):
-        # TODO
-        return False
+        return obs, reward, done, truncated, info
+
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[Any, dict[str, Any]]:
+        knowledge = self.wait_for_observed()
+        obs = self._observation(knowledge)
+        info = {}
+
+        return obs, info
+
+
+register(
+    id="GUPBBatman-v0",
+    entry_point="gupb.controller.batman.environment:GUPBEnv",
+)
