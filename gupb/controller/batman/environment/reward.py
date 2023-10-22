@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import deque
 import numpy as np
 import scipy.stats as stats
 
@@ -21,16 +22,16 @@ WeightedReward = tuple[SomeReward, Weight]
 
 
 class AccumulatedReward(SomeReward):
-    def __init__(self, wighted_reward: list[WeightedReward]) -> None:
-        weights = [weight for _, weight in wighted_reward]
+    def __init__(self, weighted_reward: list[WeightedReward]) -> None:
+        weights = [weight for _, weight in weighted_reward]
         self._total_weight = sum(weights)
-        self._wighted_reward = wighted_reward
+        self._weighted_reward = weighted_reward
 
     def _compute(self, knowledge: Knowledge) -> float:
-        return (
-            sum([reward(knowledge) * weight for reward, weight in self._wighted_reward])
-            / self._total_weight
-        )
+        return sum([
+            reward(knowledge) * weight
+            for reward, weight in self._weighted_reward
+        ]) / self._total_weight
 
 
 def distance(a: Coords, b: Coords) -> float:
@@ -62,28 +63,32 @@ class MenhirProximityReward(SomeReward):
 
 
 class UpdatedKnowledgeReward(SomeReward):
-    def __init__(self, uptodate_till: int) -> None:
+    def __init__(self, uptodate_till: int, radius: int) -> None:
         self._uptodate_till = uptodate_till
+        self._radius = radius
 
     def _compute(self, knowledge: Knowledge) -> float:
-        episodes = np.array(
-            [tile.last_seen for tile in knowledge.arena.explored_map.values()]
-        )
+        episodes = np.array([
+            tile.last_seen
+            for tile in list(knowledge.arena.explored_map.values())
+            if distance(knowledge.position, tile.coords) <= self._radius
+        ])
         if episodes.size == 0:
             return 0
-        penalty = np.mean((episodes - knowledge.episode) / self._uptodate_till)
+        penalty = min(
+            np.mean((knowledge.episode - episodes) / self._uptodate_till),
+            1.0
+        )
         return float(1 - 2 * penalty**2)
 
 
 class MotionEntropyReward(SomeReward):
-    def __init__(self, positions_buffer_size) -> None:
+    def __init__(self, positions_buffer_size: int) -> None:
         self._max_size = positions_buffer_size
-        self._buffer = []
+        self._buffer = deque(maxlen=self._max_size)
 
     def _compute(self, knowledge: Knowledge) -> float:
         self._buffer.append(knowledge.position)
-        if len(self._buffer) > self._max_size:
-            self._buffer.pop()
         xs = [x for x, _ in self._buffer]
         ys = [y for _, y in self._buffer]
         H = stats.entropy(xs) + stats.entropy(ys)
@@ -103,3 +108,39 @@ class StayingAliveReward(SomeReward):
         if self._total_chempions is None:
             self._total_chempions = knowledge.champions_alive
         return 1 - knowledge.champions_alive / self._total_chempions
+
+
+class StayingHealthyReward(SomeReward):
+    def __init__(self, acceptable_health: int) -> None:
+        self._acceptable_health = acceptable_health
+
+    def _compute(self, knowledge: Knowledge) -> float:
+        tile = knowledge.arena.explored_map.get(knowledge.position)
+        if tile is None:
+            return 0
+        champion = tile.character
+        penalty = 1 - champion.health / self._acceptable_health
+        return 1 - 2 * penalty**2
+
+
+class FindingWeaponReward(SomeReward):
+    def __init__(self, episodes_to_find_weapon: int) -> None:
+        self._episodes_to_find_weapon = episodes_to_find_weapon
+
+    def _compute(self, knowledge: Knowledge) -> float:
+        tile = knowledge.arena.explored_map.get(knowledge.position)
+        if tile is None:
+            return 0
+
+        champion = tile.character
+        weapon_name = champion.weapon.name
+
+        if weapon_name == 'knife':
+            penalty = min(
+                knowledge.episode / self._episodes_to_find_weapon,
+                1.0,
+            )
+        else:
+            penalty = 0.0
+
+        return 1 - 2 * penalty**2
