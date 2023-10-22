@@ -56,7 +56,7 @@ class Trainer:
         # algo
         self._algo = DQN(self._env, AlgoConfig())
 
-    def start(self):
+    def start(self, load: bool = True):
         try:
             self._algo.load(self._path_to_algo)
         except Exception:
