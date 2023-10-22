@@ -49,7 +49,7 @@ class KeyboardController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.PINK
+        return characters.Tabard.BLUE
 
 
 POTENTIAL_CONTROLLERS = [
