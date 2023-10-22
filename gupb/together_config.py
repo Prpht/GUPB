@@ -1,14 +1,20 @@
 from gupb.controller import random
-from gupb.controller import keyboard
-from gupb.controller.mongolek import mongolek
+from gupb.scripts import arena_generator
+from gupb.controller import pat_i_kot
+
+from gupb.controller import aragorn
+
 
 CONFIGURATION = {
     'arenas': [
-        'lone_sanctum',
+        'ordinary_chaos',
     ],
     'controllers': [
-        mongolek.Mongolek("Mongolek"),
-
+        random.RandomController("Alice"),
+        random.RandomController("Bob"),
+        random.RandomController("Cecilia"),
+        aragorn.AragornController("Aragorn"),
+        pat_i_kot.PatIKotController("Kot i Pat")
     ],
     'start_balancing': False,
     'visualise': True,
