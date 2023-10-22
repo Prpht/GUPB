@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Tuple, Optional, List, NamedTuple
+from typing import Dict, Tuple, Optional, List, NamedTuple, NewType
 
 from pathfinding.core.grid import Grid
 from pathfinding.core.node import GridNode
@@ -19,6 +19,11 @@ POSSIBLE_ACTIONS = [
 
 MAX_SIZE = 20
 
+SeenTileT = NewType("SeenTileT", Tuple[tiles.TileDescription, int])
+SeenTilesT = NewType("SeenTilesT", Dict[coordinates.Coords, SeenTileT])
+CoordsListT = NewType("CoordsListT", List[coordinates.Coords])
+TilesT = NewType("TilesT", Dict[coordinates.Coords, tiles.TileDescription])
+
 
 class SeenWeapon(NamedTuple):
     name: str
@@ -33,7 +38,7 @@ class OurController(controller.Controller):
         self.current_position: Optional[coordinates.Coords] = None
         # remembering map
         self.epoch: int = 0
-        self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
+        self.seen_tiles: SeenTilesT = {}
 
         # pathfinding
         self.grid: Optional[Grid] = None
@@ -49,7 +54,7 @@ class OurController(controller.Controller):
         self.actions_iterator = 0
         self.actions = []
         self.current_map_name = None
-        self.maps: Dict[str, Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]]] = {}
+        self.maps: Dict[str, SeenTilesT] = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, OurController):
@@ -60,8 +65,6 @@ class OurController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        for coords, tile in knowledge.visible_tiles.items():
-            print("c", coords)
         try:
             self.update_state(knowledge)
 
@@ -111,31 +114,37 @@ class OurController(controller.Controller):
             return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
 
     def praise(self, score: int) -> None:
+        print("PRAISE")
         self.remember_map()
+        print(self.maps)
+        print("PRAISE END")
 
     def remember_map(self):
         self.reset_seen_tiles()
-        self.maps[self.current_map_name].update(self.seen_tiles)
+        if self.current_map_name in self.maps.keys():
+            self.maps[self.current_map_name].update(self.seen_tiles)
+        else:
+            self.maps[self.current_map_name] = self.seen_tiles
 
-    def reset_seen_tiles(self) -> None:
+    def reset_seen_tiles(self):
         for coords, tile_round in self.seen_tiles.items():
             self.seen_tiles[coords] = self.get_reset_seen_tile(tile_round)
 
-    def get_reset_seen_tile(self, tile: Tuple[tiles.TileDescription, int]) -> Tuple[tiles.TileDescription, int]:
+    def get_reset_seen_tile(self, tile: SeenTileT) -> SeenTileT:
         epoch = 0
-        tile = tiles.TileDescription(tile[0].type, tile[0].loot, None, None)  # todo czy nietrzeba usunąć czegoś co się zmienia?
+        tile = tiles.TileDescription(tile[0].type, tile[0].loot, None, None, [])  # todo czy nietrzeba usunąć czegoś co się zmienia?
         return tile, epoch
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         print(
             arena_description)
         # reset roud unique variables
-        self.seen_tiles = self.maps.get(arena_description.name, dict())
         self.current_map_name = arena_description.name
         self.epoch = 0
         self.actions = []
         self.actions_iterator = 0
-        self.seen_tiles = {}
+        self.seen_tiles = self.maps.get(arena_description.name, dict())
+        print("INIT MAP:", arena_description.name, self.seen_tiles)
 
     def build_grid(self):
         def extract_walkable_tiles():
@@ -152,14 +161,14 @@ class OurController(controller.Controller):
         except Exception as e:
             print(e)
 
-    def look_up_for_menhir(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
+    def look_up_for_menhir(self, tiles: TilesT):
         if not self.menhir_coords:
             for coords, tile in tiles.items():
                 if tile.type == 'menhir':
                     self.menhir_coords = coords
                     break
 
-    def look_up_for_weapons(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
+    def look_up_for_weapons(self, tiles: TilesT):
         for coords, tile in tiles.items():
             if self.weapons_coords[coords]:
                 self._update_waepon(coords, tile)
@@ -173,7 +182,7 @@ class OurController(controller.Controller):
         if not tile.loot:
             del self.weapons_coords[coords]
 
-    def find_mist(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> List[coordinates.Coords]:
+    def find_mist(self, tiles: TilesT) -> CoordsListT:
         mist_coords = []
         for coords, tile in tiles.items():
             for effect in tile.effects:
@@ -181,7 +190,7 @@ class OurController(controller.Controller):
                     mist_coords.append(coords)
         return mist_coords
 
-    def find_nearest_mist_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> Optional[coordinates.Coords]:
+    def find_nearest_mist_coords(self, tiles: TilesT) -> Optional[coordinates.Coords]:
         mist_coords = self.find_mist(tiles)
         if mist_coords:
             nearest_mist_coords = self.find_nearest_coords(self.current_position, mist_coords)
@@ -189,7 +198,7 @@ class OurController(controller.Controller):
         else:
             return None
 
-    def find_nearest_enemy_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> Optional[coordinates.Coords]:
+    def find_nearest_enemy_coords(self, tiles: TilesT) -> Optional[coordinates.Coords]:
         enemies_coords = self.find_enemies_coords(tiles)
         if enemies_coords:
             nearest_enemy_coords = self.find_nearest_coords(self.current_position, enemies_coords)
@@ -197,14 +206,14 @@ class OurController(controller.Controller):
         else:
             return None
 
-    def find_enemies_coords(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> List[coordinates.Coords]:
+    def find_enemies_coords(self, tiles: TilesT) -> CoordsListT:
         enemies_coords = []
         for coords, tile in tiles.items():
             if tile.character:
                 enemies_coords.append(coords)
         return enemies_coords
 
-    def find_nearest_coords(self, point_coords: coordinates.Coords, coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
+    def find_nearest_coords(self, point_coords: coordinates.Coords, coords: CoordsListT) -> Optional[coordinates.Coords]:
         min_distance_squared = 2 * MAX_SIZE ** 2
         nearest_coords = None
         for coords in coords:
