@@ -50,6 +50,7 @@ class Tabard(Enum):
     YELLOW = 'Yellow'
     ANCYMON = "Ancymon"
     ARAGORN = 'Aragorn'
+    MONGOL = 'Mongolek'
     PIKACHU = 'Pikachu'
     R2D2 = 'R2D2'
 

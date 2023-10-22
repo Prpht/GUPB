@@ -73,6 +73,7 @@ class SpriteRepository:
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
             characters.Tabard.ANCYMON: load_sprite("characters", "champion_ancymon", BLACK),
             characters.Tabard.ARAGORN: load_sprite('characters', 'champion_aragorn', BLACK),
+            characters.Tabard.MONGOL: load_sprite('characters', 'champion_mon', BLACK),
             characters.Tabard.PIKACHU: load_sprite('characters', 'champion_pikachu', BLACK),
             characters.Tabard.R2D2: load_sprite('characters', 'champion_r2d2', BLACK),
 
@@ -103,7 +104,8 @@ class SpriteRepository:
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
                     characters.Tabard.ANCYMON,
-                    characters.Tabard.ARAGORN
+                    characters.Tabard.ARAGORN,
+                    characters.Tabard.MONGOL,
                     characters.Tabard.PIKACHU,
                     characters.Tabard.R2D2,
                 ],

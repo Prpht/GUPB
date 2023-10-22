@@ -17,7 +17,7 @@ CONFIGURATION = {
         pat_i_kot.PatIKotController("Kot i Pat")
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': None,
-    'runs_no': 1000,
+    'runs_no': 1,
 }
