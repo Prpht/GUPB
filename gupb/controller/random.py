@@ -41,7 +41,7 @@ class RandomController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.RED
+        return characters.Tabard.WHITE
 
 
 POTENTIAL_CONTROLLERS = [

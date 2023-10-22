@@ -51,7 +51,6 @@ class CynamonkaController(controller.Controller):
             else:
                 return random.choice(POSSIBLE_ACTIONS[:2])
         if self.menhir_position:
-            print(f"{distance(next_position, self.menhir_position)}")
             if (distance(next_position, self.menhir_position) < distance(self.position, self.menhir_position)) and self.can_i_move_forward():
                 return POSSIBLE_ACTIONS[2]
         if self.can_i_move_forward():

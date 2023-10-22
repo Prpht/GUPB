@@ -122,7 +122,7 @@ class ForrestGumpController(Controller):
 
     @property
     def name(self) -> str:
-        return f'ForrestGumpController{self.first_name}'
+        return f'{self.first_name}'
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
