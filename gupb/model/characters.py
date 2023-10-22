@@ -48,6 +48,7 @@ class Tabard(Enum):
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
+    ANCYMON = "Ancymon"
     PIKACHU = 'Pikachu'
 
 
