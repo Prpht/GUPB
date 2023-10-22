@@ -19,6 +19,7 @@ POSSIBLE_ACTIONS = [
 
 MAX_SIZE = 20
 
+# todo fix types
 SeenTileT = NewType("SeenTileT", Tuple[tiles.TileDescription, int])
 SeenTilesT = NewType("SeenTilesT", Dict[coordinates.Coords, SeenTileT])
 CoordsListT = NewType("CoordsListT", List[coordinates.Coords])
