@@ -37,8 +37,8 @@ class TileAnalyzer:
         return self.tile_type == "water"
 
     @property
-    def is_manhir(self) -> bool:
-        return self.tile_type == "manhir"
+    def is_menhir(self) -> bool:
+        return self.tile_type == "menhir"
 
     @property
     def is_attacked(self) -> bool:

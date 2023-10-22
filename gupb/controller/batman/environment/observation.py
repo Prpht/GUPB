@@ -62,7 +62,7 @@ class SimpleObservation(SomeObservation):
             tile_analyzer.is_out_of_map,
             tile_analyzer.is_wall,
             tile_analyzer.is_water,
-            tile_analyzer.is_manhir,
+            tile_analyzer.is_menhir,
             tile_analyzer.is_attacked,
             tile_analyzer.has_mist,
             self._map_zero_infinity_to_zero_one(tile_analyzer.last_seen, t=0.2),

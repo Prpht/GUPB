@@ -52,11 +52,11 @@ class MenhirProximityReward(SomeReward):
                 1.0,
             )
         else:
-            distance_to_manhir = distance(
+            distance_to_menhir = distance(
                 knowledge.position, knowledge.arena.menhir_position
             )
             penalty = min(
-                distance_to_manhir / self._save_distance_to_menhir,
+                distance_to_menhir / self._save_distance_to_menhir,
                 1.0,
             )
         return 1 - 2 * penalty**2
