@@ -23,6 +23,9 @@ class Brain:
         actions = []
         dstFacing = None
 
+
+        # ---
+
         if self.memory.willGetIdlePenalty():
             spinAction = self.actions['spin']
             spinAction.setSpin(characters.Action.TURN_LEFT)
@@ -31,6 +34,15 @@ class Brain:
         if self.memory.hasOponentInFront():
             attackAction = self.actions['attack']
             actions.append(attackAction)
+        
+        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
+        
+        if closestPotionDistance is not None and closestPotionDistance < 5:
+            goToPotionAction = GoToAction()
+            goToPotionAction.setDestination(closestPotionCoords)
+            actions.append(goToPotionAction)
+
+        # ---
 
         if self.state == 0:
             # go to pick up a sword

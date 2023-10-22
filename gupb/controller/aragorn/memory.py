@@ -86,6 +86,20 @@ class Memory:
 
     def willGetIdlePenalty(self):
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
+    
+    def getDistanceToClosestPotion(self):
+        minDistance = 9999
+        minCoords = None
+
+        for coords in self.map.terrain:
+            if self.map.terrain[coords].consumable == consumables.Potion:
+                distance = coordinates.distance(self.position, coords)
+
+                if distance < minDistance:
+                    minDistance = distance
+                    minCoords = coords
+        
+        return [minDistance, minCoords]
 
 class Environment:
     def __init__(self, map: 'Map'):
