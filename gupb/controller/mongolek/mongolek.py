@@ -97,7 +97,7 @@ class Mongolek(controller.Controller):
     def praise(self, score: int) -> None:
         raise NotImplementedError
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.facing = None
         self.health = None
         self.weapon = None

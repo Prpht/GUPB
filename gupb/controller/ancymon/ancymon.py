@@ -129,7 +129,7 @@ class AncymonController(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         pass
 
     @property

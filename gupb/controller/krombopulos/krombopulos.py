@@ -27,7 +27,7 @@ class KrombopulosMichaelController(controller.Controller):
     def praise(self, score: int) -> None:
         pass  # todo: adjust strategies after a match: self.knowledge_sources.praise(score)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.knowledge_sources.reset(arena_description)
 
     def _get_initial_meta_strategy(self) -> MetaStrategy:

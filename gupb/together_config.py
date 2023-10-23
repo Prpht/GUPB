@@ -13,11 +13,10 @@ from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
 from gupb.controller import reckless_roaming_dancing_druid
+from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': [
-        'ordinary_chaos',
-    ],
+    'arenas': arena_generator.generate_arenas(50),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),

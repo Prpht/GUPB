@@ -111,7 +111,7 @@ class ForrestGumpController(Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.arena = arenas.Arena.load(arena_description.name)
         self.matrix = init_grid(arena_description)
         self.fields = np.argwhere(self.matrix == 1)

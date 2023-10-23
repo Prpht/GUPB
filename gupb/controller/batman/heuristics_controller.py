@@ -47,7 +47,7 @@ class BatmanHeuristicsController(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self._episode = 0
         self._game += 1
         self._knowledge = Knowledge(arena_description)

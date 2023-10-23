@@ -274,7 +274,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.arena_id = arena_description.name
         self._init_matrix(Arena.load(self.arena_id))
 

@@ -212,7 +212,7 @@ class Roger(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         # reset round unique variables
         self.epoch = 0
         self.actions = None

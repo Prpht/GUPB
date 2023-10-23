@@ -324,7 +324,7 @@ class AresController(controller.Controller):
     def praise(self, score: int) -> None:
         self.knBase.praise(score)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.knBase.reset(arena_description)
 
     @property

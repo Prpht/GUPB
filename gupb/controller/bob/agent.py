@@ -70,7 +70,7 @@ class FSMBot(Controller):
     def __hash__(self) -> int:
         return -1
 
-    def reset(self, arena_description: ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: ArenaDescription) -> None:
         pass
 
     def analyse_field(self, pos, visibility: Dict[Coords, TileDescription]):
