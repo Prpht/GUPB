@@ -38,7 +38,8 @@ class MapKnowledge(KnowledgeSource):
         self.menhir_pos: Coords | None = None
         self.tiles_info_as_last_seen: dict[Coords, tiles.TileDescription | None] = defaultdict(lambda: None)
 
-        # todo: graph for pathing
+        # todo: implement dynamic graph for routing
+        # todo: implement mist sensing and approximate position of menhir based on mist
 
     def update(self, champion_knowledge: characters.ChampionKnowledge, epoch: int):
         self.epoch = epoch
@@ -117,55 +118,6 @@ class KnowledgeSources(KnowledgeSource):
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge()
-
-        # todo: temporary
-        self.oridinary_chaos_str = """
-        ========================
-        =####.##=....====....===
-        ==#A...#==....====..=..=
-        ==.S....==....==.......=
-        ==#....#===......=.....=
-        =##....#====..#..#.#...=
-        =####.##====......M#=..=
-        ==.....=====.....#.....=
-        ==.###.####==..#.#.#...=
-        ===#.#.####==....#.#...=
-        =....#...##.......===..=
-        =###..B.....=...====.=.=
-        =#...##.##..===...==...=
-        =#...#==.#.===........#=
-        =#..S#=.....==.........=
-        =#...#==...===##.###...=
-        =#.###=..#..==#....#==.=
-        =....=.......=#BA...====
-        ==..==...##........#====
-        ==.....#.###..##.###====
-        =====..####....M..======
-        =.....####....##.#======
-        =.====##....=.....======
-        ========================
-        """.strip()
-        self.chaos_graph: nx.Graph = self._get_graph_from_map()
-
-    def _get_graph_from_map(self) -> nx.Graph:
-        self.chaos_graph = nx.Graph()
-        for y, line in enumerate(self.oridinary_chaos_str.split('\n')):
-            for x, char in enumerate(line.strip()):
-                if char != '=' and char != '#':
-                    self.chaos_graph.add_node((x, y))
-                    for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-                        neighbor = (x + dx, y + dy)
-                        if neighbor in self.chaos_graph.nodes:
-                            self.chaos_graph.add_edge((x, y), neighbor)
-        return self.chaos_graph
-
-
-    def find_next_move_on_path(self, start: tuple, end: tuple) -> tuple | None:
-        try:
-            path = nx.shortest_path(self.chaos_graph, source=start, target=end)
-            return path[1] if len(path) > 1 else None
-        except nx.NetworkXNoPath:
-            return None
 
 
     def update(self, champion_knowledge: characters.ChampionKnowledge, epoch: int):

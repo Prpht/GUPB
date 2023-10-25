@@ -2,7 +2,7 @@ from gupb import controller
 from gupb.model import arenas, characters
 
 from .knowledge_sources import KnowledgeSources
-from .meta_strategies import MetaStrategy, RandomMetaStrat, ExploreHideRunMetaStrat
+from .meta_strategies import MetaStrategy, RandomMetaStrat, ExploreMetaStrat
 
 
 class KrombopulosMichaelController(controller.Controller):
@@ -31,7 +31,7 @@ class KrombopulosMichaelController(controller.Controller):
         self.knowledge_sources.reset(arena_description)
 
     def _get_initial_meta_strategy(self) -> MetaStrategy:
-        return ExploreHideRunMetaStrat(self.knowledge_sources)
+        return ExploreMetaStrat(self.knowledge_sources)
 
     @property
     def name(self) -> str:
