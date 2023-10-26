@@ -42,9 +42,7 @@ class GoToAction(Action):
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
 
-        self.dangerous_tiles: List[Coords] = []
         self.misty_tiles: List[Coords] = []
-        self.future_dangerous_tiles: List[Coords] = []
         
         self.good_weapon_in_sight = None
         self.consumable_coords = None
@@ -97,12 +95,22 @@ class GoToAction(Action):
         else:
             return characters.Action.TURN_RIGHT
     
-    def find_path(self, memory: Memory, start: Coords, end: Coords, facing: characters.Facing, dangerous=False, risky=False) -> (Optional[List[Coords]], int):
+    def find_path(self, memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> (Optional[List[Coords]], int):
         def get_h_cost(h_start: Coords, h_end: Coords, h_facing: characters.Facing) -> int:
             distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
             direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
                                        1 if h_end.y - h_start.y > 0 else -1 if h_end.y - h_start.y < 0 else 0)
-            turns = abs(h_facing.value.x - direction.x) + abs(h_facing.value.y - direction.y)
+            
+            turnDiffX = abs(h_facing.value.x - direction.x)
+            turnDiffY = abs(h_facing.value.y - direction.y)
+
+            if turnDiffX == 1 and turnDiffY == 1:
+                turns = 1
+            elif turnDiffX == 2 or turnDiffY == 2:
+                turns = 2
+            else:
+                turns = 0
+
             return (turns if turns <= 2 else 2) + distance
 
         a_coords = NamedTuple('a_coords', [('coords', Coords),
@@ -114,9 +122,7 @@ class GoToAction(Action):
         open_coords: [a_coords] = []
         closed_coords: {Coords: a_coords} = {}
         open_coords.append(a_coords(start, 0, get_h_cost(start, end, facing), None, facing))
-
-        risky_path = None if risky else self.find_path(memory, start, end, facing, dangerous, True)
-
+        
         while len(open_coords) > 0:
             open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost + x.h_cost, x.h_cost), reverse=False))
             current: a_coords = open_coords.pop(0)
@@ -130,10 +136,6 @@ class GoToAction(Action):
                     current_parent = closed_coords[current_parent.parent]
                     trace.insert(0, current_parent.coords)
 
-                if not risky:
-                    if int(current.h_cost + current.g_cost) > risky_path[1] + 10:
-                        return risky_path
-
                 return trace, int(current.h_cost + current.g_cost)
 
             neighbors: [Coords] = [add_coords(current.coords, (Coords(0, 1))),
@@ -145,11 +147,11 @@ class GoToAction(Action):
                 if not neighbor in memory.map.terrain:
                     continue
 
-                if neighbor in memory.map.terrain.keys()\
+                if (
+                        neighbor in memory.map.terrain.keys()\
                         and memory.map.terrain[neighbor].terrain_passable()\
-                        and neighbor not in closed_coords.keys()\
-                        and (dangerous or neighbor not in self.dangerous_tiles)\
-                        and (risky or neighbor not in self.future_dangerous_tiles):
+                        and neighbor not in closed_coords.keys()
+                ):
                     neighbor_direction: Coords = Coords(neighbor.x - current.coords.x, neighbor.y - current.coords.y)
                     neighbor_g_cost = (1 if neighbor_direction == current.facing.value else
                                        3 if add_coords(neighbor_direction, current.facing.value) == Coords(0, 0) else 2) \
@@ -166,10 +168,7 @@ class GoToAction(Action):
                                                 neighbor_h_cost,
                                                 current.coords,
                                                 self.get_facing(neighbor_direction)))
-        if not risky:
-            return risky_path
-        if not dangerous:
-            return self.find_path(memory, start, end, facing, True, True)
+        
         trace: Optional[List[Coords]] = None
         return trace, INFINITY
 
