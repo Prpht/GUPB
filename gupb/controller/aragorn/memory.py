@@ -297,6 +297,10 @@ class MenhirCalculator:
         for try_menhir_y in range(self.map.size[1]):
             for try_menhir_x in range(self.map.size[0]):
                 try_menhir = coordinates.Coords(try_menhir_x, try_menhir_y)
+
+                if try_menhir in mistCoordinates:
+                    continue
+
                 mistFound = 0
                 mistMax = 0
 
@@ -309,11 +313,18 @@ class MenhirCalculator:
 
                         if effects.Mist in self.map.terrain[coords].effects:
                             mistFound += 1
+                    
+                    if distance < mistRadius:
+                        if effects.Mist in self.map.terrain[coords].effects:
+                            mistFound -= 1
                 
                 if mistMax == 0:
                     # no mist should be found = it was not seen yet
                     # -> make proportion = 0 (this case doesnt give any information)
                     mistMax = 1
+                    mistFound = 0
+
+                if mistFound < 0:
                     mistFound = 0
                 
                 if mistFound/mistMax > bestMistAmount:
