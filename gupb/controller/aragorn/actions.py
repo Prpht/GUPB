@@ -12,6 +12,7 @@ INFINITY: int = 99999999999
 
 from gupb.model.tiles import TileDescription
 
+from gupb.controller.aragorn.constants import DEBUG
 
 
 class Action:
@@ -49,7 +50,12 @@ class GoToAction(Action):
 
 
     def setDestination(self, destination: Coords) -> None:
-        self.destination = destination
+        if isinstance(destination, Coords):
+            self.destination = destination
+        else:
+            if DEBUG:
+                print("Trying to set destination to non Coords object (" + str(destination) + " of type " + str(type(destination)) + ")")
+                raise Exception()
 
     def setDestinationFacing(self, dstFacing: characters.Facing) -> None:
         self.dstFacing = dstFacing
@@ -64,11 +70,13 @@ class GoToAction(Action):
             if self.dstFacing is not None and memory.facing != self.dstFacing:
                 # TODO: not always turning right is optimal
                 return characters.Action.TURN_RIGHT
+            # print("PF: Destination reached")
             return None
         
         [path, cost] = self.find_path(memory=memory, start=current_position, end=self.destination, facing = memory.facing)
 
         if path is None or len(path) <= 1:
+            # print("PF: Path impossible")
             return None
 
         nextCoord = path[1]
@@ -172,6 +180,37 @@ class GoToAction(Action):
         trace: Optional[List[Coords]] = None
         return trace, INFINITY
 
+class GoToAroundAction(GoToAction):
+    def perform(self, memory: Memory) -> Action:
+        if memory.position == self.destination:    
+            return None
+
+        actionToPerform = super().perform(memory)
+        
+        limit = 25
+        destinationsGenerator = self.__aroundTileGenerator(self.destination)
+
+        while actionToPerform is None and limit > 0:
+            limit -= 1
+            
+            try:
+                self.setDestination(destinationsGenerator.__next__())
+            except StopIteration:
+                pass
+
+            actionToPerform = super().perform(memory)
+        
+        return actionToPerform
+
+    def __aroundTileGenerator(self, aroundDestination :Coords):
+        if not isinstance(aroundDestination, Coords):
+            return None
+        
+        for r in range(7):
+            for x in range(-r, r + 1):
+                for y in range(-r, r + 1):
+                    if (x - aroundDestination.x) ** 2 + (y - aroundDestination.y) ** 2 == r ** 2:
+                        yield Coords(x, y)
 
 class RandomAction(Action):
     def perform(self, memory: Memory) -> characters.Action:

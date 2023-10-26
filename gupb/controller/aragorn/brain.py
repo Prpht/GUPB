@@ -21,6 +21,58 @@ class Brain:
         self.memory.update(knowledge)
 
         actions = []
+        
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos()
+
+        if menhirPos is not None:
+            goToAroundAction = GoToAroundAction()
+            goToAroundAction.setDestination(menhirPos)
+            actions.append(goToAroundAction)
+        
+        spinAction = self.actions['spin']
+        actions.append(spinAction)
+
+        dstFacing = None
+        dstPoses = [
+            # coordinates.Coords(12, 12),
+
+            
+
+            # coordinates.Coords(1, 0),
+            # coordinates.Coords(-1, -1),
+            # coordinates.Coords(1, 0),
+        ]
+
+        # for i in range(len(dstPoses)):
+        #     dstPoses[i] = coordinates.add_coords(
+        #         self.memory.position,
+        #         dstPoses[i]
+        #     )
+        
+        for dstPos in dstPoses:
+            goToAction = GoToAction()
+            goToAction.setDestination(dstPos)
+            if dstFacing is not None:
+                goToAction.setDestinationFacing(dstFacing)
+            actions.append(goToAction)
+        
+        spinAction = self.actions['spin']
+        actions.append(spinAction)
+        
+        for action in actions:
+            ret = action.perform(self.memory)
+            
+            if ret is not None and ret is not characters.Action.DO_NOTHING:
+                self.onDecisionReturning(ret)
+                return ret
+        
+        self.onDecisionReturning(characters.Action.TURN_RIGHT)
+        return characters.Action.TURN_RIGHT
+    
+    def decideOld(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.memory.update(knowledge)
+
+        actions = []
         dstFacing = None
 
 

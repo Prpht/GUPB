@@ -4,6 +4,8 @@ from typing import Dict, NamedTuple, Optional, List
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 
+from gupb.controller.aragorn.constants import DEBUG
+
 
 
 class Memory:
@@ -29,69 +31,12 @@ class Memory:
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
-        self.visible_tiles = knowledge.visible_tiles
 
-        for coords in knowledge.visible_tiles:
-            visible_tile_description = knowledge.visible_tiles[coords]
-            
-            if not coords in self.map.terrain:
-                self.map.terrain[coords] = tiles.Land()
-            
-            if self.map.terrain[coords].__class__.__name__.lower() != visible_tile_description.type:
-                newType = None
-
-                if visible_tile_description.type == 'land':
-                    newType = tiles.Land
-                elif visible_tile_description.type == 'sea':
-                    newType = tiles.Sea
-                elif visible_tile_description.type == 'wall':
-                    newType = tiles.Wall
-                elif visible_tile_description.type == 'menhir':
-                    newType = tiles.Menhir
-                else:
-                    newType = tiles.Land
-                
-                self.map.terrain[coords] = newType()
-            
-            self.map.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
-            self.map.terrain[coords].character = visible_tile_description.character
-            self.map.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
-            self.map.terrain[coords].effects = self.effectsDescriptionConverter(visible_tile_description.effects)
+        self.map.parseVisibleTiles(knowledge.visible_tiles, self.position)
         
         self.idleTime += 1
         # TODO: check if environment_action is called before turn or after
         self.environment.environment_action(self.no_of_champions_alive)
-    
-    def weaponDescriptionConverter(self, weaponName: str) -> weapons.Weapon:
-        if weaponName == 'knife':
-            return weapons.Knife
-        elif weaponName == 'sword':
-            return weapons.Sword
-        elif weaponName == 'axe':
-            return weapons.Axe
-        elif weaponName == 'bow':
-            return weapons.Bow
-        elif weaponName == 'amulet':
-            return weapons.Amulet
-        else:
-            return None
-    
-    def consumableDescriptionConverter(self, consumableName: str) -> consumables.Consumable:
-        if consumableName == 'potion':
-            return consumables.Potion
-        return None
-    
-    def effectsDescriptionConverter(self, effects: List[effects.EffectDescription]) -> list[effects.Effect]:
-        convertedEffects = []
-
-        for effect in effects:
-            if effect == 'mist':
-                convertedEffects.append(effects.Mist)
-            # we dont need to know weapon cuts
-            # elif effect == 'weaponcut':
-            #     convertedEffects.append(effects.WeaponCut)
-        
-        return convertedEffects
     
     def hasOponentInFront(self):
         frontCell = coordinates.add_coords(self.position, self.facing.value)
@@ -144,6 +89,8 @@ class Map:
         self.passableCenter = self.__getPassableCenter()
         self.hidingSpot = self.__getHidingSpot()
 
+        self.menhirCalculator = MenhirCalculator(self)
+
     @staticmethod
     def load(name: str) -> 'Map':
         terrain = dict()
@@ -177,6 +124,82 @@ class Map:
         
         return Map(name, terrain)
     
+    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], characterPos :coordinates.Coords) -> None:
+        for coords in visibleTiles:
+            visible_tile_description = visibleTiles[coords]
+            
+            if not coords in self.terrain:
+                self.terrain[coords] = tiles.Land()
+            
+            if self.terrain[coords].__class__.__name__.lower() != visible_tile_description.type:
+                newType = None
+
+                if visible_tile_description.type == 'land':
+                    newType = tiles.Land
+                elif visible_tile_description.type == 'sea':
+                    newType = tiles.Sea
+                elif visible_tile_description.type == 'wall':
+                    newType = tiles.Wall
+                elif visible_tile_description.type == 'menhir':
+                    newType = tiles.Menhir
+
+                    if isinstance(coords, coordinates.Coords):
+                        coordsWithCorrectType = coords
+                    elif isinstance(coords, tuple):
+                        coordsWithCorrectType = coordinates.Coords(coords[0], coords[1])
+                    else:
+                        coordsWithCorrectType = coords
+                        if DEBUG:
+                            print("[Map] Trying to set menhir pos to non Coords object (" + str(coords) + " of type " + str(type(coords)) + ")")
+                    
+                    self.menhir_position = coordsWithCorrectType
+                    self.menhirCalculator.setMenhirPos(coordsWithCorrectType)
+                else:
+                    newType = tiles.Land
+                
+                self.terrain[coords] = newType()
+            
+            self.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
+            self.terrain[coords].character = visible_tile_description.character
+            self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
+            
+            tileEffects = self.effectsDescriptionConverter(visible_tile_description.effects)
+            self.terrain[coords].effects = tileEffects
+
+            if effects.Mist in tileEffects:
+                self.menhirCalculator.addMist(coords)
+    
+    def weaponDescriptionConverter(self, weaponName: str) -> weapons.Weapon:
+        if weaponName == 'knife':
+            return weapons.Knife
+        elif weaponName == 'sword':
+            return weapons.Sword
+        elif weaponName == 'axe':
+            return weapons.Axe
+        elif weaponName == 'bow':
+            return weapons.Bow
+        elif weaponName == 'amulet':
+            return weapons.Amulet
+        else:
+            return None
+    
+    def consumableDescriptionConverter(self, consumableName: str) -> consumables.Consumable:
+        if consumableName == 'potion':
+            return consumables.Potion
+        return None
+    
+    def effectsDescriptionConverter(self, effectsToConvert: List[effects.EffectDescription]) -> list[effects.Effect]:
+        convertedEffects = []
+
+        for effect in effectsToConvert:
+            if effect.type == 'mist':
+                convertedEffects.append(effects.Mist)
+            # we dont need to know weapon cuts
+            # elif effect == 'weaponcut':
+            #     convertedEffects.append(effects.WeaponCut)
+        
+        return convertedEffects
+    
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
     
@@ -204,3 +227,97 @@ class Map:
             return coordinates.Coords(4, 14)
 
         return None
+
+class MenhirCalculator2:
+    def __init__(self) -> None:
+        self.menhirPos = None
+        self.mistCoordinates = []
+
+    def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
+        self.menhirPos = menhirPos
+    
+    def addMist(self, mistPos: coordinates.Coords) -> None:
+        if mistPos not in self.mistCoordinates:
+            self.mistCoordinates.append(mistPos)
+    
+    def isMenhirPosFound(self) -> bool:
+        return self.menhirPos is not None
+    
+    def approximateMenhirPos(self, characterPosition :coordinates.Coords) -> coordinates.Coords:
+        if self.menhirPos is not None:
+            return self.menhirPos
+        
+        mistCoordinates = self.mistCoordinates
+        if len(mistCoordinates) == 0:
+            return None
+        
+        fakeMistCenter = coordinates.Coords(0, 0)
+
+        for mistCoordinate in mistCoordinates:
+            fakeMistCenter = coordinates.add_coords(
+                fakeMistCenter,
+                coordinates.sub_coords(mistCoordinate, characterPosition)
+            )
+        
+        return fakeMistCenter
+    
+
+class MenhirCalculator:
+    def __init__(self, map :Map) -> None:
+        self.map = map
+
+        self.menhirPos = None
+        self.mistCoordinates = []
+
+    def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
+        if not isinstance(menhirPos, coordinates.Coords):
+            print("[MenhirCalculator] Trying to set menhir pos to non Coords object (" + str(menhirPos) + " of type " + str(type(menhirPos)) + ")")
+        self.menhirPos = menhirPos
+    
+    def addMist(self, mistPos: coordinates.Coords) -> None:
+        if mistPos not in self.mistCoordinates:
+            self.mistCoordinates.append(mistPos)
+    
+    def isMenhirPosFound(self) -> bool:
+        return self.menhirPos is not None
+    
+    def approximateMenhirPos(self) -> coordinates.Coords:
+        mistRadius = self.map.mist_radius
+
+        if self.menhirPos is not None:
+            return self.menhirPos, 1
+        
+        mistCoordinates = self.mistCoordinates
+        if len(mistCoordinates) == 0:
+            return None, None
+        
+        bestMenhirPos = None
+        bestMistAmount = 0
+
+        for try_menhir_y in range(self.map.size[1]):
+            for try_menhir_x in range(self.map.size[0]):
+                try_menhir = coordinates.Coords(try_menhir_x, try_menhir_y)
+                mistFound = 0
+                mistMax = 0
+
+                for coords in self.map.terrain:
+                    distance = int(((coords.x - try_menhir.x) ** 2 +
+                                    (coords.y - try_menhir.y) ** 2) ** 0.5)
+                    
+                    if distance == mistRadius:
+                        mistMax += 1
+
+                        if effects.Mist in self.map.terrain[coords].effects:
+                            mistFound += 1
+                
+                if mistMax == 0:
+                    # no mist should be found = it was not seen yet
+                    # -> make proportion = 0 (this case doesnt give any information)
+                    mistMax = 1
+                    mistFound = 0
+                
+                if mistFound/mistMax > bestMistAmount:
+                    bestMenhirPos = try_menhir
+                    bestMistAmount = mistFound/mistMax
+        
+        return bestMenhirPos, bestMistAmount
