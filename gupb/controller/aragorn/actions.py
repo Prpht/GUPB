@@ -41,11 +41,11 @@ class GoToAction(Action):
         super().__init__()
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
+
         self.dangerous_tiles: List[Coords] = []
         self.misty_tiles: List[Coords] = []
         self.future_dangerous_tiles: List[Coords] = []
-        # self.tiles: {Coords: TileDescription} = {}
-        self.facing = characters.Facing.DOWN
+        
         self.good_weapon_in_sight = None
         self.consumable_coords = None
 
@@ -56,9 +56,7 @@ class GoToAction(Action):
     def setDestinationFacing(self, dstFacing: characters.Facing) -> None:
         self.dstFacing = dstFacing
 
-    def perform(self, memory :Memory) -> characters.Action:
-        self.facing = memory.facing
-        
+    def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
             return None
         
@@ -69,22 +67,6 @@ class GoToAction(Action):
                 # TODO: not always turning right is optimal
                 return characters.Action.TURN_RIGHT
             return None
-        
-        # for tile in memory.visible_tiles:
-        #     if memory.visible_tiles[tile].effects is not None and memory.visible_tiles[tile].effects != []:
-        #         if Coords(tile[0], tile[1]) not in self.misty_tiles:
-        #             self.misty_tiles.append(Coords(tile[0], tile[1]))
-        #         if Coords(tile[0], tile[1]) not in self.dangerous_tiles:
-        #             self.dangerous_tiles.append(Coords(tile[0], tile[1]))
-
-        #     if memory.visible_tiles[tile].consumable is not None:
-        #         self.consumable_coords = Coords(tile[0], tile[1])
-
-        #     if memory.visible_tiles[tile].loot is not None:
-        #         if memory.visible_tiles[tile].loot.name in ('axe', 'sword'):
-        #             self.good_weapon_in_sight = Coords(tile[0], tile[1])
-
-        #     self.tiles[Coords(tile[0], tile[1])] = memory.visible_tiles[tile]
         
         [path, cost] = self.find_path(memory=memory, start=current_position, end=self.destination, facing = memory.facing)
 
@@ -108,9 +90,9 @@ class GoToAction(Action):
     def get_action_to_move_in_path(self, memory: Memory, destination: Coords) -> characters.Action:
         direction = sub_coords(destination, memory.position)
 
-        if direction == self.facing.value:
+        if direction == memory.facing.value:
             return characters.Action.STEP_FORWARD
-        elif direction == self.facing.turn_left().value:
+        elif direction == memory.facing.turn_left().value:
             return characters.Action.TURN_LEFT
         else:
             return characters.Action.TURN_RIGHT
