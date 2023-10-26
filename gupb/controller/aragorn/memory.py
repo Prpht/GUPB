@@ -22,7 +22,7 @@ class Memory:
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
 
-        self.map = Map.load('random')
+        self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
         self.environment = Environment(self.map)
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
@@ -33,6 +33,26 @@ class Memory:
 
         for coords in knowledge.visible_tiles:
             visible_tile_description = knowledge.visible_tiles[coords]
+            
+            if not coords in self.map.terrain:
+                self.map.terrain[coords] = tiles.Land()
+            
+            if self.map.terrain[coords].__class__.__name__.lower() != visible_tile_description.type:
+                newType = None
+
+                if visible_tile_description.type == 'land':
+                    newType = tiles.Land
+                elif visible_tile_description.type == 'sea':
+                    newType = tiles.Sea
+                elif visible_tile_description.type == 'wall':
+                    newType = tiles.Wall
+                elif visible_tile_description.type == 'menhir':
+                    newType = tiles.Menhir
+                else:
+                    newType = tiles.Land
+                
+                self.map.terrain[coords] = newType()
+            
             self.map.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
             self.map.terrain[coords].character = visible_tile_description.character
             self.map.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
@@ -125,34 +145,37 @@ class Map:
         self.hidingSpot = self.__getHidingSpot()
 
     @staticmethod
-    def load(name: str, size: coordinates.Coords = None) -> 'Map':
+    def load(name: str) -> 'Map':
         terrain = dict()
 
-        if name != 'random':
-            # predefined map
-            # (not used anymore)
-            arena_file_path = os.path.join('resources', 'arenas', f'{name}.gupb')
-            with open(arena_file_path) as file:
-                for y, line in enumerate(file.readlines()):
-                    for x, character in enumerate(line):
-                        if character != '\n':
-                            position = coordinates.Coords(x, y)
-                            if character in arenas.TILE_ENCODING:
-                                terrain[position] = arenas.TILE_ENCODING[character]()
-                            elif character in arenas.WEAPON_ENCODING:
-                                terrain[position] = tiles.Land()
-                                terrain[position].loot = arenas.WEAPON_ENCODING[character]()
-            return Map(name, terrain)
-        else:
-            # load empty map
-            # if size is given - assume everything a land
-            if size is not None:
-                for y in range(size[1]):
-                    for x in range(size[0]):
+        # predefined map
+        # (not used anymore)
+        arena_file_path = os.path.join('resources', 'arenas', f'{name}.gupb')
+        with open(arena_file_path) as file:
+            for y, line in enumerate(file.readlines()):
+                for x, character in enumerate(line):
+                    if character != '\n':
                         position = coordinates.Coords(x, y)
-                        terrain[position] = tiles.Land()
-            
-            return Map(name, terrain)
+                        if character in arenas.TILE_ENCODING:
+                            terrain[position] = arenas.TILE_ENCODING[character]()
+                        elif character in arenas.WEAPON_ENCODING:
+                            terrain[position] = tiles.Land()
+                            terrain[position].loot = arenas.WEAPON_ENCODING[character]()
+        return Map(name, terrain)
+    
+    @staticmethod
+    def loadRandom(name: str = 'generated', size: coordinates.Coords = None) -> 'Map':
+        terrain = dict()
+
+        # load empty map
+        # if size is given - assume everything a land
+        if size is not None:
+            for y in range(size[1]):
+                for x in range(size[0]):
+                    position = coordinates.Coords(x, y)
+                    terrain[position] = tiles.Land()
+        
+        return Map(name, terrain)
     
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
