@@ -42,7 +42,6 @@ class Memory:
         self.map.parseVisibleTiles(knowledge.visible_tiles, self.position, self.tick)
         
         self.idleTime += 1
-        # TODO: check if environment_action is called before turn or after
         self.environment.environment_action(self.no_of_champions_alive)
     
     def hasOponentInFront(self):
