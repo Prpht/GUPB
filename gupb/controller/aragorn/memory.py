@@ -85,6 +85,7 @@ class Environment:
         if self.episodes_since_mist_increase >= games.MIST_TTH_PER_CHAMPION * no_of_champions_alive:
             self.map.increase_mist()
             self.episodes_since_mist_increase = 0
+
 class Map:
     def __init__(self, name: str, terrain: arenas.Terrain) -> None:
         self.name = name
@@ -176,22 +177,28 @@ class Map:
             if effects.Mist in tileEffects:
                 self.menhirCalculator.addMist(coords)
     
-    def weaponDescriptionConverter(self, weaponName: str) -> weapons.Weapon:
-        if weaponName == 'knife':
+    def weaponDescriptionConverter(self, weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
+        if weaponDescription is None or not isinstance(weaponDescription, weapons.WeaponDescription):
+            return None
+        
+        if weaponDescription.name == 'knife':
             return weapons.Knife
-        elif weaponName == 'sword':
+        elif weaponDescription.name == 'sword':
             return weapons.Sword
-        elif weaponName == 'axe':
+        elif weaponDescription.name == 'axe':
             return weapons.Axe
-        elif weaponName == 'bow':
+        elif weaponDescription.name == 'bow':
             return weapons.Bow
-        elif weaponName == 'amulet':
+        elif weaponDescription.name == 'amulet':
             return weapons.Amulet
         else:
             return None
     
-    def consumableDescriptionConverter(self, consumableName: str) -> consumables.Consumable:
-        if consumableName == 'potion':
+    def consumableDescriptionConverter(self, consumableDescription: consumables.ConsumableDescription) -> consumables.Consumable:
+        if consumableDescription is None or not isinstance(consumableDescription, consumables.ConsumableDescription):
+            return None
+        
+        if consumableDescription.name == 'potion':
             return consumables.Potion
         return None
     
