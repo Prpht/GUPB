@@ -10,6 +10,8 @@ from gupb.controller.aragorn.constants import DEBUG
 
 class Memory:
     def __init__(self):
+        self.tick = 0
+
         self.idleTime = 0
         self.position: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
@@ -19,6 +21,8 @@ class Memory:
         self.environment: Environment = None
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.tick = 0
+
         self.idleTime = 0
         self.position: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
@@ -28,11 +32,13 @@ class Memory:
         self.environment = Environment(self.map)
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
+        self.tick += 1
+
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
-        self.map.parseVisibleTiles(knowledge.visible_tiles, self.position)
+        self.map.parseVisibleTiles(knowledge.visible_tiles, self.position, self.tick)
         
         self.idleTime += 1
         # TODO: check if environment_action is called before turn or after
@@ -124,7 +130,7 @@ class Map:
         
         return Map(name, terrain)
     
-    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], characterPos :coordinates.Coords) -> None:
+    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], characterPos :coordinates.Coords, currentTick :int) -> None:
         for coords in visibleTiles:
             visible_tile_description = visibleTiles[coords]
             
@@ -159,6 +165,7 @@ class Map:
                 
                 self.terrain[coords] = newType()
             
+            self.terrain[coords].tick = currentTick
             self.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
@@ -281,7 +288,7 @@ class MenhirCalculator:
     def isMenhirPosFound(self) -> bool:
         return self.menhirPos is not None
     
-    def approximateMenhirPos(self) -> coordinates.Coords:
+    def approximateMenhirPos(self, tick :int = None) -> coordinates.Coords:
         mistRadius = self.map.mist_radius
 
         if self.menhirPos is not None:
@@ -305,10 +312,14 @@ class MenhirCalculator:
                 mistMax = 0
 
                 for coords in self.map.terrain:
+                    if tick is not None and hasattr(self.map.terrain[coords], 'tick'):
+                        if self.map.terrain[coords].tick < tick - 16:
+                            continue
+                    
                     distance = int(((coords.x - try_menhir.x) ** 2 +
                                     (coords.y - try_menhir.y) ** 2) ** 0.5)
                     
-                    if distance == mistRadius:
+                    if distance >= mistRadius:
                         mistMax += 1
 
                         if effects.Mist in self.map.terrain[coords].effects:

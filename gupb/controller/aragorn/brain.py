@@ -22,7 +22,7 @@ class Brain:
 
         actions = []
         
-        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos()
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
         if menhirPos is not None:
             goToAroundAction = GoToAroundAction()
