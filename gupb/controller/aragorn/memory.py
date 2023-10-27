@@ -4,6 +4,7 @@ from typing import Dict, NamedTuple, Optional, List
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 
+from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG
 
 
@@ -64,7 +65,7 @@ class Memory:
 
         for coords in self.map.terrain:
             if self.map.terrain[coords].consumable == consumables.Potion:
-                distance = coordinates.distance(self.position, coords)
+                distance = utils.coordinatesDistance(self.position, coords)
 
                 if distance < minDistance:
                     minDistance = distance
