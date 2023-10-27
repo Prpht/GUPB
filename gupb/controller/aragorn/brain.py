@@ -3,6 +3,7 @@ from gupb.model import arenas, characters, coordinates, weapons
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
+from gupb.controller.aragorn.constants import DEBUG, INFINITY
 
 
 
@@ -39,7 +40,7 @@ class Brain:
             actions.append(goToAroundAction)
         
         closestEnemy = None
-        closestEnemyDistance = 9999999
+        closestEnemyDistance = INFINITY
 
         for coords in self.memory.map.terrain:
             if self.memory.map.terrain[coords].character is not None and self.memory.position != coords:

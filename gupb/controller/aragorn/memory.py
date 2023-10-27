@@ -5,7 +5,7 @@ from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG
+from gupb.controller.aragorn.constants import DEBUG, INFINITY
 
 
 
@@ -59,7 +59,7 @@ class Memory:
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
     
     def getDistanceToClosestPotion(self):
-        minDistance = 9999
+        minDistance = INFINITY
         minCoords = None
 
         for coords in self.map.terrain:
@@ -217,7 +217,7 @@ class Map:
     
     def getClosestWeaponPos(self, searchedWeaponType: weapons.Weapon|None, currentPos: coordinates.Coords = None):
         closestCoords = None
-        closestDistance = 9999999
+        closestDistance = INFINITY
 
         for coords in self.terrain:
             weapon = self.terrain[coords].loot

@@ -1,18 +1,13 @@
 from abc import abstractmethod
-
-from gupb.model import arenas, coordinates, weapons
-from gupb.model.coordinates import *
+from random import choice
 from typing import NamedTuple, Optional, List, Tuple
 
-
+from gupb.model.coordinates import *
 from gupb.model import characters
-from random import choice
+
 from gupb.controller.aragorn.memory import Memory
-INFINITY: int = 99999999999
+from gupb.controller.aragorn.constants import DEBUG, INFINITY
 
-from gupb.model.tiles import TileDescription
-
-from gupb.controller.aragorn.constants import DEBUG
 
 
 class Action:
@@ -37,17 +32,21 @@ class SpinAction(Action):
         
         self.spin = spin
 
+class RandomAction(Action):
+    def perform(self, memory: Memory) -> characters.Action:
+        available_actions = [characters.Action.STEP_FORWARD, characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
+        random_action = choice(available_actions)
+        return random_action
+
+class AttackAction(Action):
+    def perform(self, memory: Memory) -> Action:
+        return characters.Action.ATTACK
+
 class GoToAction(Action):
     def __init__(self) -> None:
         super().__init__()
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
-
-        self.misty_tiles: List[Coords] = []
-        
-        self.good_weapon_in_sight = None
-        self.consumable_coords = None
-
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -55,10 +54,13 @@ class GoToAction(Action):
         else:
             if DEBUG:
                 print("Trying to set destination to non Coords object (" + str(destination) + " of type " + str(type(destination)) + ")")
-                raise Exception()
 
     def setDestinationFacing(self, dstFacing: characters.Facing) -> None:
-        self.dstFacing = dstFacing
+        if isinstance(dstFacing, characters.Facing):
+            self.dstFacing = dstFacing
+        else:
+            if DEBUG:
+                print("Trying to set destination facing to non Facing object (" + str(dstFacing) + " of type " + str(type(dstFacing)) + ")")
 
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
@@ -70,13 +72,11 @@ class GoToAction(Action):
             if self.dstFacing is not None and memory.facing != self.dstFacing:
                 # TODO: not always turning right is optimal
                 return characters.Action.TURN_RIGHT
-            # print("PF: Destination reached")
             return None
         
         [path, cost] = self.find_path(memory=memory, start=current_position, end=self.destination, facing = memory.facing)
 
         if path is None or len(path) <= 1:
-            # print("PF: Path impossible")
             return None
 
         nextCoord = path[1]
@@ -211,13 +211,3 @@ class GoToAroundAction(GoToAction):
                 for y in range(-r, r + 1):
                     if (x - aroundDestination.x) ** 2 + (y - aroundDestination.y) ** 2 == r ** 2:
                         yield Coords(x, y)
-
-class RandomAction(Action):
-    def perform(self, memory: Memory) -> characters.Action:
-        available_actions = [characters.Action.STEP_FORWARD, characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
-        random_action = choice(available_actions)
-        return random_action
-
-class AttackAction(Action):
-    def perform(self, memory: Memory) -> Action:
-        return characters.Action.ATTACK
