@@ -1,5 +1,4 @@
-from gupb.model import arenas, coordinates, weapons
-from gupb.model import characters
+from gupb.model import arenas, characters, coordinates, weapons
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
@@ -10,13 +9,6 @@ from gupb.controller.aragorn import utils
 class Brain:
     def __init__(self):
         self.memory = Memory()
-        self.actions = {
-            'spin': SpinAction(),
-            'go_to': GoToAction(),
-            'random': RandomAction(),
-            'attack': AttackAction(),
-        }
-        self.state = 0
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
@@ -24,12 +16,12 @@ class Brain:
         actions = []
 
         if self.memory.willGetIdlePenalty():
-            spinAction = self.actions['spin']
+            spinAction = SpinAction()
             spinAction.setSpin(characters.Action.TURN_LEFT)
             actions.append(spinAction)
 
         if self.memory.hasOponentInFront():
-            attackAction = self.actions['attack']
+            attackAction = AttackAction()
             actions.append(attackAction)
         
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
@@ -63,7 +55,7 @@ class Brain:
             actions.append(goToAttackAction)
 
         
-        spinAction = self.actions['spin']
+        spinAction = SpinAction()
         actions.append(spinAction)
         
         for action in actions:
@@ -76,14 +68,13 @@ class Brain:
         self.onDecisionReturning(characters.Action.TURN_RIGHT)
         return characters.Action.TURN_RIGHT
     
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.memory.reset(arena_description)
+    
     def onDecisionReturning(self, action: characters.Action):
-        # print(action)
         if action in [
             characters.Action.TURN_LEFT,
             characters.Action.TURN_RIGHT,
             characters.Action.STEP_FORWARD,
         ]:
             self.memory.resetIdle()
-    
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.memory.reset(arena_description)
