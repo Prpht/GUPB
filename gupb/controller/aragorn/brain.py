@@ -3,6 +3,7 @@ from gupb.model import characters
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
+from gupb.controller.aragorn import utils
 
 
 
@@ -21,62 +22,6 @@ class Brain:
         self.memory.update(knowledge)
 
         actions = []
-        
-        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
-
-        if menhirPos is not None:
-            goToAroundAction = GoToAroundAction()
-            goToAroundAction.setDestination(menhirPos)
-            actions.append(goToAroundAction)
-        
-        spinAction = self.actions['spin']
-        actions.append(spinAction)
-
-        dstFacing = None
-        dstPoses = [
-            # coordinates.Coords(12, 12),
-
-            
-
-            # coordinates.Coords(1, 0),
-            # coordinates.Coords(-1, -1),
-            # coordinates.Coords(1, 0),
-        ]
-
-        # for i in range(len(dstPoses)):
-        #     dstPoses[i] = coordinates.add_coords(
-        #         self.memory.position,
-        #         dstPoses[i]
-        #     )
-        
-        for dstPos in dstPoses:
-            goToAction = GoToAction()
-            goToAction.setDestination(dstPos)
-            if dstFacing is not None:
-                goToAction.setDestinationFacing(dstFacing)
-            actions.append(goToAction)
-        
-        spinAction = self.actions['spin']
-        actions.append(spinAction)
-        
-        for action in actions:
-            ret = action.perform(self.memory)
-            
-            if ret is not None and ret is not characters.Action.DO_NOTHING:
-                self.onDecisionReturning(ret)
-                return ret
-        
-        self.onDecisionReturning(characters.Action.TURN_RIGHT)
-        return characters.Action.TURN_RIGHT
-    
-    def decideOld(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.memory.update(knowledge)
-
-        actions = []
-        dstFacing = None
-
-
-        # ---
 
         if self.memory.willGetIdlePenalty():
             spinAction = self.actions['spin']
@@ -93,60 +38,31 @@ class Brain:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
             actions.append(goToPotionAction)
+                
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
-        # ---
-
-        if self.state == 0:
-            # go to pick up a sword
-            dstPos = self.memory.map.getWeaponPos(weapons.Sword)
-            attackAction = False
-
-            if dstPos == self.memory.position:
-                self.state += 1
+        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
+            goToAroundAction = GoToAroundAction()
+            goToAroundAction.setDestination(menhirPos)
+            actions.append(goToAroundAction)
         
-        if self.state == 1:
-            # go to camping spot
-            [dstPos, dstFacing] = self.memory.map.hidingSpot
-            attackAction = False
+        closestEnemy = None
+        closestEnemyDistance = 9999999
 
-            if dstPos == self.memory.position and dstFacing == self.memory.facing:
-                self.state += 1
+        for coords in self.memory.map.terrain:
+            if self.memory.map.terrain[coords].character is not None and self.memory.position != coords:
+                distance = utils.coordinatesDistance(self.memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
         
-        if self.state == 2:
-            # continously attack
-            [tmp_dstPos, tmp_dstFacing] = self.memory.map.hidingSpot
-            
-            if self.memory.facing != tmp_dstFacing:
-                dstPos = tmp_dstPos
-                dstFacing = tmp_dstFacing
-                attackAction = False
-            else:
-                dstPos = None
-                attackAction = True
+        if closestEnemy is not None:
+            goToAttackAction = GoToAroundAction()
+            goToAttackAction.setDestination(closestEnemy)
+            actions.append(goToAttackAction)
 
-            # if mist is comming - go to the next stage
-            if self.memory.map.mist_radius < self.memory.map.size[0] * 4 / 5:
-                self.state += 1
         
-        if self.state >= 3:
-            # go to map center
-            dstPos = self.memory.map.passableCenter
-            attackAction = False
-
-            if dstPos == self.memory.position:
-                self.state += 1
-
-        if dstPos is not None:
-            goToAction = self.actions['go_to']
-            goToAction.setDestination(dstPos)
-            if dstFacing is not None:
-                goToAction.setDestinationFacing(dstFacing)
-            actions.append(goToAction)
-        
-        if attackAction:
-            attackAction = self.actions['attack']
-            actions.append(attackAction)
-
         spinAction = self.actions['spin']
         actions.append(spinAction)
         
