@@ -39,7 +39,7 @@ class Memory:
         self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
-        self.map.parseVisibleTiles(knowledge.visible_tiles, self.position, self.tick)
+        self.map.parseVisibleTiles(knowledge.visible_tiles, self.tick)
         
         self.idleTime += 1
         self.environment.environment_action(self.no_of_champions_alive)
@@ -93,8 +93,6 @@ class Map:
         self.size: tuple[int, int] = arenas.terrain_size(self.terrain)
         self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
-        self.passableCenter = self.__getPassableCenter()
-        self.hidingSpot = self.__getHidingSpot()
 
         self.menhirCalculator = MenhirCalculator(self)
 
@@ -131,7 +129,7 @@ class Map:
         
         return Map(name, terrain)
     
-    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], characterPos :coordinates.Coords, currentTick :int) -> None:
+    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], currentTick :int) -> None:
         for coords in visibleTiles:
             visible_tile_description = visibleTiles[coords]
             
@@ -209,7 +207,7 @@ class Map:
             if effect.type == 'mist':
                 convertedEffects.append(effects.Mist)
             # we dont need to know weapon cuts
-            # elif effect == 'weaponcut':
+            # elif effect.type == 'weaponcut':
             #     convertedEffects.append(effects.WeaponCut)
         
         return convertedEffects
@@ -217,64 +215,33 @@ class Map:
     def increase_mist(self) -> None:
         self.mist_radius -= 1 if self.mist_radius > 0 else self.mist_radius
     
-    def __getPassableCenter(self) -> coordinates.Coords|None:
-        mapSize = self.size
-        
-        for r in range(mapSize[0] // 2):
-            for x in range(mapSize[0] // 2 - r, mapSize[0] // 2 + r + 1):
-                for y in range(mapSize[1] // 2 - r, mapSize[1] // 2 + r + 1):
-                    coordToCheck = coordinates.Coords(x, y)
+    def getClosestWeaponPos(self, searchedWeaponType: weapons.Weapon|None, currentPos: coordinates.Coords = None):
+        closestCoords = None
+        closestDistance = 9999999
 
-                    if coordToCheck in self.terrain and self.terrain[coordToCheck].terrain_passable():
-                        return coordToCheck
-        
-        return None
-    
-    def __getHidingSpot(self) -> [coordinates.Coords|None,characters.Facing]:
-        if self.name == 'ordinary_chaos':
-            return coordinates.Coords(4, 9), characters.Facing.DOWN
-        
-        return None, None
-    
-    def getWeaponPos(self, weponType: weapons.Weapon):
-        if weponType == weapons.Sword:
-            return coordinates.Coords(4, 14)
+        for coords in self.terrain:
+            weapon = self.terrain[coords].loot
 
-        return None
+            if (
+                # take this tile's wapon into consideretion if
+                # did not requested any specific searchedWeaponType
+                searchedWeaponType is None
+                # or the weapon is the one we are looking for
+                or (
+                    weapon is not None
+                    and weapon == searchedWeaponType
+                )
+            ):
+                if currentPos is None:
+                    return coords
+                
+                distance = utils.coordinatesDistance(currentPos, coords)
 
-class MenhirCalculator2:
-    def __init__(self) -> None:
-        self.menhirPos = None
-        self.mistCoordinates = []
-
-    def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
-        self.menhirPos = menhirPos
-    
-    def addMist(self, mistPos: coordinates.Coords) -> None:
-        if mistPos not in self.mistCoordinates:
-            self.mistCoordinates.append(mistPos)
-    
-    def isMenhirPosFound(self) -> bool:
-        return self.menhirPos is not None
-    
-    def approximateMenhirPos(self, characterPosition :coordinates.Coords) -> coordinates.Coords:
-        if self.menhirPos is not None:
-            return self.menhirPos
+                if distance < closestDistance:
+                    closestCoords = coords
+                    closestDistance = distance
         
-        mistCoordinates = self.mistCoordinates
-        if len(mistCoordinates) == 0:
-            return None
-        
-        fakeMistCenter = coordinates.Coords(0, 0)
-
-        for mistCoordinate in mistCoordinates:
-            fakeMistCenter = coordinates.add_coords(
-                fakeMistCenter,
-                coordinates.sub_coords(mistCoordinate, characterPosition)
-            )
-        
-        return fakeMistCenter
-    
+        return closestCoords
 
 class MenhirCalculator:
     def __init__(self, map :Map) -> None:
