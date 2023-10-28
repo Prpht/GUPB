@@ -52,7 +52,8 @@ class Tabard(Enum):
     ARAGORN = 'Aragorn'
     MONGOL = 'Mongolek'
     PIKACHU = 'Pikachu'
-    R2D2 = 'R2D2'
+    R2D2 = 'R2D2',
+    FROG = 'Frog'
 
 
 class Champion:
