@@ -184,11 +184,13 @@ class CynamonkaController(controller.Controller):
 
     def find_nearest_path(self, grid, start, goal):
         # TODO: tak jak pisalam wczesniej, trzeba dodac tutaj,a lbo w innej funkcji koszt przechodzenia z jednego pola na drugie
+        # TODO: powinno być git, ale uwzględnić, ze aktualnie nie przypisuje sie nigdzie self. target, zadne wartosci, wiec wyrzuca blad, bo jest Nonem
         # wytłumaczenie w komentarzu w mniej wiecej 138 linijce
         # Initialize a list to represent the path
         path = [start]
         current_position = start
         current_direction = self.facing.value 
+        steps_taken = [0]
 
         while current_position != goal:
             # Calculate the positions for moving forward, turning right, and turning left
@@ -200,12 +202,17 @@ class CynamonkaController(controller.Controller):
 
             if not valid_positions:
                 return None
+
+            # Calculate the weight for each position (distance + steps)
+            weights = [abs(pos[0] - goal[0]) + abs(pos[1] - goal[1]) + steps_taken[-1] + (1 if pos == forward_position else 2) for pos in valid_positions for pos in valid_positions]
+
             # Choose the position that brings you closer to the goal
-            closest_position = min(valid_positions, key=lambda pos: abs(pos[0] - goal[0]) + abs(pos[1] - goal[1]))
+            closest_position = valid_positions[weights.index(min(weights))]
 
             # Update the path and current position
             path.append(closest_position)
             current_position = closest_position
+            steps_taken.append(steps_taken[-1] + (1 if closest_position == forward_position else 2))
 
             # Update the direction based on the movement
             if closest_position == forward_position:
