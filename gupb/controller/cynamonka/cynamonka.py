@@ -85,6 +85,9 @@ class CynamonkaController(controller.Controller):
             # player do not see mist so it is not its priority to run away
             else:
                 print("there is no mist")
+
+                # TODO: zaimplementowac algorytm zeby on nie szedl w kierunku broni jesli ma lepsza, czyli tylko jak ma noz to ma szukac
+                # TODO: moze tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
                 if self.is_weapon_or_elixir_in_the_neighbourhood():
                     return self.go_in_the_target_direction()
                 if self.menhir_position:
@@ -156,8 +159,9 @@ class CynamonkaController(controller.Controller):
         # TODO: tak samo jak w przypadku funkcji go_in_the_target_direction, cale do zaimplementowania od nowa, tak naprawde to one beda takie same
         # mozna zrobic jedna funckje, jedyne co to w tym przyadku nie zlaezy nam jakos zeby dotrzec do samego menhira, wystarczy byc w poblizu, mozemy uznac 
         # ze jesli gracz jest <=2 od menhiru to juz do niego nie idzie
-        nearest_path_to_target_from_next_pos = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.target)
-        nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, self.target)
+
+        nearest_path_to_target_from_next_pos = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.menhir_position)
+        nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, self.menhir_position)
         if nearest_path_to_target and nearest_path_to_target_from_next_pos is not None:
             if (len(nearest_path_to_target_from_next_pos) < len(nearest_path_to_target)) and self.can_move_forward():
                 return POSSIBLE_ACTIONS[2]
@@ -185,6 +189,7 @@ class CynamonkaController(controller.Controller):
     def find_nearest_path(self, grid, start, goal):
         # TODO: tak jak pisalam wczesniej, trzeba dodac tutaj,a lbo w innej funkcji koszt przechodzenia z jednego pola na drugie
         # TODO: powinno być git, ale uwzględnić, ze aktualnie nie przypisuje sie nigdzie self. target, zadne wartosci, wiec wyrzuca blad, bo jest Nonem
+
         # wytłumaczenie w komentarzu w mniej wiecej 138 linijce
         # Initialize a list to represent the path
         path = [start]
@@ -209,10 +214,13 @@ class CynamonkaController(controller.Controller):
             # Choose the position that brings you closer to the goal
             closest_position = valid_positions[weights.index(min(weights))]
 
+
             # Update the path and current position
             path.append(closest_position)
             current_position = closest_position
+
             steps_taken.append(steps_taken[-1] + (1 if closest_position == forward_position else 2))
+
 
             # Update the direction based on the movement
             if closest_position == forward_position:

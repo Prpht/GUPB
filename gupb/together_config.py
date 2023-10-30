@@ -24,7 +24,7 @@ CONFIGURATION = {
         ares.AresController("Nike"),
         bob.FSMBot(),
         batman.BatmanHeuristicsController('Batman'),
-        cynamonka.CynamonkaController("Cynamonka"),
+        cynamonka.CynamonkaController("CynamonkaController", arena_description=ArenaDescription('ordinary_chaos')),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         krombopulos.KrombopulosMichaelController(),
         maly_konik.MalyKonik("LittlePonny"),
