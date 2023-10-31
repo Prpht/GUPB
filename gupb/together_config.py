@@ -15,11 +15,15 @@ from gupb.controller import roger
 from gupb.controller import reckless_roaming_dancing_druid
 from gupb.scripts import arena_generator
 
+ancymon_controler = ancymon.AncymonController("Ancymon")
+
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50),
+    'arenas': [
+        'ordinary_chaos',
+    ],
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
-        ancymon.AncymonController("Ancymon"),
+        ancymon_controler,
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
         bob.FSMBot(),
@@ -35,7 +39,7 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': False,
-    'show_sight': False,
-    'runs_no': 1000,
+    'visualise': True,
+    'show_sight': ancymon_controler,
+    'runs_no': 1,
 }
