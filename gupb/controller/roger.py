@@ -1,4 +1,5 @@
 import random
+import os
 from enum import Enum
 from typing import Dict, Tuple, Optional, List, NamedTuple
 
@@ -9,7 +10,9 @@ from pathfinding.finder.a_star import AStarFinder
 from gupb import controller
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
+from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, Arena, Terrain
 from gupb.model.coordinates import Coords
+from gupb.model.tiles import Land, Menhir
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -18,7 +21,7 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-MAX_SIZE = 20
+MAX_SIZE = 100
 
 
 class SeenWeapon(NamedTuple):
@@ -43,6 +46,7 @@ class Roger(controller.Controller):
         # remembering map
         self.epoch: int = 0
         self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
+        self.terrain: Optional[Terrain] = None
 
         # pathfinding
         self.grid: Optional[Grid] = None
@@ -222,10 +226,30 @@ class Roger(controller.Controller):
         self.menhir_coords = None
         self.weapons_coords = {}
         self.has_weapon = False
+        self.terrain = self.load_arena(arena_description.name).terrain
+
+
+    def load_arena(self, name: str) -> Arena:
+        terrain = dict()
+        arena_file_path = os.path.join('resources', 'arenas', f'{name}.gupb')
+        with open(arena_file_path) as file:
+            for y, line in enumerate(file.readlines()):
+                for x, character in enumerate(line):
+                    if character != '\n':
+                        position = coordinates.Coords(x, y)
+                        if character in TILE_ENCODING:
+                            terrain[position] = TILE_ENCODING[character]()
+                        elif character in WEAPON_ENCODING:
+                            terrain[position] = tiles.Land()
+                            terrain[position].loot = WEAPON_ENCODING[character]()
+        return Arena(name, terrain)
 
     def build_grid(self):
         def extract_walkable_tiles():
-            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.seen_tiles.items()))
+            try:
+                return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.terrain.items()))
+            except AttributeError:
+                return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.seen_tiles.items()))
 
         walkable_tiles_list = extract_walkable_tiles()
         walkable_tiles_matrix = [[0 for y in range(MAX_SIZE)] for x in range(MAX_SIZE)]
