@@ -38,7 +38,9 @@ class BatmanHeuristicsController(controller.Controller):
         self._knowledge.update(knowledge, self._episode)
 
         events = self._event_detector.detect(self._knowledge)
-        action, strategy = self._current_strategy.decide(self._knowledge, events, self._navigation)
+        action, strategy = self._current_strategy.decide(
+            self._knowledge, events, self._navigation
+        )
         # print(self._current_strategy, action)
         self._current_strategy = self._strategies[strategy]
 
@@ -47,7 +49,7 @@ class BatmanHeuristicsController(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self._episode = 0
         self._game += 1
         self._knowledge = Knowledge(arena_description)
