@@ -21,8 +21,6 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-max_size = 100
-
 
 class SeenWeapon(NamedTuple):
     name: str
@@ -47,6 +45,7 @@ class Roger(controller.Controller):
         self.epoch: int = 0
         self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
         self.terrain: Optional[Terrain] = None
+        self.arena_size = 50
 
         # pathfinding
         self.grid: Optional[Grid] = None
@@ -112,7 +111,8 @@ class Roger(controller.Controller):
         return random.choices(POSSIBLE_ACTIONS[:-1], weights=[1, 1, 3])[0]
 
     def chose_next_tile(self) -> Coords:
-        pass
+
+
 
     def explore_map(self):
         if not self.actions:
@@ -243,8 +243,7 @@ class Roger(controller.Controller):
         self.has_weapon = False
         self.load_arena(arena_description.name)
 
-
-    def load_arena(self, name: str) -> Arena:
+    def load_arena(self, name: str):
         terrain = dict()
         arena_file_path = os.path.join('resources', 'arenas', f'{name}.gupb')
         with open(arena_file_path) as file:
@@ -258,7 +257,7 @@ class Roger(controller.Controller):
                             terrain[position] = tiles.Land()
                             terrain[position].loot = WEAPON_ENCODING[character]()
         self.terrain = terrain
-        max_size = int(len(self.terrain.keys()) ** (1/2))
+        self.arena_size = int(len(self.terrain.keys()) ** (1/2))
 
     def build_grid(self):
         def extract_walkable_tiles():
@@ -268,13 +267,13 @@ class Roger(controller.Controller):
                 return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.seen_tiles.items()))
 
         walkable_tiles_list = extract_walkable_tiles()
-        walkable_tiles_matrix = [[0 for y in range(max_size)] for x in range(max_size)]
+        walkable_tiles_matrix = [[0 for y in range(self.arena_size)] for x in range(self.arena_size)]
 
         for tile in walkable_tiles_list:
             x, y = tile[0]
             walkable_tiles_matrix[y][x] = 1
 
-        self.grid = Grid(max_size, max_size, walkable_tiles_matrix)
+        self.grid = Grid(self.arena_size, self.arena_size, walkable_tiles_matrix)
 
     def look_for_menhir(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, tile in tiles.items():
@@ -305,7 +304,7 @@ class Roger(controller.Controller):
         return mist_coords
 
     def find_nearest_mist_coords(self, mist_coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
-        min_distance_squared = 2 * max_size ** 2
+        min_distance_squared = 2 * self.arena_size ** 2
         nearest_mist_coords = None
         for coords in mist_coords:
             distance_squared = (coords.x - self.current_position.x) ** 2 + (coords.y - self.current_position.y) ** 2
