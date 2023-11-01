@@ -1,70 +1,69 @@
 import heapq
+from gupb.controller.ancymon.environment import Environment
+from gupb.model.coordinates import Coords
 
-# It is A* DEMO
+directions = [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]
 
-directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+class Path_Finder():
+    def __init__(self, environment: Environment):
+        self.environment: Environment = environment
+    def heuristic(self, node: Coords, goal:Coords):
+        # Calculate the Manhattan distance as the heuristic.
+        return abs(node.x - goal.x) + abs(node.y - goal.y)
 
-def heuristic(node, goal):
-    # Calculate the Manhattan distance as the heuristic.
-    return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+    def astar_search(self, start: Coords, end: Coords):
+        open_set = [(0, start)]
+        came_from = {}
+        g_score = {Coords(row, col): float('inf') for row in range(self.environment.map_known_len) for col in range(self.environment.map_known_len)}
+        g_score[start] = 0
 
-def astar_search(grid, start, end):
-    open_set = [(0, start)]
-    came_from = {}
-    g_score = {(row, col): float('inf') for row in range(len(grid)) for col in range(len(grid[0]))}
-    g_score[start] = 0
+        while open_set:
+            _, current = heapq.heappop(open_set)
 
-    while open_set:
-        _, current = heapq.heappop(open_set)
+            if current == end:
+                path = self.reconstruct_path(came_from, end)
+                return path
 
-        if current == end:
-            path = reconstruct_path(came_from, end)
+            for dCoord in directions:
+                neighbor = current + dCoord
+                if not self.is_valid(neighbor):
+                    continue
+
+                tentative_g_score = g_score[current] + 1  # Assuming a constant cost of 1 for movement.
+
+                if tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score = tentative_g_score + self.heuristic(neighbor, end)
+                    heapq.heappush(open_set, (f_score, neighbor))
+
+        return None
+
+    def is_valid(self, point):
+        x, y = point
+        if 0 <= x < self.environment.map_known_len and 0 <= y < self.environment.map_known_len:
+            if self.environment.discovered_map.get(Coords(x, y)) == None:
+                return True
+            if self.environment.discovered_map[Coords(x, y)].type == 'land':
+                return True
+            if self.environment.discovered_map[Coords(x, y)].type == 'menhir':
+                return True
+        return False
+
+    def reconstruct_path(self, came_from, current):
+        path = [current]
+        while current in came_from:
+            current = came_from[current]
+            path.insert(0, current)
+        return path
+
+    # Example usage:
+    def caluclate(self, start: Coords, end: Coords):
+
+        path = self.astar_search(start, end)
+
+        if path:
             return path
-
-        for dx, dy in directions:
-            neighbor = (current[0] + dx, current[1] + dy)
-            if not is_valid(neighbor, grid):
-                continue
-
-            tentative_g_score = g_score[current] + 1  # Assuming a constant cost of 1 for movement.
-
-            if tentative_g_score < g_score[neighbor]:
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score = tentative_g_score + heuristic(neighbor, end)
-                heapq.heappush(open_set, (f_score, neighbor))
-
-    return None  # No path found
-
-def is_valid(point, grid):
-    x, y = point
-    return 0 <= x < len(grid) and 0 <= y < len(grid[0]) and grid[x][y] != 1
-
-def reconstruct_path(came_from, current):
-    path = [current]
-    while current in came_from:
-        current = came_from[current]
-        path.insert(0, current)
-    return path
-
-# Example usage:
-if __name__ == "__main__":
-    grid = [
-        [0, 0, 0, 1, 0],
-        [0, 1, 1, 2, 0],
-        [0, 2, 0, 1, 0],
-        [0, 0, 0, 0, 0],
-    ]
-
-    start_x, start_y = 0, 0
-    end_x, end_y = 3, 4
-
-    start = (start_x, start_y)
-    end = (end_x, end_y)
-
-    path = astar_search(grid, start, end)
-
-    if path:
-        print("Path found:", path)
-    else:
-        print("No path found.")
+        else:
+            print("No path found.")
+            return None

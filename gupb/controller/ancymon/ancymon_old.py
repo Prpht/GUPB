@@ -4,7 +4,6 @@ from gupb import controller
 from gupb.model import arenas, characters
 from gupb.model.weapons import Knife
 from gupb.model import tiles
-self.position = None
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
