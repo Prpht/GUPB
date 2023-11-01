@@ -56,10 +56,8 @@ class CynamonkaController(controller.Controller):
             self.position = knowledge.position
             self.facing = knowledge.visible_tiles[self.position].character.facing
             self.next_forward_position = self.position + self.facing.value
-            # self.current_weapon = self.discovered_arena[self.position].character.weapon
             self.set_new_weapon()
 
-            # self.remove_collected_items()
             print("moja aktualna bron to:  " + str(self.discovered_arena[self.position].character.weapon))
 
             # first three ifs are the most important actions, player do it even when the map shrinks
@@ -94,9 +92,8 @@ class CynamonkaController(controller.Controller):
             else:
                 print("there is no mist")
 
-                # TODO: zaimplementowac algorytm zeby on nie szedl w kierunku broni jesli ma lepsza, czyli tylko jak ma noz to ma szukac
                 # TODO: moze tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
-                if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon == Knife:
+                if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon in [Knife, Amulet]:
                     print("go in weapon or elixir direction")
                     return self.go_in_the_target_direction(self.target)
                 if self.menhir_position:
@@ -147,28 +144,6 @@ class CynamonkaController(controller.Controller):
         shortest_path = min(not_empty_paths, key=len)
         return shortest_path
 
-    
-    # def go_in_the_target_direction(self):
-    #     # TODO: to jest implementacja tylko taka robocza, nie dziala to zbyt dobrze, trzeba napisac ja od nowa, najlepiej wgl nie patrz za bardzo na to co tu jest xd
-    #     # jest funkcja find_nearest_path, ktora znajduje nam po kolei kroki ktore powinnismy wykonac zbey dojsc do jakiegos punktiu
-    #     # trzeba ja wykorzystac jakos tak zeby gracz robil po kolei te kroki ktore powinien, trzeba pamietac ze funkcja find earest path zwraca
-    #     # lsite pozycji uwzlędniając pozycje początkowa zawodnika i końcową,. Dodatkowo np jesli patrzymy wprzód to koszt przejscia z pola (1,1) na pole (1,2) jest mniejszy niz przejscia z pola (1,1) na pole (2,1)
-    #     # bo trzeba sie obrocic i potem isc prosto, czyli to sie liczy jako dwa kroki, a nie jeden jak w pierwszym przypadku, narazie ten algorytm tego nie uwzglednia
-    #     nearest_path_to_target_from_next_pos = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.target)
-    #     nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, self.target)
-    #     if nearest_path_to_target and nearest_path_to_target_from_next_pos is not None:
-    #         if (len(nearest_path_to_target_from_next_pos) < len(nearest_path_to_target)) and self.can_move_forward():
-    #             return POSSIBLE_ACTIONS[2]
-    #     if self.position[0]< self.target[0] and self.can_turn_right():
-    #         return POSSIBLE_ACTIONS[1]
-    #     if self.position[0] > self.target[0] and self.can_turn_left():
-    #         return POSSIBLE_ACTIONS[0]
-    #     # plan jest taki ze jak nie moze skrecic w prawo i lewo (w sensie moze ale jest tam przeszkoda) to obraca sie w prawo bo wtedy bedzie tyleem, ryzyko zapetlenia
-    #     return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
-    
-
-
-
         ###############
     def go_in_the_target_direction(self, target_point):
         print("JESTEEEEM W SROKUUUUUU GO INTO THE TARGET FUNCTION")
@@ -193,7 +168,7 @@ class CynamonkaController(controller.Controller):
             else:
                 # W przeciwnym razie, sprawdź, czy musimy obrócić się o 180 stopni
                 if self.is_opposite_direction(self.facing.value, next_position_direction):
-                    return self.turn_around()
+                    return POSSIBLE_ACTIONS[1] #po prostu wtedy zawsze w prawo
                 else:
                     # W przeciwnym razie, obróć się w kierunku kolejnej pozycji na trasie
                     return self.turn_towards_direction(next_position_direction)
@@ -244,16 +219,16 @@ class CynamonkaController(controller.Controller):
                 print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
 
-    def turn_around(self):
-        # Obróć się o 180 stopni
-        if self.facing == characters.Facing.UP:
-            return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-        elif self.facing == characters.Facing.DOWN:
-            return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-        elif self.facing == characters.Facing.LEFT:
-            return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-        elif self.facing == characters.Facing.RIGHT:
-            return POSSIBLE_ACTIONS[1]  # Skręć w prawo
+    # def turn_around(self):
+    #     # Obróć się o 180 stopni
+    #     if self.facing == characters.Facing.UP:
+    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
+    #     elif self.facing == characters.Facing.DOWN:
+    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
+    #     elif self.facing == characters.Facing.LEFT:
+    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
+    #     elif self.facing == characters.Facing.RIGHT:
+    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
 
         ###############
 
@@ -261,44 +236,26 @@ class CynamonkaController(controller.Controller):
         # TODO: tak samo jak w przypadku funkcji go_in_the_target_direction, cale do zaimplementowania od nowa, tak naprawde to one beda takie same
         # mozna zrobic jedna funckje, jedyne co to w tym przyadku nie zlaezy nam jakos zeby dotrzec do samego menhira, wystarczy byc w poblizu, mozemy uznac 
         # ze jesli gracz jest <=2 od menhiru to juz do niego nie idzie
-        # nearest_path_to_target_from_next_pos = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.menhir_position)
-        # nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, self.menhir_position)
-        # if nearest_path_to_target and nearest_path_to_target_from_next_pos is not None:
-        #     if (len(nearest_path_to_target_from_next_pos) < len(nearest_path_to_target)) and self.can_move_forward():
-        #         return POSSIBLE_ACTIONS[2]
-        # if self.position[0] < self.menhir_position[0] and self.can_turn_right():
-        #     return POSSIBLE_ACTIONS[1]
-        # if self.position[0] > self.menhir_position[0] and self.can_turn_left():
-        #     return POSSIBLE_ACTIONS[0]
-        # # plan jest taki ze jak nie moze skrecic w prawo i lewo (w sensie moze ale jest tam przeszkoda) to obraca sie w prawo bo wtedy bedzie tyleem, ryzyko zapetlenia TODO: sprawdzic to
-        # return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
         path_from_menhir = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.menhir_position)
         if path_from_menhir:
             distance_from_menhir = len(path_from_menhir)
             if distance_from_menhir > 2:
                 return self.go_in_the_target_direction(self.menhir_position)            
-            else: return self.go_randomly(self)
-        else: return self.go_randomly(self)
+            else: 
+                return self.go_randomly()
+        else: 
+            return self.go_randomly()
     
     def go_randomly(self):
-        available_actions = []
-
         if self.can_move_forward():
-            available_actions.append(POSSIBLE_ACTIONS[2])
-        if self.can_turn_right():
-            available_actions.append(POSSIBLE_ACTIONS[1])
-        if self.can_turn_left():
-            available_actions.append(POSSIBLE_ACTIONS[0])
-
-        if available_actions:
-            num_available_actions = len(available_actions)
-            probabilities = [1 / num_available_actions] * num_available_actions
-            random_action = random.choices(available_actions, probabilities, k=1)[0]
-
-            print(random_action)
-            return random_action
-        else:
-            print("randomly")
+            print("forward")
+            return POSSIBLE_ACTIONS[2]
+        if self.can_turn_right() and self.can_turn_left:
+            print("right")
+            return random.choice(POSSIBLE_ACTIONS[:2])
+        elif self.can_turn_left():
+            return POSSIBLE_ACTIONS[0]
+        else: 
             return POSSIBLE_ACTIONS[1]
     
 
@@ -384,8 +341,11 @@ class CynamonkaController(controller.Controller):
         return attackable_area
     
     def can_attack(self):
+        # amulet jest chyba taki szalony, ze w aktualnej implementacji jak sie go zbierze to bot staje i tylko atakuje, az umrze
         if self.current_weapon == weapons.Bow and self.current_weapon.__name__ == "bow_unloaded":
             return True
+        if self.current_weapon == weapons.Amulet:
+            return False
         attackable_area = self.get_attackable_area()
         for coords, description in self.discovered_arena.items():
             if description.character and coords in attackable_area:
