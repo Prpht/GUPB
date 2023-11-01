@@ -11,7 +11,7 @@ from gupb import controller
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
 from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, Arena, Terrain
-from gupb.model.coordinates import Coords
+from gupb.model.coordinates import Coords, add_coords
 from gupb.model.tiles import Land, Menhir
 
 POSSIBLE_ACTIONS = [
@@ -69,11 +69,11 @@ class Roger(controller.Controller):
         return hash(self._id)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-
         self.update_state(knowledge)
         if self.beginning_iterator < 4:
             self.beginning_iterator += 1
             return characters.Action.TURN_RIGHT
+
         match self.current_state:
             case States.RANDOM_WALK:
                 return self.random_walk()
@@ -108,22 +108,60 @@ class Roger(controller.Controller):
                 self.current_state = States.HEAD_TO_WEAPON
                 return self.head_to_weapon(path)
 
-        return random.choices(POSSIBLE_ACTIONS[:-1], weights=[1, 1, 3])[0]
+        # return random.choices(POSSIBLE_ACTIONS[:-1], weights=[1, 1, 3])[0]
+        return self.explore_map()
 
     def chose_next_tile(self) -> Coords:
-
-
+        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.terrain.items()))
+        walkable_coords = set(map(lambda x: x[0], walkable))
+        seen_coords = set(self.seen_tiles.keys())
+        unseen_coords = walkable_coords - seen_coords
+        unseen_coords = list(unseen_coords)
+        best_coords = random.choices(list(walkable_coords), k=1)[0]
+        if unseen_coords:
+            k = min(10, len(unseen_coords))
+            random_unseen = random.choices(unseen_coords, k=k)
+        else:
+            return best_coords
+        longest_path_len = 0
+        for coords in random_unseen:
+            path = self.get_path(coords)
+            if path:
+                path_len = len(self.map_path_to_action_list(self.current_position, path))
+                if path_len > longest_path_len:
+                    longest_path_len = path_len
+                    best_coords = coords
+        return best_coords
 
     def explore_map(self):
+        if self.actions and self.actions_iterator >= len(self.actions):
+            self.actions = None
+            self.actions_iterator = 0
+
         if not self.actions:
             new_aim = self.chose_next_tile()
             path = self.get_path(new_aim)
             actions = self.map_path_to_action_list(self.current_position, path)
             self.actions = actions
             self.actions_iterator = 0
-
         action = self.actions[self.actions_iterator]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)  # todo niektóre brobnir nir biją do przodu :(
+        return action
+
+    def return_attack_if_enemy_before(self, action: characters.Action):
+        if not action == characters.Action.ATTACK:
+            initial_facing = self.seen_tiles[self.current_position][0].character.facing.value
+            coords_before = add_coords(self.current_position, initial_facing)
+            if self.seen_tiles[coords_before][1] == self.epoch:
+                if self.seen_tiles[coords_before][0].character:
+                    self.actions_iterator -= 1
+                    return characters.Action.ATTACK
+        return action
+
+    def return_attack_if_enemy_on_the_road(self, action: characters.Action):
+        if action == characters.Action.STEP_FORWARD:
+            action = self.return_attack_if_enemy_before(action)
         return action
 
     def head_to_finish(self) -> characters.Action:
@@ -166,6 +204,7 @@ class Roger(controller.Controller):
 
         action = self.actions[self.actions_iterator]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def head_to_menhir(self, path: List[GridNode]) -> characters.Action:
@@ -179,12 +218,14 @@ class Roger(controller.Controller):
 
         action = self.actions[self.actions_iterator]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def final_defence(self) -> characters.Action:
         self.actions = [characters.Action.TURN_RIGHT, characters.Action.ATTACK]
         action = self.actions[self.actions_iterator % 2]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def head_to_center(self, path) -> characters.Action:
@@ -201,9 +242,9 @@ class Roger(controller.Controller):
         return action
 
     def update_state(self, knowledge: characters.ChampionKnowledge):
+        self.epoch += 1
         self.current_position = knowledge.position
         self.seen_tiles.update(dict((Coords(x[0][0], x[0][1]), (x[1], self.epoch)) for x in knowledge.visible_tiles.items()))
-        self.epoch += 1
 
         if not self.menhir_coords:
             self.look_for_menhir(knowledge.visible_tiles)
