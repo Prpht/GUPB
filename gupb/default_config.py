@@ -11,7 +11,6 @@ CONFIGURATION = {
     ],
     'controllers': [
         cynamonka_controller,
-
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
