@@ -1,7 +1,7 @@
 from re import S
 import traceback
 import random
-from turtle import distance
+from turtle import distance, position
 from typing import Dict
 from gupb import controller
 from gupb.model import arenas, effects, tiles
@@ -86,14 +86,14 @@ class CynamonkaController(controller.Controller):
                 else:
                     # here should be runaway from mist function
                     print("runaway from mist")
-                    return self.go_randomly()
-                    #return self.runaway_from_mist()
+                    # return self.go_randomly()
+                    return self.runaway_from_mist()
             # player do not see mist so it is not its priority to run away
             else:
                 print("there is no mist")
 
                 # TODO: moze tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
-                if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon in [Knife, Amulet]:
+                if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon == Knife: # [Knife, Amulet]:
                     print("go in weapon or elixir direction")
                     return self.go_in_the_target_direction(self.target)
                 if self.menhir_position:
@@ -122,9 +122,9 @@ class CynamonkaController(controller.Controller):
         if shortest_path:
             if len(shortest_path) <= 7:
                 self.target = shortest_path[-1]
-                print("nowy target zostal ustawiony na ===== " + str(self.target))
+                print("nowy target zostal ustawiony na ===== " + str(self.target) + str(self.discovered_arena[self.target]))
                 return True
-            else: print("nowy target byl za dalekoooooo")
+            # else: print("nowy target byl za dalekoooooo")
         return False
     
 
@@ -151,7 +151,7 @@ class CynamonkaController(controller.Controller):
         print("nasz target ===== " + str(target_point))
         # Znajdź optymalną trasę do celu
         nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, target_point)
-        print("najblizsza droga ==== " + str(nearest_path_to_target))
+        # print("najblizsza droga ==== " + str(nearest_path_to_target))
 
         
         if nearest_path_to_target:
@@ -174,7 +174,7 @@ class CynamonkaController(controller.Controller):
                     return self.turn_towards_direction(next_position_direction)
 
         # Jeśli nie udało się znaleźć trasy, wykonaj losowy ruch
-        return random.choice(POSSIBLE_ACTIONS)
+        return self.go_randomly()
 
     def calculate_direction(self, from_position, to_position):
         # Oblicz kierunek między dwiema pozycjami
@@ -218,18 +218,6 @@ class CynamonkaController(controller.Controller):
             else:
                 print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-
-    # def turn_around(self):
-    #     # Obróć się o 180 stopni
-    #     if self.facing == characters.Facing.UP:
-    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-    #     elif self.facing == characters.Facing.DOWN:
-    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-    #     elif self.facing == characters.Facing.LEFT:
-    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-    #     elif self.facing == characters.Facing.RIGHT:
-    #         return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-
         ###############
 
     def go_in_menhir_direction(self):
@@ -245,8 +233,9 @@ class CynamonkaController(controller.Controller):
                 return self.go_randomly()
         else: 
             return self.go_randomly()
-    
+
     def go_randomly(self):
+        print("inside go randomly function")
         if self.can_move_forward():
             print("forward")
             return POSSIBLE_ACTIONS[2]
@@ -321,7 +310,10 @@ class CynamonkaController(controller.Controller):
 
     def runaway_from_mist(self):
         #TODO: to sie bedzie troche roznic od go in the target direction bo w sumie bedzie dzialac odwrotnie, no i mgla jest na wielu polach
-        pass
+        if self.is_mist_at_position(self.next_forward_position):
+            mist_position = self.next_forward_position
+            opposite_direction = coordinates.Coords((-mist_position[0] + self.position[0], -mist_position[1] + self.position[1]))
+        return self.go_in_the_target_direction(opposite_direction)
 
     # TODO: w poprzednich latach wiekszosc bierze pozycje broni w taki sposob ale w sumie to zaczynam miec watpliwosci czy tak mozna
     def get_attackable_area(self):
@@ -332,7 +324,7 @@ class CynamonkaController(controller.Controller):
             attackable_area = Axe.cut_positions(self.arena.terrain, self.position, self.facing)
         elif self.current_weapon == Amulet:
             attackable_area = Amulet.cut_positions(self.arena.terrain, self.position, self.facing)
-        elif self.current_weapon == Bow and self.current_weapon.__name__ == "bow_loaded":
+        elif self.current_weapon == Bow: # and self.current_weapon.__name__ == "bow_loaded":
             attackable_area = weapons.Bow.cut_positions(self.arena.terrain, self.position, self.facing)
         elif self.current_weapon == Sword:
             attackable_area = Sword.cut_positions(self.arena.terrain, self.position, self.facing)
@@ -344,11 +336,9 @@ class CynamonkaController(controller.Controller):
         # amulet jest chyba taki szalony, ze w aktualnej implementacji jak sie go zbierze to bot staje i tylko atakuje, az umrze
         if self.current_weapon == weapons.Bow and self.current_weapon.__name__ == "bow_unloaded":
             return True
-        if self.current_weapon == weapons.Amulet:
-            return False
         attackable_area = self.get_attackable_area()
         for coords, description in self.discovered_arena.items():
-            if description.character and coords in attackable_area:
+            if description.character and  coords != self.position and coords in attackable_area:
                 return True
         return False
 
