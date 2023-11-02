@@ -21,40 +21,26 @@ class Explore():
         start = self.environment.position
 
         if self.environment.menhir != None:
-            end = Coords(self.environment.menhir[0], self.environment.menhir[1])
+            end = self.environment.menhir
         else:
             end = self.poi
 
-        path = self.path_finder.caluclate(start, end)
+        next_move = self.path_finder.caluclate(start, end)
 
-        if path == None or len(path) == 1 or self.environment.discovered_map.get(self.poi) != None: #Unexpected move
+        if next_move == None or self.environment.discovered_map.get(self.poi) != None:
             self.poi = Coords(random.randint(0, self.environment.map_known_len),
                               random.randint(0, self.environment.map_known_len))
             while (self.environment.discovered_map.get(self.poi) != None):
                 self.poi = Coords(random.randint(0, self.environment.map_known_len),
                                   random.randint(0, self.environment.map_known_len))
-            return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
+            return None
 
-        next_move = path[1]
-        move_vector = next_move - start
-        sub = self.environment.discovered_map[start].character.facing.value - move_vector
+        #TODO it is possible to do this some where else?
+        if next_move == characters.Action.STEP_FORWARD:
+            new_position = self.environment.position + self.environment.discovered_map[self.environment.position].character.facing.value
+            if self.environment.discovered_map[new_position].character != None:
+                next_move = characters.Action.ATTACK
 
-        if sub.x != 0 or sub.y != 0:
-            if sub.x == 2 or sub.y == 2 or sub.x == -2 or sub.y == -2:
-                return characters.Action.TURN_RIGHT
+        return next_move
 
-            if move_vector.x == 0:
-                if sub.x * sub.y == 1:
-                    return characters.Action.TURN_LEFT
-                else:
-                    return characters.Action.TURN_RIGHT
 
-            if move_vector.y == 0:
-                if sub.x * sub.y == 1:
-                    return characters.Action.TURN_RIGHT
-                else:
-                    return characters.Action.TURN_LEFT
-
-        #Move forward
-
-        return characters.Action.STEP_FORWARD

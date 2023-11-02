@@ -1,20 +1,27 @@
 import heapq
 from gupb.controller.ancymon.environment import Environment
 from gupb.model.coordinates import Coords
+from gupb.model import characters
 
 directions = [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]
+
+POSSIBLE_ACTIONS = [
+    characters.Action.TURN_LEFT,
+    characters.Action.TURN_RIGHT,
+    characters.Action.STEP_FORWARD,
+    characters.Action.ATTACK,
+]
 
 class Path_Finder():
     def __init__(self, environment: Environment):
         self.environment: Environment = environment
     def heuristic(self, node: Coords, goal:Coords):
-        # Calculate the Manhattan distance as the heuristic.
         return abs(node.x - goal.x) + abs(node.y - goal.y)
 
     def astar_search(self, start: Coords, end: Coords):
         open_set = [(0, start)]
         came_from = {}
-        g_score = {Coords(row, col): float('inf') for row in range(self.environment.map_known_len) for col in range(self.environment.map_known_len)}
+        g_score = {Coords(row, col): float('inf') for row in range(self.environment.map_known_len+1) for col in range(self.environment.map_known_len+1)}
         g_score[start] = 0
 
         while open_set:
@@ -41,12 +48,12 @@ class Path_Finder():
 
     def is_valid(self, point):
         x, y = point
-        if 0 <= x < self.environment.map_known_len and 0 <= y < self.environment.map_known_len:
-            if self.environment.discovered_map.get(Coords(x, y)) == None:
+        if 0 <= x <= self.environment.map_known_len and 0 <= y <= self.environment.map_known_len:
+            if self.environment.discovered_map.get(point) == None:
                 return True
-            if self.environment.discovered_map[Coords(x, y)].type == 'land':
+            if self.environment.discovered_map.get(point).type == 'land':
                 return True
-            if self.environment.discovered_map[Coords(x, y)].type == 'menhir':
+            if self.environment.discovered_map.get(point).type == 'menhir':
                 return True
         return False
 
@@ -58,12 +65,31 @@ class Path_Finder():
         return path
 
     # Example usage:
-    def caluclate(self, start: Coords, end: Coords):
+    def caluclate(self, start: Coords, end: Coords)-> characters.Action:
 
         path = self.astar_search(start, end)
 
-        if path:
-            return path
+        if path and len(path) > 1:
+            next_move = path[1]
+            move_vector = next_move - start
+            sub = self.environment.discovered_map[start].character.facing.value - move_vector
+
+            if sub.x != 0 or sub.y != 0:
+                if sub.x == 2 or sub.y == 2 or sub.x == -2 or sub.y == -2:
+                    return characters.Action.TURN_RIGHT
+
+                if move_vector.x == 0:
+                    if sub.x * sub.y == 1:
+                        return characters.Action.TURN_LEFT
+                    else:
+                        return characters.Action.TURN_RIGHT
+
+                if move_vector.y == 0:
+                    if sub.x * sub.y == 1:
+                        return characters.Action.TURN_RIGHT
+                    else:
+                        return characters.Action.TURN_LEFT
+
+            return characters.Action.STEP_FORWARD
         else:
-            print("No path found.")
             return None
