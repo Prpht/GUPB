@@ -1,7 +1,6 @@
 from re import S
 import traceback
 import random
-from turtle import distance, position
 from typing import Dict
 from gupb import controller
 from gupb.model import arenas, effects, tiles
@@ -53,6 +52,7 @@ class CynamonkaController(controller.Controller):
             print(f"ROUND NUMBER {self.move_count}")
             self.update_discovered_arena(knowledge.visible_tiles)
             self.update_walkable_area()
+            print(f"Eliksiry: {self.elixir_positions}")
             self.position = knowledge.position
             self.facing = knowledge.visible_tiles[self.position].character.facing
             self.next_forward_position = self.position + self.facing.value
@@ -254,7 +254,7 @@ class CynamonkaController(controller.Controller):
         current_position = start
         current_direction = self.facing.value 
         steps_taken = [0]
-
+        print("start to find nearest path")
         while current_position != goal:
             # Calculate the positions for moving forward, turning right, and turning left
             forward_position = (current_position[0] + current_direction[0], current_position[1] + current_direction[1])
@@ -284,7 +284,7 @@ class CynamonkaController(controller.Controller):
                 current_direction = (current_direction[1], -current_direction[0])  # Turn right
             elif closest_position == left_position:
                 current_direction = (-current_direction[1], current_direction[0])  # Turn left
-
+        print(f"end to find nearest path {path}")
         return path
 
     
@@ -309,11 +309,13 @@ class CynamonkaController(controller.Controller):
                     raise ValueError(f'No Weapon named  {new_weapon} found')
 
     def runaway_from_mist(self):
-        #TODO: to sie bedzie troche roznic od go in the target direction bo w sumie bedzie dzialac odwrotnie, no i mgla jest na wielu polach
+        # TODO: on narazie tylko ucieka przed mgla ktora jest naprzeciwko niego a chodzi ogolnie zeby ucikeal przed mgla nawet jak jest daleko ta mgla
+        # to takie dodatkowe, wywalalo tu blad bo nie zaawsze przypisywalo arguemnt do opposite_direction
         if self.is_mist_at_position(self.next_forward_position):
             mist_position = self.next_forward_position
             opposite_direction = coordinates.Coords((-mist_position[0] + self.position[0], -mist_position[1] + self.position[1]))
-        return self.go_in_the_target_direction(opposite_direction)
+            return self.go_in_the_target_direction(opposite_direction)
+        return self.go_randomly()
 
     # TODO: w poprzednich latach wiekszosc bierze pozycje broni w taki sposob ale w sumie to zaczynam miec watpliwosci czy tak mozna
     def get_attackable_area(self):
@@ -338,7 +340,8 @@ class CynamonkaController(controller.Controller):
             return True
         attackable_area = self.get_attackable_area()
         for coords, description in self.discovered_arena.items():
-            if description.character and  coords != self.position and coords in attackable_area:
+            if description.character and description.character.controller_name != "CynamonkaController" and coords in attackable_area:
+                print(f"pole gracza ktore atakujemy: {description.character}")
                 return True
         return False
 
@@ -360,8 +363,12 @@ class CynamonkaController(controller.Controller):
     def update_discovered_arena(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for coords, description in visible_tiles.items():
             self.discovered_arena[coords] = description
+            if coords in self.elixir_positions.keys() and not description.consumable:
+                del self.elixir_positions[coords]
             if description.consumable:
                 self.elixir_positions[coords] = description
+            if self.weapons_positions and coords in self.weapons_positions.keys() and not description.loot:
+                del self.weapons_positions[coords]
             if description.loot:
                 self.weapons_positions[coords] = description
             if not self.is_mist and self.is_mist_at_position(coords):
