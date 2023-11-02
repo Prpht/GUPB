@@ -6,6 +6,7 @@ from gupb.model import characters
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.explore import Explore
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
+from gupb.model.weapons import Knife
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -31,6 +32,7 @@ class AncymonController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.environment.update_environment(knowledge)
+        self.weapon = Knife
 
         decision = None
 
@@ -46,7 +48,16 @@ class AncymonController(controller.Controller):
 
         try:
             if self.neer_menhir():
-                decision = random.choice(POSSIBLE_ACTIONS)
+                # print("NEER MENHIR")
+                new_position = self.environment.position + self.environment.discovered_map[self.environment.position].character.facing.value
+                if self.collect_loot(new_position):
+                    return POSSIBLE_ACTIONS[2]
+                elif self.should_attack(new_position):
+                    return POSSIBLE_ACTIONS[3]
+                else:
+                    return random.choices(
+                        population=POSSIBLE_ACTIONS[:3], weights=(20, 20, 60), k=1
+                    )[0]
         except Exception as e:
             print(f"An exception occurred: {e}")
 
@@ -73,3 +84,13 @@ class AncymonController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.ANCYMON
+
+    def should_attack(self, new_position):
+        if self.environment.discovered_map[new_position].character:
+            return True
+        return False
+
+    def collect_loot(self, new_position):
+        return (
+            self.environment.discovered_map[new_position].loot and self.weapon == Knife
+        ) or self.environment.discovered_map[new_position].consumable

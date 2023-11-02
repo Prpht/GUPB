@@ -22,6 +22,7 @@ class Environment():
         for coords, description in visible_tiles.items():
             self.discovered_map[coords] = description
             if self.menhir == None and self.discovered_map[coords].type == "menhir":
-                self.menhir = coords
+                self.menhir = coordinates.Coords(coords[0], coords[1])
+                # print(self.menhir)
             if self.map_known_len < max(coords[0], coords[1]):
                 self.map_known_len = max(coords[0], coords[1])

@@ -27,8 +27,12 @@ class Explore():
 
         path = self.path_finder.caluclate(start, end)
 
-        if path == None or len(path) == 1: #Unexpected move
-            self.poi = Coords(random.randint(0, self.environment.map_known_len), random.randint(0, self.environment.map_known_len))
+        if path == None or len(path) == 1 or self.environment.discovered_map.get(self.poi) != None: #Unexpected move
+            self.poi = Coords(random.randint(0, self.environment.map_known_len),
+                              random.randint(0, self.environment.map_known_len))
+            while (self.environment.discovered_map.get(self.poi) != None):
+                self.poi = Coords(random.randint(0, self.environment.map_known_len),
+                                  random.randint(0, self.environment.map_known_len))
             return random.choice([characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT])
 
         next_move = path[1]
