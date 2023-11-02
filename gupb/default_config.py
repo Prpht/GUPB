@@ -27,6 +27,6 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': cynamonka_controller,
-    'runs_no': 1,
+    'runs_no': 10,
     'profiling_metrics': [],
 }
