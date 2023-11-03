@@ -10,6 +10,8 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
 ]
+
+
 class Hunter():
     def __init__(self, environment: Environment, path_finder: Path_Finder):
         self.environment: Environment = environment
@@ -18,26 +20,29 @@ class Hunter():
         self.next_target = None
         self.next_target_coord: Coords = None
 
-    def decide(self)-> characters.Action:
-        if self.is_enemy_neer() and (self.environment.enemies_left >= self.environment.enemies_num * 0.6 or self.is_menhir_neer()):
-            # print(self.next_target)
+    def decide(self) -> characters.Action:
+        if self.is_enemy_neer(1) == False and self.can_attack():
+            print("LONG RANGE ATTACK", self.environment.weapon)
+            return characters.Action.ATTACK
 
-            next_move_to_atack = self.path_finder.caluclate(self.environment.position, self.next_target_coord)
+        if self.is_enemy_neer() and (
+                self.environment.champion.health > self.next_target.health or self.is_menhir_neer()):
 
-            sub = self.environment.position - self.next_target_coord
-
-            if(next_move_to_atack == characters.Action.STEP_FORWARD and abs(sub.x + sub.y) == 1 and (sub.x == 0 or sub.y == 0)):
+            if self.can_attack():
+                print("CAN ATTACK with", self.environment.weapon)
                 return characters.Action.ATTACK
 
-            return next_move_to_atack
+            cord_position_to_atack = self.find_coord_to_attack_spot()
+
+            print("CHASING")
+            return self.path_finder.caluclate(self.environment.position, cord_position_to_atack)
         return None
 
-
     def is_menhir_neer(self):
-        if self.environment.menhir != None:
-            margin = self.environment.enemies_left - 2
+        if self.environment.menhir:
+            margin = self.environment.enemies_left
             if len(self.environment.discovered_map[self.environment.position].effects) > 0:
-                margin = 0
+                margin = 1
             return (abs(self.environment.menhir[0] - self.environment.position.x) < margin and
                     abs(self.environment.menhir[1] - self.environment.position.y) < margin)
 
@@ -53,3 +58,85 @@ class Hunter():
         self.next_target = None
         self.next_target_coord = None
         return False
+
+    def is_character_on_visible_field(self, further_position: Coords) -> bool:
+        return self.environment.visible_map.get(further_position) and self.environment.visible_map.get(
+            further_position).character
+
+    def can_attack(self) -> bool:
+        position = self.environment.position
+        further_position = position + self.environment.champion.facing.value
+
+        if self.environment.weapon.name == 'knife':
+            if self.is_character_on_visible_field(further_position):
+                return True
+            return False
+
+        if self.environment.weapon.name == 'sword':
+            for i in range(3):
+                if self.is_character_on_visible_field(further_position):
+                    return True
+                further_position += self.environment.champion.facing.value
+            return False
+
+        if self.environment.weapon.name == 'bow_loaded' or self.environment.weapon.name == 'bow_unloaded':
+            while (self.environment.visible_map.get(further_position)):
+                if self.environment.visible_map.get(further_position).character:
+                    return True
+                further_position += self.environment.champion.facing.value
+            return False
+
+        if self.environment.weapon.name == 'amulet':
+            for direction in [Coords(1, 1), Coords(-1, -1), Coords(1, -1), Coords(-1, 1)]:
+                further_position = position
+                for i in range(2):
+                    further_position += direction
+                    if self.is_character_on_visible_field(further_position):
+                        return True
+            return False
+
+        if self.environment.weapon.name == 'axe':
+            if (
+                    (further_position.x != position.x and (
+                            self.environment.visible_map[further_position].character or
+                            self.environment.visible_map[
+                                Coords(further_position.x, further_position.y + 1)].character or
+                            self.environment.visible_map[Coords(further_position.x, further_position.y - 1)].character
+                    )) or
+                    (further_position.y != position.y and (
+                            self.environment.visible_map[further_position].character or
+                            self.environment.visible_map[
+                                Coords(further_position.x + 1, further_position.y)].character or
+                            self.environment.visible_map[Coords(further_position.x - 1, further_position.y)].character
+                    ))
+            ):
+                return True
+            return False
+
+        return False
+
+    def manhatan_distance(self, start: Coords, end: Coords):
+        return abs(start.x - end.x) + abs(start.y - end.y)
+    def find_coord_to_attack_spot(self):
+        new_attack_spot_dist = float('inf')
+        new_attack_spot = None
+
+        if self.environment.weapon.name == 'knife':
+            return self.next_target_coord
+
+        elif self.environment.weapon.name == 'sword':
+            for direction in [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]:
+                further_position = self.next_target_coord
+                for i in range(2):
+                    further_position += direction
+                    spot = self.environment.discovered_map.get(further_position)
+                    if spot and spot.type == 'land':
+                        spot_dist = self.manhatan_distance(self.environment.position, spot)
+                        if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
+                            new_attack_spot_dist = spot_dist
+                            new_attack_spot = spot
+            if new_attack_spot:
+                return new_attack_spot
+
+        else:
+            return self.next_target_coord

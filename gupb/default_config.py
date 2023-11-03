@@ -3,6 +3,7 @@ from gupb.controller import random
 from gupb.controller import ancymon
 
 ancymon_controler = ancymon.AncymonController("Ancymon")
+keyboard_controler = keyboard.KeyboardController()
 
 CONFIGURATION = {
     'arenas': [
@@ -20,8 +21,8 @@ CONFIGURATION = {
         random.RandomController("Darius2"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': ancymon_controler,
-    'runs_no': 100,
+    'runs_no': 1,
     'profiling_metrics': [],
 }
