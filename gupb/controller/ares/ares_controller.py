@@ -39,6 +39,7 @@ class Map():
         self.position = None  # current position
         self.opponents = []  # list of tuples (Coord, Character) for every currently visible opponent
         self.closestMist = None  # coord
+        self.menhir=None # coords of menhir
 
     def initMap(self):
         self.map = [[None for i in range(self.MAPSIZE[1])] for j in range(self.MAPSIZE[0])]
@@ -47,7 +48,7 @@ class Map():
 
     def tileIsMist(self, tile):
         for effect in tile.effects:
-            if effect.description().type == 'mist':
+            if effect.type == 'mist':
                 return True
         return False
     
@@ -62,20 +63,11 @@ class Map():
         self.position = knowledge.position
         self.description = knowledge.visible_tiles[self.position].character
         self.opponentsAlive = knowledge.no_of_champions_alive - 1  # not including us
-        # for coord, tile in knowledge.visible_tiles.items():
-        #     coord=coordinates.Coords(coord[0], coord[1])
-        #     if self.tileIsMist(tile) and \
-        #         (self.closestMist is None or \
-        #         (self.taxiDistance(self.position, self.closestMist) > self.taxiDistance(self.position, coord))):
-        #         self.closestMist = coord
-        #     if tile.character != self.map[coord.x][coord.y].character:
-        #         self.map[coord.x][coord.y].character = tile.character
-        #     if tile.loot != self.map[coord.x][coord.y].loot:
-        #         self.map[coord.x][coord.y].loot = tile.loot
-        #     if tile.consumable != self.map[coord.x][coord.y].consumable:
-        #         self.map[coord.x][coord.y].consumable = tile.consumable
-        #     if tile.effects != self.map[coord.x][coord.y].effects:
-        #         self.map[coord.x][coord.y].effects = tile.effects
+        for coord, tile in knowledge.visible_tiles.items():
+            coord=coordinates.Coords(coord[0], coord[1])
+            self.map[coord.x][coord.y]=tile
+            if tile.type=="menhir":
+                self.menhir=coord
 
     def taxiDistance(self, root, target):
         '''Return taxi distance between two points.'''
@@ -154,7 +146,7 @@ class Map():
             if tile.type == target.type:
                 return True
         if type(target) is weapons.WeaponDescription:
-            if tile.description().loot is not None and tile.description().loot.name == target.name:
+            if tile.description().loot is not None and tile.description().loot.name == target.name: # maybe add description?
                 return True
         if type(target) is consumables.ConsumableDescription:
             if tile.description().consumable is not None and tile.description().consumable.name == target.name:
@@ -212,20 +204,6 @@ class Map():
         '''
         return self.shortestPath(self.position, target)
 
-    def findMiddle(self):
-        '''
-        Finds the best guess as to the map's middle
-        Returns shortest path to middle and its coordinates (or tuple(empty list, self.position) if middle not found)
-        '''
-        middle = coordinates.Coords(
-            self.MAPSIZE[0] // 2,
-            self.MAPSIZE[1] // 2,
-        )
-        tile = self.map[middle.x][middle.y]
-        if not tile.passable or self.tileIsMist(tile):
-            _, middle = self.shortestPath(middle, 'passable', 'middle')
-            return self.shortestPath(self.position, middle)
-        return [], self.position
 
 
 class KnowledgeBase():
@@ -254,18 +232,22 @@ class KnowledgeBase():
         Additionally, it could take into account changing weapons, strategy, ect.
         
         '''
-        
         inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
-        inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y].description()
+        inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
 
-        if inFrontTile.character is not None:
+        if inFrontTile.character is not None: # depending on a weapon!!!
             action=characters.Action.ATTACK
         elif self.round_counter<3:
             action=characters.Action.TURN_RIGHT
             self.round_counter+=1
+        elif self.mapBase.menhir:
+            try:
+                self.actionsToMake=self.mapBase.findTarget(self.mapBase.menhir)
+            except Exception as e:
+                print(e)
+            print(self.actionsToMake)
         else:
             action=self.checkPossibleAction(inFrontTile)
-            # print(inFrontTile.description().type)
             # self.actionsToMake=self.mapBase.findMiddle()[0]
             # self.actionsToMake=[characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD]
             # print("this is middle of the map")
