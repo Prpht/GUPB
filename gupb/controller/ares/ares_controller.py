@@ -70,6 +70,12 @@ class Map():
         self.map = [[None for i in range(self.MAPSIZE[1])] for j in range(self.MAPSIZE[0])]
         for coords, tile in self.arena.terrain.items():
             self.map[coords.x][coords.y] = tile
+
+    def tileIsMist(self, tile):
+        for effect in tile.effects:
+            if effect.type == 'mist':
+                return True
+        return False
     
     def update(self, knowledge: characters.ChampionKnowledge):
         '''
