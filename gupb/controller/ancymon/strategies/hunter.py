@@ -34,6 +34,9 @@ class Hunter():
 
             cord_position_to_atack = self.find_coord_to_attack_spot()
 
+            # if cord_position_to_atack == self.environment.position:
+            #     return characters.Action.TURN_RIGHT
+            # else:
             print("CHASING")
             return self.path_finder.caluclate(self.environment.position, cord_position_to_atack)
         return None
@@ -46,7 +49,7 @@ class Hunter():
             return (abs(self.environment.menhir[0] - self.environment.position.x) < margin and
                     abs(self.environment.menhir[1] - self.environment.position.y) < margin)
 
-    def is_enemy_neer(self, size_of_searched_area: int = 2):
+    def is_enemy_neer(self, size_of_searched_area: int = 3):
         for x in range(-size_of_searched_area, size_of_searched_area + 1):
             for y in range(-size_of_searched_area, size_of_searched_area + 1):
                 field = self.environment.discovered_map.get(self.environment.position + Coords(x, y))
@@ -118,6 +121,7 @@ class Hunter():
     def manhatan_distance(self, start: Coords, end: Coords):
         return abs(start.x - end.x) + abs(start.y - end.y)
     def find_coord_to_attack_spot(self):
+        return self.next_target_coord #TODO Temporarly
         new_attack_spot_dist = float('inf')
         new_attack_spot = None
 
@@ -131,11 +135,12 @@ class Hunter():
                     further_position += direction
                     spot = self.environment.discovered_map.get(further_position)
                     if spot and spot.type == 'land':
-                        spot_dist = self.manhatan_distance(self.environment.position, spot)
+                        spot_dist = self.manhatan_distance(self.environment.position, further_position)
                         if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
                             new_attack_spot_dist = spot_dist
-                            new_attack_spot = spot
+                            new_attack_spot = further_position
             if new_attack_spot:
+                print(new_attack_spot)
                 return new_attack_spot
 
         else:
