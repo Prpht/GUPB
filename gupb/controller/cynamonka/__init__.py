@@ -6,5 +6,5 @@ __all__ = [
 ]
 # TODO: tu chyba przed zrobieniem PR trzeba baedzie to zmeinic
 POTENTIAL_CONTROLLERS = [
-    CynamonkaController("CynamonkaController", arena_description=ArenaDescription('ordinary_chaos')),
+    CynamonkaController("CynamonkaController"),
 ]

@@ -17,15 +17,15 @@ from gupb.model.arenas import ArenaDescription
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50),
+    'arenas': arena_generator.generate_arenas(20),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
         bob.FSMBot(),
-        batman.BatmanHeuristicsController('Batman'),
-        cynamonka.CynamonkaController("CynamonkaController", arena_description=ArenaDescription('ordinary_chaos')),
+        #batman.BatmanHeuristicsController('Batman'),
+        cynamonka.CynamonkaController("CynamonkaController"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         krombopulos.KrombopulosMichaelController(),
         maly_konik.MalyKonik("LittlePonny"),
@@ -36,7 +36,7 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': False,
     'runs_no': 1000,
 }
