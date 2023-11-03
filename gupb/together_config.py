@@ -13,6 +13,7 @@ from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
 from gupb.controller import reckless_roaming_dancing_druid
+from gupb.model.arenas import ArenaDescription
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {

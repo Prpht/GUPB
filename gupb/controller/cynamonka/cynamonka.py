@@ -1,3 +1,5 @@
+import heapq
+import math
 from re import S
 import traceback
 import random
@@ -28,6 +30,7 @@ class CynamonkaController(controller.Controller):
         self.current_weapon = Knife
         self.weapons_positions = {}
         self.elixir_positions = {}
+        self.mist_positions = {}
         self.position = None
         self.next_forward_position = None # position of player if it goes forward
         self.facing = None
@@ -37,6 +40,7 @@ class CynamonkaController(controller.Controller):
         self.move_count = 0
         self.target = None
         self.walkable_area = set()
+        self.runaway_target = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, CynamonkaController):
@@ -49,56 +53,55 @@ class CynamonkaController(controller.Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             self.move_count+=1
-            print(f"ROUND NUMBER {self.move_count}")
+            # print(f"ROUND NUMBER {self.move_count}")
             self.update_discovered_arena(knowledge.visible_tiles)
             self.update_walkable_area()
-            print(f"Eliksiry: {self.elixir_positions}")
+            # print(f"Eliksiry: {self.elixir_positions}")
             self.position = knowledge.position
             self.facing = knowledge.visible_tiles[self.position].character.facing
             self.next_forward_position = self.position + self.facing.value
             self.set_new_weapon()
-
-            # print("moja aktualna bron to:  " + str(self.discovered_arena[self.position].character.weapon))
+            # print("Czy jest mgla?" + str(self.is_mist))
 
             # first three ifs are the most important actions, player do it even when the map shrinks
             #if see elixir take it 
             if self.can_collect_elixir(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):
-                print("go forward and collect elixir")
+                # print("go forward and collect elixir")
                 return POSSIBLE_ACTIONS[2] # go forward
             # if can attack
             if self.can_attack():
-                print("attack")
+                # print("attack")
                 return POSSIBLE_ACTIONS[3] # attack
             #if can take a weapon
             if self.can_collect_weapon(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):  
-                print("go forward and collect weapon")
+                # print("go forward and collect weapon")
                 return POSSIBLE_ACTIONS[2] # go forward
             
             #if there is mist, player acts differently - main goal is to run
             if self.is_mist:
-                print("Attention there is mist")
+                # print("Attention there is mist")
                 # if we see menhir we know where to run
                 if self.menhir_position:
-                    print("go in menhir direction")
+                    # print("go in menhir direction")
                     return self.go_in_menhir_direction()
                 # player can see mist but do not see menhir, it must runaway from mist
                 else:
                     # here should be runaway from mist function
-                    print("runaway from mist")
+                    # print("runaway from mist")
                     return self.runaway_from_mist()
             # player do not see mist so it is not its priority to run away
             else:
-                print("there is no mist")
+                # print("there is no mist")
 
                 # TODO: moze tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
                 if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon == Knife: 
-                    print("go in weapon or elixir direction")
+                    # print("go in weapon or elixir direction")
                     return self.go_in_the_target_direction(self.target)
                 if self.menhir_position:
-                    print("go in menhir direction 2")
+                    # print("go in menhir direction 2")
                     return self.go_in_menhir_direction()
                 else:
-                    print("there is no mist, no weapon no menhir, go randomly")
+                    # print("there is no mist, no weapon no menhir, go randomly")
                     return self.go_randomly()
         except Exception as e:
             # Handle exceptions or errors here
@@ -144,10 +147,10 @@ class CynamonkaController(controller.Controller):
     def go_in_the_target_direction(self, target_point):
         # print("JESTEEEEM W SROKUUUUUU GO INTO THE TARGET FUNCTION")
         # print("moja pozycja  ==== " + str(self.position))
-        # print("nasz target ===== " + str(target_point))
+        # print("Target ===== " + str(target_point))
         # Znajdź optymalną trasę do celu
         nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, target_point)
-        # print("najblizsza droga ==== " + str(nearest_path_to_target))
+        # print("Path to target ==== " + str(nearest_path_to_target))
 
         
         if nearest_path_to_target:
@@ -186,32 +189,23 @@ class CynamonkaController(controller.Controller):
         # Obróć się w kierunku podanego kierunku
         if self.facing == characters.Facing.UP:
             if target_direction == characters.Facing.LEFT.value:
-                print("skrecam w lewo")
                 return POSSIBLE_ACTIONS[0]  # Skręć w lewo
             else:
-                print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
-
         elif self.facing == characters.Facing.DOWN:
             if target_direction == characters.Facing.LEFT.value:
-                print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo                
             else:
-                print("skrecam w lewo")
                 return POSSIBLE_ACTIONS[0]  # Skręć w lewo
         elif self.facing == characters.Facing.LEFT:
             if target_direction == characters.Facing.UP.value:
-                print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
             else:
-                print("skrecam w lewo")
                 return POSSIBLE_ACTIONS[0]  # Skręć w lewo
         elif self.facing == characters.Facing.RIGHT:
             if target_direction == characters.Facing.UP.value:
-                print("skrecam w lewo")
                 return POSSIBLE_ACTIONS[0]  # Skręć w lewo
             else:
-                print("skrecam w prawo")
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
 
     def go_in_menhir_direction(self):
@@ -226,7 +220,7 @@ class CynamonkaController(controller.Controller):
             return self.go_randomly()
 
     def go_randomly(self):
-        print("inside go randomly function")
+        # print("inside go randomly function")
         if self.can_move_forward():
             return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
         elif self.can_turn_right() and self.can_turn_left:
@@ -247,55 +241,86 @@ class CynamonkaController(controller.Controller):
         #     return POSSIBLE_ACTIONS[1]
     
 
+    # def find_nearest_path(self, grid, start, goal):
+    #     # Initialize a list to represent the path
+    #     path = []
+    #     current_position = start
+    #     current_direction = self.facing.value 
+    #     steps_taken = [0]
+    #     visited_positions = set()  # Zbiór odwiedzonych pozycji
+
+    #     print("start to find nearest path")
+    #     while current_position != goal:
+    #         # Calculate the positions for moving forward, turning right, and turning left
+    #         forward_position = (current_position[0] + current_direction[0], current_position[1] + current_direction[1])
+    #         right_position = (current_position[0] + current_direction[1], current_position[1] - current_direction[0])
+    #         left_position = (current_position[0] - current_direction[1], current_position[1] + current_direction[0])
+
+    #         valid_positions = [pos for pos in (forward_position, right_position, left_position) if pos in grid]
+
+    #         if not valid_positions:
+    #             return None
+
+    #         # Calculate the weight for each position (distance + steps)
+    #         weights = [abs(pos[0] - goal[0]) + abs(pos[1] - goal[1]) + steps_taken[-1] + (1 if pos == forward_position else 2) for pos in valid_positions for pos in valid_positions]
+    #         # Choose the position that brings you closer to the goal
+    #         closest_position = valid_positions[weights.index(min(weights))]
+
+    #         if closest_position in visited_positions:
+    #             print("przypadek zapetlenia, sciezka juz odwiedzona")
+    #             return None
+
+    #         # Update the path and current position
+    #         path.append(coordinates.Coords(closest_position[0], closest_position[1]))
+    #         visited_positions.add(closest_position) 
+    #         current_position = closest_position
+    #         steps_taken.append(steps_taken[-1] + (1 if closest_position == forward_position else 2))
+
+    #         # Update the direction based on the movement
+    #         if closest_position == forward_position:
+    #             pass  # Keep the same direction (no need to change direction)
+    #         elif closest_position == right_position:
+    #             current_direction = (current_direction[1], -current_direction[0])  # Turn right
+    #         elif closest_position == left_position:
+    #             current_direction = (-current_direction[1], current_direction[0])  # Turn left
+    #     print(f"end to find nearest path {path}")
+    #     return path
+
+    import heapq
+
+    # astar funkcja do znalezienia trasy
     def find_nearest_path(self, grid, start, goal):
-        # Initialize a list to represent the path
-        path = []
-        current_position = start
-        current_direction = self.facing.value 
-        steps_taken = [0]
-        visited_positions = set()  # Zbiór odwiedzonych pozycji
+        # Inicjalizuj listę odwiedzonych pozycji
+        visited_positions = set()
 
-        print("start to find nearest path")
-        while current_position != goal:
-            # Calculate the positions for moving forward, turning right, and turning left
-            forward_position = (current_position[0] + current_direction[0], current_position[1] + current_direction[1])
-            right_position = (current_position[0] + current_direction[1], current_position[1] - current_direction[0])
-            left_position = (current_position[0] - current_direction[1], current_position[1] + current_direction[0])
+        # Inicjalizuj kolejkę priorytetową do przechowywania pozycji i ich kosztów
+        priority_queue = [(0, start, [])]  # (koszt, pozycja, ścieżka)
 
-            valid_positions = [pos for pos in (forward_position, right_position, left_position) if pos in grid]
+        while priority_queue:
+            cost, current_position, path = heapq.heappop(priority_queue)
 
-            if not valid_positions:
-                return None
+            if current_position == goal:
+                return path  # Znaleziono cel, zwróć ścieżkę
 
-            # Calculate the weight for each position (distance + steps)
-            weights = [abs(pos[0] - goal[0]) + abs(pos[1] - goal[1]) + steps_taken[-1] + (1 if pos == forward_position else 2) for pos in valid_positions for pos in valid_positions]
-            # Choose the position that brings you closer to the goal
-            closest_position = valid_positions[weights.index(min(weights))]
+            if current_position in visited_positions:
+                continue  # Ta pozycja została już odwiedzona
 
-            if closest_position in visited_positions:
-                print("przypadek zapetlenia, sciezka juz odwiedzona")
-                return None
+            visited_positions.add(current_position)
 
-            # Update the path and current position
-            path.append(coordinates.Coords(closest_position[0], closest_position[1]))
-            visited_positions.add(closest_position) 
-            current_position = closest_position
-            steps_taken.append(steps_taken[-1] + (1 if closest_position == forward_position else 2))
+            # Oblicz dostępne pozycje i ich koszty
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                new_position = (current_position[0] + dx, current_position[1] + dy)
+                if new_position in grid:
+                    new_cost = len(path) + 1 + math.dist(new_position, goal)
+                    heapq.heappush(priority_queue, (new_cost, new_position, path + [new_position]))
 
-            # Update the direction based on the movement
-            if closest_position == forward_position:
-                pass  # Keep the same direction (no need to change direction)
-            elif closest_position == right_position:
-                current_direction = (current_direction[1], -current_direction[0])  # Turn right
-            elif closest_position == left_position:
-                current_direction = (-current_direction[1], current_direction[0])  # Turn left
-        print(f"end to find nearest path {path}")
-        return path
+        return None  # Nie znaleziono ścieżki do celu
+
 
     
     def set_new_weapon(self):
         new_weapon = self.discovered_arena[self.position].character.weapon.name
-        print("imie nowej broni ==== " + str(new_weapon))
+        # print("imie nowej broni ==== " + str(new_weapon))
         match new_weapon:
                 case 'knife':
                     self.current_weapon = Knife
@@ -314,14 +339,41 @@ class CynamonkaController(controller.Controller):
 
 
     def runaway_from_mist(self):
-        # TODO: on narazie tylko ucieka przed mgla ktora jest naprzeciwko niego a chodzi ogolnie zeby ucikeal przed mgla nawet jak jest daleko ta mgla
-        # to takie dodatkowe, wywalalo tu blad bo nie zaawsze przypisywalo arguemnt do opposite_direction
-        #TODO: błąd z przypisaniem mist_position
-        if self.is_mist_at_position(self.next_forward_position):
-            mist_position = coordinates.Coords(self.next_forward_position[0], self.next_forward_position[1])
-            opposite_direction = coordinates.Coords((-mist_position[0] + self.position[0], -mist_position[1] + self.position[1]))
-            return self.go_in_the_target_direction(opposite_direction)
-        return self.go_randomly()
+        # główne załozenie: jesli zidentyfikuje mgle na mapie kieruje sie w strone najdalszego odkrytego do tej pory punktu, do ktorego istenieje sciezka
+
+        # Jeśli brak obszarów mgły, zwróć losową akcję
+        # print("jestem w srodku uciekania")
+        if not self.mist_positions:
+            # print("brak mgly")
+            return self.go_randomly()
+        
+        if self.runaway_target is not None and self.runaway_target not in self.walkable_area:
+
+            max_distance = 0
+            best_position = None
+
+            for position in self.discovered_arena:
+                print("sprawdzana pozycja = " + str(position))
+                if position not in self.mist_positions and position in self.walkable_area:
+                    # Oblicz odległość między polem a najbliższym obszarem mgły
+                    min_distance = min(math.dist(position, mist) for mist in self.mist_positions)
+
+                    if min_distance > max_distance:
+                        max_distance = min_distance
+                        best_position = position
+
+            if best_position is not None and self.find_nearest_path(self.walkable_area, self.position, best_position):
+                # Znaleziono najlepsze pole, więc uciekaj w jego kierunku
+                direction = coordinates.Coords(best_position[0] - self.position[0], best_position[1] - self.position[1])
+                print("Uciekam przed mgla w kierunku : " + str(best_position))
+                self.runaway_target = best_position
+                return self.go_in_the_target_direction(self.runaway_target)
+            else:
+                # Brak dostępnych pól, które nie są w obszarze mgły, zwróć losową akcję
+                print("brak dostepnych pol")
+                return self.go_randomly()
+        else:
+            return self.go_in_the_target_direction(self.runaway_target)
 
     # TODO: w poprzednich latach wiekszosc bierze pozycje broni w taki sposob ale w sumie to zaczynam miec watpliwosci czy tak mozna
     def get_attackable_area(self):
@@ -336,8 +388,8 @@ class CynamonkaController(controller.Controller):
             attackable_area = weapons.Bow.cut_positions(self.arena.terrain, self.position, self.facing)
         elif self.current_weapon == Sword:
             attackable_area = Sword.cut_positions(self.arena.terrain, self.position, self.facing)
-        else:
-            print("Does not have a weapon")
+        # else:
+        #     print("Does not have a weapon")
         return attackable_area
     
     def can_attack(self):
@@ -378,11 +430,15 @@ class CynamonkaController(controller.Controller):
                 del self.weapons_positions[coords]
             if description.loot:
                 self.weapons_positions[coords] = description
-            if not self.is_mist and self.is_mist_at_position(coords):
+                #TODO: sprawdzic czy ta zmiana jest okej:
+            if not self.is_mist and self.mist_positions:
                 self.is_mist = True
             if not self.menhir_position and self.is_menhir(coords):
-                print("menhir")
+                # print("menhir")
                 self.menhir_position = coords
+            if effects.EffectDescription(type='mist') in description.effects:
+                self.mist_positions[coords] = description
+            
 
     def is_menhir(self, coords):
         return self.discovered_arena[coords].type == 'menhir'
