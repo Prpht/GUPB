@@ -12,5 +12,5 @@ class RandomMicroStrat(MicroStrategy):
         if precedence is None:
             self.precedence = StrategyPrecedence.LOWEST
 
-    def decide_and_get_next(self) -> tuple[characters.Action, MicroStrategy]:
-        return random.choice(POSSIBLE_ACTIONS), self
+    def decide_and_get_next(self) -> tuple[characters.Action, bool]:
+        return random.choice(POSSIBLE_ACTIONS), True

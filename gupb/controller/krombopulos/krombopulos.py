@@ -56,4 +56,4 @@ class KrombopulosMichaelController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.VIOLET
+        return characters.Tabard.KROMBOPULOS

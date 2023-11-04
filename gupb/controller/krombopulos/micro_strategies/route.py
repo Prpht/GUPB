@@ -9,14 +9,14 @@ class RouteMicroStrat(MicroStrategy):
         if precedence is None:
             self.precedence = StrategyPrecedence.HIGH
 
-    def decide_and_get_next(self) -> tuple[characters.Action, MicroStrategy]:
+    def decide_and_get_next(self) -> tuple[characters.Action, bool]:
         front_tile = self.knowledge_sources.get_tile_info_in_front_of()
         if front_tile.consumable:
-            return characters.Action.STEP_FORWARD, self
+            return characters.Action.STEP_FORWARD, True
         elif front_tile.character:
-            return characters.Action.ATTACK, self
+            return characters.Action.ATTACK, True
         elif front_tile.loot:
-            return characters.Action.STEP_FORWARD, self
+            return characters.Action.STEP_FORWARD, True
         # find next move in path to menhir
         try:
             next_pos = self.knowledge_sources.find_next_move_on_path(self.knowledge_sources.players.own_player_pos,
@@ -35,4 +35,10 @@ class RouteMicroStrat(MicroStrategy):
             self.knowledge_sources.players.own_player_facing.value == next_pos:
             return characters.Action.STEP_FORWARD, self
 
-        return characters.Action.DO_NOTHING, self
+        # todo: implement routing strategy (using dynamically-created graph)
+        #  it should:
+        #   - explore first (look around, maybe first try to go to the center)
+        #   - if menhir is found, go there are if already there, return (act, False)
+        #   - escape mist if found
+
+        return characters.Action.DO_NOTHING, False

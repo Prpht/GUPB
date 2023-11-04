@@ -85,6 +85,18 @@ class Arena:
             elif champion.facing == characters.Facing.LEFT:
                 return coordinates.Coords(0, champion.position.y), champion.position[0]
 
+        def champion_left_and_right() -> list[coordinates.Coords]:
+            if champion.facing == characters.Facing.UP or champion.facing == characters.Facing.DOWN:
+                return [
+                    coordinates.Coords(champion.position.x + 1, champion.position.y),
+                    coordinates.Coords(champion.position.x - 1, champion.position.y),
+                ]
+            elif champion.facing == characters.Facing.LEFT or champion.facing == characters.Facing.RIGHT:
+                return [
+                    coordinates.Coords(champion.position.x, champion.position.y + 1),
+                    coordinates.Coords(champion.position.x, champion.position.y - 1),
+                ]
+
         border, distance = estimate_border_point()
         left = champion.facing.turn_left().value
         targets = [border + coordinates.Coords(i * left.x, i * left.y) for i in range(-distance, distance + 1)]
@@ -99,6 +111,7 @@ class Arena:
                 visible.add(ray_coords)
                 if not self.terrain[ray_coords].transparent:
                     break
+        visible.update(champion_left_and_right())
         return visible
 
     def visible_tiles(self, champion: characters.Champion) -> dict[coordinates.Coords, tiles.TileDescription]:

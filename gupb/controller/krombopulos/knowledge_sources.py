@@ -42,6 +42,8 @@ class MapKnowledge(KnowledgeSource):
         self.impassable_tiles: list[str] = [tile.__class__.__name__.lower() for tile in tiles.Tile.__subclasses__() if not tile.terrain_passable()]
         self.graph: nx.Graph = nx.Graph()
 
+        # todo: implement mist sensing and menhir position approx based on mist
+
     def update(self, champion_knowledge: characters.ChampionKnowledge, epoch: int):
         self.epoch = epoch
         for coords, tile_info in champion_knowledge.visible_tiles.items():

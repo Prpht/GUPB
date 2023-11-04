@@ -1,6 +1,5 @@
 import abc
 import enum
-from typing import Self
 
 from gupb.model import characters
 
@@ -21,7 +20,8 @@ class MicroStrategy(abc.ABC):
         self.precedence: StrategyPrecedence = precedence
 
     @abc.abstractmethod
-    def decide_and_get_next(self) -> tuple[characters.Action, Self]:
+    def decide_and_get_next(self) -> tuple[characters.Action, bool]:
+        """Return a tuple: (chosen_action, continue_using_this_strategy)."""
         pass
 
     def avoid_afk(self) -> characters.Action | None:
