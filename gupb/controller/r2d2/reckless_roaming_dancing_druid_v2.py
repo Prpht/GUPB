@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 from pathfinding.finder.bi_a_star import BiAStarFinder
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -10,43 +12,9 @@ from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords
 
-from .r2d2_state_machine import R2D2StateMachine
-
-
-LARGEST_ARENA_SHAPE = (100, 100)
-
-# Non walking tiles are: [0, 2, 3]
-tiles_mapping = {
-    "out": 0,
-    "land": 1,
-    "sea": 2,
-    "wall": 3,
-    "menhir": 4,
-    "champion": 5,
-    "knife": 6,
-    "sword": 7,
-    "bow_unloaded": 8,
-    "bow_loaded": 8, # "bow_unloaded" and "bow_loaded" are the same tile
-    "axe": 9,
-    "amulet": 10,
-    "potion": 11,
-    "enymy": 12,
-    "mist": 13,
-}
-
-update_facing_right = {
-    characters.Facing.UP: characters.Facing.RIGHT,
-    characters.Facing.RIGHT: characters.Facing.DOWN,
-    characters.Facing.DOWN: characters.Facing.LEFT,
-    characters.Facing.LEFT: characters.Facing.UP,
-}
-
-update_facing_left = {
-    characters.Facing.UP: characters.Facing.LEFT,
-    characters.Facing.RIGHT: characters.Facing.UP,
-    characters.Facing.DOWN: characters.Facing.RIGHT,
-    characters.Facing.LEFT: characters.Facing.DOWN,
-}
+from .r2d2_state_machine import R2D2StateMachineV2 as R2D2StateMachine
+from .r2d2_helpers import *
+from .utils import *
 
 
 class RecklessRoamingDancingDruid(controller.Controller):
@@ -75,11 +43,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
         # Save the initial state of the arena for decay mechanism
         self.initial_arena = self.matrix.copy()
-
-        # Create a walkable matrix for pathfinding
-        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
-        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
-        self.matrix_walkable = matrix_walkable.astype(int)
     
     def _fill_matrix(self, champion_knowledge: ChampionKnowledge):
         
@@ -89,8 +52,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
             if tile_description.type == "menhir":
                 self.matrix[coords[1], coords[0]] = tiles_mapping[tile_description.type]
                 self.menhir_position = coords
-                if self.state_machine.current_state == self.state_machine.searching_for_menhir:
-                    self.state_machine.approach_menhir()
             
             if tile_description.loot:
                 self.matrix[coords[1], coords[0]] = tiles_mapping[tile_description.loot.name]
@@ -108,6 +69,12 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # Update Champion position
         self.matrix[champion_knowledge.position.y, champion_knowledge.position.x] = tiles_mapping["champion"]
         self.champion_position = champion_knowledge.position
+
+        # Create a walkable matrix for pathfinding
+        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
+        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
+        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != 12)
+        self.matrix_walkable = matrix_walkable.astype(int)
     
     def _decay_step(self, champion_knowledge: ChampionKnowledge):
         
@@ -148,6 +115,9 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.defending_attack = False # TODO This is a hack, use the state machine instead
         self.finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
 
+        # The state of the agend
+        self.destination = None
+
         # This is the representation of the map state that will be returned as the observation
         self.matrix = np.zeros(LARGEST_ARENA_SHAPE, dtype=np.int8)
 
@@ -159,11 +129,14 @@ class RecklessRoamingDancingDruid(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
     
-    def _move_to(self, target_coords: Coords, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def _move_to(
+            self, target_coords: Coords, knowledge: characters.ChampionKnowledge
+        ) -> Tuple[characters.Action, bool]:
+        "Returns the next action to move to the target_coords and a flag indicating if the target was reached"
         
         # If already in 
         if self.champion_position == target_coords:
-            return self.action_do_nothing()
+            return characters.Action.TURN_RIGHT, True   # Always better turn than do nothing
         
         # Find a path to the target
         # - Translate the matrix into an appropriate format for the pathfinding algorithm
@@ -181,62 +154,87 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
         if facing.value == characters.Facing.UP.value:
             if delta == characters.Facing.UP.value:
-                return self.action_step_forward()
+                return characters.Action.STEP_FORWARD, False
             if delta == characters.Facing.LEFT.value:
-                return self.action_turn_left()
-            return self.action_turn_right()
+                return characters.Action.TURN_LEFT, False
+            return characters.Action.TURN_RIGHT, False
         
         if facing.value == characters.Facing.RIGHT.value:
             if delta == characters.Facing.RIGHT.value:
-                return self.action_step_forward()
+                return characters.Action.STEP_FORWARD, False
             if delta == characters.Facing.UP.value:
-                return self.action_turn_left()
-            return self.action_turn_right()
+                return characters.Action.TURN_LEFT, False
+            return characters.Action.TURN_RIGHT, False
         
         if facing.value == characters.Facing.DOWN.value:
             if delta == characters.Facing.DOWN.value:
-                return self.action_step_forward()
+                return characters.Action.STEP_FORWARD, False
             if delta == characters.Facing.RIGHT.value:
-                return self.action_turn_left()
-            return self.action_turn_right()
+                return characters.Action.TURN_LEFT, False
+            return characters.Action.TURN_RIGHT, False
         
         if facing.value == characters.Facing.LEFT.value:
             if delta == characters.Facing.LEFT.value:
-                return self.action_step_forward()
+                return characters.Action.STEP_FORWARD, False
             if delta == characters.Facing.DOWN.value:
-                return self.action_turn_left()
-            return self.action_turn_right()
-
-    def _searching_for_menhir(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return self.action_turn_right()
+                return characters.Action.TURN_LEFT, False
+            return characters.Action.TURN_RIGHT, False
     
-    def _approaching_menhir(self, knowledge: characters.ChampionKnowledge, eps = 1) -> characters.Action:
-
-        delta = self.champion_position - self.menhir_position
-        delta = abs(delta[0]) + abs(delta[1])
-        if delta <= eps:
-            self.state_machine.defend()
-            self.defending_attack = True
-            return self._defending(knowledge)
+    def _act_stage_1(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         
-        return self._move_to(self.menhir_position, knowledge)
-
-    def _defending(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        # Act according to the state in stage I - Find Weapon
+        if self.state_machine.current_state.value.name == "ChooseDestinationStI":
+            # - choose a destination and transition to the approach destination state
+            print("[R2D2] I'm in stage 1, choosing destination")
+            self.destination = choose_destination(self.matrix)
+            self.state_machine.st1_destination_chosen()
         
-        if self.defending_attack:
-            self.defending_attack = False
-            return self.action_attack()
-        
-        self.defending_attack = True
-        return self.action_turn_right()
+        if self.state_machine.current_state.value.name == "ApproachDestinationStI":
+            print("[R2D2] I'm in stage 1, approaching destination")
+            # - scan the visible tiles for the weapon, if any, save the weapon destination
+            # and transition to the 'approach weapon' state
+            possible_weapon = scan_for_weapons(self.matrix)
+            if possible_weapon:
+                weapon_coords, weapon_type = possible_weapon
+                self.weapon_destination = weapon_coords
+                self.weapon_destination_type = weapon_type
+                self.state_machine.st1_weapon_localized()
 
-        # TODO Does not work, no matter what I do, the agent always turns
-        # if self.state_machine.current_state == self.state_machine.defending_attack:
-        #     # self.state_machine.defend_turn()
-        #     return self.action_attack()
-        # # if self.state_machine.current_state == self.state_machine.defending_turn:
-        # #     # self.state_machine.defend_attack()
-        # #     return self.action_turn_right()
+            # - if the weapon is not visible, move to the destination
+            else:
+                next_action, reached = self._move_to(self.destination, knowledge)
+                if reached:
+                    self.destination = None
+                    self.state_machine.st1_destination_reached()
+                return next_action
+            
+        if self.state_machine.current_state.value.name == "ApproachWeaponStI":
+            print("[R2D2] I'm in stage 1, approaching weapon")
+            # - if the weapon is reached, transition to the stage II
+            if self.champion_position == self.weapon_destination:
+                self.weapon_destination_type = None
+                self.state_machine.st1_weapon_collected()
+                print("[R2D2] I'm in stage 1, weapon collected, now I'm in stage 2")
+
+            # - if the weapon is still on board, move to the weapon
+            elif self.matrix[self.weapon_destination[1], self.weapon_destination[0]] == tiles_mapping[self.weapon_destination_type]:
+                next_action, _ = self._move_to(self.weapon_destination, knowledge)
+                return next_action
+            
+            # - if the weapon is not visible, return to the 'choose destination' state
+            else:
+                self.weapon_destination_type = None
+                self.state_machine.st1_weapon_lost()
+                print("[R2D2] I'm in stage 1, weapon lost...")
+
+        return characters.Action.TURN_RIGHT # Better than nothing
+
+    def _act_stage_2(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        print("[R2D2] I'm in stage 2")
+        return characters.Action.TURN_LEFT # Better than nothing
+
+    def _act_stage_3(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        pass
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         
@@ -250,15 +248,13 @@ class RecklessRoamingDancingDruid(controller.Controller):
         if not self.facing:
             self.facing = knowledge.visible_tiles[self.champion_position].character.facing
         
-        # Act according to the current state
-        if self.state_machine.current_state.value == self.state_machine.searching_for_menhir.value:
-            return self._searching_for_menhir(knowledge)
-        
-        if self.state_machine.current_state.value == self.state_machine.approaching_menhir.value:
-            return self._approaching_menhir(knowledge, eps=self.menhir_eps)
-        
-        if self.state_machine.current_state.value == "Defending":
-            return self._defending(knowledge)
+        # Act acording to the stage
+        if self.state_machine.current_state.value.stage == 1:
+            return self._act_stage_1(knowledge)
+        if self.state_machine.current_state.value.stage == 2:
+            return self._act_stage_2(knowledge)
+        if self.state_machine.current_state.value.stage == 3:
+            return self._act_stage_3(knowledge)
 
     def praise(self, score: int) -> None:
         pass

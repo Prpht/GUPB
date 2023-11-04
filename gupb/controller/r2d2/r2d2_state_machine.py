@@ -1,4 +1,13 @@
 from statemachine import StateMachine, State
+from dataclasses import dataclass
+
+@dataclass(unsafe_hash=True)
+class R2D2StateValue:
+    name: str
+    stage: int
+    description: str
+
+R2D2StateValue("SearchingForMenhir", 1, "None")
 
 class R2D2StateMachine(StateMachine):
 
@@ -15,18 +24,34 @@ class R2D2StateMachineV2(StateMachine):
 
     # Define states
     # - Stage I (Find Weapons)
-    st1_choose_destination = State('ChooseDestinationStI', value="ChooseDestinationStI", initial=True)
-    st1_approach_destination = State('ApproachDestinationStI', value="ApproachDestinationStI")
-    st1_approach_weapon = State('ApproachWeaponStI', value="ApproachWeaponStI")
+    st1_choose_destination = State('ChooseDestinationStI', value=R2D2StateValue(
+        name="ChooseDestinationStI", stage=1, description=""
+    ), initial=True)
+    st1_approach_destination = State('ApproachDestinationStI', value=R2D2StateValue(
+        name="ApproachDestinationStI", stage=1, description=""
+    ))
+    st1_approach_weapon = State('ApproachWeaponStI', value=R2D2StateValue(
+        name="ApproachWeaponStI", stage=1, description=""
+    ))
 
     # - Stage II (Find Menhir)
-    st2_choose_destination = State('ChooseDestinationStII', value="ChooseDestinationStII")
-    st2_approach_destination = State('ApproachDestinationStII', value="ApproachDestinationStII")
-    st2_approach_menhir = State('ApproachMenhirStII', value="ApproachMenhirStII")
+    st2_choose_destination = State('ChooseDestinationStII', value=R2D2StateValue(
+        name="ChooseDestinationStII", stage=2, description=""
+    ))
+    st2_approach_destination = State('ApproachDestinationStII', value=R2D2StateValue(
+        name="ApproachDestinationStII", stage=2, description=""
+    ))
+    st2_approach_menhir = State('ApproachMenhirStII', value=R2D2StateValue(
+        name="ApproachMenhirStII", stage=2, description=""
+    ))
 
     # - Stage III (Defend Menhir)
-    st3_choose_destination = State('ChooseDestinationStIII', value="ChooseDestinationStIII")
-    st3_approach_destination = State('ApproachDestinationStIII', value="ApproachDestinationStIII")
+    st3_choose_destination = State('ChooseDestinationStIII', value=R2D2StateValue(
+        name="ChooseDestinationStIII", stage=3, description=""
+    ))
+    st3_approach_destination = State('ApproachDestinationStIII', value=R2D2StateValue(
+        name="ApproachDestinationStIII", stage=3, description=""
+    ))
 
     # Define transitions
     # - Stage I (Find Weapons)
