@@ -7,8 +7,9 @@ from gupb.model.coordinates import Coords
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.explore import Explore
 from gupb.controller.ancymon.strategies.hunter import Hunter
+from gupb.controller.ancymon.strategies.item_finder import Item_Finder
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
-from gupb.model.weapons import Knife, Sword, Bow, Amulet, Axe
+from gupb.model.weapons import Knife
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -23,6 +24,7 @@ class AncymonController(controller.Controller):
         self.environment: Environment = Environment()
         self.path_finder: Path_Finder = Path_Finder(self.environment)
         self.explore: Explore = Explore(self.environment, self.path_finder)
+        self.item_finder: Item_Finder = Item_Finder(self.environment, self.path_finder)
         self.hunter: Hunter = Hunter(self.environment, self.path_finder)
         self.i: int = 0
 
@@ -43,11 +45,20 @@ class AncymonController(controller.Controller):
 
         try:
             decision = self.hunter.decide()
-            if decision != None:
+            if decision:
                 print(self.i, strategy)
                 return decision
         except Exception as e:
             print(f"An exception occurred in Hunter strategy: {e}")
+
+        try:
+            decision = self.item_finder.decide()
+            strategy = "ITEM FINDER"
+            if decision:
+                print(self.i, strategy)
+                return decision
+        except Exception as e:
+            print(f"An exception occurred in Item Finder strategy: {e}")
 
         try:
             decision = self.explore.decide()
@@ -65,6 +76,10 @@ class AncymonController(controller.Controller):
                 return POSSIBLE_ACTIONS[2]
             if self.is_menhir_neer():
                 print(self.i, "EXPLORE MENHIR")
+                if self.environment.discovered_map.get(new_position).loot and self.environment.discovered_map.get(new_position).loot.name == 'amulet':
+                    return random.choices(
+                        population=POSSIBLE_ACTIONS[:2], weights=(50, 50), k=1
+                    )[0]
                 return random.choices(
                     population=POSSIBLE_ACTIONS[:3], weights=(20, 20, 60), k=1
                 )[0]
@@ -91,6 +106,7 @@ class AncymonController(controller.Controller):
         self.path_finder.environment = self.environment
         self.explore.environment = self.environment
         self.hunter.environment = self.environment
+        self.item_finder.environment = self.environment
 
     @property
     def name(self) -> str:

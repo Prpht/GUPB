@@ -39,5 +39,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': ancymon_controler,
-    'runs_no': 5,
+    'runs_no': 10,
 }

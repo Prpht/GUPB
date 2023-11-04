@@ -21,8 +21,8 @@ CONFIGURATION = {
         random.RandomController("Darius2"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': ancymon_controler,
-    'runs_no': 100,
+    'runs_no': 1,
     'profiling_metrics': [],
 }

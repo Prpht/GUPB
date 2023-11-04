@@ -1,4 +1,3 @@
-import random
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
 from gupb.model import characters
@@ -12,7 +11,7 @@ POSSIBLE_ACTIONS = [
 ]
 
 
-class Hunter():
+class Hunter:
     def __init__(self, environment: Environment, path_finder: Path_Finder):
         self.environment: Environment = environment
         self.path_finder: Path_Finder = path_finder
@@ -29,7 +28,7 @@ class Hunter():
                 self.environment.champion.health > self.next_target.health or self.is_menhir_neer()):
 
             if self.can_attack():
-                print("CAN ATTACK with", self.environment.weapon)
+                print("CAN ATTACK WITH", self.environment.weapon)
                 return characters.Action.ATTACK
 
             cord_position_to_atack = self.find_coord_to_attack_spot()
