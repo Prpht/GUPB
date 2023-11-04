@@ -36,20 +36,6 @@ def tilePassable(tile):
         return tile.passable
     return False
 
-def tileIsMist(tile):
-    for effect in tile.effects:
-        if effect.type == 'mist':
-            return True
-    return False
-
-def tilePassable(tile):
-    if type(tile) == tiles.TileDescription:
-        if tile.type in ['land', 'menhir']:
-            return True
-    elif type(tile) == tiles.Tile:
-        return tile.passable
-    return False
-
 class Map():
     '''Gathers and keeps information about the state of the arena'''
 
@@ -70,12 +56,6 @@ class Map():
         self.map = [[None for i in range(self.MAPSIZE[1])] for j in range(self.MAPSIZE[0])]
         for coords, tile in self.arena.terrain.items():
             self.map[coords.x][coords.y] = tile
-
-    def tileIsMist(self, tile):
-        for effect in tile.effects:
-            if effect.type == 'mist':
-                return True
-        return False
     
     def update(self, knowledge: characters.ChampionKnowledge):
         '''
@@ -192,7 +172,6 @@ class Map():
             if target == 'passable':
                 tile = self.map[v.x][v.y]
                 return tile.passable and not tileIsMist(tile)
-                return tile.passable and not tileIsMist(tile)
         if type(target) is coordinates.Coords:
             if v.x == target.x and v.y == target.y:
                 return True
@@ -222,9 +201,6 @@ class Map():
         Visited = [[(0 if self.map[i][j] is not None else None) for j in range(self.MAPSIZE[1])] for i in range(self.MAPSIZE[0])] 
         Visited[root.x][root.y] = root
         Q = [root]
-        r = 0
-        while len(Q) > 0 and (radius is None or r <= radius):
-            r += 1
         r = 0
         while len(Q) > 0 and (radius is None or r <= radius):
             r += 1
@@ -270,33 +246,21 @@ class KnowledgeBase():
     def __init__(self):
         self.mapBase = None
         self.round_counter=0
-        self.actionsToMake=[]
+        self.actionsToMake=None
         self.actionsTarget=None
         self.tileNeighbourhood = 16
 
-    def stepPossible(self, step):
-        if step == characters.Action.STEP_FORWARD:
-            frontCoords=self.mapBase.description.facing.value+self.mapBase.position
-            frontTile=self.mapBase.map[frontCoords.x][frontCoords.y]
-            if not tilePassable(frontTile) or tileIsMist(frontTile):
-                return False
-        return True
+    def findTarget(self):
+        '''Looks for opponent or worthy consumable. If opponent found, change self.MODE'''
+        pass
 
-    def followTarget(self):
-        nextStep = None
-        if len(self.actionsToMake) > 0:
-            nextStep = self.actionsToMake[0]
-            self.actionsToMake.pop(0)
-            if not self.stepPossible(nextStep):
-                self.actionsToMake=[]
-                self.actionsTarget=None
-                nextStep = None
-        if nextStep is None:
-            self.actionsToMake=[]
-            self.actionsTarget=None
-            inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
-            nextStep = self.checkPossibleAction(self.mapBase.map[inFrontCoords.x][inFrontCoords.y])
-        return nextStep
+    def fightOpponent(self):
+        '''starts or continues a fight'''
+        pass
+
+    def avoidOpponent(self):
+        '''Avoids fights in cases of low HP'''
+        pass
 
     def stepPossible(self, step):
         if step == characters.Action.STEP_FORWARD:
