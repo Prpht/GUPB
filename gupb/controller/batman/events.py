@@ -2,6 +2,7 @@ from typing import Optional
 from enum import IntEnum, auto
 from copy import deepcopy
 
+from gupb.model.characters import PENALISED_IDLE_TIME
 from gupb.controller.batman.environment.knowledge import (
     Knowledge,
     ArenaKnowledge,
@@ -20,6 +21,7 @@ class Event:
 
 class MenhirFoundEvent(Event):
     name = "menhir_found"
+    __match_args__ = ("position",)
 
     def __init__(self, position):
         self.position = position
@@ -27,6 +29,7 @@ class MenhirFoundEvent(Event):
 
 class WeaponFoundEvent(Event):
     name = "weapon_found"
+    __match_args__ = ("weapon",)
 
     def __init__(self, weapon: WeaponKnowledge):
         self.weapon = weapon
@@ -34,6 +37,7 @@ class WeaponFoundEvent(Event):
 
 class WeaponPickedUpEvent(Event):
     name = "weapon_picked_up"
+    __match_args__ = ("weapon_name",)
 
     def __init__(self, weapon_name: str):
         self.weapon_name = weapon_name
@@ -41,6 +45,7 @@ class WeaponPickedUpEvent(Event):
 
 class ConsumableFoundEvent(Event):
     name = "consumable_found"
+    __match_args__ = ("consumable",)
 
     def __init__(self, consumable: ConsumableKnowledge):
         self.consumable = consumable
@@ -48,6 +53,7 @@ class ConsumableFoundEvent(Event):
 
 class LosingHealthEvent(Event):
     name = "losing_health"
+    __match_args__ = ("damage",)
 
     def __init__(self, damage: int):
         self.damage = damage
@@ -55,14 +61,24 @@ class LosingHealthEvent(Event):
 
 class EnemyFoundEvent(Event):
     name = "enemy_found"
+    __match_args__ = ("champion",)
 
     def __init__(self, champion: ChampionKnowledge):
         self.champion = champion
 
 
+class IdlePenaltyEvent(Event):
+    name = "idle_penalty"
+    __match_args__ = ("episodes_to_penalty",)
+
+    def __init__(self, episodes_to_penalty: int):
+        self.episodes_to_penalty = episodes_to_penalty
+
+
 class EventDetector:
     def __init__(self):
         self._previous_knowledge: Optional[Knowledge] = None
+        self._idle_episodes = 0
 
     def _detect_menhir_found(self, knowledge: Knowledge) -> list[MenhirFoundEvent]:
         if self._previous_knowledge is None:
@@ -91,8 +107,12 @@ class EventDetector:
         if self._previous_knowledge is None:
             return []
 
-        new_consumables = knowledge.consumables.keys() - self._previous_knowledge.consumables.keys()
-        return [ConsumableFoundEvent(knowledge.consumables[consumable]) for consumable in new_consumables]
+        consumables = []
+        for position, consumable in knowledge.consumables.items():
+            if position in knowledge.visible_tiles and knowledge.visible_tiles[position].consumable is not None:
+                consumables.append(consumable)
+
+        return [ConsumableFoundEvent(consumable) for consumable in consumables]
 
     def _detect_losing_health(self, knowledge: Knowledge) -> list[LosingHealthEvent]:
         if self._previous_knowledge is None:
@@ -108,9 +128,23 @@ class EventDetector:
         new_enemies = []
         for enemy in knowledge.champions.values():
             if enemy.position in knowledge.visible_tiles \
-                    and knowledge.visible_tiles[enemy.position].character is not None:
+                    and enemy.name != "Batman" \
+                    and knowledge.visible_tiles[enemy.position].character is not None \
+                    and knowledge.visible_tiles[enemy.position].character.controller_name == enemy.name:
                 new_enemies.append(enemy)
         return [EnemyFoundEvent(enemy) for enemy in new_enemies]
+
+    def _detect_idle_penalty(self, knowledge: Knowledge) -> list[IdlePenaltyEvent]:
+        if self._previous_knowledge is None:
+            return [IdlePenaltyEvent(episodes_to_penalty=PENALISED_IDLE_TIME)]
+
+        if self._previous_knowledge.champion.position == knowledge.champion.position \
+                and self._previous_knowledge.champion.facing == knowledge.champion.facing:
+            self._idle_episodes += 1
+        else:
+            self._idle_episodes = 0
+
+        return [IdlePenaltyEvent(episodes_to_penalty=PENALISED_IDLE_TIME - self._idle_episodes)]
 
     def detect(self, knowledge: Knowledge) -> list[Event]:
         events = []
@@ -119,6 +153,7 @@ class EventDetector:
         events.extend(self._detect_consumable_found(knowledge))
         events.extend(self._detect_losing_health(knowledge))
         events.extend(self._detect_enemy_found(knowledge))
+        events.extend(self._detect_idle_penalty(knowledge))
 
         self._previous_knowledge = deepcopy(knowledge)
 
