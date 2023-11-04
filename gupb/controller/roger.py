@@ -1,4 +1,5 @@
 import random
+import os
 from enum import Enum
 from typing import Dict, Tuple, Optional, List, NamedTuple
 
@@ -9,7 +10,9 @@ from pathfinding.finder.a_star import AStarFinder
 from gupb import controller
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
-from gupb.model.coordinates import Coords
+from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, Arena, Terrain
+from gupb.model.coordinates import Coords, add_coords
+from gupb.model.tiles import Land, Menhir
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -17,8 +20,6 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
 ]
-
-MAX_SIZE = 20
 
 
 class SeenWeapon(NamedTuple):
@@ -43,6 +44,8 @@ class Roger(controller.Controller):
         # remembering map
         self.epoch: int = 0
         self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
+        self.terrain: Optional[Terrain] = None
+        self.arena_size = 50
 
         # pathfinding
         self.grid: Optional[Grid] = None
@@ -66,11 +69,11 @@ class Roger(controller.Controller):
         return hash(self._id)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-
         self.update_state(knowledge)
         if self.beginning_iterator < 4:
             self.beginning_iterator += 1
             return characters.Action.TURN_RIGHT
+
         match self.current_state:
             case States.RANDOM_WALK:
                 return self.random_walk()
@@ -105,7 +108,61 @@ class Roger(controller.Controller):
                 self.current_state = States.HEAD_TO_WEAPON
                 return self.head_to_weapon(path)
 
-        return random.choices(POSSIBLE_ACTIONS[:-1], weights=[1, 1, 3])[0]
+        # return random.choices(POSSIBLE_ACTIONS[:-1], weights=[1, 1, 3])[0]
+        return self.explore_map()
+
+    def chose_next_tile(self) -> Coords:
+        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.terrain.items()))
+        walkable_coords = set(map(lambda x: x[0], walkable))
+        seen_coords = set(self.seen_tiles.keys())
+        unseen_coords = walkable_coords - seen_coords
+        unseen_coords = list(unseen_coords)
+        best_coords = random.choices(list(walkable_coords), k=1)[0]
+        if unseen_coords:
+            k = min(10, len(unseen_coords))
+            random_unseen = random.choices(unseen_coords, k=k)
+        else:
+            return best_coords
+        longest_path_len = 0
+        for coords in random_unseen:
+            path = self.get_path(coords)
+            if path:
+                path_len = len(self.map_path_to_action_list(self.current_position, path))
+                if path_len > longest_path_len:
+                    longest_path_len = path_len
+                    best_coords = coords
+        return best_coords
+
+    def explore_map(self):
+        if self.actions and self.actions_iterator >= len(self.actions):
+            self.actions = None
+            self.actions_iterator = 0
+
+        if not self.actions:
+            new_aim = self.chose_next_tile()
+            path = self.get_path(new_aim)
+            actions = self.map_path_to_action_list(self.current_position, path)
+            self.actions = actions
+            self.actions_iterator = 0
+        action = self.actions[self.actions_iterator]
+        self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)  # todo niektóre brobnir nir biją do przodu :(
+        return action
+
+    def return_attack_if_enemy_before(self, action: characters.Action):
+        if not action == characters.Action.ATTACK:
+            initial_facing = self.seen_tiles[self.current_position][0].character.facing.value
+            coords_before = add_coords(self.current_position, initial_facing)
+            if self.seen_tiles[coords_before][1] == self.epoch:
+                if self.seen_tiles[coords_before][0].character:
+                    self.actions_iterator -= 1
+                    return characters.Action.ATTACK
+        return action
+
+    def return_attack_if_enemy_on_the_road(self, action: characters.Action):
+        if action == characters.Action.STEP_FORWARD:
+            action = self.return_attack_if_enemy_before(action)
+        return action
 
     def head_to_finish(self) -> characters.Action:
         if self.menhir_coords:
@@ -147,6 +204,7 @@ class Roger(controller.Controller):
 
         action = self.actions[self.actions_iterator]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def head_to_menhir(self, path: List[GridNode]) -> characters.Action:
@@ -160,12 +218,14 @@ class Roger(controller.Controller):
 
         action = self.actions[self.actions_iterator]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def final_defence(self) -> characters.Action:
         self.actions = [characters.Action.TURN_RIGHT, characters.Action.ATTACK]
         action = self.actions[self.actions_iterator % 2]
         self.actions_iterator += 1
+        action = self.return_attack_if_enemy_before(action)
         return action
 
     def head_to_center(self, path) -> characters.Action:
@@ -182,9 +242,9 @@ class Roger(controller.Controller):
         return action
 
     def update_state(self, knowledge: characters.ChampionKnowledge):
+        self.epoch += 1
         self.current_position = knowledge.position
         self.seen_tiles.update(dict((Coords(x[0][0], x[0][1]), (x[1], self.epoch)) for x in knowledge.visible_tiles.items()))
-        self.epoch += 1
 
         if not self.menhir_coords:
             self.look_for_menhir(knowledge.visible_tiles)
@@ -222,19 +282,39 @@ class Roger(controller.Controller):
         self.menhir_coords = None
         self.weapons_coords = {}
         self.has_weapon = False
+        self.load_arena(arena_description.name)
+
+    def load_arena(self, name: str):
+        terrain = dict()
+        arena_file_path = os.path.join('resources', 'arenas', f'{name}.gupb')
+        with open(arena_file_path) as file:
+            for y, line in enumerate(file.readlines()):
+                for x, character in enumerate(line):
+                    if character != '\n':
+                        position = coordinates.Coords(x, y)
+                        if character in TILE_ENCODING:
+                            terrain[position] = TILE_ENCODING[character]()
+                        elif character in WEAPON_ENCODING:
+                            terrain[position] = tiles.Land()
+                            terrain[position].loot = WEAPON_ENCODING[character]()
+        self.terrain = terrain
+        self.arena_size = int(len(self.terrain.keys()) ** (1/2))
 
     def build_grid(self):
         def extract_walkable_tiles():
-            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.seen_tiles.items()))
+            try:
+                return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.terrain.items()))
+            except AttributeError:
+                return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.seen_tiles.items()))
 
         walkable_tiles_list = extract_walkable_tiles()
-        walkable_tiles_matrix = [[0 for y in range(MAX_SIZE)] for x in range(MAX_SIZE)]
+        walkable_tiles_matrix = [[0 for y in range(self.arena_size)] for x in range(self.arena_size)]
 
         for tile in walkable_tiles_list:
             x, y = tile[0]
             walkable_tiles_matrix[y][x] = 1
 
-        self.grid = Grid(MAX_SIZE, MAX_SIZE, walkable_tiles_matrix)
+        self.grid = Grid(self.arena_size, self.arena_size, walkable_tiles_matrix)
 
     def look_for_menhir(self, tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         for coords, tile in tiles.items():
@@ -265,7 +345,7 @@ class Roger(controller.Controller):
         return mist_coords
 
     def find_nearest_mist_coords(self, mist_coords: List[coordinates.Coords]) -> Optional[coordinates.Coords]:
-        min_distance_squared = 2 * MAX_SIZE**2
+        min_distance_squared = 2 * self.arena_size ** 2
         nearest_mist_coords = None
         for coords in mist_coords:
             distance_squared = (coords.x - self.current_position.x) ** 2 + (coords.y - self.current_position.y) ** 2
