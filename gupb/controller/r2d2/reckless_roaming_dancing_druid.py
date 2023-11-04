@@ -1,5 +1,4 @@
 import numpy as np
-from statemachine import StateMachine, State
 from pathfinding.finder.bi_a_star import BiAStarFinder
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
@@ -11,6 +10,7 @@ from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords
 
+from .r2d2_state_machine import R2D2StateMachine
 
 
 LARGEST_ARENA_SHAPE = (100, 100)
@@ -47,17 +47,6 @@ update_facing_left = {
     characters.Facing.DOWN: characters.Facing.RIGHT,
     characters.Facing.LEFT: characters.Facing.DOWN,
 }
-
-class R2D2StateMachine(StateMachine):
-
-    # Define StateMachine states
-    searching_for_menhir = State('SearchingForMenhir', value="SearchingForMenhir", initial=True)
-    approaching_menhir = State('ApproachingMenhir', value="ApproachingMenhir")
-    defending = State('Defending', value="Defending")
-
-    # Define the transitions of the StateMachine
-    approach_menhir = searching_for_menhir.to(approaching_menhir)
-    defend = approaching_menhir.to(defending)
 
 
 class RecklessRoamingDancingDruid(controller.Controller):
