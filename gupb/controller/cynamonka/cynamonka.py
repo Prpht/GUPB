@@ -11,7 +11,6 @@ from gupb.model import coordinates
 from gupb.model import weapons
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
-# TODO: nie idzie za bardzo w kierunku eliksiru
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -55,7 +54,6 @@ class CynamonkaController(controller.Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
             self.move_count+=1
-            #print(f"ROUND NUMBER {self.move_count}")
             self.update_discovered_arena(knowledge.visible_tiles)
             self.update_walkable_area()
             self.position = knowledge.position
@@ -66,59 +64,45 @@ class CynamonkaController(controller.Controller):
             # first three ifs are the most important actions, player do it even when the map shrinks
             #if see elixir take it 
             if self.can_collect_elixir(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):
-                # print("go forward and collect elixir")
                 self.times_in_row_amulet = 0
                 return POSSIBLE_ACTIONS[2] # go forward
             # if can attack
             if self.can_attack():
-                # print("attack")
                 return POSSIBLE_ACTIONS[3] # attack
             #if can take a weapon
             if self.can_collect_weapon(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):  
-                # print("go forward and collect weapon")
                 self.times_in_row_amulet = 0
                 return POSSIBLE_ACTIONS[2] # go forward
             
             #if there is mist, player acts differently - main goal is to run
             if self.is_mist:
-                # print("Attention there is mist")
                 # if we see menhir we know where to run
                 if self.menhir_position:
-                    # print("go in menhir direction")
                     self.times_in_row_amulet = 0
                     return self.go_in_menhir_direction()
                 # player can see mist but do not see menhir, it must runaway from mist
                 else:
                     # here should be runaway from mist function
-                    # print("runaway from mist")
                     self.times_in_row_amulet = 0
                     return self.runaway_from_mist()
             # player do not see mist so it is not its priority to run away
             else:
-                # print("there is no mist")
-
                 # TODO: mozna tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
                 if self.is_elixir_in_the_neighbourhood():
                     self.times_in_row_amulet = 0
                     return self.go_in_the_target_direction(self.target)
                 if self.is_weapon_in_the_neighbourhood() and self.current_weapon == Knife: 
-                    # print("go in weapon or elixir direction")
                     self.times_in_row_amulet = 0
                     return self.go_in_the_target_direction(self.target)
                 if self.menhir_position:
-                    # print("go in menhir direction 2")
                     self.times_in_row_amulet = 0
                     return self.go_in_menhir_direction()
                 else:
-                    # print("there is no mist, no weapon no menhir, go randomly")
                     self.times_in_row_amulet = 0
                     return self.go_randomly()
         except Exception as e:
             # Handle exceptions or errors here
-            traceback.print_exc()
-            print("heeere")
-            #return self.go_randomly()
-            #print(f"An error occurred: {e}")
+            return self.go_randomly()
 
 
     # returns path if weapon or elixir in the neighbourhood, if its far away return None
@@ -132,7 +116,6 @@ class CynamonkaController(controller.Controller):
         if shortest_path:
             if len(shortest_path) <= 7 and (self.discovered_arena[shortest_path[-1]].consumable or self.discovered_arena[shortest_path[-1]].loot):
                 self.target = shortest_path[-1]
-                # print("nowy target zostal ustawiony na ===== " + str(self.target) + str(self.discovered_arena[self.target]))
                 return True
         return False
     
@@ -145,7 +128,6 @@ class CynamonkaController(controller.Controller):
         if shortest_path:
             if len(shortest_path) <= 7 and (self.discovered_arena[shortest_path[-1]].consumable or self.discovered_arena[shortest_path[-1]].loot):
                 self.target = shortest_path[-1]
-                # print("nowy target zostal ustawiony na ===== " + str(self.target) + str(self.discovered_arena[self.target]))
                 return True
         return False
 
@@ -167,23 +149,15 @@ class CynamonkaController(controller.Controller):
         return shortest_path
 
     def go_in_the_target_direction(self, target_point):
-        # print("JESTEEEEM W SROKUUUUUU GO INTO THE TARGET FUNCTION")
-        # print("moja pozycja  ==== " + str(self.position))
-        # print("Target ===== " + str(target_point))
         # Znajdź optymalną trasę do celu
         nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, target_point)
-        # print("Path to target ==== " + str(nearest_path_to_target))
-
         
         if nearest_path_to_target is not None:
             # Pobierz kierunek, w którym znajduje się kolejna pozycja na trasie
             next_position_direction = self.calculate_direction(self.position, nearest_path_to_target[0])
-            # print("next pos dir ======== " + str(next_position_direction))
-            # print("and my direction ==== " + str(self.facing.value))
 
             # Sprawdź, czy jesteśmy zwróceni w tym samym kierunku co kolejna pozycja
             if self.facing.value == next_position_direction:
-                # print("self facing value =" + str(self.facing.value))
                 # Jeśli tak, idź prosto
                 return POSSIBLE_ACTIONS[2]
             else:
@@ -244,7 +218,6 @@ class CynamonkaController(controller.Controller):
             return self.go_randomly()
 
     def go_randomly(self):
-        # print("inside go randomly function")
         if self.can_move_forward():
             return random.choices(POSSIBLE_ACTIONS[:3], [1,1,8], k=1)[0]
         elif self.can_turn_right() and self.can_turn_left:
@@ -253,69 +226,11 @@ class CynamonkaController(controller.Controller):
             return POSSIBLE_ACTIONS[0]
         else: 
             return POSSIBLE_ACTIONS[1]
-        # if self.can_move_forward():
-        #     print("forward")
-        #     return POSSIBLE_ACTIONS[2]
-        # if self.can_turn_right() and self.can_turn_left:
-        #     print("right")
-        #     return random.choice(POSSIBLE_ACTIONS[:2])
-        # elif self.can_turn_left():
-        #     return POSSIBLE_ACTIONS[0]
-        # else: 
-        #     return POSSIBLE_ACTIONS[1]
-    
 
-    # def find_nearest_path(self, grid, start, goal):
-    #     # Initialize a list to represent the path
-    #     path = []
-    #     current_position = start
-    #     current_direction = self.facing.value 
-    #     steps_taken = [0]
-    #     visited_positions = set()  # Zbiór odwiedzonych pozycji
-
-    #     print("start to find nearest path")
-    #     while current_position != goal:
-    #         # Calculate the positions for moving forward, turning right, and turning left
-    #         forward_position = (current_position[0] + current_direction[0], current_position[1] + current_direction[1])
-    #         right_position = (current_position[0] + current_direction[1], current_position[1] - current_direction[0])
-    #         left_position = (current_position[0] - current_direction[1], current_position[1] + current_direction[0])
-
-    #         valid_positions = [pos for pos in (forward_position, right_position, left_position) if pos in grid]
-
-    #         if not valid_positions:
-    #             return None
-
-    #         # Calculate the weight for each position (distance + steps)
-    #         weights = [abs(pos[0] - goal[0]) + abs(pos[1] - goal[1]) + steps_taken[-1] + (1 if pos == forward_position else 2) for pos in valid_positions for pos in valid_positions]
-    #         # Choose the position that brings you closer to the goal
-    #         closest_position = valid_positions[weights.index(min(weights))]
-
-    #         if closest_position in visited_positions:
-    #             print("przypadek zapetlenia, sciezka juz odwiedzona")
-    #             return None
-
-    #         # Update the path and current position
-    #         path.append(coordinates.Coords(closest_position[0], closest_position[1]))
-    #         visited_positions.add(closest_position) 
-    #         current_position = closest_position
-    #         steps_taken.append(steps_taken[-1] + (1 if closest_position == forward_position else 2))
-
-    #         # Update the direction based on the movement
-    #         if closest_position == forward_position:
-    #             pass  # Keep the same direction (no need to change direction)
-    #         elif closest_position == right_position:
-    #             current_direction = (current_direction[1], -current_direction[0])  # Turn right
-    #         elif closest_position == left_position:
-    #             current_direction = (-current_direction[1], current_direction[0])  # Turn left
-    #     print(f"end to find nearest path {path}")
-    #     return path
-
-    import heapq
 
     # astar funkcja do znalezienia trasy
     def find_nearest_path(self, grid, start, goal):
         # Inicjalizuj listę odwiedzonych pozycji
-        # TODO: to dodalam
         if goal is None:
             return None
         visited_positions = set()
@@ -346,7 +261,6 @@ class CynamonkaController(controller.Controller):
     
     def set_new_weapon(self):
         new_weapon = self.discovered_arena[self.position].character.weapon.name
-        # print("imie nowej broni ==== " + str(new_weapon))
         match new_weapon:
                 case 'knife':
                     self.current_weapon = Knife
@@ -366,11 +280,8 @@ class CynamonkaController(controller.Controller):
 
     def runaway_from_mist(self):
         # główne załozenie: jesli zidentyfikuje mgle na mapie kieruje sie w strone najdalszego odkrytego do tej pory punktu, do ktorego istenieje sciezka
-
         # Jeśli brak obszarów mgły, zwróć losową akcję
-        # print("jestem w srodku uciekania")
         if not self.mist_positions:
-            # print("brak mgly")
             return self.go_randomly()
         
         if self.runaway_target is not None and self.runaway_target not in self.walkable_area:
@@ -379,7 +290,6 @@ class CynamonkaController(controller.Controller):
             best_position = None
 
             for position in self.discovered_arena:
-                #print("sprawdzana pozycja = " + str(position))
                 if position not in self.mist_positions and position in self.walkable_area:
                     # Oblicz odległość między polem a najbliższym obszarem mgły
                     min_distance = min(math.dist(position, mist) for mist in self.mist_positions)
@@ -391,17 +301,14 @@ class CynamonkaController(controller.Controller):
             if best_position is not None and self.find_nearest_path(self.walkable_area, self.position, best_position):
                 # Znaleziono najlepsze pole, więc uciekaj w jego kierunku
                 direction = coordinates.Coords(best_position[0] - self.position[0], best_position[1] - self.position[1])
-                #print("Uciekam przed mgla w kierunku : " + str(best_position))
                 self.runaway_target = best_position
                 return self.go_in_the_target_direction(self.runaway_target)
             else:
                 # Brak dostępnych pól, które nie są w obszarze mgły, zwróć losową akcję
-                #print("brak dostepnych pol")
                 return self.go_randomly()
         else:
             return self.go_in_the_target_direction(self.runaway_target)
 
-    # TODO: w poprzednich latach wiekszosc bierze pozycje broni w taki sposob ale w sumie to zaczynam miec watpliwosci czy tak mozna
     def get_attackable_area(self):
         attackable_area = []
         if self.current_weapon == Knife:
@@ -414,14 +321,9 @@ class CynamonkaController(controller.Controller):
             attackable_area = weapons.Bow.cut_positions(self.arena.terrain, self.position, self.facing)
         elif self.current_weapon == Sword:
             attackable_area = Sword.cut_positions(self.arena.terrain, self.position, self.facing)
-        # else:
-        #     print("Does not have a weapon")
         return attackable_area
     
     def can_attack(self):
-        #TODO: naprawić case z amuletem, bo czasem zapętla atak
-        #TODO: naprawić case z łukiem, bo czasem nie czyta go
-        #print(f"num in rows ammulet: {self.times_in_row_amulet}")
         if self.current_weapon == weapons.Bow and self.current_weapon.__name__ == "bow_unloaded":
             self.times_in_row_amulet = 0
             return True
@@ -433,11 +335,9 @@ class CynamonkaController(controller.Controller):
             
             if description.character and description.character.controller_name != "CynamonkaController" and coords in attackable_area:
                 if self.current_weapon == weapons.Amulet:
-                    #print("`you have amulet and you will attack")
                     self.times_in_row_amulet+=1
                 else:
                     self.times_in_row_amulet=0
-                #print(f"pole gracza ktore atakujemy: {description.character}")
                 return True
         return False
 
@@ -458,7 +358,6 @@ class CynamonkaController(controller.Controller):
             
     def update_discovered_arena(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for coords, description in visible_tiles.items():
-            # TODO: to zmienilam
             if isinstance(coords, Coords):
                 coords = (coords[0], coords[1])
             self.discovered_arena[coords] = description
@@ -470,11 +369,9 @@ class CynamonkaController(controller.Controller):
                 del self.weapons_positions[coords]
             if description.loot:
                 self.weapons_positions[coords] = description
-                #TODO: sprawdzic czy ta zmiana jest okej:
             if not self.is_mist and self.mist_positions:
                 self.is_mist = True
             if not self.menhir_position and self.is_menhir(coords):
-                # print("menhir")
                 self.menhir_position = coords
             if effects.EffectDescription(type='mist') in description.effects:
                 self.mist_positions[coords] = description
@@ -509,7 +406,6 @@ class CynamonkaController(controller.Controller):
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        #print("RESET")
         self.arena = arenas.Arena.load(arena_description.name)
         self.current_weapon = Knife
         self.weapons_positions = {}
@@ -534,11 +430,3 @@ class CynamonkaController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.PINK
-
-    # TODO: Najlepiej byloby pusic symulacje i liczyc ile punktow/ ruchow zrobil nasz gracz, super gdyby udaloby ci sie dodac tych gracyz z 1 labu, ale to takie dodatkowe
-    # wazne jest to zeby puscic tego bota z 1000 razy i zebrac jego srednia i tych randowmoych, jak bedziemy widziec ze jest duzo lepszy niz wiekszosc randomow to znaczy ze jest git
-    # ja dodalam ogolnie z 12 tych randomow, im wiecej tym lepiej
-
-
-    # TODO; On czasem tak muli i sie nie rusza, obczaic o co chodzi, generalnie pewnie to jest zwiazane z tym ze te funkcje pojscia do celu i menhira
-    # sa slabe, takze jak sie zaimplementuje nowe nie powinno byc problemu
