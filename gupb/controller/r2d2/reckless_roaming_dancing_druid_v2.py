@@ -91,7 +91,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         for coords, tile_description in champion_knowledge.visible_tiles.items():
             self.decay_mask[coords[1], coords[0]] = self.decay
 
-    def __init__(self, first_name: str, decay: int = 1, menhir_eps=0):
+    def __init__(self, first_name: str, decay: int = 5, menhir_eps=4):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
@@ -185,12 +185,10 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # Act according to the state in stage I - Find Weapon
         if self.state_machine.current_state.value.name == "ChooseDestinationStI":
             # - choose a destination and transition to the approach destination state
-            print("[R2D2] I'm in stage 1, choosing destination")
             self.destination = choose_destination(self.matrix)
             self.state_machine.st1_destination_chosen()
         
         if self.state_machine.current_state.value.name == "ApproachDestinationStI":
-            print("[R2D2] I'm in stage 1, approaching destination")
             # - scan the visible tiles for the weapon, if any, save the weapon destination
             # and transition to the 'approach weapon' state
             possible_weapon = scan_for_weapons(self.matrix)
@@ -200,7 +198,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 self.weapon_destination_type = weapon_type
                 self.state_machine.st1_weapon_localized()
 
-            # - if the weapon is not visible, move to the destination
+            # - if no weapon is not visible, move to the destination
             else:
                 next_action, reached = self._move_to(self.destination, knowledge)
                 if reached:
@@ -209,12 +207,10 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 return next_action
             
         if self.state_machine.current_state.value.name == "ApproachWeaponStI":
-            print("[R2D2] I'm in stage 1, approaching weapon")
             # - if the weapon is reached, transition to the stage II
             if self.champion_position == self.weapon_destination:
                 self.weapon_destination_type = None
                 self.state_machine.st1_weapon_collected()
-                print("[R2D2] I'm in stage 1, weapon collected, now I'm in stage 2")
 
             # - if the weapon is still on board, move to the weapon
             elif self.matrix[self.weapon_destination[1], self.weapon_destination[0]] == tiles_mapping[self.weapon_destination_type]:
@@ -225,16 +221,59 @@ class RecklessRoamingDancingDruid(controller.Controller):
             else:
                 self.weapon_destination_type = None
                 self.state_machine.st1_weapon_lost()
-                print("[R2D2] I'm in stage 1, weapon lost...")
 
         return characters.Action.TURN_RIGHT # Better than nothing
 
     def _act_stage_2(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        print("[R2D2] I'm in stage 2")
-        return characters.Action.TURN_LEFT # Better than nothing
+
+        # Act according to the state in stage II - Find Menhir
+        if self.state_machine.current_state.value.name == "ChooseDestinationStII":
+            # - choose a destination and transition to the approach destination state
+            self.destination = choose_destination(self.matrix)
+            self.state_machine.st2_destination_chosen()
+        
+        if self.state_machine.current_state.value.name == "ApproachDestinationStII":
+            # - If menhir is already found, transition to the 'approach menhir' state
+            if self.menhir_position:
+                self.state_machine.st2_menhir_localized()
+            
+            # - If menhir is not found, move to the destination
+            else:
+                next_action, reached = self._move_to(self.destination, knowledge)
+                if reached:
+                    self.destination = None
+                    self.state_machine.st2_destination_reached()
+                return next_action
+        
+        if self.state_machine.current_state.value.name == "ApproachMenhirStII":
+            # # - If menhir is reached, transition to the stage III
+            if manhataan_distance(self.champion_position, self.menhir_position) <= self.menhir_eps:
+                self.state_machine.st2_menhir_reached()
+            
+            # - If menhir is not reached, move to the menhir
+            else:
+                next_action, _ = self._move_to(self.menhir_position, knowledge)
+                return next_action
+        
+        return characters.Action.TURN_RIGHT # Better than nothing
 
     def _act_stage_3(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        pass
+
+        # Act according to the state in stage III - Defend Menhir
+        if self.state_machine.current_state.value.name == "ChooseDestinationStIII":
+            # - choose a destination and transition to the approach destination state
+            self.destination = choose_destination_around_menhir(self.matrix, self.menhir_position, self.menhir_eps)
+            self.state_machine.st3_destination_chosen()
+        
+        if self.state_machine.current_state.value.name == "ApproachDestinationStIII":
+            # - move to the destination
+            next_action, reached = self._move_to(self.destination, knowledge)
+            if reached:
+                self.destination = None
+                self.state_machine.st3_destination_reached()
+            return next_action
+        
+        return characters.Action.TURN_RIGHT # Better than nothing
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         

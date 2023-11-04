@@ -1,4 +1,5 @@
 from gupb.model import characters
+from gupb.model.coordinates import Coords
 
 
 LARGEST_ARENA_SHAPE = (100, 100)
@@ -43,3 +44,6 @@ update_facing_left = {
     characters.Facing.DOWN: characters.Facing.RIGHT,
     characters.Facing.LEFT: characters.Facing.DOWN,
 }
+
+def manhataan_distance(a: Coords, b: Coords) -> int:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
