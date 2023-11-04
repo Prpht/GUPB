@@ -46,25 +46,28 @@ class AncymonController(controller.Controller):
         try:
             decision = self.hunter.decide()
             if decision:
-                print(self.i, strategy)
+                # print(self.i, strategy)
                 return decision
         except Exception as e:
-            print(f"An exception occurred in Hunter strategy: {e}")
+            # print(f"An exception occurred in Hunter strategy: {e}")
+            pass
 
         try:
             decision = self.item_finder.decide()
             strategy = "ITEM FINDER"
             if decision:
-                print(self.i, strategy)
+                # print(self.i, strategy)
                 return decision
         except Exception as e:
-            print(f"An exception occurred in Item Finder strategy: {e}")
+            # print(f"An exception occurred in Item Finder strategy: {e}")
+            pass
 
         try:
             decision = self.explore.decide()
             strategy = "EXPLORE"
         except Exception as e:
-            print(f"An exception occurred in Explore strategy: {e}")
+            # print(f"An exception occurred in Explore strategy: {e}")
+            pass
 
         #After providing hunter decider nothing below should be requierd
 
@@ -72,10 +75,10 @@ class AncymonController(controller.Controller):
             new_position = self.environment.position + self.environment.discovered_map[
                 self.environment.position].character.facing.value
             if self.collect_loot(new_position):
-                print(self.i, "COLLECT LOOT")
+                # print(self.i, "COLLECT LOOT")
                 return POSSIBLE_ACTIONS[2]
             if self.is_menhir_neer():
-                print(self.i, "EXPLORE MENHIR")
+                # print(self.i, "EXPLORE MENHIR")
                 if self.environment.discovered_map.get(new_position).loot and self.environment.discovered_map.get(new_position).loot.name == 'amulet':
                     return random.choices(
                         population=POSSIBLE_ACTIONS[:2], weights=(50, 50), k=1
@@ -84,9 +87,10 @@ class AncymonController(controller.Controller):
                     population=POSSIBLE_ACTIONS[:3], weights=(20, 20, 60), k=1
                 )[0]
         except Exception as e:
-            print(f"An exception occurred: {e}")
+            # print(f"An exception occurred: {e}")
+            pass
 
-        print(self.i, strategy)
+        # print(self.i, strategy)
         return decision
 
     def is_menhir_neer(self):

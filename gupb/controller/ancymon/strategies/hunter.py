@@ -21,14 +21,14 @@ class Hunter:
 
     def decide(self) -> characters.Action:
         if self.is_enemy_neer(1) == False and self.can_attack():
-            print("LONG RANGE ATTACK", self.environment.weapon)
+            # print("LONG RANGE ATTACK", self.environment.weapon)
             return characters.Action.ATTACK
 
         if self.is_enemy_neer() and (
                 self.environment.champion.health > self.next_target.health or self.is_menhir_neer()):
 
             if self.can_attack():
-                print("CAN ATTACK WITH", self.environment.weapon)
+                # print("CAN ATTACK WITH", self.environment.weapon)
                 return characters.Action.ATTACK
 
             cord_position_to_atack = self.find_coord_to_attack_spot()
@@ -36,7 +36,7 @@ class Hunter:
             # if cord_position_to_atack == self.environment.position:
             #     return characters.Action.TURN_RIGHT
             # else:
-            print("CHASING")
+            # print("CHASING")
             return self.path_finder.caluclate(self.environment.position, cord_position_to_atack)
         return None
 
@@ -139,7 +139,7 @@ class Hunter:
                             new_attack_spot_dist = spot_dist
                             new_attack_spot = further_position
             if new_attack_spot:
-                print(new_attack_spot)
+                # print(new_attack_spot)
                 return new_attack_spot
 
         else:

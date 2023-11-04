@@ -24,13 +24,13 @@ class Item_Finder:
         self.update_items_knowladge()
 
         if self.potion_coord and self.manhatan_distance(self.environment.position, self.potion_coord) < self.environment.enemies_left + 3:
-            print("GO FOR POTION")
+            # print("GO FOR POTION")
             decision = self.path_finder.caluclate(self.environment.position, self.potion_coord)
             return self.should_attack(decision)
 
 
         if self.loot_coord and (self.environment.weapon.name == 'knife' or self.environment.weapon.name == 'amulet') and self.manhatan_distance(self.environment.position, self.loot_coord) < self.environment.enemies_left + 3:
-            print("GO FOR LOOT")
+            # print("GO FOR LOOT")
             decision = self.path_finder.caluclate(self.environment.position, self.loot_coord)
             return self.should_attack(decision)
 
@@ -41,7 +41,7 @@ class Item_Finder:
             new_position = self.environment.position + self.environment.discovered_map[
                 self.environment.position].character.facing.value
             if self.environment.discovered_map[new_position].character != None:
-                print("KILL WHILE ITEM SEARCH")
+                # print("KILL WHILE ITEM SEARCH")
                 return characters.Action.ATTACK
         return decision
     def manhatan_distance(self, start: Coords, end: Coords):

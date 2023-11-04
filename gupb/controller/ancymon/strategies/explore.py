@@ -38,7 +38,7 @@ class Explore():
         if next_move == characters.Action.STEP_FORWARD:
             new_position = self.environment.position + self.environment.discovered_map[self.environment.position].character.facing.value
             if self.environment.discovered_map[new_position].character != None:
-                print("KILL WHILE EXPLORE")
+                # print("KILL WHILE EXPLORE")
                 next_move = characters.Action.ATTACK
 
         return next_move
