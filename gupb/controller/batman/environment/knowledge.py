@@ -4,6 +4,10 @@ from gupb.model import arenas, tiles, characters, weapons, coordinates, consumab
 from gupb.controller.batman.copyable import Copyable
 
 
+def manhattan_distance(start: coordinates.Coords, end: coordinates.Coords) -> int:
+    return abs(start.x - end.x) + abs(start.y - end.y)
+
+
 class TileKnowledge(Copyable):
     def __init__(self, coords: coordinates.Coords):
         self.coords = coords
@@ -104,11 +108,20 @@ class Knowledge(Copyable):
         self.champions_alive: int = 0
         self.episode = 0
         self.position = coordinates.Coords(0, 0)
+        self.mist_distance: int = 1_000_000
         self.visible_tiles: dict[coordinates.Coords, TileKnowledge] = {}
 
     @property
     def champion(self) -> ChampionKnowledge:
         return self.champions["Batman"]  # TODO get this automatically somehow?
+
+    @property
+    def last_seen_champions(self) -> dict[str, ChampionKnowledge]:
+        return {
+            champion_name: champion
+            for champion_name, champion in self.champions.items()
+            if champion.position in self.visible_tiles and champion_name != "Batman"
+        }
 
     def update(self, knowledge: characters.ChampionKnowledge, episode: int) -> None:
         self.visible_tiles = {
@@ -139,5 +152,9 @@ class Knowledge(Copyable):
                 )
             elif position in self.consumables:
                 del self.consumables[position]
+
+            for effect in tile_desc.effects:
+                if effect.type == "mist":
+                    self.mist_distance = min(self.mist_distance, manhattan_distance(self.position, position))
 
         self.arena.update(self.visible_tiles, episode)

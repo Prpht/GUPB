@@ -20,6 +20,7 @@ class Event:
 
 class MenhirFoundEvent(Event):
     name = "menhir_found"
+    __match_args__ = ("position",)
 
     def __init__(self, position):
         self.position = position
@@ -27,6 +28,7 @@ class MenhirFoundEvent(Event):
 
 class WeaponFoundEvent(Event):
     name = "weapon_found"
+    __match_args__ = ("weapon",)
 
     def __init__(self, weapon: WeaponKnowledge):
         self.weapon = weapon
@@ -34,6 +36,7 @@ class WeaponFoundEvent(Event):
 
 class WeaponPickedUpEvent(Event):
     name = "weapon_picked_up"
+    __match_args__ = ("weapon_name",)
 
     def __init__(self, weapon_name: str):
         self.weapon_name = weapon_name
@@ -41,6 +44,7 @@ class WeaponPickedUpEvent(Event):
 
 class ConsumableFoundEvent(Event):
     name = "consumable_found"
+    __match_args__ = ("consumable",)
 
     def __init__(self, consumable: ConsumableKnowledge):
         self.consumable = consumable
@@ -48,6 +52,7 @@ class ConsumableFoundEvent(Event):
 
 class LosingHealthEvent(Event):
     name = "losing_health"
+    __match_args__ = ("damage",)
 
     def __init__(self, damage: int):
         self.damage = damage
@@ -55,6 +60,7 @@ class LosingHealthEvent(Event):
 
 class EnemyFoundEvent(Event):
     name = "enemy_found"
+    __match_args__ = ("champion",)
 
     def __init__(self, champion: ChampionKnowledge):
         self.champion = champion
