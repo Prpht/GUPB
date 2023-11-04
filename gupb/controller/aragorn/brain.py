@@ -24,13 +24,36 @@ class Brain:
         if self.memory.hasOponentInFront():
             attackAction = AttackAction()
             actions.append(attackAction)
-        
+
+        if self.memory.hasOponentOnRight():
+            spinAction = SpinAction()
+            spinAction.setSpin(characters.Action.TURN_RIGHT)
+            actions.append(spinAction)
+
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
+        if self.memory.hasOponentOnLeft():
+            spinAction = SpinAction()
+            spinAction.setSpin(characters.Action.TURN_LEFT)
+            actions.append(spinAction)
+
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
-        
-        if closestPotionDistance is not None and closestPotionDistance < 5:
+
+        if closestPotionDistance is not None and closestPotionDistance < 8:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
             actions.append(goToPotionAction)
+
+        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
+
+        if closestWeaponDistance is not None and closestWeaponDistance < 8:
+            goToWeaponAction = GoToAction()
+            goToWeaponAction.setDestination(closestWeaponCoords)
+            actions.append(goToWeaponAction)
                 
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 

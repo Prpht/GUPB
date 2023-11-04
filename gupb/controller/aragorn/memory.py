@@ -3,6 +3,7 @@ from typing import Dict, NamedTuple, Optional, List
 
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
+from gupb.model.characters import CHAMPION_STARTING_HP
 
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY
@@ -20,6 +21,8 @@ class Memory:
         
         self.map: Map = None
         self.environment: Environment = None
+
+        self.health: int = 0
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
@@ -31,6 +34,8 @@ class Memory:
 
         self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
         self.environment = Environment(self.map)
+
+        self.health: int = 0
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.tick += 1
@@ -43,7 +48,9 @@ class Memory:
         
         self.idleTime += 1
         self.environment.environment_action(self.no_of_champions_alive)
-    
+
+        self.health = knowledge.visible_tiles[self.position].character.health
+
     def hasOponentInFront(self):
         frontCell = coordinates.add_coords(self.position, self.facing.value)
         
@@ -51,7 +58,24 @@ class Memory:
             return True
         
         return False
-    
+
+    def hasOponentOnRight(self):
+        rightCell = coordinates.add_coords(self.position, self.facing.turn_right().value)
+
+        if rightCell in self.map.terrain and self.map.terrain[rightCell].character is not None:
+            return True
+
+        return False
+
+    def hasOponentOnLeft(self):
+        leftCell = coordinates.add_coords(self.position, self.facing.turn_left().value)
+
+        if leftCell in self.map.terrain and self.map.terrain[leftCell].character is not None:
+            return True
+
+        return False
+
+
     def resetIdle(self):
         self.idleTime = 0
 
@@ -71,6 +95,27 @@ class Memory:
                     minCoords = coords
         
         return [minDistance, minCoords]
+
+    def getDistanceToClosestWeapon(self):
+        minDistance = INFINITY
+        minCoords = None
+
+        for coords in self.map.terrain:
+            if self.map.terrain[coords].loot == weapons.Weapon:
+                distance = utils.coordinatesDistance(self.position, coords)
+
+                if distance < minDistance:
+                    minDistance = distance
+                    minCoords = coords
+        return [minDistance, minCoords]
+
+    def isWeak(self):
+        if self.health < 0.5 * CHAMPION_STARTING_HP:
+            return True
+
+        return False
+
+
 
 class Environment:
     def __init__(self, map: 'Map'):
