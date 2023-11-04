@@ -71,7 +71,7 @@ class Navigation:
         return len(path) - 1
 
     def find_path(self, start: Coords, end: Coords, grid: Grid = None) -> list[Coords]:
-        grid = grid or Grid(matrix=self.grid_matrix)
+        grid = Grid(matrix=self.grid_matrix) if grid is None else Grid(matrix=grid)
         start = grid.node(start.x, start.y)
         end = grid.node(end.x, end.y)
 
@@ -91,11 +91,25 @@ class Navigation:
     def back_tile(self, position: Coords, facing: Facing) -> Coords:
         return add_coords(position, FACING_TO_COORDS[FACING_TURN_BACK[facing]])
 
+    def is_passable_tile(self, position: Coords) -> bool:
+        terrain_tile = self.knowledge.arena.arena.terrain.get(position, None)
+        return terrain_tile.terrain_passable() if terrain_tile is not None else False
+
     def is_free_tile(self, position: Coords) -> bool:
         tile_knowledge = self.knowledge.arena.explored_map.get(position)
         if tile_knowledge is None:
             return False
         return tile_knowledge.passable and tile_knowledge.character is None
+
+    def is_corner_tile(self, position: Coords) -> bool:
+        facing = Facing.UP
+        passable_tiles = sum([
+            self.is_passable_tile(self.front_tile(position, facing)),
+            self.is_passable_tile(self.right_tile(position, facing)),
+            self.is_passable_tile(self.left_tile(position, facing)),
+            self.is_passable_tile(self.back_tile(position, facing)),
+        ])
+        return passable_tiles <= 2
 
     def find_closest_free_tile(self, knowledge: Knowledge) -> Coords:
         facing = knowledge.champion.facing
@@ -131,11 +145,14 @@ class Navigation:
         tiles2path_danger = dict()
         for candidate_tile in self.iterate_tiles_in_region_boundary(sub_coords(knowledge.position, delta),
                                                                     add_coords(knowledge.position, delta)):
-            danger = danger_grid[candidate_tile.y, candidate_tile.x]
-            if danger == 0:
+            if not self.is_passable_tile(candidate_tile):
                 continue
 
-            path_danger = self.path_cost(self.find_path(knowledge.position, candidate_tile, danger_grid), danger_grid)
+            path = self.find_path(knowledge.position, candidate_tile, danger_grid)
+            if not path or len(path) == 1:
+                continue
+
+            path_danger = self.path_cost(path, danger_grid)
             tiles2path_danger[candidate_tile] = path_danger
 
         if not tiles2path_danger:
@@ -168,10 +185,10 @@ class Navigation:
         if x >= y and x > -y:
             return Facing.RIGHT
         if x > y and x <= -y:
-            return Facing.DOWN
+            return Facing.UP
         if x <= y and x < -y:
             return Facing.LEFT
-        return Facing.UP
+        return Facing.DOWN
 
     def turn(self, current_direction: Facing, target_direction: Facing) -> Optional[Action]:
         if current_direction == target_direction:

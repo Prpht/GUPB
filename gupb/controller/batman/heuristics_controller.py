@@ -1,4 +1,5 @@
 from typing import Optional
+import time
 
 from gupb import controller
 from gupb.model import arenas
@@ -56,9 +57,9 @@ class BatmanHeuristicsController(controller.Controller):
             self._current_strategy = self._strategies[strategy]
             changed_strategies += 1
 
-        # this should never happen
+        # this should never happen (but it does happen xd)
         if action is None:
-            print('WARNING: endless loop in strategies changing')
+            # print('WARNING: endless loop in strategies changing')
             action = Action.DO_NOTHING
 
         return action

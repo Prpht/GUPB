@@ -128,7 +128,6 @@ class Knowledge(Copyable):
             coordinates.Coords(xy[0], xy[1]): tile
             for xy, tile in knowledge.visible_tiles.items()
         }
-        # print(self.visible_tiles)
 
         self.champions_alive = knowledge.no_of_champions_alive
         self.position = knowledge.position

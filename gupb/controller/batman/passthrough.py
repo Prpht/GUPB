@@ -10,7 +10,8 @@ from gupb.controller.batman.navigation import Navigation
 class Passthrough:
     def __init__(self, knowledge: Knowledge, navigation: Navigation, samples: int = 1000, seed: int = 0):
         self._knowledge = knowledge
-        self._navigation = navigation
+        self.arena_size = knowledge.arena.arena_size
+        self.navigation = navigation
         self._samples = samples
         self._rng = random.Random(seed)
         self._passthrough = self._calculate_passthrough()
@@ -19,8 +20,7 @@ class Passthrough:
         return self._passthrough[item.y, item.x]
 
     def _calculate_passthrough(self) -> np.ndarray:
-        arena_size = self._knowledge.arena.arena.size
-        base_grid = self._navigation.base_grid()
+        base_grid = self.navigation.base_grid()
         passthrough = np.where(base_grid == 0, 100 * self._samples, 0)
 
         passable_ys, passable_xs = np.where(base_grid == 1)
@@ -30,7 +30,7 @@ class Passthrough:
         to_tiles = self._rng.choices(passable_tiles, k=self._samples)
 
         for from_tile, to_tile in zip(from_tiles, to_tiles):
-            path = self._navigation.find_path(from_tile, to_tile)
+            path = self.navigation.find_path(from_tile, to_tile)
             for tile in path:
                 passthrough[tile.y, tile.x] += 1
 

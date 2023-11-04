@@ -19,7 +19,8 @@ from gupb.controller.batman.events import (
     WeaponFoundEvent,
     ConsumableFoundEvent,
     LosingHealthEvent,
-    EnemyFoundEvent
+    EnemyFoundEvent,
+    IdlePenaltyEvent
 )
 
 
@@ -42,23 +43,25 @@ class DefendingStrategy:
                 case LosingHealthEvent(damage):
                     # TODO would be nice to turn to the more probable side (by number of enemies, terrain, etc)
                     reaction = 2, Action.TURN_RIGHT, "defending"
-                case ConsumableFoundEvent(consumable):
+                case ConsumableFoundEvent(consumable) if knowledge.mist_distance >= 15 \
+                        or navigation.manhattan_terrain_distance(consumable.position, knowledge.position) <= 5:
                     reaction = 3, None, "scouting"  # collect the consumable
+                case IdlePenaltyEvent(episodes_to_penalty) if episodes_to_penalty <= 2:
+                    reaction = 4, random.choice([Action.TURN_RIGHT, Action.TURN_LEFT]), "defending"
                 case EnemyFoundEvent(enemy) if navigation.is_headed_towards(enemy, knowledge.position) \
                         and navigation.manhattan_terrain_distance(enemy.position, knowledge.position) <= 2:
                     direction_towards_enemy = navigation.direction_to(knowledge.position, enemy.position)
                     turn_action = navigation.turn(knowledge.champion.facing, direction_towards_enemy)
                     if turn_action is not None:
-                        reaction = 4, turn_action, "defending"
+                        reaction = 5, turn_action, "defending"
                     else:
-                        reaction = 4, Action.DO_NOTHING, "defending"
+                        reaction = 5, Action.DO_NOTHING, "defending"
 
             if reaction is not None:
                 possible_reactions.append(reaction)
 
         if possible_reactions:
             best_reaction = min(possible_reactions, key=itemgetter(0))
-            print("defending best reaction", best_reaction)  # TODO remove this
             return best_reaction[1:]
 
         if knowledge.arena.menhir_position is not None \
