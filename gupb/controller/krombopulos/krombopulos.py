@@ -16,7 +16,7 @@ class KrombopulosMichaelController(controller.Controller):
         self._name: str = 'krombopulos-michael'
         self.epoch: int = 0
 
-        self.knowledge_sources: KnowledgeSources = KnowledgeSources()
+        self.knowledge_sources: KnowledgeSources = KnowledgeSources(own_name=self._name)
         self.meta_strategy: MetaStrategy = self._get_initial_meta_strategy()
 
         # stuff needed to use DQN
@@ -41,11 +41,11 @@ class KrombopulosMichaelController(controller.Controller):
         # (optionally, save model, every 10 games)
         # self.trainer.stop(self.game % 10 == 0)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         """What happens before the beginning of a new game."""
         self.knowledge_sources.reset(arena_description)
         self.step = 0
-        self.game += 1
+        self.game = game_no
 
     def _get_initial_meta_strategy(self) -> MetaStrategy:
         return ExploreHideRunMetaStrat(self.knowledge_sources)

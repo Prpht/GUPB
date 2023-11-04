@@ -19,7 +19,7 @@ class ExploreHideRunMetaStrat(MetaStrategy):
         # switch mode every 20 epochs or if route is complete
         if self.knowledge_sources.epoch % 20 == 0 or self.previous_action == characters.Action.DO_NOTHING:
             self._switch_mode()
-        action, self.current_micro_strat = self.current_micro_strat.decide_and_get_next()
+        action, _ = self.current_micro_strat.decide_and_get_next()
         self.previous_action = action
         return action
 

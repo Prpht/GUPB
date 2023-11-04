@@ -10,6 +10,9 @@ class RouteMicroStrat(MicroStrategy):
             self.precedence = StrategyPrecedence.HIGH
 
     def decide_and_get_next(self) -> tuple[characters.Action, bool]:
+        # move if champion has not moved in 5 epochs
+        if action := self.avoid_afk():
+            return action, False
         front_tile = self.knowledge_sources.get_tile_info_in_front_of()
         if front_tile.consumable:
             return characters.Action.STEP_FORWARD, True

@@ -13,6 +13,9 @@ class ExploreMicroStrat(MicroStrategy):
             self.precedence = StrategyPrecedence.LOW
 
     def decide_and_get_next(self) -> tuple[characters.Action, bool]:
+        # move if champion has not moved in 5 epochs
+        if action := self.avoid_afk():
+            return action, False
         front_tile = self.knowledge_sources.get_tile_info_in_front_of()
         actions_to_choose_from = []
         probs = []
@@ -28,10 +31,6 @@ class ExploreMicroStrat(MicroStrategy):
 
         right_tile = self.knowledge_sources.get_tile_in_direction(
             self.knowledge_sources.players.own_player_facing.turn_right())
-
-        # move if champion has not moved in 5 epochs
-        if action := self.avoid_afk():
-            return action, False
 
         # queued action
         if self.queued_action:

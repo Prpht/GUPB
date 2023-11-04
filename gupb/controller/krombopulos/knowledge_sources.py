@@ -8,7 +8,6 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
-from meta_strategies.meta_strategy import MetaStrategy
 
 class KnowledgeSource(abc.ABC):
     def __init__(self):
@@ -63,7 +62,7 @@ class MapKnowledge(KnowledgeSource):
                 self.menhir_pos = coords
         if self.epoch % 10 == 0:
             # update presumed map size
-            self._update_map_center(coords)
+            self._update_map_center()
 
 
     def reset(self, arena_description: arenas.ArenaDescription):
@@ -80,8 +79,9 @@ class MapKnowledge(KnowledgeSource):
                 self.graph.add_edge(coords, neighbor)
     
     def _update_map_center(self):
-        center = self.graph.nodes[0]
-        for node in self.graph.nodes[1:]:
+        nodes = list(self.graph.nodes)
+        center = nodes[0]
+        for node in nodes[1:]:
             center = add_coords(center, node)
         # uncomment if mul_coords allows float as other
         # self.map_center = mul_coords(add_coords(self.map_start, self.map_end), 1/len(self.graph.nodes))
@@ -115,6 +115,7 @@ class PlayersKnowledge(KnowledgeSource):
         self.epoch = epoch
         self.own_player_pos = champion_knowledge.position
         self.own_player_facing = champion_knowledge.visible_tiles[self.own_player_pos].character.facing
+        self.own_player_history = self.players_history[self._own_name]
         self.n_players_alive = champion_knowledge.no_of_champions_alive
         for coords, tile_info in champion_knowledge.visible_tiles.items():
             if character_info := tile_info.character:
@@ -123,7 +124,7 @@ class PlayersKnowledge(KnowledgeSource):
                 self.players_history[char_key][self.epoch] = character_info, coords
 
     def reset(self, arena_description: arenas.ArenaDescription):
-        self.__init__()
+        self.__init__(self._own_name)
 
     def get_own_champion_info(self) -> characters.ChampionDescription:
         return self.own_player_history[self.epoch][0]
@@ -144,11 +145,11 @@ class PlayersKnowledge(KnowledgeSource):
 
 
 class KnowledgeSources(KnowledgeSource):
-    def __init__(self):
+    def __init__(self, own_name):
         super().__init__()
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
-        self.players: PlayersKnowledge = PlayersKnowledge()
+        self.players: PlayersKnowledge = PlayersKnowledge(own_name)
         # todo: make this work
         # self.meta_ratings: Dict[MetaStrategy, int] = {meta: 0 for meta in MetaStrategy.__subclasses__}
 
@@ -187,7 +188,7 @@ class KnowledgeSources(KnowledgeSource):
         for ks in self:
             ks.reset(arena_description)
 
-    def praise(self, score: int, meta: MetaStrategy):
+    def praise(self, score: int, meta_strat):
         # todo: make this work
         # self.meta_ratings[meta] += score
         ...
