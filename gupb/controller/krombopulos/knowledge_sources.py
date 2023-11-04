@@ -5,7 +5,7 @@ from typing import NamedTuple, Iterator
 import networkx as nx
 
 from gupb.model import characters, arenas, tiles
-from gupb.model.coordinates import Coords
+from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
 
@@ -33,35 +33,69 @@ class TerrainType(enum.StrEnum):
 class MapKnowledge(KnowledgeSource):
     def __init__(self):
         super().__init__()
-        self.width: int | None = None
-        self.height: int | None = None
+        self.map_start: Coords | None = None
+        self.map_end: Coords | None = None
+        self.map_center: Coords = Coords(11, 13)
         self.menhir_pos: Coords | None = None
-        self.tiles_info_as_last_seen: dict[Coords, tiles.TileDescription | None] = defaultdict(lambda: None)
-
-        # todo: graph for pathing
+        self.epoch: int = 0
+        # ! __subclasses__ works only for direct children
+        self.impassable_tiles: list[str] = [tile.__class__.__name__.lower() for tile in tiles.Tile.__subclasses__() if not tile.terrain_passable()]
+        self.graph: nx.Graph = nx.Graph()
 
     def update(self, champion_knowledge: characters.ChampionKnowledge, epoch: int):
         self.epoch = epoch
         for coords, tile_info in champion_knowledge.visible_tiles.items():
-            self.tiles_info_as_last_seen[coords] = tile_info
+            # update map graph
+            if self.graph.has_node(coords):
+                nx.set_node_attributes(self.graph, {coords: tile_info._asdict(), "tile_info": tile_info})
+            else:
+                # extract tile info directly to map graph as node attributes
+                # might be useful for fast key location finding
+                self.graph.add_node(coords, **tile_info._asdict(), tile_info=tile_info)
+                # add edges if tile is passable
+                if tile_info.type not in self.impassable_tiles:
+                    self._update_paths(coords)
+            # update menhir position
             if tile_info.type == 'menhir' and not self.menhir_pos:
                 self.menhir_pos = coords
+            # update presumed map size
+            self._update_map_center(coords)
+
 
 
     def reset(self, arena_description: arenas.ArenaDescription):
         super().__init__()
-        self.tiles_info_as_last_seen = defaultdict(lambda: None)
+        self.graph = nx.Graph()
+
+    
+    def _update_paths(self, coords: Coords):
+        """Add edges if terrain is passable."""
+        x, y = coords
+        neighbors = [Coords(x-1, y), Coords(x+1, y), Coords(x, y-1), Coords(x, y+1)]
+        for neighbor in neighbors:
+            if neighbor in G.nodes() and G.nodes[neighbor]["type"] not in self.impassable_tiles:
+                G.add_edge(coords, Coords(xi, yi))
+    
+    def _update_map_center(self, coords: Coords):
+        if coords.x < self.map_start.x:
+            self.map_start.x = coords.x
+        if coords.y < self.map_start.y:
+            self.map_start.y = coords.y
+        if coords.x > self.map_end.x:
+            self.map_start.x = coords.x
+        if coords.y > self.map_end.y:
+            self.map_start.y = coords.y
+        # uncomment if mul_coords allows float as other
+        # self.map_center = mul_coords(add_coords(self.map_start, self.map_end), .5)
+        self.map_center = Coords(*[el / 2 for el in add_coords(self.map_start, self.map_end)])
 
 
     def terrain_at(self, pos: Coords) -> TerrainType | None:
-        if tile_info := self.tiles_info_as_last_seen[pos] is None:
-            return None
-        return TerrainType(tile_info.type)
+        return TerrainType(self.graph[pos]["type"]) if pos in self.graph.nodes else None
 
 
     def tile_info_at(self, pos: Coords) -> tiles.TileDescription | None:
-        return self.tiles_info_as_last_seen[pos]
-
+        return self.graph[pos]["tile_info"] if pos in self.graph.nodes else None
 
 
 class PlayersKnowledge(KnowledgeSource):
@@ -118,51 +152,27 @@ class KnowledgeSources(KnowledgeSource):
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge()
 
-        # todo: temporary
-        self.oridinary_chaos_str = """
-        ========================
-        =####.##=....====....===
-        ==#A...#==....====..=..=
-        ==.S....==....==.......=
-        ==#....#===......=.....=
-        =##....#====..#..#.#...=
-        =####.##====......M#=..=
-        ==.....=====.....#.....=
-        ==.###.####==..#.#.#...=
-        ===#.#.####==....#.#...=
-        =....#...##.......===..=
-        =###..B.....=...====.=.=
-        =#...##.##..===...==...=
-        =#...#==.#.===........#=
-        =#..S#=.....==.........=
-        =#...#==...===##.###...=
-        =#.###=..#..==#....#==.=
-        =....=.......=#BA...====
-        ==..==...##........#====
-        ==.....#.###..##.###====
-        =====..####....M..======
-        =.....####....##.#======
-        =.====##....=.....======
-        ========================
-        """.strip()
-        self.chaos_graph: nx.Graph = self._get_graph_from_map()
 
-    def _get_graph_from_map(self) -> nx.Graph:
-        self.chaos_graph = nx.Graph()
-        for y, line in enumerate(self.oridinary_chaos_str.split('\n')):
-            for x, char in enumerate(line.strip()):
-                if char != '=' and char != '#':
-                    self.chaos_graph.add_node((x, y))
-                    for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-                        neighbor = (x + dx, y + dy)
-                        if neighbor in self.chaos_graph.nodes:
-                            self.chaos_graph.add_edge((x, y), neighbor)
-        return self.chaos_graph
-
-
-    def find_next_move_on_path(self, start: tuple, end: tuple) -> tuple | None:
+    def find_next_move_on_path(self, start: Coords, end: Coords) -> Coords | None:
+        # returns None if destination is reached
         try:
-            path = nx.shortest_path(self.chaos_graph, source=start, target=end)
+            path = nx.shortest_path(self.map.graph, source=start, target=end)
+            return path[1] if len(path) > 1 else None
+        except nx.NetworkXNoPath:
+            # happens when end is impassable
+            pass
+        # find next best tile to go to
+        distances = sorted(
+            [
+                (manhattan_distance(coord, end), coord)
+                for coord in self.map.graph.nodes()
+                if self.map.graph.nodes[coord]['type'] not in self.map.impassable_tiles
+            ],
+            key=lambda x: x[0]
+        )
+        best_match = distances[0][1]
+        try:
+            path = nx.shortest_path(self.map.graph, source=start, target=best_match)
             return path[1] if len(path) > 1 else None
         except nx.NetworkXNoPath:
             return None
@@ -177,7 +187,7 @@ class KnowledgeSources(KnowledgeSource):
         for ks in self:
             ks.reset(arena_description)
 
-
+    # why?
     # todo: def praise(self, score: int)
 
 

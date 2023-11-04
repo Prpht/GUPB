@@ -17,9 +17,13 @@ class RouteMicroStrat(MicroStrategy):
             return characters.Action.ATTACK, self
         elif front_tile.loot:
             return characters.Action.STEP_FORWARD, self
-
-        next_pos = self.knowledge_sources.find_next_move_on_path(tuple(self.knowledge_sources.players.own_player_pos),
-                      tuple(self.knowledge_sources.map.menhir_pos + characters.Facing.random().value) or (11, 13))
+        # find next move in path to menhir
+        try:
+            next_pos = self.knowledge_sources.find_next_move_on_path(self.knowledge_sources.players.own_player_pos,
+                        self.knowledge_sources.map.menhir_pos + characters.Facing.random().value)
+        # if we do not know where the menhir is, move to the map center
+        except TypeError:            
+            next_pos = self.knowledge_sources.find_next_move_on_path(self.knowledge_sources.players.own_player_pos, self.knowledge_sources.map.map_center)
 
         if self.knowledge_sources.players.own_player_pos + \
             self.knowledge_sources.players.own_player_facing.turn_left().value == next_pos:
@@ -31,4 +35,4 @@ class RouteMicroStrat(MicroStrategy):
             self.knowledge_sources.players.own_player_facing.value == next_pos:
             return characters.Action.STEP_FORWARD, self
 
-        return characters.Action.TURN_LEFT, self
+        return characters.Action.DO_NOTHING, self

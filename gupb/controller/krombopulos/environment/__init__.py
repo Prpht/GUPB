@@ -15,15 +15,23 @@ class GUPBEnv(gym.Env):
     def __init__(self):
         """Initiate environment."""
         super().__init__()
+        self.actions = list(Action)
         self.action_space = spaces.Discrete(len(Action))
         self.observation_space = spaces.Box(low=-1, high=1, shape=(100, 100), dtype=np.float32)
 
     def step(self, action):
-        """Result of taking step in environment."""
+        """Result of taking step in environment. Implements abstract method."""
+        observation = ... # todo: should be the state of the environment
+        reward = ... # todo: design reward function
+        terminated = ...
+        # do not limit the number of steps
+        truncated = False 
+        # this is for passing additional information, if there is ever the need to
+        info = {} 
         return observation, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        """Called after every epoch."""
+        """Called after every epoch. Implements abstract method."""
         return observation, info
 
     def render(self):
