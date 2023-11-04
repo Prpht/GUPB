@@ -1,4 +1,4 @@
-from .reckless_roaming_dancing_druid import RecklessRoamingDancingDruid
+from .reckless_roaming_dancing_druid_v2 import RecklessRoamingDancingDruid
 
 __all__ = [
     'RecklessRoamingDancingDruid',
