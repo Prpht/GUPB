@@ -2,13 +2,12 @@ from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller.cynamonka.cynamonka import CynamonkaController
 from gupb.model.arenas import ArenaDescription
+from gupb.scripts import arena_generator
 
 cynamonka_controller = CynamonkaController("CynamonkaController")
 
 CONFIGURATION = {
-    'arenas': [
-        'ordinary_chaos',
-    ],
+    'arenas': arena_generator.generate_arenas(3),
     'controllers': [
         cynamonka_controller,
         random.RandomController("Alice"),
@@ -22,6 +21,6 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': cynamonka_controller,
-    'runs_no': 10,
+    'runs_no': 1,
     'profiling_metrics': [],
 }

@@ -17,7 +17,7 @@ from gupb.model.arenas import ArenaDescription
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(20),
+    'arenas': arena_generator.generate_arenas(50),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -36,7 +36,7 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': True,
+    'visualise': False,
     'show_sight': False,
-    'runs_no': 1000,
+    'runs_no': 500,
 }

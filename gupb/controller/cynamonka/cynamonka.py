@@ -12,7 +12,6 @@ from gupb.model import weapons
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
 # TODO: nie idzie za bardzo w kierunku eliksiru
-# TODO: ogarnac zeby moze atakowal jak ma troche wiecej zycia
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -98,8 +97,11 @@ class CynamonkaController(controller.Controller):
             else:
                 # print("there is no mist")
 
-                # TODO: moze tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
-                if self.is_weapon_or_elixir_in_the_neighbourhood() and self.current_weapon == Knife: 
+                # TODO: mozna tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
+                if self.is_elixir_in_the_neighbourhood():
+                    self.times_in_row_amulet = 0
+                    return self.go_in_the_target_direction(self.target)
+                if self.is_weapon_in_the_neighbourhood() and self.current_weapon == Knife: 
                     # print("go in weapon or elixir direction")
                     self.times_in_row_amulet = 0
                     return self.go_in_the_target_direction(self.target)
@@ -114,16 +116,28 @@ class CynamonkaController(controller.Controller):
         except Exception as e:
             # Handle exceptions or errors here
             traceback.print_exc()
-            print(f"An error occurred: {e}")
+            print("heeere")
+            #return self.go_randomly()
+            #print(f"An error occurred: {e}")
 
 
     # returns path if weapon or elixir in the neighbourhood, if its far away return None
-    def is_weapon_or_elixir_in_the_neighbourhood(self):
+    def is_weapon_in_the_neighbourhood(self):
         paths =[]
         if self.weapons_positions:
             for coords in self.weapons_positions.keys():
                 path = self.find_nearest_path(self.walkable_area, self.position, coords)
                 paths.append(path)
+        shortest_path = CynamonkaController.find_shortest_path_from_list(paths)
+        if shortest_path:
+            if len(shortest_path) <= 7 and (self.discovered_arena[shortest_path[-1]].consumable or self.discovered_arena[shortest_path[-1]].loot):
+                self.target = shortest_path[-1]
+                # print("nowy target zostal ustawiony na ===== " + str(self.target) + str(self.discovered_arena[self.target]))
+                return True
+        return False
+    
+    def is_elixir_in_the_neighbourhood(self):
+        paths = []
         if self.elixir_positions:
             for coords in self.elixir_positions.keys():
                 paths.append(self.find_nearest_path(self.walkable_area, self.position, coords))
@@ -134,7 +148,8 @@ class CynamonkaController(controller.Controller):
                 # print("nowy target zostal ustawiony na ===== " + str(self.target) + str(self.discovered_arena[self.target]))
                 return True
         return False
-    
+
+
 
     def update_walkable_area(self):
         for coords in self.discovered_arena.keys():
@@ -148,7 +163,6 @@ class CynamonkaController(controller.Controller):
         not_empty_paths = [path for path in paths if path is not None]  # Fixed the list comprehension
         if not not_empty_paths:
             return None  # Return None if the list is empty
-
         shortest_path = min(not_empty_paths, key=len)
         return shortest_path
 
@@ -215,6 +229,8 @@ class CynamonkaController(controller.Controller):
                 return POSSIBLE_ACTIONS[0]  # Skręć w lewo
             else:
                 return POSSIBLE_ACTIONS[1]  # Skręć w prawo
+        else:
+            return self.go_randomly()
 
     def go_in_menhir_direction(self):
         path_from_menhir = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.menhir_position)
@@ -442,8 +458,11 @@ class CynamonkaController(controller.Controller):
             
     def update_discovered_arena(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for coords, description in visible_tiles.items():
+            # TODO: to zmienilam
+            if isinstance(coords, Coords):
+                coords = (coords[0], coords[1])
             self.discovered_arena[coords] = description
-            if coords in self.elixir_positions.keys() and not description.consumable:
+            if self.elixir_positions and coords in self.elixir_positions.keys() and not description.consumable:
                 del self.elixir_positions[coords]
             if description.consumable:
                 self.elixir_positions[coords] = description
@@ -495,6 +514,7 @@ class CynamonkaController(controller.Controller):
         self.current_weapon = Knife
         self.weapons_positions = {}
         self.elixir_positions = {}
+        self.mist_positions = {}
         self.position = None
         self.next_forward_position = None
         self.facing = None
@@ -503,6 +523,9 @@ class CynamonkaController(controller.Controller):
         self.move_count = 0
         self.target = None
         self.times_in_row_amulet = 0
+        self.is_mist = False
+        self.walkable_area = set()
+        self.runaway_target = None
 
     @property
     def name(self) -> str:
