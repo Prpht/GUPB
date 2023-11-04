@@ -29,6 +29,10 @@ class ExploreMicroStrat(MicroStrategy):
         right_tile = self.knowledge_sources.get_tile_in_direction(
             self.knowledge_sources.players.own_player_facing.turn_right())
 
+        # move if champion has not moved in 5 epochs
+        if action := self.avoid_afk():
+            return action, self
+
         # queued action
         if self.queued_action:
             temp = self.queued_action

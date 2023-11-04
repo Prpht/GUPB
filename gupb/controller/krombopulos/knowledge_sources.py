@@ -8,7 +8,7 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
-
+import logging
 
 class KnowledgeSource(abc.ABC):
     def __init__(self):
@@ -52,15 +52,16 @@ class MapKnowledge(KnowledgeSource):
                 # extract tile info directly to map graph as node attributes
                 # might be useful for fast key location finding
                 self.graph.add_node(coords, **tile_info._asdict(), tile_info=tile_info)
+                # self.graph.nodes[coords]['tile_info'] = tile_info
                 # add edges if tile is passable
                 if tile_info.type not in self.impassable_tiles:
                     self._update_paths(coords)
             # update menhir position
             if tile_info.type == 'menhir' and not self.menhir_pos:
                 self.menhir_pos = coords
+        if self.epoch % 10 == 0:
             # update presumed map size
             self._update_map_center(coords)
-
 
 
     def reset(self, arena_description: arenas.ArenaDescription):
@@ -73,29 +74,24 @@ class MapKnowledge(KnowledgeSource):
         x, y = coords
         neighbors = [Coords(x-1, y), Coords(x+1, y), Coords(x, y-1), Coords(x, y+1)]
         for neighbor in neighbors:
-            if neighbor in G.nodes() and G.nodes[neighbor]["type"] not in self.impassable_tiles:
-                G.add_edge(coords, Coords(xi, yi))
+            if neighbor in self.graph.nodes() and self.graph.nodes[neighbor]["type"] not in self.impassable_tiles:
+                self.graph.add_edge(coords, neighbor)
     
-    def _update_map_center(self, coords: Coords):
-        if coords.x < self.map_start.x:
-            self.map_start.x = coords.x
-        if coords.y < self.map_start.y:
-            self.map_start.y = coords.y
-        if coords.x > self.map_end.x:
-            self.map_start.x = coords.x
-        if coords.y > self.map_end.y:
-            self.map_start.y = coords.y
+    def _update_map_center(self):
+        center = self.graph.nodes[0]
+        for node in self.graph.nodes[1:]:
+            center = add_coords(center, node)
         # uncomment if mul_coords allows float as other
-        # self.map_center = mul_coords(add_coords(self.map_start, self.map_end), .5)
-        self.map_center = Coords(*[el / 2 for el in add_coords(self.map_start, self.map_end)])
+        # self.map_center = mul_coords(add_coords(self.map_start, self.map_end), 1/len(self.graph.nodes))
+        self.map_center = Coords(*[int(el / len(self.graph.nodes)) for el in center])
 
 
     def terrain_at(self, pos: Coords) -> TerrainType | None:
-        return TerrainType(self.graph[pos]["type"]) if pos in self.graph.nodes else None
+        return TerrainType(self.graph.nodes[pos]["type"]) if pos in self.graph.nodes else None
 
 
     def tile_info_at(self, pos: Coords) -> tiles.TileDescription | None:
-        return self.graph[pos]["tile_info"] if pos in self.graph.nodes else None
+        return self.graph.nodes[pos]["tile_info"] if pos in self.graph.nodes else None
 
 
 class PlayersKnowledge(KnowledgeSource):

@@ -5,7 +5,7 @@ import os
 from threading import Thread
 
 from stable_baselines3 import DQN
-from stable_baselines3.deepq.policies import CnnPolicy
+from stable_baselines3.deepqn.policies import CnnPolicy
 
 from gupb.controller.krombopulos.environment import GUPBEnv
 

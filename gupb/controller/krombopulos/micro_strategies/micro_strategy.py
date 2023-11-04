@@ -24,6 +24,17 @@ class MicroStrategy(abc.ABC):
     def decide_and_get_next(self) -> tuple[characters.Action, Self]:
         pass
 
+    def avoid_afk(self) -> characters.Action | None:
+        history = sorted(self.knowledge_sources.players.own_player_history.items(), reverse=True)
+        if len(history) < 5:
+            return None
+        history = list(history[:5])
+        facings = [el[0] for el in history]
+        coords = [el[1] for el in history]
+        if all([facings[0] == facing for facing in facings]) and all([coords[0] == coord for coord in coords]):
+            return characters.Action.STEP_FORWARD
+        return None
+
     def __gt__(self, other) -> bool:
         assert isinstance(other, MicroStrategy)
         return self.precedence > other.precedence

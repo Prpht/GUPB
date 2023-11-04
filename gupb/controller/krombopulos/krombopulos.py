@@ -1,6 +1,6 @@
 from gupb import controller
 from gupb.model import arenas, characters
-from gupb.controller.krombopulos.trainer import Trainer
+# from gupb.controller.krombopulos.trainer import Trainer
 
 from .knowledge_sources import KnowledgeSources
 from .meta_strategies import MetaStrategy, RandomMetaStrat, ExploreHideRunMetaStrat
@@ -20,7 +20,7 @@ class KrombopulosMichaelController(controller.Controller):
         self.meta_strategy: MetaStrategy = self._get_initial_meta_strategy()
 
         # stuff needed to use DQN
-        self.trainer = Trainer(self, './gupb/controller/krombopulos/trainer/model.zip')
+        # self.trainer = Trainer(self, './gupb/controller/krombopulos/trainer/model.zip')
         self.game = 0
         self.step = 0
 
@@ -37,7 +37,7 @@ class KrombopulosMichaelController(controller.Controller):
         # todo: adjust strategies after a match: self.knowledge_sources.praise(score)
         # trainer is stopped
         # (optionally, save model, every 10 games)
-        self.trainer.stop(self.game % 10 == 0)
+        # self.trainer.stop(self.game % 10 == 0)
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         """What happens before the beginning of a new game."""

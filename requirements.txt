@@ -2,7 +2,7 @@ bresenham==0.2.1
 click==8.1.7
 dataclasses-json==0.6.1
 matplotlib==3.8.0
-networkx==3.1
+networkx==3.2.1
 numpy==1.26.0
 pathfinding==1.0.4
 perlin-noise==1.12
