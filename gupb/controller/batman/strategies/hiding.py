@@ -68,8 +68,8 @@ class HidingStrategy:
         return sorted(hideout2danger, key=hideout2danger.get)[:self._hideouts_count]
 
     def decide(self, knowledge: Knowledge, events: list[Event], navigation: Navigation) -> tuple[Optional[Action], str]:
-        if knowledge.arena.menhir_position is None:
-            return None, "scouting"
+        # if knowledge.arena.menhir_position is None:
+        #     return None, "scouting"
 
         # hide until we see mist close enough (10 tiles?) or the number of alive enemies has dropped to less than 5?
         if knowledge.champions_alive <= 5 or knowledge.mist_distance <= 10:
@@ -79,16 +79,18 @@ class HidingStrategy:
             match event:
                 case EnemyFoundEvent(enemy) if enemy.position in weapon_cut_positions(knowledge.champion, knowledge):
                     return None, "fighting"
-                case ConsumableFoundEvent(consumable) \
-                        if navigation.manhattan_terrain_distance(consumable.position, knowledge.position) <= 15:
-                    return None, "scouting"
+                # case ConsumableFoundEvent(consumable) \
+                #         if navigation.manhattan_terrain_distance(consumable.position, knowledge.position) <= 15:
+                #     return None, "scouting"
                 case IdlePenaltyEvent(episodes_to_penalty) if episodes_to_penalty <= 2:
                     return random.choice([Action.TURN_LEFT, Action.TURN_RIGHT]), "hiding"
 
         if self._current_objective is None and knowledge.position not in self._hideouts:
+            related_position = knowledge.arena.menhir_position \
+                if knowledge.arena.menhir_position else knowledge.position
             self._current_objective = min(
                 self._hideouts,
-                key=lambda hideout: navigation.manhattan_terrain_distance(hideout, knowledge.arena.menhir_position)
+                key=lambda hideout: navigation.manhattan_terrain_distance(hideout, related_position)
             )
 
         if knowledge.position == self._current_objective:

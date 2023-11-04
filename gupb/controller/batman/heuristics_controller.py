@@ -81,7 +81,7 @@ class BatmanHeuristicsController(controller.Controller):
             "running_away": RunningAwayStrategy(),
             "scouting": ScoutingStrategy(),
         }
-        self._current_strategy = self._strategies["scouting"]
+        self._current_strategy = self._strategies["hiding"]
 
     @property
     def name(self) -> str:
