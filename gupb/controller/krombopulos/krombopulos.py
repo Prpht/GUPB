@@ -35,6 +35,8 @@ class KrombopulosMichaelController(controller.Controller):
     def praise(self, score: int) -> None:
         """What happens after the end of the game."""
         # todo: adjust strategies after a match: self.knowledge_sources.praise(score)
+        # self.knowledge_sources.praise(score, self.meta_strategy)
+        ...
         # trainer is stopped
         # (optionally, save model, every 10 games)
         # self.trainer.stop(self.game % 10 == 0)

@@ -8,7 +8,7 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
-import logging
+from meta_strategies.meta_strategy import MetaStrategy
 
 class KnowledgeSource(abc.ABC):
     def __init__(self):
@@ -147,6 +147,8 @@ class KnowledgeSources(KnowledgeSource):
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge()
+        # todo: make this work
+        # self.meta_ratings: Dict[MetaStrategy, int] = {meta: 0 for meta in MetaStrategy.__subclasses__}
 
 
     def find_next_move_on_path(self, start: Coords, end: Coords) -> Coords | None:
@@ -183,8 +185,10 @@ class KnowledgeSources(KnowledgeSource):
         for ks in self:
             ks.reset(arena_description)
 
-    # why?
-    # todo: def praise(self, score: int)
+    def praise(self, score: int, meta: MetaStrategy):
+        # todo: make this work
+        # self.meta_ratings[meta] += score
+        ...
 
 
     def __iter__(self) -> Iterator[KnowledgeSource]:
