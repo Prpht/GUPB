@@ -1,0 +1,2 @@
+def astar():
+    return None
