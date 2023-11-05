@@ -3,7 +3,7 @@ from gupb.model import characters, arenas, weapons
 from gupb.model import coordinates as cord
 from .mapa import Mapa
 from .strategie import FirstStrategy
-from .utils import CHAMPION_STARTING_HP, get_weapon_value
+from .utils import CHAMPION_STARTING_HP
 from typing import Optional
 
 
@@ -11,14 +11,13 @@ class MalyKonik(controller.Controller):
 
     def __init__(self, nick: str) -> None:
         self.nick: str = nick
-        self.weapon: weapons.Weapon = weapons.Knife()
         self.weapon_name: Optional[str] = None
         self.health: int = CHAMPION_STARTING_HP
         self.position: Optional[cord.Coords] = None
         self.orientation: characters.Facing = characters.Facing.random()
         self.map: Mapa = Mapa()
         self.strategy: FirstStrategy = FirstStrategy(self.map,
-                                                     get_weapon_value(self.weapon_name),
+                                                     self.weapon_name,
                                                      self.position,
                                                      self.orientation)
 
@@ -67,9 +66,16 @@ class MalyKonik(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__update_myself(knowledge)
+
         self.map.read_information(knowledge)
+
         self.strategy.set_position_and_orientation(self.position, self.orientation)
+        self.strategy.set_weapon(self.weapon_name)
+
         next_move = self.strategy.best_choice(knowledge)
+
+        # self.map.reset_enemies()
+
         return next_move
 
         #  Z naładowanym łukiem można chodzić, więc jeżeli tylko go mamy to go ładujmy
@@ -81,6 +87,10 @@ class MalyKonik(controller.Controller):
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.map.reset_map(arena_description)
+        self.strategy = FirstStrategy(self.map,
+                                      self.weapon_name,
+                                      self.position,
+                                      self.orientation)
 
     @property
     def name(self) -> str:
