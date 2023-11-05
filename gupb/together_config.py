@@ -5,6 +5,7 @@ from gupb.controller import ares
 from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
+from gupb.controller import frog
 from gupb.controller import forrest_gump
 from gupb.controller import krombopulos
 from gupb.controller import maly_konik
@@ -13,7 +14,6 @@ from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
 from gupb.controller import r2d2
-from gupb.controller import frog
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
@@ -24,8 +24,8 @@ CONFIGURATION = {
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
         bob.FSMBot(),
-        batman.BatmanHeuristicsController('Batman'),
-        cynamonka.CynamonkaController("Cynamonka"),
+        #batman.BatmanHeuristicsController('Batman'),
+        cynamonka.CynamonkaController("CynamonkaController"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         krombopulos.KrombopulosMichaelController(),
         maly_konik.MalyKonik("LittlePonny"),
