@@ -19,23 +19,6 @@ from .utils import *
 
 class RecklessRoamingDancingDruid(controller.Controller):
 
-    def action_turn_left(self):
-        self.facing = update_facing_left[self.facing]
-        return characters.Action.TURN_LEFT
-
-    def action_turn_right(self):
-        self.facing = update_facing_right[self.facing]
-        return characters.Action.TURN_RIGHT
-    
-    def action_step_forward(self):
-        return characters.Action.STEP_FORWARD
-    
-    def action_attack(self):
-        return characters.Action.ATTACK
-    
-    def action_do_nothing(self):
-        return characters.Action.DO_NOTHING
-
     def _init_matrix(self, arena: Arena):
         self.arena_shape = arena.size[1], arena.size[0]
         for coords, tile in arena.terrain.items():
@@ -65,16 +48,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
             if tile_description.effects:
                 if "mist" in tile_description.effects:
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
-
-        # Update Champion position
-        self.matrix[champion_knowledge.position.y, champion_knowledge.position.x] = tiles_mapping["champion"]
-        self.champion_position = champion_knowledge.position
-
-        # Create a walkable matrix for pathfinding
-        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
-        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
-        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != 12)
-        self.matrix_walkable = matrix_walkable.astype(int)
     
     def _decay_step(self, champion_knowledge: ChampionKnowledge):
         
@@ -89,7 +62,28 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
         # Reset decay of visible tiles
         for coords, tile_description in champion_knowledge.visible_tiles.items():
-            self.decay_mask[coords[1], coords[0]] = self.decay
+            if tile_description.character:
+                # - if the tile is occupied by an enemy, reset the decay to 0, we need live information
+                self.decay_mask[coords[1], coords[0]] = 0
+            else:
+                # - otherwise, reset the decay to the initial value
+                self.decay_mask[coords[1], coords[0]] = self.decay
+    
+    def _update_state(self, champion_knowledge: ChampionKnowledge):
+
+        # Update counter
+        self.counter += 1
+
+        # Update Champion position
+        self.matrix[champion_knowledge.position.y, champion_knowledge.position.x] = tiles_mapping["champion"]
+        self.champion_position = champion_knowledge.position
+        self.current_weapon = champion_knowledge.visible_tiles[self.champion_position].character.weapon.name
+
+        # Create a walkable matrix for pathfinding
+        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
+        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
+        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != 12)
+        self.matrix_walkable = matrix_walkable.astype(int)
 
     def __init__(self, first_name: str, decay: int = 5, menhir_eps=3):
         self.first_name: str = first_name
@@ -109,13 +103,12 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.initial_arena = None
         self.menhir_position = None
         self.champion_position = None
-        self.initial_facing = None
-        self.facing = None
         self.menhir_eps = menhir_eps
         self.defending_attack = False # TODO This is a hack, use the state machine instead
         self.finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
 
         # The state of the agend
+        self.counter = 0
         self.destination = None
 
         # This is the representation of the map state that will be returned as the observation
@@ -180,7 +173,61 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 return characters.Action.TURN_LEFT, False
             return characters.Action.TURN_RIGHT, False
     
+    def _attack_is_effective(self, knowledge: characters.ChampionKnowledge) -> bool:
+        """
+        Check if the attack is effective. The attack is effective if the enemy is in the range of the weapon.
+        """
+        
+        # Determine facing
+        facing = knowledge.visible_tiles[self.champion_position].character.facing
+
+        if self.current_weapon == "knife":
+            # - if the enemy is in the range of the knife, attack
+            range = [self.champion_position + facing.value]
+            pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            return any(pot)
+
+        if self.current_weapon == "sword":
+            range = [self.champion_position + i * facing.value for i in [1, 2, 3]]
+            pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            return any(pot)
+
+        if self.current_weapon == "bow":
+            range = [self.champion_position + i * facing.value for i in [1, 2, 3, 4, 5]]
+            pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            return any(pot)
+
+        if self.current_weapon == "axe":
+            range = [
+                self.champion_position + facing.value,
+                self.champion_position + facing.value + facing.turn_left().value,
+                self.champion_position + facing.value + facing.turn_right().value,
+            ]
+            pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            return any(pot)
+
+        if self.current_weapon == "amulet":
+            position = self.champion_position
+            range = [
+                Coords(*position + (1, 1)),
+                Coords(*position + (-1, 1)),
+                Coords(*position + (1, -1)),
+                Coords(*position + (-1, -1)),
+                Coords(*position + (2, 2)),
+                Coords(*position + (-2, 2)),
+                Coords(*position + (2, -2)),
+                Coords(*position + (-2, -2)),
+            ]
+            pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            return any(pot)
+
+        return False
+    
     def _act_stage_1(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        """
+        In this stage, the agent is supposed to find a weapon. The agent randomly chooses a destination, until
+        a weapon is seen. Then the agent moves to the weapon and collects it. It finalizes this stage.
+        """
         
         # Act according to the state in stage I - Find Weapon
         if self.state_machine.current_state.value.name == "ChooseDestinationStI":
@@ -209,7 +256,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         if self.state_machine.current_state.value.name == "ApproachWeaponStI":
             # - if the weapon is reached, transition to the stage II
             if self.champion_position == self.weapon_destination:
-                self.weapon_destination_type = None
+                self.current_weapon = self.weapon_destination_type
                 self.state_machine.st1_weapon_collected()
 
             # - if the weapon is still on board, move to the weapon
@@ -225,6 +272,10 @@ class RecklessRoamingDancingDruid(controller.Controller):
         return characters.Action.TURN_RIGHT # Better than nothing
 
     def _act_stage_2(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        """
+        In second stage, the agent is supposed to find the menhir. When the menhir is seen, the agent moves to it.
+        This stage ends when the agent reaches the menhir and stages III is started.
+        """
 
         # Act according to the state in stage II - Find Menhir
         if self.state_machine.current_state.value.name == "ChooseDestinationStII":
@@ -258,6 +309,10 @@ class RecklessRoamingDancingDruid(controller.Controller):
         return characters.Action.TURN_RIGHT # Better than nothing
 
     def _act_stage_3(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        """
+        This is the final stage, when the agent is supposed to defend the menhir. At the moment, the agent
+        just moves around the menhir.
+        """
 
         # Act according to the state in stage III - Defend Menhir
         if self.state_machine.current_state.value.name == "ChooseDestinationStIII":
@@ -283,17 +338,23 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # Update the matrix with the current observation
         self._fill_matrix(knowledge)
 
-        # Save the facing of the champion on the first observation
-        if not self.facing:
-            self.facing = knowledge.visible_tiles[self.champion_position].character.facing
+        # Update the state of the agent
+        self._update_state(knowledge)
         
-        # Act acording to the stage
+        # Chose next action acording to the stage
+        next_action = characters.Action.TURN_RIGHT # Better than nothing
         if self.state_machine.current_state.value.stage == 1:
-            return self._act_stage_1(knowledge)
-        if self.state_machine.current_state.value.stage == 2:
-            return self._act_stage_2(knowledge)
-        if self.state_machine.current_state.value.stage == 3:
-            return self._act_stage_3(knowledge)
+            next_action = self._act_stage_1(knowledge)
+        elif self.state_machine.current_state.value.stage == 2:
+            next_action = self._act_stage_2(knowledge)
+        elif self.state_machine.current_state.value.stage == 3:
+            next_action = self._act_stage_3(knowledge)
+
+        # However, if the attack is effective, attack
+        if self._attack_is_effective(knowledge):
+            return characters.Action.ATTACK
+        
+        return next_action
 
     def praise(self, score: int) -> None:
         pass
