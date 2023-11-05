@@ -14,10 +14,11 @@ from gupb.controller import random
 from gupb.controller import roger
 from gupb.controller import reckless_roaming_dancing_druid
 from gupb.model.arenas import ArenaDescription
+from gupb.controller import frog
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50),
+    'arenas': arena_generator.generate_arenas(1),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -34,9 +35,10 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         reckless_roaming_dancing_druid.RecklessRoamingDancingDruid("R2D2"),
         roger.Roger('1'),
+        frog.FrogController('Frog')
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': False,
-    'runs_no': 500,
+    'runs_no': 20,
 }
