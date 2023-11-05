@@ -78,6 +78,7 @@ class SpriteRepository:
             characters.Tabard.MONGOL: load_sprite('characters', 'champion_mon', BLACK),
             characters.Tabard.PIKACHU: load_sprite('characters', 'champion_pikachu', BLACK),
             characters.Tabard.R2D2: load_sprite('characters', 'champion_r2d2', BLACK),
+            characters.Tabard.ALPHA: load_sprite('characters', 'champion_alpha', BLACK),   
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
@@ -112,6 +113,7 @@ class SpriteRepository:
                     characters.Tabard.MONGOL,
                     characters.Tabard.PIKACHU,
                     characters.Tabard.R2D2,
+                    characters.Tabard.ALPHA
                 ],
                 [
                     characters.Facing.RIGHT,

@@ -54,6 +54,7 @@ class Tabard(Enum):
     MONGOL = 'Mongolek'
     PIKACHU = 'Pikachu'
     R2D2 = 'R2D2'
+    ALPHA = "AlphaGUPB"
 
 
 class Champion:
