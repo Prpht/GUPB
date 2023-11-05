@@ -62,9 +62,17 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
         # Reset decay of visible tiles
         for coords, tile_description in champion_knowledge.visible_tiles.items():
-            self.decay_mask[coords[1], coords[0]] = self.decay
+            if tile_description.character:
+                # - if the tile is occupied by an enemy, reset the decay to 0, we need live information
+                self.decay_mask[coords[1], coords[0]] = 0
+            else:
+                # - otherwise, reset the decay to the initial value
+                self.decay_mask[coords[1], coords[0]] = self.decay
     
     def _update_state(self, champion_knowledge: ChampionKnowledge):
+
+        # Update counter
+        self.counter += 1
 
         # Update Champion position
         self.matrix[champion_knowledge.position.y, champion_knowledge.position.x] = tiles_mapping["champion"]
@@ -100,6 +108,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
 
         # The state of the agend
+        self.counter = 0
         self.destination = None
 
         # This is the representation of the map state that will be returned as the observation
@@ -176,29 +185,25 @@ class RecklessRoamingDancingDruid(controller.Controller):
             # - if the enemy is in the range of the knife, attack
             range = [self.champion_position + facing.value]
             pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
-            print(f"[R2D2] Attacking with {self.current_weapon} at {range} -> {pot} -> {any(pot)}")
             return any(pot)
 
         if self.current_weapon == "sword":
             range = [self.champion_position + i * facing.value for i in [1, 2, 3]]
             pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
-            print(f"[R2D2] Attacking with {self.current_weapon} at {range} -> {pot} -> {any(pot)}")
             return any(pot)
 
         if self.current_weapon == "bow":
             range = [self.champion_position + i * facing.value for i in [1, 2, 3, 4, 5]]
             pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
-            print(f"[R2D2] Attacking with {self.current_weapon} at {range} -> {pot} -> {any(pot)}")
             return any(pot)
 
         if self.current_weapon == "axe":
             range = [
                 self.champion_position + facing.value,
-                self.champion_position + facing.turn_left().value,
-                self.champion_position + facing.turn_right().value,
+                self.champion_position + facing.value + facing.turn_left().value,
+                self.champion_position + facing.value + facing.turn_right().value,
             ]
             pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
-            print(f"[R2D2] Attacking with {self.current_weapon} at {range} -> {pot} -> {any(pot)}")
             return any(pot)
 
         if self.current_weapon == "amulet":
@@ -214,7 +219,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 Coords(*position + (-2, -2)),
             ]
             pot = [self.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
-            print(f"[R2D2] Attacking with {self.current_weapon} at {range} -> {pot} -> {any(pot)}")
             return any(pot)
 
         return False
@@ -347,10 +351,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
             next_action = self._act_stage_3(knowledge)
 
         # However, if the attack is effective, attack
-        bool_b = self._attack_is_effective(knowledge)
-        print(f"[R2D2] Attack is effective: {bool_b}")
-        if bool_b:
-            print("[R2D2] Attack is effective, attacking!")
+        if self._attack_is_effective(knowledge):
             return characters.Action.ATTACK
         
         return next_action
