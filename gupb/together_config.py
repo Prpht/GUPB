@@ -17,7 +17,7 @@ from gupb.controller import frog
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50),
+    'arenas': arena_generator.generate_arenas(1),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -39,5 +39,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': False,
-    'runs_no': 1000,
+    'runs_no': 20,
 }
