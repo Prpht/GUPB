@@ -91,7 +91,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         for coords, tile_description in champion_knowledge.visible_tiles.items():
             self.decay_mask[coords[1], coords[0]] = self.decay
 
-    def __init__(self, first_name: str, decay: int = 5, menhir_eps=4):
+    def __init__(self, first_name: str, decay: int = 5, menhir_eps=3):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
