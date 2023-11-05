@@ -13,6 +13,7 @@ from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
 from gupb.controller import reckless_roaming_dancing_druid
+from gupb.controller import frog
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
@@ -33,6 +34,7 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         reckless_roaming_dancing_druid.RecklessRoamingDancingDruid("R2D2"),
         roger.Roger('1'),
+        frog.FrogController('Frog')
     ],
     'start_balancing': False,
     'visualise': False,

@@ -49,10 +49,11 @@ class Tabard(Enum):
     YELLOW = 'Yellow'
     ANCYMON = "Ancymon"
     ARAGORN = 'Aragorn'
+    FROG = 'Frog'
+    KROMBOPULOS = 'Krombopulos'
     MONGOL = 'Mongolek'
     PIKACHU = 'Pikachu'
     R2D2 = 'R2D2'
-    KROMBOPULOS = 'Krombopulos'
 
 
 class Champion:
