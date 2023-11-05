@@ -20,7 +20,6 @@ CHAMPION_STARTING_HP: int = 8
 PENALISED_IDLE_TIME = 16
 IDLE_DAMAGE_PENALTY = 1
 
-
 class ChampionKnowledge(NamedTuple):
     position: coordinates.Coords
     no_of_champions_alive: int
@@ -50,10 +49,11 @@ class Tabard(Enum):
     YELLOW = 'Yellow'
     ANCYMON = "Ancymon"
     ARAGORN = 'Aragorn'
+    FROG = 'Frog'
+    KROMBOPULOS = 'Krombopulos'
     MONGOL = 'Mongolek'
     PIKACHU = 'Pikachu'
-    R2D2 = 'R2D2',
-    FROG = 'Frog'
+    R2D2 = 'R2D2'
 
 
 class Champion:

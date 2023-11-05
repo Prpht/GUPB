@@ -4,7 +4,7 @@ dataclasses-json==0.6.1
 gymnasium==0.29.1
 stable-baselines3==2.1.0
 matplotlib==3.8.0
-networkx==3.1
+networkx==3.2.1
 numpy==1.26.0
 pathfinding==1.0.4
 perlin-noise==1.12
