@@ -12,7 +12,7 @@ from gupb.controller import mongolek
 from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
-from gupb.controller import reckless_roaming_dancing_druid
+from gupb.controller import r2d2
 from gupb.controller import frog
 from gupb.scripts import arena_generator
 
@@ -32,7 +32,7 @@ CONFIGURATION = {
         mongolek.Mongolek('Mongolek'),
         pat_i_kot.PatIKotController("Kot i Pat"),
         random.RandomController("Alice"),
-        reckless_roaming_dancing_druid.RecklessRoamingDancingDruid("R2D2"),
+        r2d2.RecklessRoamingDancingDruid("R2D2"),
         roger.Roger('1'),
         frog.FrogController('Frog')
     ],
