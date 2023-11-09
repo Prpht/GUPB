@@ -7,5 +7,5 @@ WEAPON_HIERARCHY = {
     "bow_loaded" : 1,
     "bow_unloaded" : 1,
     "amulet" : 1, 
-    "knife" : 2
+    "knife" : 5
 }
