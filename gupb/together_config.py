@@ -3,16 +3,18 @@ from gupb.controller import ancymon
 from gupb.controller import aragorn
 from gupb.controller import ares
 from gupb.controller import batman
-from gupb.controller import bob
+# from gupb.controller import bob
 from gupb.controller import cynamonka
+from gupb.controller import frog
 from gupb.controller import forrest_gump
+from gupb.controller import frog
 from gupb.controller import krombopulos
 from gupb.controller import maly_konik
-from gupb.controller import mongolek
+# from gupb.controller import mongolek
 from gupb.controller import pat_i_kot
 from gupb.controller import random
 from gupb.controller import roger
-from gupb.controller import reckless_roaming_dancing_druid
+from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
@@ -22,16 +24,17 @@ CONFIGURATION = {
         ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
-        bob.FSMBot(),
+        # bob.FSMBot(),
         batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("Cynamonka"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
+        frog.FrogController('Frog'),
         krombopulos.KrombopulosMichaelController(),
         maly_konik.MalyKonik("LittlePonny"),
-        mongolek.Mongolek('Mongolek'),
+        # mongolek.Mongolek('Mongolek'),
         pat_i_kot.PatIKotController("Kot i Pat"),
         random.RandomController("Alice"),
-        reckless_roaming_dancing_druid.RecklessRoamingDancingDruid("R2D2"),
+        r2d2.RecklessRoamingDancingDruid("R2D2"),
         roger.Roger('1'),
     ],
     'start_balancing': False,
