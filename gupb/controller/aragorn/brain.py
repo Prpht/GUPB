@@ -3,7 +3,7 @@ from gupb.model import arenas, characters, coordinates, weapons
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
 
 
 
@@ -89,7 +89,11 @@ class Brain:
         closestEnemyDistance = INFINITY
 
         for coords in self.memory.map.terrain:
-            if self.memory.map.terrain[coords].character is not None and self.memory.position != coords:
+            if (
+                self.memory.map.terrain[coords].character is not None
+                and self.memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                and self.memory.position != coords
+            ):
                 distance = utils.coordinatesDistance(self.memory.position, coords)
                 
                 if distance < closestEnemyDistance:
