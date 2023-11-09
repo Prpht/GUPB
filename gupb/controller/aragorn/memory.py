@@ -102,7 +102,7 @@ class Memory:
         minCoords = None
 
         for coords in self.map.terrain:
-            if self.map.terrain[coords].loot == weapons.Weapon:
+            if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 distance = utils.coordinatesDistance(self.position, coords)
 
                 if distance < minDistance:
