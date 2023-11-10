@@ -131,6 +131,9 @@ class Arena:
                 visible.add(ray_coords)
                 if not self.terrain[ray_coords].transparent:
                     break
+        for coords in champion.weapon.prescience(champion.position, champion.facing):
+            if coords in self.terrain:
+                visible.add(coords)
         visible.update(champion_left_and_right())
         return visible
 
