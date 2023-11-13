@@ -14,11 +14,8 @@ def sub_coords(self: Coords, other: Coords) -> Coords:
 def mul_coords(self: Coords, other) -> Coords:
     if isinstance(other, int):
         return Coords(self[0] * other, self[1] * other)
-    # ? mogę tu dodać opcję dla mnozenia przez float? przydaje się czasem ~WS
     elif isinstance(other, float):
         return Coords(int(self[0] * other), int(self[1] * other))
-    # * i w ogóle mozna by z tego zrobic porzadna klase, z __add__, __sub__, etc.
-    # * zrobie to w kolejnej kolejce rozgrywek
     else:
         raise NotImplementedError
 
