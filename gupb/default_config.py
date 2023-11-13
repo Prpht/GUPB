@@ -1,25 +1,27 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import ancymon
 
-keyboard_controller = keyboard.KeyboardController()
+ancymon_controler = ancymon.AncymonController("Ancymon")
 
 CONFIGURATION = {
     'arenas': [
-        'ordinary_chaos'
+        'ordinary_chaos',
     ],
     'controllers': [
-        keyboard_controller,
+        ancymon_controler,
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        random.RandomController("Asd"),
-        random.RandomController("Bo"),
-        random.RandomController("Ce"),
+        random.RandomController("Alice2"),
+        random.RandomController("Bob2"),
+        random.RandomController("Cecilia2"),
+        random.RandomController("Darius2"),
     ],
     'start_balancing': False,
     'visualise': True,
-    'show_sight': keyboard_controller,
-    'runs_no': 1,
+    'show_sight': ancymon_controler,
+    'runs_no': 10,
     'profiling_metrics': [],
 }
