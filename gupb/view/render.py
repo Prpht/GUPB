@@ -108,8 +108,8 @@ class SpriteRepository:
                     characters.Tabard.YELLOW,
                     characters.Tabard.ANCYMON,
                     characters.Tabard.ARAGORN,
-                    characters.Tabard.FROG
-                    characters.Tabard.KROMBOPULOS
+                    characters.Tabard.FROG,
+                    characters.Tabard.KROMBOPULOS,
                     characters.Tabard.MONGOL,
                     characters.Tabard.PIKACHU,
                     characters.Tabard.R2D2,

@@ -7,7 +7,7 @@ from gupb.scripts import arena_generator
 cynamonka_controller = CynamonkaController("CynamonkaController")
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(3),
+    'arenas': arena_generator.generate_arenas(1),
     'controllers': [
         cynamonka_controller,
         random.RandomController("Alice"),

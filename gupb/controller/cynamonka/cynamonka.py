@@ -60,14 +60,17 @@ class CynamonkaController(controller.Controller):
             self.facing = knowledge.visible_tiles[self.position].character.facing
             self.next_forward_position = self.position + self.facing.value
             self.set_new_weapon()
-
+            print("Round: " + str(self.move_count))
             # first three ifs are the most important actions, player do it even when the map shrinks
             #if see elixir take it 
             if self.can_collect_elixir(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):
                 self.times_in_row_amulet = 0
                 return POSSIBLE_ACTIONS[2] # go forward
             # if can attack
-            if self.can_attack():
+            if self.should_run_away():
+                return self.run_away_from_enemies()
+            elif self.can_attack():
+                print("inside can attack")
                 return POSSIBLE_ACTIONS[3] # attack
             #if can take a weapon
             if self.can_collect_weapon(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):  
@@ -340,6 +343,46 @@ class CynamonkaController(controller.Controller):
                     self.times_in_row_amulet=0
                 return True
         return False
+
+    def run_away_from_enemies(self):
+        print("jestem w runaway enemies")
+        escape_range = 3  # Zakres, w którym bot sprawdzi obecność przeciwników
+        escape_area = self.get_escape_area(escape_range)
+
+        for coords, description in self.discovered_arena.items():
+            if description.character and description.character.controller_name != "CynamonkaController" and coords in escape_area:
+                print("zdrowie przeciwnika: " + str(description.character.health) + " moje zdrowie : " + str(self.discovered_arena[self.position].character.health))
+                if description.character.health > self.discovered_arena[self.position].character.health:
+                    enemy_direction = description.character.facing.value
+                    # Uciekaj od przeciwnika
+                    # direction = coordinates.Coords(coords[0] - self.position[0], coords[1] - self.position[1])
+                    escape_position = coordinates.Coords(self.position[0] + enemy_direction[0], self.position[1] + enemy_direction[1])
+
+                    print("zwracam uciekanie do : " + str(escape_position))
+                    return self.go_in_the_target_direction(escape_position)
+
+        return None
+
+    def get_escape_area(self, escape_range):
+        print("zbieram pole ucieczki")
+        escape_area = set()
+
+        for dx in range(-escape_range, escape_range + 1):
+            for dy in range(-escape_range, escape_range + 1):
+                escape_position = (self.position[0] + dx, self.position[1] + dy)
+                if escape_position in self.discovered_arena:
+                    escape_area.add(escape_position)
+
+        return escape_area
+
+    def should_run_away(self):
+        print("should run away")
+        escape_action = self.run_away_from_enemies()
+        if escape_action is not None:
+            print("pora uciekac")
+        else: print("nie trzeba uciekac")
+        return escape_action is not None
+
 
     def can_turn_right(self):
         right_position = self.position + self.facing.turn_right().value
