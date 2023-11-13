@@ -25,7 +25,7 @@ class Explore():
         else:
             end = self.poi
 
-        next_move = self.path_finder.caluclate(start, end)
+        next_move, path_len = self.path_finder.calculate_next_move(end)
 
         if next_move == None or self.environment.discovered_map.get(self.poi) != None:
             self.poi = Coords(random.randint(0, self.environment.map_known_len),

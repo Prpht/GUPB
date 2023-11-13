@@ -23,15 +23,15 @@ class Item_Finder:
     def decide(self) -> characters.Action:
         self.update_items_knowladge()
 
-        if self.potion_coord and self.manhatan_distance(self.environment.position, self.potion_coord) < self.environment.enemies_left * 2:
+        if self.potion_coord and self.path_finder.calculate_path_length(self.potion_coord) < self.environment.enemies_left + 3:
             print("GO FOR POTION")
-            decision = self.path_finder.caluclate(self.environment.position, self.potion_coord)
+            decision, path_len = self.path_finder.calculate_next_move(self.potion_coord)
             return self.should_attack(decision)
 
 
-        if self.loot_coord and (self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0) and self.manhatan_distance(self.environment.position, self.loot_coord) < self.environment.enemies_left * 2:
+        if self.loot_coord and (self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0) and self.path_finder.calculate_path_length(self.loot_coord) < self.environment.enemies_left + 3:
             print("GO FOR LOOT")
-            decision = self.path_finder.caluclate(self.environment.position, self.loot_coord)
+            decision, path_len = self.path_finder.calculate_next_move(self.loot_coord)
             return self.should_attack(decision)
 
         return None
@@ -44,8 +44,7 @@ class Item_Finder:
                 print("KILL WHILE ITEM SEARCH")
                 return characters.Action.ATTACK
         return decision
-    def manhatan_distance(self, start: Coords, end: Coords):
-        return abs(start.x - end.x) + abs(start.y - end.y)
+
     def update_items_knowladge(self):
         potion_dist = float('inf')
         loot_dist = float('inf')
@@ -54,13 +53,14 @@ class Item_Finder:
 
         for coords, description in self.environment.discovered_map.items():
             coords = Coords(coords[0], coords[1])
+            path_len_to_coords = self.path_finder.calculate_path_length(coords)
             if description.consumable and description.consumable.name == 'potion':
-                if self.potion_coord is None or self.manhatan_distance(self.environment.position, coords) < potion_dist:
+                if self.potion_coord is None or path_len_to_coords < potion_dist:
                     self.potion_coord = coords
-                    potion_dist = self.manhatan_distance(self.environment.position, coords)
+                    potion_dist = path_len_to_coords
             if description.loot and (description.loot.name.find('bow') < 0 or (description.loot.name.find('bow') >= 0 and self.environment.weapon.name == 'knife')):
-                if self.loot_coord is None or self.manhatan_distance(self.environment.position, coords) < loot_dist:
+                if self.loot_coord is None or path_len_to_coords < loot_dist:
                     self.loot_coord = coords
-                    loot_dist = self.manhatan_distance(self.environment.position, coords)
+                    loot_dist = path_len_to_coords
 
 

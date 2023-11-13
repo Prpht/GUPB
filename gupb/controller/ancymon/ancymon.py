@@ -36,15 +36,28 @@ class AncymonController(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
+    def decide2(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.environment.update_environment(knowledge)
+        self.path_finder.update_paths(self.environment.position)
+        self.i += 1
+
+        decision = None
+        strategy = "HUNTER"
+
+        return decision
+
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.environment.update_environment(knowledge)
+        self.path_finder.update_paths(self.environment.position)
         self.i +=1
 
         decision = None
         strategy = "HUNTER"
 
         try:
-            decision = self.hunter.decide()
+            decision, path_len = self.hunter.decide()
+            self.hunter.decide2()
             if decision:
                 print(self.i, strategy)
                 return decision

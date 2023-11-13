@@ -19,7 +19,7 @@ from gupb.scripts import arena_generator
 ancymon_controller = ancymon.AncymonController("Ancymon")
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(1),
+    'arenas': arena_generator.generate_arenas(5),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon_controller,
@@ -41,5 +41,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': ancymon_controller,
-    'runs_no': 5,
+    'runs_no': 10,
 }
