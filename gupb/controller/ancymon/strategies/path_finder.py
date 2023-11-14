@@ -77,24 +77,24 @@ class Path_Finder():
         if path and len(path) >= 3:
             if self.environment.champion.facing.value == Coords(1, 0):
                 if self.environment.position + Coords(0,1) == path[1] and self.environment.position + Coords(1,1) == path[2]:
-                    return characters.Action.STEP_RIGHT, len(path)
+                    return characters.Action.STEP_RIGHT, path
                 if self.environment.position + Coords(0,-1) == path[1] and self.environment.position + Coords(1, -1) == path[2]:
-                    return characters.Action.STEP_LEFT, len(path)
+                    return characters.Action.STEP_LEFT, path
             if self.environment.champion.facing.value == Coords(0, 1):
                 if self.environment.position + Coords(1, 0) == path[1] and self.environment.position + Coords(1, 1) == path[2]:
-                    return characters.Action.STEP_LEFT, len(path)
+                    return characters.Action.STEP_LEFT, path
                 if self.environment.position + Coords(-1, 0) == path[1] and self.environment.position + Coords(-1, 1) == path[2]:
-                    return characters.Action.STEP_RIGHT, len(path)
+                    return characters.Action.STEP_RIGHT, path
             if self.environment.champion.facing.value == Coords(-1, 0):
                 if self.environment.position + Coords(0,1) == path[1] and self.environment.position + Coords(-1,1) == path[2]:
-                    return characters.Action.STEP_LEFT, len(path)
+                    return characters.Action.STEP_LEFT, path
                 if self.environment.position + Coords(0,-1) == path[1] and self.environment.position + Coords(-1, -1) == path[2]:
-                    return characters.Action.STEP_RIGHT, len(path)
+                    return characters.Action.STEP_RIGHT, path
             if self.environment.champion.facing.value == Coords(0, -1):
                 if self.environment.position + Coords(1, 0) == path[1] and self.environment.position + Coords(1, -1) == path[2]:
-                    return characters.Action.STEP_RIGHT, len(path)
+                    return characters.Action.STEP_RIGHT, path
                 if self.environment.position + Coords(-1, 0) == path[1] and self.environment.position + Coords(-1, -1) == path[2]:
-                    return characters.Action.STEP_LEFT, len(path)
+                    return characters.Action.STEP_LEFT, path
 
         if path and len(path) > 1:
             next_move = path[1]
@@ -103,20 +103,20 @@ class Path_Finder():
 
             if sub.x != 0 or sub.y != 0:
                 if sub.x == 2 or sub.y == 2 or sub.x == -2 or sub.y == -2:
-                    return characters.Action.TURN_RIGHT, len(path)
+                    return characters.Action.TURN_RIGHT, path
 
                 if move_vector.x == 0:
                     if sub.x * sub.y == 1:
-                        return characters.Action.TURN_LEFT, len(path)
+                        return characters.Action.TURN_LEFT, path
                     else:
-                        return characters.Action.TURN_RIGHT, len(path)
+                        return characters.Action.TURN_RIGHT, path
 
                 if move_vector.y == 0:
                     if sub.x * sub.y == 1:
-                        return characters.Action.TURN_RIGHT, len(path)
+                        return characters.Action.TURN_RIGHT, path
                     else:
-                        return characters.Action.TURN_LEFT, len(path)
+                        return characters.Action.TURN_LEFT, path
 
-            return characters.Action.STEP_FORWARD, len(path)
+            return characters.Action.STEP_FORWARD, path
         else:
             return None, None

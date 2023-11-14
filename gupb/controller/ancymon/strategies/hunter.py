@@ -1,5 +1,6 @@
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
+from gupb.controller.ancymon.strategies.decision_enum import HUNTER_DECISION
 from gupb.model import characters
 from gupb.model.coordinates import Coords
 
@@ -15,26 +16,37 @@ class Hunter:
     def __init__(self, environment: Environment, path_finder: Path_Finder):
         self.environment: Environment = environment
         self.path_finder: Path_Finder = path_finder
-        self.poi: Coords = Coords(0, 0)
+
         self.next_target = None
         self.next_target_coord: Coords = None
 
+        self.next_move: characters.Action = None
+        self.path: list[Coords] = None
+
     def decide2(self):
-        decision = None
+        self.next_move = None
+        self.path = None
 
         if self.is_enemy_neer(1) == False and self.can_attack():
-            # print("LONG RANGE ATTACK", self.environment.weapon)
-            return characters.Action.ATTACK, None
+            self.next_move = characters.Action.ATTACK
+            return HUNTER_DECISION.LONG_RANGE_ATTACK
 
-        self.is_target_on_same_position()
+        potential_enemies = self.neerest_enemy_list()
 
-        tmp = self.neerest_enemy_list()
+        if len(potential_enemies) > 0:
+            if self.can_attack():
+                self.next_move = characters.Action.ATTACK
+                return HUNTER_DECISION.ATTACK
 
-        if len(tmp) > 0:
-            decision, path = self.path_finder.calculate_next_move(tmp[0])
+            for enemy in potential_enemies:
+                self.next_target_coord = enemy
+                self.next_target = self.environment.discovered_map.get(enemy).character
+                cord_position_to_atack = self.find_coord_to_attack_spot()
+                self.next_move, self.path = self.path_finder.calculate_next_move(cord_position_to_atack)
+                if self.next_move:
+                    return HUNTER_DECISION.CHASE
 
-
-        return decision, None
+        return HUNTER_DECISION.NO_ENEMY
 
     def decide(self):
 
@@ -203,5 +215,5 @@ class Hunter:
                             new_attack_spot_dist = spot_dist
                             new_attack_spot = further_position
 
-        print(new_attack_spot)
+        # print(new_attack_spot)
         return new_attack_spot

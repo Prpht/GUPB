@@ -1,6 +1,7 @@
 import random
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
+from gupb.controller.ancymon.strategies.decision_enum import ITEM_FINDER_DECISION
 from gupb.model import characters
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Sword, Bow, Amulet, Axe
@@ -17,24 +18,55 @@ class Item_Finder:
     def __init__(self, environment: Environment, path_finder: Path_Finder):
         self.environment: Environment = environment
         self.path_finder: Path_Finder = path_finder
+
         self.potion_coord: Coords = None
         self.loot_coord: Coords = None
+
+        self.decision: ITEM_FINDER_DECISION = None
+        self.next_move: characters.Action = None
+        self.path: list[Coords] = None
+
+    def decide2(self):
+        self.next_move = None
+        self.path = None
+        self.update_items_knowladge()
+
+        if self.potion_coord:
+            self.next_move, self.path = self.path_finder.calculate_next_move(self.potion_coord)
+            if self.is_enemy_on_path():
+                return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
+            return ITEM_FINDER_DECISION.GO_FOR_POTION
+
+        if self.loot_coord:
+            self.next_move, self.path = self.path_finder.calculate_next_move(self.loot_coord)
+            if self.is_enemy_on_path():
+                return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
+            return ITEM_FINDER_DECISION.GO_FOR_LOOT
+
+        return ITEM_FINDER_DECISION.NO_ITEMS
 
     def decide(self) -> characters.Action:
         self.update_items_knowladge()
 
         if self.potion_coord and self.path_finder.calculate_path_length(self.potion_coord) < self.environment.enemies_left + 3:
             print("GO FOR POTION")
-            decision, path_len = self.path_finder.calculate_next_move(self.potion_coord)
+            decision, path = self.path_finder.calculate_next_move(self.potion_coord)
             return self.should_attack(decision)
 
 
         if self.loot_coord and (self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0) and self.path_finder.calculate_path_length(self.loot_coord) < self.environment.enemies_left + 3:
             print("GO FOR LOOT")
-            decision, path_len = self.path_finder.calculate_next_move(self.loot_coord)
+            decision, path = self.path_finder.calculate_next_move(self.loot_coord)
             return self.should_attack(decision)
 
         return None
+
+    def is_enemy_on_path(self) -> bool:
+        if self.path and len(self.path) >= 2:
+            field = self.environment.discovered_map.get(self.path[1])
+            if field and field.character and field.character.controller_name != self.environment.champion.controller_name:
+                return True
+        return False
 
     def should_attack(self, decision):
         if decision == characters.Action.STEP_FORWARD:

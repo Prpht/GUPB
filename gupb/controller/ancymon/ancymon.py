@@ -9,6 +9,7 @@ from gupb.controller.ancymon.strategies.explore import Explore
 from gupb.controller.ancymon.strategies.hunter import Hunter
 from gupb.controller.ancymon.strategies.item_finder import Item_Finder
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
+from gupb.controller.ancymon.strategies.decision_enum import HUNTER_DECISION, ITEM_FINDER_DECISION, EXPLORER_DECISION
 from gupb.model.weapons import Knife
 
 POSSIBLE_ACTIONS = [
@@ -23,7 +24,7 @@ class AncymonController(controller.Controller):
         self.first_name: str = first_name
         self.environment: Environment = Environment()
         self.path_finder: Path_Finder = Path_Finder(self.environment)
-        self.explore: Explore = Explore(self.environment, self.path_finder)
+        self.explorer: Explore = Explore(self.environment, self.path_finder)
         self.item_finder: Item_Finder = Item_Finder(self.environment, self.path_finder)
         self.hunter: Hunter = Hunter(self.environment, self.path_finder)
         self.i: int = 0
@@ -41,13 +42,79 @@ class AncymonController(controller.Controller):
         self.path_finder.update_paths(self.environment.position)
         self.i += 1
 
-        decision = None
-        strategy = "HUNTER"
+        hunter_decision, item_finder_decision, explorer_decision = None, None, None
 
-        return decision
+        try:
+            hunter_decision = self.hunter.decide2()
+        except Exception as e:
+            print(f"An exception occurred in Hunter strategy: {e}")
+            pass
 
+        try:
+            item_finder_decision = self.item_finder.decide2()
+        except Exception as e:
+            print(f"An exception occurred in Item Finder strategy: {e}")
+            pass
+
+        try:
+            explorer_decision = self.explorer.decide2()
+        except Exception as e:
+            print(f"An exception occurred in Explorer strategy: {e}")
+            pass
+
+        if hunter_decision != HUNTER_DECISION.NO_ENEMY and item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS and item_finder_decision != ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE:
+            if hunter_decision == HUNTER_DECISION.LONG_RANGE_ATTACK:
+                print('I see items but i do range attack')
+                return self.hunter.next_move
+            if hunter_decision == HUNTER_DECISION.ATTACK and self.environment.champion.health > self.hunter.next_target.health:
+                print('I see items but i can attack week opponent')
+                return self.hunter.next_move
+            if hunter_decision == HUNTER_DECISION.CHASE and self.environment.champion.health > self.hunter.next_target.health and self.hunter.path is not None and len(self.hunter.path) <= 5:
+                print('I see items but i can chase week opponent')
+                return self.hunter.next_move
+            if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
+                print('I see enemy but i can get fast potion')
+                return self.item_finder.next_move
+            if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_LOOT and (self.environment.weapon.name == 'knife' or self.environment.weapon.name == 'bow' or self.hunter.next_target.weapon.name != 'knife'):
+                print('I see enemy but i can get fast weapon')
+                return self.item_finder.next_move
+            return self.hunter.next_move
+
+        if hunter_decision != HUNTER_DECISION.NO_ENEMY:
+            if hunter_decision == HUNTER_DECISION.LONG_RANGE_ATTACK:
+                print('Long range attack')
+                return self.hunter.next_move
+            if hunter_decision == HUNTER_DECISION.ATTACK and self.environment.champion.health >= self.hunter.next_target.health:
+                print('Classic Attack')
+                return self.hunter.next_move
+            if self.environment.champion.health >= self.hunter.next_target.health and self.hunter.path is not None and len(self.hunter.path) <= 5:
+                print('Classic chase')
+                return self.hunter.next_move
+
+        if item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS:
+            if item_finder_decision == ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE:
+                print('ENEMY NEXT TODO')
+                return characters.Action.ATTACK #TODO
+            if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
+                if self.item_finder.path is not None and len(self.item_finder.path) < self.environment.enemies_left:
+                    print('Go for potion')
+                    return self.item_finder.next_move
+            if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_LOOT:
+                if self.item_finder.path is not None and len(self.item_finder.path) < self.environment.enemies_left:
+                    print('Go for loot')
+                    return self.item_finder.next_move
+
+        if explorer_decision:
+            print('Explore')
+            return self.explorer.next_move
+
+        print(self.i, "EXPLORE MENHIR")
+        return random.choices(
+            population=POSSIBLE_ACTIONS[:3], weights=(40, 40, 20), k=1
+        )[0]
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.decide2(knowledge)
         self.environment.update_environment(knowledge)
         self.path_finder.update_paths(self.environment.position)
         self.i +=1
@@ -56,8 +123,7 @@ class AncymonController(controller.Controller):
         strategy = "HUNTER"
 
         try:
-            decision, path_len = self.hunter.decide()
-            self.hunter.decide2()
+            decision, path = self.hunter.decide()
             if decision:
                 print(self.i, strategy)
                 return decision
@@ -76,7 +142,7 @@ class AncymonController(controller.Controller):
             pass
 
         try:
-            decision = self.explore.decide()
+            decision = self.explorer.decide()
             strategy = "EXPLORE"
         except Exception as e:
             print(f"An exception occurred in Explore strategy: {e}")
@@ -108,7 +174,7 @@ class AncymonController(controller.Controller):
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.environment = Environment()
         self.path_finder.environment = self.environment
-        self.explore.environment = self.environment
+        self.explorer.environment = self.environment
         self.hunter.environment = self.environment
         self.item_finder.environment = self.environment
 
