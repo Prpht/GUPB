@@ -26,7 +26,7 @@ class Item_Finder:
         self.next_move: characters.Action = None
         self.path: list[Coords] = None
 
-    def decide2(self):
+    def decide(self):
         self.next_move = None
         self.path = None
         self.update_items_knowladge()
@@ -44,22 +44,6 @@ class Item_Finder:
             return ITEM_FINDER_DECISION.GO_FOR_LOOT
 
         return ITEM_FINDER_DECISION.NO_ITEMS
-
-    def decide(self) -> characters.Action:
-        self.update_items_knowladge()
-
-        if self.potion_coord and self.path_finder.calculate_path_length(self.potion_coord) < self.environment.enemies_left + 3:
-            print("GO FOR POTION")
-            decision, path = self.path_finder.calculate_next_move(self.potion_coord)
-            return self.should_attack(decision)
-
-
-        if self.loot_coord and (self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0) and self.path_finder.calculate_path_length(self.loot_coord) < self.environment.enemies_left + 3:
-            print("GO FOR LOOT")
-            decision, path = self.path_finder.calculate_next_move(self.loot_coord)
-            return self.should_attack(decision)
-
-        return None
 
     def is_enemy_on_path(self) -> bool:
         if self.path and len(self.path) >= 2:

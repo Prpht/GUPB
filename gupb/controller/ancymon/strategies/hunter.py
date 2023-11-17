@@ -4,14 +4,6 @@ from gupb.controller.ancymon.strategies.decision_enum import HUNTER_DECISION
 from gupb.model import characters
 from gupb.model.coordinates import Coords
 
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
-]
-
-
 class Hunter:
     def __init__(self, environment: Environment, path_finder: Path_Finder):
         self.environment: Environment = environment
@@ -23,7 +15,7 @@ class Hunter:
         self.next_move: characters.Action = None
         self.path: list[Coords] = None
 
-    def decide2(self):
+    def decide(self):
         self.next_move = None
         self.path = None
 
@@ -47,33 +39,6 @@ class Hunter:
                     return HUNTER_DECISION.CHASE
 
         return HUNTER_DECISION.NO_ENEMY
-
-    def decide(self):
-
-        if self.is_enemy_neer(1) == False and self.can_attack():
-            print("LONG RANGE ATTACK", self.environment.weapon)
-            return characters.Action.ATTACK, None
-
-        if self.is_enemy_neer(3) and (
-                self.environment.champion.health >= self.next_target.health or self.is_menhir_neer()):
-
-            if self.can_attack():
-                print("CAN ATTACK WITH", self.environment.weapon)
-                return characters.Action.ATTACK, None
-
-            cord_position_to_atack = self.find_coord_to_attack_spot()
-            print("CHASING")
-
-            return self.path_finder.calculate_next_move(cord_position_to_atack)
-        return None, None
-
-    def is_menhir_neer(self):
-        if self.environment.menhir:
-            margin = self.environment.enemies_left
-            if len(self.environment.discovered_map[self.environment.position].effects) > 0:
-                margin = 1
-            return (abs(self.environment.menhir[0] - self.environment.position.x) < margin and
-                    abs(self.environment.menhir[1] - self.environment.position.y) < margin)
 
     def is_target_on_same_position(self):
         if self.next_target and self.next_target_coord:

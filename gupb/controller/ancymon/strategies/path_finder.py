@@ -5,13 +5,6 @@ from gupb.model import characters
 
 directions = [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]
 
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
-]
-
 class Path_Finder():
     def __init__(self, environment: Environment):
         self.environment: Environment = environment
@@ -39,8 +32,7 @@ class Path_Finder():
                 if tentative_g_score < self.g_score[neighbor]:
                     self.came_from[neighbor] = current
                     self.g_score[neighbor] = tentative_g_score
-                    f_score = tentative_g_score
-                    heapq.heappush(open_set, (f_score, neighbor))
+                    heapq.heappush(open_set, (tentative_g_score, neighbor))
 
     def is_valid(self, point):
         x, y = point
