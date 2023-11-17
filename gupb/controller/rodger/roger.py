@@ -1,51 +1,18 @@
 import random
 import os
-from enum import Enum
-from typing import Dict, Tuple, Optional, List, NamedTuple
+from typing import Dict, Tuple, Optional, List
 
 from pathfinding.core.grid import Grid
 from pathfinding.core.node import GridNode
 from pathfinding.finder.a_star import AStarFinder
 
 from gupb import controller
+from gupb.controller.rodger.constans_and_types import WeaponValue, States, SeenWeapon
 from gupb.model import arenas, coordinates, tiles
 from gupb.model import characters
-from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, Arena, Terrain
-from gupb.model.coordinates import Coords, add_coords
+from gupb.model.arenas import TILE_ENCODING, WEAPON_ENCODING, Terrain
+from gupb.model.coordinates import Coords
 from gupb.model.tiles import Land, Menhir
-
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.STEP_BACKWARD,
-    characters.Action.STEP_LEFT,
-    characters.Action.STEP_RIGHT,
-    characters.Action.ATTACK,
-    characters.Action.DO_NOTHING
-]
-
-
-class SeenWeapon(NamedTuple):
-    name: str
-    seen_epoch_nr: int
-
-
-class States(Enum):
-    RANDOM_WALK     = 1
-    HEAD_TO_WEAPON  = 2
-    HEAD_TO_MENHIR  = 3
-    FINAL_DEFENCE   = 4
-    HEAD_TO_CENTER  = 5
-    HEAD_TO_POTION  = 6
-
-class WeaponValue(Enum):
-    AMULET          = 0
-    KNIFE           = 1
-    AXE             = 3
-    SWORD           = 5
-    BOW_UNLOADED    = 6
-    BOW_LOADED      = 7
 
 
 # noinspection PyUnusedLocal
