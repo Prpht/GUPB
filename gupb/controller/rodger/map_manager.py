@@ -11,7 +11,7 @@ from gupb.model.characters import ChampionDescription
 from gupb.model.coordinates import Coords
 
 
-class Map:
+class MapManager:
     def __init__(self):
         self.seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]] = {}
         self.terrain: Optional[Terrain] = None
@@ -70,7 +70,8 @@ class Map:
 
     def check_enemy(self, coords: coordinates.Coords, tile: tiles.TileDescription):
         if tile.character:
-            self.enemies_coords[coords] = SeenEnemy(tile.character, self.epoch)
+            if coords != self.current_position:
+                self.enemies_coords[coords] = SeenEnemy(tile.character, self.epoch)
         else:
             self.enemies_coords.pop(coords, None)
 
@@ -124,4 +125,12 @@ class Map:
                 nearest_distance = distance
                 nearest_coords = coords
         return nearest_coords, items[nearest_coords]
+
+    def get_4_tiles_around(self):
+        tiles = []
+        tiles.append(self.current_position + Coords(0, 1))
+        tiles.append(self.current_position + Coords(0, -1))
+        tiles.append(self.current_position + Coords(1, 0))
+        tiles.append(self.current_position + Coords(-1, 0))
+        return tiles
 

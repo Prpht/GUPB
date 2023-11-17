@@ -8,7 +8,8 @@ from pathfinding.core.node import GridNode
 from pathfinding.finder.a_star import AStarFinder
 
 from gupb import controller
-from gupb.controller.rodger.Map import Map
+from gupb.controller.rodger.map_manager import MapManager
+from gupb.controller.rodger.weapon_manager import WeaponManager
 from gupb.controller.rodger.constans_and_types import WeaponValue, States, EpochNr
 from gupb.controller.rodger.utils import get_distance
 from gupb.model import arenas, coordinates
@@ -32,7 +33,8 @@ class Roger(controller.Controller):
         self.actions = []
         self.current_state = States.RANDOM_WALK
         self.beginning_iterator = 0
-        self.arena = Map()
+        self.arena = MapManager()
+        self.weapon_manager = WeaponManager()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Roger):
@@ -159,7 +161,7 @@ class Roger(controller.Controller):
 
     def return_attack_if_enemy_in_cut_range(self, action: characters.Action):
         if not action == characters.Action.ATTACK:
-            cut_positions = self.get_weapon_cut_positions(self.current_weapon().name)
+            cut_positions = self.weapon_manager.get_weapon_cut_positions(self.arena, self.current_position, self.current_weapon().name)
             for cut_position in cut_positions:
                 if self.arena.seen_tiles.get(cut_position):
                     if self.arena.seen_tiles[cut_position][1] == self.epoch and self.arena.seen_tiles[cut_position][0].character:
@@ -167,43 +169,7 @@ class Roger(controller.Controller):
                         return characters.Action.ATTACK
         return action
 
-    def get_weapon_cut_positions(self, name: str) -> List[Coords]:
-        initial_facing = self.arena.seen_tiles[self.current_position][0].character.facing
-        if name == 'knife':
-            return self.get_line_cut_positions(initial_facing, 1)
-        elif name == 'sword':
-            return self.get_line_cut_positions(initial_facing, 3)
-        elif name == 'bow_unloaded' or name == 'bow_loaded':
-            return self.get_line_cut_positions(initial_facing, 50)
-        elif name == 'axe':
-            centre_position = self.current_position + initial_facing.value
-            left_position = centre_position + initial_facing.turn_left().value
-            right_position = centre_position + initial_facing.turn_right().value
-            return [left_position, centre_position, right_position]
-        elif name == 'amulet':
-            position = self.current_position
-            return [
-                Coords(*position + (1, 1)),
-                Coords(*position + (-1, 1)),
-                Coords(*position + (1, -1)),
-                Coords(*position + (-1, -1)),
-                Coords(*position + (2, 2)),
-                Coords(*position + (-2, 2)),
-                Coords(*position + (2, -2)),
-                Coords(*position + (-2, -2)),
-            ]
-        else:
-            return []
 
-    def get_line_cut_positions(self, initial_facing, reach):
-        cut_positions = []
-        cut_position = self.current_position
-        for _ in range(reach):
-            cut_position += initial_facing.value
-            if cut_position not in self.arena.terrain:
-                break
-            cut_positions.append(cut_position)
-        return cut_positions
 
     # def return_attack_if_enemy_on_the_road(self, action: characters.Action):
     #     if action == characters.Action.STEP_FORWARD:
@@ -341,14 +307,17 @@ class Roger(controller.Controller):
         self.current_state = States.RANDOM_WALK
         self.arena.reset(arena_description.name)
 
-    def build_grid(self):
-        def extract_walkable_tiles():
-            try:
-                return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.arena.terrain.items()))
-            except AttributeError:
-                return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', self.arena.seen_tiles.items()))
 
-        walkable_tiles_list = extract_walkable_tiles()
+    def extract_walkable_tiles(self, items=None):
+        if items is None:
+            items = self.arena.terrain.items()
+        try:
+            return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), items))
+        except AttributeError:
+            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', items))
+
+    def build_grid(self):
+        walkable_tiles_list = self.extract_walkable_tiles()
         walkable_tiles_matrix = [[0 for y in range(self.arena.arena_size[1])] for x in range(self.arena.arena_size[0])]
 
         for tile in walkable_tiles_list:
@@ -368,11 +337,22 @@ class Roger(controller.Controller):
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.RED
 
-    def get_safe_tiles(self):
-        pass
+    def get_safe_tiles(self) -> List[Coords]:
+        tiles_around = self.arena.get_4_tiles_around()
+        tiles_available = self.extract_walkable_tiles(tiles_around)  #todo uogólnić
+        tiles_available_set = set(tiles_available)
+        unsafe_tiles = []
+        for coords, seen_enemy in self.arena.enemies_coords.items():
+            cut_tiles = self.weapon_manager.get_weapon_cut_positions(self.arena, coords, seen_enemy.enemy.weapon.name)
+            unsafe_tiles.extend(cut_tiles)
+        unsafe_tiles_set = set(unsafe_tiles)
+        safe_tiles = tiles_available_set.difference(unsafe_tiles_set)
+        safe_tiles = list(safe_tiles)
+        return safe_tiles
 
 
 
 POTENTIAL_CONTROLLERS = [
     Roger('1'),
-]
+]  # todo czy to powinno być w __init__.py?
+
