@@ -3,10 +3,11 @@ import os
 from typing import Dict, Optional, List, Tuple, Callable
 from math import inf
 
-from gupb.controller.rodger.constans_and_types import SeenWeapon, EpochNr, T
+from gupb.controller.rodger.constans_and_types import SeenWeapon, EpochNr, T, SeenEnemy
 from gupb.controller.rodger.utils import get_distance
 from gupb.model import coordinates, tiles
 from gupb.model.arenas import Terrain, TILE_ENCODING, WEAPON_ENCODING
+from gupb.model.characters import ChampionDescription
 from gupb.model.coordinates import Coords
 
 
@@ -18,6 +19,7 @@ class Map:
         self.menhir_coords: Optional[coordinates.Coords] = None
         self.weapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
         self.potions_coords: Dict[coordinates.Coords, EpochNr] = {}
+        self.enemies_coords: Dict[coordinates.Coords, SeenEnemy] = {}
         self.mist_coords: List[coordinates.Coords] = []
         self.current_position: Optional[coordinates.Coords] = None
         self.epoch: EpochNr = 0
@@ -65,6 +67,12 @@ class Map:
         for effect in tile.effects:
             if effect.type == 'mist':
                 self.mist_coords.append(coords)
+
+    def check_enemy(self, coords: coordinates.Coords, tile: tiles.TileDescription):
+        if tile.character:
+            self.enemies_coords[coords] = SeenEnemy(tile.character, self.epoch)
+        else:
+            self.enemies_coords.pop(coords, None)
 
     def find_nearest_mist_coords(self) -> Optional[coordinates.Coords]:
         min_distance_squared = 2 * self.arena_size[0] ** 2
@@ -116,3 +124,4 @@ class Map:
                 nearest_distance = distance
                 nearest_coords = coords
         return nearest_coords, items[nearest_coords]
+

@@ -368,6 +368,10 @@ class Roger(controller.Controller):
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.RED
 
+    def get_safe_tiles(self):
+        pass
+
+
 
 POTENTIAL_CONTROLLERS = [
     Roger('1'),
