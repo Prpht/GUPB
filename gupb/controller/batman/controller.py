@@ -41,7 +41,7 @@ class BatmanController(controller.Controller, Observer[Action], Observable[Knowl
     def praise(self, score: int) -> None:
         self._trainer.stop(self._knowledge, save=self._game % 10 == 0)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self._trainer.start(load=self._game == 0)
         self._episode = 0
         self._game += 1

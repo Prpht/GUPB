@@ -18,12 +18,20 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-'''
-Suggestion: strategy in try, excet, in case of failure random step?
 
-Or eliminate all raise exception
+def tileIsMist(tile):
+    for effect in tile.effects:
+        if effect.type == 'mist':
+            return True
+    return False
 
-'''
+def tilePassable(tile):
+    if type(tile) == tiles.TileDescription:
+        if tile.type in ['land', 'menhir']:
+            return True
+    elif type(tile) == tiles.Tile:
+        return tile.passable
+    return False
 
 class Map():
     '''Gathers and keeps information about the state of the arena'''
@@ -39,17 +47,12 @@ class Map():
         self.position = None  # current position
         self.opponents = []  # list of tuples (Coord, Character) for every currently visible opponent
         self.closestMist = None  # coord
+        self.menhir=None # coords of menhir
 
     def initMap(self):
         self.map = [[None for i in range(self.MAPSIZE[1])] for j in range(self.MAPSIZE[0])]
         for coords, tile in self.arena.terrain.items():
             self.map[coords.x][coords.y] = tile
-
-    def tileIsMist(self, tile):
-        for effect in tile.effects:
-            if effect.description().type == 'mist':
-                return True
-        return False
     
     def update(self, knowledge: characters.ChampionKnowledge):
         '''
@@ -62,20 +65,11 @@ class Map():
         self.position = knowledge.position
         self.description = knowledge.visible_tiles[self.position].character
         self.opponentsAlive = knowledge.no_of_champions_alive - 1  # not including us
-        # for coord, tile in knowledge.visible_tiles.items():
-        #     coord=coordinates.Coords(coord[0], coord[1])
-        #     if self.tileIsMist(tile) and \
-        #         (self.closestMist is None or \
-        #         (self.taxiDistance(self.position, self.closestMist) > self.taxiDistance(self.position, coord))):
-        #         self.closestMist = coord
-        #     if tile.character != self.map[coord.x][coord.y].character:
-        #         self.map[coord.x][coord.y].character = tile.character
-        #     if tile.loot != self.map[coord.x][coord.y].loot:
-        #         self.map[coord.x][coord.y].loot = tile.loot
-        #     if tile.consumable != self.map[coord.x][coord.y].consumable:
-        #         self.map[coord.x][coord.y].consumable = tile.consumable
-        #     if tile.effects != self.map[coord.x][coord.y].effects:
-        #         self.map[coord.x][coord.y].effects = tile.effects
+        for coord, tile in knowledge.visible_tiles.items():
+            coord=coordinates.Coords(coord[0], coord[1])
+            self.map[coord.x][coord.y]=tile
+            if self.menhir is None and tile.type=="menhir":
+                self.menhir=coord
 
     def taxiDistance(self, root, target):
         '''Return taxi distance between two points.'''
@@ -99,7 +93,7 @@ class Map():
         for new in all:
             if self.isInMap(new):
                 tile = self.map[new.x][new.y]
-                if (tile.passable and not self.tileIsMist(tile)) or mode != '': # passable as an attribute???
+                if (tilePassable(tile) and not tileIsMist(tile)) or mode != '':
                     neighbours.append(new)
         return neighbours
     
@@ -118,7 +112,6 @@ class Map():
         if len(actions) == 3:
             actions = [characters.Action.TURN_LEFT]
         if len(actions) == 4:
-            # print("Direction not found.")
             pass
         return actions, face
         
@@ -145,7 +138,7 @@ class Map():
         if type(target) is str:
             if target == 'passable':
                 tile = self.map[v.x][v.y]
-                return tile.passable and not self.tileIsMist(tile)
+                return tile.passable and not tileIsMist(tile)
         if type(target) is coordinates.Coords:
             if v.x == target.x and v.y == target.y:
                 return True
@@ -154,18 +147,18 @@ class Map():
             if tile.type == target.type:
                 return True
         if type(target) is weapons.WeaponDescription:
-            if tile.description().loot is not None and tile.description().loot.name == target.name:
+            if tile.description().loot is not None and tile.description().loot.name == target.name: # maybe add description?
                 return True
         if type(target) is consumables.ConsumableDescription:
-            if tile.description().consumable is not None and tile.description().consumable.name == target.name:
+            if tile.consumable is not None and tile.consumable.name == target.name:
                 return True
         if type(target) is effects.EffectDescription:
             for effect in tile.effects:
-                if effect.description().type == target.type:
+                if effect.type == target.type:
                     return True
         return False
 
-    def shortestPath(self, root, target, mode=''):
+    def shortestPath(self, root, target, radius = None, mode=''):
         '''
         find shortest path from A to B using the knowledge base
         
@@ -175,7 +168,9 @@ class Map():
         Visited = [[(0 if self.map[i][j] is not None else None) for j in range(self.MAPSIZE[1])] for i in range(self.MAPSIZE[0])] 
         Visited[root.x][root.y] = root
         Q = [root]
-        while len(Q) > 0:
+        r = 0
+        while len(Q) > 0 and (radius is None or r <= radius):
+            r += 1
             v = Q.pop(0)
             if self.targetFound(v, target):
                 # find path
@@ -194,7 +189,7 @@ class Map():
                     Q.append(p)
         return [], self.position
 
-    def findTarget(self, target):
+    def findTarget(self, target, radius=None):
         '''
         finds nearest coordinate, tile type, collectible type, 
 
@@ -210,23 +205,7 @@ class Map():
         return: tuple = (shortest path to the target, target coordinates). 
             If target not found, returns tuple = ([], self.position)
         '''
-        return self.shortestPath(self.position, target)
-
-    def findMiddle(self):
-        '''
-        Finds the best guess as to the map's middle
-        Returns shortest path to middle and its coordinates (or tuple(empty list, self.position) if middle not found)
-        '''
-        middle = coordinates.Coords(
-            self.MAPSIZE[0] // 2,
-            self.MAPSIZE[1] // 2,
-        )
-        tile = self.map[middle.x][middle.y]
-        if not tile.passable or self.tileIsMist(tile):
-            _, middle = self.shortestPath(middle, 'passable', 'middle')
-            return self.shortestPath(self.position, middle)
-        return [], self.position
-
+        return self.shortestPath(self.position, target, radius=radius)
 
 class KnowledgeBase():
     
@@ -234,6 +213,8 @@ class KnowledgeBase():
         self.mapBase = None
         self.round_counter=0
         self.actionsToMake=None
+        self.actionsTarget=None
+        self.tileNeighbourhood = 16
 
     def findTarget(self):
         '''Looks for opponent or worthy consumable. If opponent found, change self.MODE'''
@@ -247,6 +228,41 @@ class KnowledgeBase():
         '''Avoids fights in cases of low HP'''
         pass
 
+    def stepPossible(self, step):
+        if step == characters.Action.STEP_FORWARD:
+            frontCoords=self.mapBase.description.facing.value+self.mapBase.position
+            frontTile=self.mapBase.map[frontCoords.x][frontCoords.y]
+            if not tilePassable(frontTile) or tileIsMist(frontTile):
+                return False
+        return True
+
+    def followTarget(self):
+        nextStep = None
+        if len(self.actionsToMake) > 0:
+            nextStep = self.actionsToMake[0]
+            self.actionsToMake.pop(0)
+            if not self.stepPossible(nextStep):
+                self.actionsToMake=None
+                self.actionsTarget=None
+                nextStep = None
+        if nextStep is None:
+            self.actionsToMake=None
+            self.actionsTarget=None
+            inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
+            nextStep = self.checkPossibleAction(self.mapBase.map[inFrontCoords.x][inFrontCoords.y])
+        return nextStep
+    
+    # def isMistNear(self):
+    #     target = effects.EffectDescription('mist')
+    #     mistPath, mistTile = self.mapBase.findTarget(
+    #         target, 
+    #         radius=self.tileNeighbourhood
+    #     )
+    #     if len(mistPath) > 0:
+    #         pass
+    #         # return self.followTarget() away from mist
+    #     return None
+
     def choice(self):
         '''
         Return one of the choices described in POSSIBLE_ACTIONS.
@@ -254,42 +270,44 @@ class KnowledgeBase():
         Additionally, it could take into account changing weapons, strategy, ect.
         
         '''
-        
         inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
-        inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y].description()
-
-        if inFrontTile.character is not None:
-            action=characters.Action.ATTACK
-        elif self.round_counter<3:
-            action=characters.Action.TURN_RIGHT
-            self.round_counter+=1
-        else:
-            action=self.checkPossibleAction(inFrontTile)
-            # print(inFrontTile.description().type)
-            # self.actionsToMake=self.mapBase.findMiddle()[0]
-            # self.actionsToMake=[characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD, characters.Action.STEP_FORWARD]
-            # print("this is middle of the map")
-            # print(middle[0])
-            # print(type(middle[0]))
-            # if len(self.actionsToMake)>0:
-            #     to_do=self.actionsToMake.pop(1)
-            #     print(to_do)
-            #     print(type(to_do))
-            #     # action=to_do
-            # else:
-                # action=random.choice(POSSIBLE_ACTIONS)
-                # action=self.checkPossibleAction(inFrontTile)
-            # action=characters.Action.DO_NOTHING
-        # print(action)
+        inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
+        try:
+            
+            # action = self.isMistNear()
+            # if action is not None:
+            #     return action
+            
+            potionPath, potionTile = self.mapBase.findTarget(
+                consumables.ConsumableDescription('potion'), 
+                radius=self.tileNeighbourhood
+            )
+            
+            if inFrontTile.character is not None: # depending on a weapon!!!
+                action=characters.Action.ATTACK
+            elif self.round_counter<3:
+                action=characters.Action.TURN_RIGHT
+                self.round_counter+=1
+            elif self.actionsTarget is not None:
+                action = self.followTarget()
+            elif potionPath != [] and len(potionTile) < self.tileNeighbourhood:
+                self.actionsToMake, self.actionsTarget = potionPath, potionTile
+                action = self.followTarget()
+            elif self.mapBase.menhir:
+                self.actionsToMake, self.actionsTarget = self.mapBase.findTarget(self.mapBase.menhir)
+                if len(self.actionsToMake) > self.tileNeighbourhood:
+                    action = self.followTarget()
+            else:
+                action = self.checkPossibleAction(inFrontTile)
+        except:
+            action = self.checkPossibleAction(inFrontTile)
         return action
     
     def checkPossibleAction(self, inFrontTile: tiles.TileDescription):
         '''checks if tile in front is passable and if not turns randomly'''
-        # print(inFrontTile.type)
-        if inFrontTile.type in ["sea", "wall"]:
+        if not tilePassable(inFrontTile):
             return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT])
         else:
-            # return characters.Action.STEP_FORWARD
             return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD])
     
     def update(self, knowledge: characters.ChampionKnowledge):
@@ -324,7 +342,7 @@ class AresController(controller.Controller):
     def praise(self, score: int) -> None:
         self.knBase.praise(score)
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.knBase.reset(arena_description)
 
     @property

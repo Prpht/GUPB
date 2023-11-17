@@ -18,7 +18,7 @@ class Controller(Protocol):
         raise NotImplementedError
 
     @abstractmethod
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         raise NotImplementedError
 
     @property

@@ -9,6 +9,8 @@ from gupb.model.arenas import ArenaDescription
 from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
 
+# Random comment as we did not change anything
+
 POSSIBLE_RANDOM_ACTIONS = [
     Action.TURN_LEFT,
     Action.TURN_RIGHT,
@@ -70,7 +72,7 @@ class FSMBot(Controller):
     def __hash__(self) -> int:
         return -1
 
-    def reset(self, arena_description: ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: ArenaDescription) -> None:
         pass
 
     def analyse_field(self, pos, visibility: Dict[Coords, TileDescription]):
