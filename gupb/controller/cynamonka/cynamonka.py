@@ -14,6 +14,13 @@ from gupb.model import weapons
 from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
 
+"""
+TODO: inteligentniejsze atakowanie, jesli ma mniej zycia niz przeciwnik to powinien uciekac
+TODO: sprawdza przeciwnikow w szerszym obszarze i jesli widzi jakeigo w poblizu to ucieka w zaleznosci od zycia
+TODO: uciekanie przed mgłą
+"""
+
+
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
