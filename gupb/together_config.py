@@ -2,7 +2,7 @@ from gupb.controller import alpha_gupb
 from gupb.controller import ancymon
 from gupb.controller import aragorn
 from gupb.controller import ares
-# from gupb.controller import batman
+from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
 from gupb.controller import frog
@@ -18,14 +18,14 @@ from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50),
+    'arenas': arena_generator.generate_arenas(25),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
         bob.FSMBot(),
-        #batman.BatmanHeuristicsController('Batman'),
+        batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("CynamonkaController"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         frog.FrogController('Frog'),
@@ -38,8 +38,8 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': True,
+    'visualise': False,
     'show_sight': False,
-    'runs_no': 1,
+    'runs_no': 500,
 
 }
