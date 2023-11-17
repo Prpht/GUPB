@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import NamedTuple
+from typing import NamedTuple, NewType, TypeVar
 
 from gupb.model import characters
 
@@ -22,9 +22,12 @@ class States(Enum):
     HEAD_TO_POTION  = 6
 
 
+EpochNr = NewType("EpochNr", int)
+T = TypeVar("T")
+
 class SeenWeapon(NamedTuple):
     name: str
-    seen_epoch_nr: int
+    seen_epoch_nr: EpochNr
 
 
 POSSIBLE_ACTIONS = [
@@ -37,3 +40,4 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
     characters.Action.DO_NOTHING
 ]
+
