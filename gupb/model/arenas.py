@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import logging
 import os.path
 import random
+from enum import Enum, member
 from typing import Dict, NamedTuple, Optional
 
 import bresenham
@@ -36,6 +37,25 @@ FIXED_MENHIRS = {
 }
 
 Terrain = Dict[coordinates.Coords, tiles.Tile]
+
+
+# noinspection PyMethodParameters
+class StepDirection(Enum):
+    @member
+    def FORWARD(facing: characters.Facing) -> characters.Facing:
+        return facing
+
+    @member
+    def BACKWARD(facing: characters.Facing) -> characters.Facing:
+        return facing.opposite()
+
+    @member
+    def LEFT(facing: characters.Facing) -> characters.Facing:
+        return facing.turn_left()
+
+    @member
+    def RIGHT(facing: characters.Facing) -> characters.Facing:
+        return facing.turn_right()
 
 
 class ArenaDescription(NamedTuple):
@@ -111,14 +131,17 @@ class Arena:
                 visible.add(ray_coords)
                 if not self.terrain[ray_coords].transparent:
                     break
+        for coords in champion.weapon.prescience(champion.position, champion.facing):
+            if coords in self.terrain:
+                visible.add(coords)
         visible.update(champion_left_and_right())
         return visible
 
     def visible_tiles(self, champion: characters.Champion) -> dict[coordinates.Coords, tiles.TileDescription]:
         return {coords: self.terrain[coords].description() for coords in self.visible_coords(champion)}
 
-    def step_forward(self, champion: characters.Champion) -> None:
-        new_position = champion.position + champion.facing.value
+    def step(self, champion: characters.Champion, step_direction: StepDirection) -> None:
+        new_position = champion.position + step_direction.value(champion.facing).value
         if self.terrain[new_position].passable:
             self.terrain[champion.position].leave(champion)
             champion.position = new_position
