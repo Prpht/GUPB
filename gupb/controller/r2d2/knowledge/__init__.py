@@ -5,13 +5,17 @@ import numpy as np
 from gupb.controller.r2d2.utils import LARGEST_ARENA_SHAPE, tiles_mapping
 from gupb.model.arenas import Arena
 
-from gupb.model.characters import ChampionKnowledge
+from gupb.model.characters import ChampionDescription, ChampionKnowledge
+from gupb.model.coordinates import Coords
+from gupb.model.tiles import TileDescription
+from gupb.model.weapons import Knife, Sword, Axe, Bow, Amulet
 
 
 @dataclass(frozen=True)
 class R2D2Knowledge:
-    chempion_knowledge: ChampionKnowledge
+    champion_knowledge: ChampionKnowledge
     world_state: WorldState 
+    arena: Arena
 
 
 class WorldState:
@@ -89,7 +93,85 @@ class WorldState:
                 if "mist" in tile_description.effects:
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
 
+
+def get_threating_enemies_map(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
+    """
+    Get a map of enemies that are a threat to the agent.
+    """
+    threating_enemies = []
+    my_coords = knowledge.champion_knowledge.position
+    for coords, tile_description in knowledge.champion_knowledge.visible_tiles.items():
+        if tile_description.character:
+            my_description = knowledge.champion_knowledge.visible_tiles[my_coords].character
+            if is_enemy_a_threat(my_coords, coords, my_description, tile_description.character, knowledge):
+                threating_enemies.append((coords, tile_description.character))
+    return threating_enemies
+
     
+def is_enemy_a_threat(my_coords, enemy_coords, me: ChampionDescription, enemy: ChampionDescription, knowledge: R2D2Knowledge) -> bool:
+    """
+    Check if the enemy is a threat to the agent.
+    """
+    in_range = my_coords in get_cut_positions(enemy_coords, enemy, knowledge)
+    enemy_in_range = enemy_coords in get_cut_positions(my_coords, me, knowledge)
+    return (enemy.health > me.health) 
 
 
+def get_cut_positions(coords: Coords, character: ChampionDescription, knowledge: R2D2Knowledge) -> list[Coords]:
+    if not isinstance(coords, Coords):
+        coords = Coords(coords[0], coords[1])
+    weapon_class = {
+        "knife": Knife,
+        "sword": Sword,
+        "axe": Axe,
+        "bow": Bow,
+        "bow_loaded": Bow,
+        "bow_unloaded": Bow,
+        "amulet": Amulet
+    }[character.weapon.name]
+    cut_positions = weapon_class.cut_positions(
+        knowledge.arena.terrain,
+        coords,
+        character.facing
+    )
+    return cut_positions
 
+def get_enemies_in_cut_range(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
+    """
+    Get a map of enemies that are in the range of the agent's weapon.
+    """
+    enemies_in_range = []
+    coords = knowledge.champion_knowledge.position
+    my_description = knowledge.champion_knowledge.visible_tiles[coords].character
+    for coords in get_cut_positions(coords, my_description, knowledge):
+        if coords == knowledge.champion_knowledge.position:
+            continue
+        if (enymy := knowledge.champion_knowledge.visible_tiles[coords].character):
+            enemies_in_range.append((coords, enymy))
+    return enemies_in_range
+
+def decide_whether_attack(knowledge: R2D2Knowledge):
+    enemies_in_range = get_enemies_in_cut_range(knowledge)
+    my_description = knowledge.champion_knowledge.visible_tiles[knowledge.champion_knowledge.position].character
+    if len(enemies_in_range) == 0:
+        return False
+    enemies_cut_ranges = set()
+    for coords, enemy in enemies_in_range:
+        cuts = get_cut_positions(coords, enemy, knowledge)
+        enemies_cut_ranges.update(set((y, x) for y, x in cuts))
+    in_enemies_cut_range = knowledge.champion_knowledge.position in enemies_cut_ranges
+    
+    all_weaker = all([enemy.health <= my_description.health for _, enemy in enemies_in_range])
+    return all_weaker
+
+def get_all_enemies(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
+    """
+    Get a map of all enemies.
+    """
+    all_enemies = []
+    for coords, tile_description in knowledge.champion_knowledge.visible_tiles.items():
+        if coords == knowledge.champion_knowledge.position:
+            continue
+        if tile_description.character:
+            all_enemies.append((coords, tile_description.character))
+    return all_enemies

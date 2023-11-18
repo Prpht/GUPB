@@ -20,7 +20,7 @@ class WeaponFinder(Strategy):
         In this stage, the agent is supposed to find a weapon. The agent randomly chooses a destination, until
         a weapon is seen. Then the agent moves to the weapon and collects it. It finalizes this stage.
         """
-        champion_position = knowledge.chempion_knowledge.position
+        champion_position = knowledge.champion_knowledge.position
         
         # Act according to the state in stage I - Find Weapon
         if state_machine.current_state.value.name == "ChooseDestinationStI":
@@ -75,7 +75,7 @@ class MenhirFinder(Strategy):
         In second stage, the agent is supposed to find the menhir. When the menhir is seen, the agent moves to it.
         This stage ends when the agent reaches the menhir and stages III is started.
         """
-        champion_position = knowledge.chempion_knowledge.position
+        champion_position = knowledge.champion_knowledge.position
 
         # Act according to the state in stage II - Find Menhir
         if state_machine.current_state.value.name == "ChooseDestinationStII":
@@ -93,7 +93,7 @@ class MenhirFinder(Strategy):
                 next_action, reached = get_move_towards_target(champion_position, self.destination, knowledge)
                 if reached:
                     self.destination = None
-                    self.state_machine.st2_destination_reached()
+                    state_machine.st2_destination_reached()
                 return next_action
         
         if state_machine.current_state.value.name == "ApproachMenhirStII":
@@ -119,7 +119,7 @@ class MenhirObserver(Strategy):
         This is the final stage, when the agent is supposed to defend the menhir. At the moment, the agent
         just moves around the menhir.
         """
-        champion_position = knowledge.chempion_knowledge.position
+        champion_position = knowledge.champion_knowledge.position
 
         # Act according to the state in stage III - Defend Menhir
         if state_machine.current_state.value.name == "ChooseDestinationStIII":

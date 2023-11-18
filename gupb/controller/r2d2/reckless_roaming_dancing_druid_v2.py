@@ -1,7 +1,8 @@
 from gupb import controller
-from gupb.controller.r2d2.knowledge import R2D2Knowledge, WorldState
+from gupb.controller.r2d2.knowledge import R2D2Knowledge, WorldState, decide_whether_attack, get_all_enemies, get_cut_positions, get_threating_enemies_map
 from gupb.controller.r2d2.navigation import get_move_towards_target
 from gupb.controller.r2d2.strategies.exploration import MenhirFinder, MenhirObserver, WeaponFinder
+from gupb.controller.r2d2.strategies.runaway import Runaway
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.arenas import Arena
@@ -106,7 +107,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.current_weapon = knowledge.visible_tiles[self.champion_position].character.weapon.name
         self.world_state.update(knowledge)
 
-        r2_knowledge = R2D2Knowledge(knowledge, self.world_state)
+        r2_knowledge = R2D2Knowledge(knowledge, self.world_state, self.arena)
         
         # Chose next action acording to the stage
         next_action = characters.Action.TURN_RIGHT # Better than nothing
@@ -117,18 +118,39 @@ class RecklessRoamingDancingDruid(controller.Controller):
         elif self.state_machine.current_state.value.stage == 3:
             next_action = self.menhir_observer.decide(r2_knowledge, self.state_machine)
 
-        # However, if the attack is effective, attack
-        if self._attack_is_effective(knowledge, self.world_state):
-            return characters.Action.ATTACK
+        try:
+            if self._is_threat_nearby(r2_knowledge):
+                next_action = Runaway().decide(r2_knowledge, self.state_machine)
+            # However, if the attack is effective, attack
+            if decide_whether_attack(r2_knowledge):
+                return characters.Action.ATTACK
+        except Exception as e:
+            import traceback
+            print(e)
+            traceback.print_exc()
+            return characters.Action.TURN_RIGHT
         
         return next_action
+    
+    def _is_threat_nearby(self, knowledge: R2D2Knowledge) -> bool:
+        """
+        Check if there is a threat nearby.
+        """
+        def manhatan_dinstance(a: Coords, b: Coords) -> int:
+            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+        
+        threating_coords = get_threating_enemies_map(knowledge)
+        my_coord = knowledge.champion_knowledge.position
+        return any([manhatan_dinstance(my_coord, coords) <= 4 for coords, _ in threating_coords])
+        
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.arena_id = arena_description.name
-        self.world_state = WorldState(Arena.load(self.arena_id), self.decay)
+        self.arena = Arena.load(self.arena_id)
+        self.world_state = WorldState(self.arena, self.decay)
 
     @property
     def name(self) -> str:

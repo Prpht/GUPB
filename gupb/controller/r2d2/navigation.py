@@ -3,6 +3,7 @@ from gupb.model import characters
 from gupb.model.coordinates import Coords
 from pathfinding.core.grid import Grid
 from pathfinding.finder.bi_a_star import BiAStarFinder
+from pathfinding.finder.dijkstra import DijkstraFinder
 from pathfinding.core.diagonal_movement import DiagonalMovement
 
 
@@ -11,7 +12,8 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 def get_move_towards_target(
     current_position: Coords, 
     target_coords: Coords, 
-    knowledge: R2D2Knowledge
+    knowledge: R2D2Knowledge,
+    allow_moonwalk: bool = False,
 ) -> tuple[characters.Action, bool]:
     "Returns the next action to move to the target_coords and a flag indicating if the target was reached"
     
@@ -32,7 +34,48 @@ def get_move_towards_target(
 
     # - Move to the next tile
     delta = next_tile_coords - current_position
-    facing = knowledge.chempion_knowledge.visible_tiles[current_position].character.facing
+    facing = knowledge.champion_knowledge.visible_tiles[current_position].character.facing
+    if allow_moonwalk:
+        # print("delta, facing: ", delta, facing)
+        if facing.value == characters.Facing.UP.value:
+            if delta == characters.Facing.UP.value:
+                action = characters.Action.STEP_FORWARD, False
+            if delta == characters.Facing.LEFT.value:
+                action = characters.Action.STEP_LEFT, False
+            if delta == characters.Facing.RIGHT.value:
+                action = characters.Action.STEP_RIGHT, False
+            if delta == characters.Facing.DOWN.value:
+                action = characters.Action.STEP_BACKWARD, False
+        elif facing.value == characters.Facing.RIGHT.value:
+            if delta == characters.Facing.UP.value:
+                action = characters.Action.STEP_LEFT, False
+            if delta == characters.Facing.LEFT.value:
+                action = characters.Action.STEP_BACKWARD, False
+            if delta == characters.Facing.RIGHT.value:
+                action = characters.Action.STEP_FORWARD, False
+            if delta == characters.Facing.DOWN.value:
+                action = characters.Action.STEP_RIGHT, False
+        elif facing.value == characters.Facing.DOWN.value:
+            if delta == characters.Facing.UP.value:
+                action = characters.Action.STEP_BACKWARD, False
+            if delta == characters.Facing.LEFT.value:
+                action = characters.Action.STEP_RIGHT, False
+            if delta == characters.Facing.RIGHT.value:
+                action = characters.Action.STEP_LEFT, False
+            if delta == characters.Facing.DOWN.value:
+                action = characters.Action.STEP_FORWARD, False
+        elif facing.value == characters.Facing.LEFT.value:
+            if delta == characters.Facing.UP.value:
+                action = characters.Action.STEP_RIGHT, False
+            if delta == characters.Facing.LEFT.value:
+                action = characters.Action.STEP_FORWARD, False
+            if delta == characters.Facing.RIGHT.value:
+                action = characters.Action.STEP_BACKWARD, False
+            if delta == characters.Facing.DOWN.value:
+                action = characters.Action.STEP_LEFT, False
+        return action 
+
+
 
     if facing.value == characters.Facing.UP.value:
         if delta == characters.Facing.UP.value:
