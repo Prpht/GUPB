@@ -541,7 +541,7 @@ class AlphaGUPB(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        print("start")
+        #print("start")
         self.update_knowledge(knowledge.visible_tiles)
         self.alive_champions = knowledge.no_of_champions_alive
         self.position = knowledge.position
@@ -570,7 +570,7 @@ class AlphaGUPB(controller.Controller):
             self.menhir = self.get_menhir()
 
         if (self.closest_enemy and (self.weapon.name in ['bow_loaded', 'bow_unloaded'])):
-            print("close enemy and bow")
+            #print("close enemy and bow")
             distance = self.distance(self.position, self.closest_enemy)
             if(distance < 4):
                 furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
@@ -580,14 +580,14 @@ class AlphaGUPB(controller.Controller):
                     return self.find_move(path[1])
     
         if(can_attack and self.weapon not in ['bow_loaded', 'bow_unloaded']):
-            print('can attack')
+            #print('can attack')
             if(self.weapon.name =='bow_loaded'):
                 return self.attack_enemy(can_attack)
             if(self.should_attack2(self.closest_enemy)):
-                print("should attack, attacking")
+                #print("should attack, attacking")
                 return self.attack_enemy(can_attack)
             else:
-                print("shouldnt attack")
+                #print("shouldnt attack")
                 furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
                 furthest_tile = self.furthest_tile_from_enemy(furthest_tiles, self.closest_enemy)
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), furthest_tile)
@@ -595,35 +595,35 @@ class AlphaGUPB(controller.Controller):
                     return self.find_move(path[1])
         
         if(len(self.positions)>5 and len(set(self.positions[-9:])) == 1):
-            print("random action")
+            #print("random action")
             self.positions = []
             return random.choice(POSSIBLE_ACTIONS)
     
         if(len(self.mist)>0):
-            print("mist")
+            #print("mist")
             closest_mist = self.closest_tile(self.position, self.mist)
             if(self.distance(self.position, closest_mist) < 5):
                 if(self.menhir): 
                     if(self.distance(self.position, self.menhir) > 3):
                         path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.menhir)
-                        print("going to menhir")
+                        #print("going to menhir")
                         return self.find_move(path[1])
                 furthest_tiles = self.furthest_tiles(closest_mist, self.walkable_tiles)
                 for tile in furthest_tiles:
                     if (tile not in self.mist and self.can_walk(tile)):
-                        print(tile)
+                        #print(tile)
                         path = pathfinder.astar(blocks, (self.position[0], self.position[1]), tile)
                         if (path):
                             return self.find_move(path[1])
-                print("dont know where to run")
+                #print("dont know where to run")
         
         if(len(tiles_with_potions)>0):
-            print("potions")
+            #print("potions")
             closest_potion= self.closest_tile(self.position, tiles_with_potions)
             if(closest_potion != self.position):
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), closest_potion)
                 if(path[1] not in self.mist):
-                    print("going to potion")
+                    #print("going to potion")
                     return self.find_move(path[1])  
 
 
@@ -631,7 +631,7 @@ class AlphaGUPB(controller.Controller):
             if(self.should_attack(self.closest_enemy)):
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.closest_enemy)
                 if(path[1] not in self.mist):
-                    print("chasing enemy")
+                    #print("chasing enemy")
                     return self.find_move(path[1])
             
         if(self.weapon.name == 'bow_unloaded'):
@@ -644,12 +644,12 @@ class AlphaGUPB(controller.Controller):
                     return self.find_move(path[1])
         
         if self.closest_enemy:
-            print(self.closest_enemy)
+            #print(self.closest_enemy)
             enemy_weapon = self.get_enemy_weapon(self.closest_enemy)
             distance = self.distance(self.position, self.closest_enemy)
             if(distance<=3 and distance>1 and self.weapon.name !='amulet' and enemy_weapon not in ['sword', 'axe', 'bow_loaded', 'bow_unloaded']):
-                print("predicting attack")
-                print(self.closest_enemy)
+                #print("predicting attack")
+                #print(self.closest_enemy)
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.closest_enemy)
                 if(path[1][0]<self.position[0]):
                     direction = "left"
@@ -661,7 +661,7 @@ class AlphaGUPB(controller.Controller):
                     direction = "up"
                 return self.attack_enemy(direction)
             elif(distance<8):
-                print("running away")
+                #print("running away")
                 if len(self.walkable_tiles)>0:
                     furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
                     furthest_tile = self.furthest_tile_from_enemy(furthest_tiles, self.closest_enemy)
@@ -670,19 +670,20 @@ class AlphaGUPB(controller.Controller):
                         return self.find_move(path[1])
                 
         if not self.menhir and self.alive_champions < 5:
-            print('exploring')
+            #print('exploring')
             not_explored = self.not_walked_tiles()
             if not not_explored:
-                print('no tiles to explore')
+                #print('no tiles to explore')
+                pass
             closest_tile = self.closest_tile(self.position, not_explored)
-            print("going to", closest_tile)
-            print("pos", self.position)
+            #print("going to", closest_tile)
+            #print("pos", self.position)
             path = pathfinder.astar(blocks, (self.position[0], self.position[1]), closest_tile)
             return self.find_move(path[1])
-            print("running :)")
+            #print("running :)")
             if(self.can_step_forward()):
                 return controller.characters.Action.STEP_FORWARD
-        print("left")
+        #print("left")
         return controller.characters.Action.TURN_LEFT
 
 
