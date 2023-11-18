@@ -35,7 +35,7 @@ class Item_Finder:
         if self.potion_coord:
             self.next_move, self.path = self.path_finder.calculate_next_move(self.potion_coord)
             if self.next_move is None or self.path is None:
-                print('Potion Finder Alternate path case')
+                # print('Potion Finder Alternate path case')
                 return ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH
             if self.is_enemy_on_path():
                 return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
@@ -44,7 +44,7 @@ class Item_Finder:
         if self.loot_coord:
             self.next_move, self.path = self.path_finder.calculate_next_move(self.loot_coord)
             if self.next_move is None or self.path is None:
-                print('Potion Finder Alternate path case')
+                # print('Potion Finder Alternate path case')
                 return ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH
             if self.is_enemy_on_path():
                 return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
@@ -58,15 +58,6 @@ class Item_Finder:
             if field and field.character and field.character.controller_name != self.environment.champion.controller_name:
                 return True
         return False
-
-    def should_attack(self, decision):
-        if decision == characters.Action.STEP_FORWARD:
-            new_position = self.environment.position + self.environment.discovered_map[
-                self.environment.position].character.facing.value
-            if self.environment.discovered_map[new_position].character != None:
-                print("KILL WHILE ITEM SEARCH")
-                return characters.Action.ATTACK
-        return decision
 
     def update_items_knowladge(self):
         potion_dist = float('inf')

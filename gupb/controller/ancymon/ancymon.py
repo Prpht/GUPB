@@ -43,85 +43,96 @@ class AncymonController(controller.Controller):
         self.path_finder.update_paths(self.environment.position)
         self.alternative_path_finder.update_paths(self.environment.position)
         self.i += 1
-        print(self.i, end=' ')
+        # print(self.i, end=' ')
 
         hunter_decision, item_finder_decision, explorer_decision = None, None, None
 
         try:
             hunter_decision = self.hunter.decide(self.path_finder)
         except Exception as e:
-            print(f"An exception occurred in Hunter strategy: {e}")
+            # print(f"An exception occurred in Hunter strategy: {e}")
             pass
 
         try:
-            item_finder_decision = self.item_finder.decide(self.alternative_path_finder)
-            if item_finder_decision == ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH:
+            temporary_item_finder_decision = self.item_finder.decide(self.alternative_path_finder)
+            if temporary_item_finder_decision == ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH:
                 item_finder_decision = self.item_finder.decide(self.path_finder)
+            else:
+                item_finder_decision = temporary_item_finder_decision
         except Exception as e:
-            print(f"An exception occurred in Item Finder strategy: {e}")
+            # print(f"An exception occurred in Item Finder strategy: {e}")
             pass
 
         try:
-            explorer_decision = self.explorer.decide(self.alternative_path_finder)
-            if explorer_decision == EXPLORER_DECISION.NO_ALTERNATIVE_PATH:
+            temporary_explorer_decision = self.explorer.decide(self.alternative_path_finder)
+            if temporary_explorer_decision == EXPLORER_DECISION.NO_ALTERNATIVE_PATH:
                 explorer_decision = self.explorer.decide(self.path_finder)
+            else:
+                explorer_decision = temporary_explorer_decision
         except Exception as e:
-            print(f"An exception occurred in Explorer strategy: {e}")
+            # print(f"An exception occurred in Explorer strategy: {e}")
             pass
 
-        if hunter_decision != HUNTER_DECISION.NO_ENEMY and item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS: #Podnoś potki zamiast gonić
+        if hunter_decision != HUNTER_DECISION.NO_ENEMY and item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS:
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
                 if hunter_decision == HUNTER_DECISION.CHASE:
                     if len(self.hunter.path) >= len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health: #Dodać ograniczenie globalne
                         if len(self.item_finder.path) <= self.environment.enemies_left + 3:
-                            print('Go for potion instead of chasing')
+                            # print('Go for potion instead of chasing')
                             return self.item_finder.next_move
 
 
         if hunter_decision != HUNTER_DECISION.NO_ENEMY:
-            if hunter_decision == HUNTER_DECISION.LONG_RANGE_ATTACK: # Jeżeli przeciwnik sam nie ma jakiejś dalekosiężnej broni
-                print('Long range attack')
-                return self.hunter.next_move
+            if hunter_decision == HUNTER_DECISION.LONG_RANGE_ATTACK:
+                if self.environment.old_health == self.environment.champion.health:
+                    # print('Long range attack')
+                    return self.hunter.next_move
             if hunter_decision == HUNTER_DECISION.ATTACK:
                 if self.environment.champion.health >= self.hunter.next_target.health:
-                    print('Classic Attack')
+                    # print('Classic Attack')
                     return self.hunter.next_move
             if hunter_decision == HUNTER_DECISION.CHASE:
                 if (self.environment.champion.health >= self.hunter.next_target.health
                         and self.hunter.path is not None and len(self.hunter.path) <= 4):
-                    print('Classic chase')
+                    # print('Classic chase')
                     return self.hunter.next_move
 
         if item_finder_decision is not ITEM_FINDER_DECISION.NO_ITEMS:
             if item_finder_decision == ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE:
                 if self.item_finder.next_move == characters.Action.STEP_FORWARD:
-                    print('Item finder, enemy on way, no other path, attack')
+                    # print('Item finder, enemy on way, no other path, attack')
                     return characters.Action.ATTACK
+                if hunter_decision == HUNTER_DECISION.CHASE:
+                    # print('Item finder, enemy on way, chase path')
+                    return self.hunter.next_move
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
                 if self.item_finder.path is not None and len(self.item_finder.path) <= self.environment.enemies_left + 3:
-                    print('Go for potion')
+                    # print('Go for potion')
                     return self.item_finder.next_move
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_LOOT:
                 if (self.item_finder.path is not None and len(self.item_finder.path) <= self.environment.enemies_left + 3 and
                         (self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0)):
-                    print('Go for loot')
+                    # print('Go for loot')
                     return self.item_finder.next_move
 
         if explorer_decision:
             if explorer_decision == EXPLORER_DECISION.ENEMY_ON_NEXT_MOVE:
                 if self.explorer.next_move == characters.Action.STEP_FORWARD:
-                    print('Explorer, enemy on way, no other path, attack')
+                    # print('Explorer, enemy on way, no other path, attack')
                     return characters.Action.ATTACK
+                if hunter_decision == HUNTER_DECISION.CHASE:
+                    # print('Explorer, enemy on way, chase path')
+                    return self.hunter.next_move
             if explorer_decision == EXPLORER_DECISION.EXPLORE and self.is_menhir_neer() is False:
-                print('Explore')
+                # print('Explore')
                 return self.explorer.next_move
 
-            print("EXPLORE MENHIR")
+            # print("EXPLORE MENHIR")
             return random.choices(
                 population=POSSIBLE_ACTIONS[:3], weights=(40, 40, 20), k=1
             )[0]
 
-        print('UNEXPECTED MOVE - EXCEPTION')
+        # print('UNEXPECTED MOVE - EXCEPTION')
         return characters.Action.TURN_RIGHT
 
     def is_menhir_neer(self):
@@ -141,7 +152,6 @@ class AncymonController(controller.Controller):
         self.hunter.environment = self.environment
         self.item_finder.environment = self.environment
         self.explorer.environment = self.environment
-        self.explorer.reset()
 
     @property
     def name(self) -> str:

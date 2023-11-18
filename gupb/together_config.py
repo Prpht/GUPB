@@ -16,13 +16,11 @@ from gupb.controller import roger
 from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
-ancymon_controller = ancymon.AncymonController("Ancymon")
-
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(2),
+    'arenas': arena_generator.generate_arenas(50),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
-        ancymon_controller,
+        ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
         bob.FSMBot(),
@@ -39,7 +37,7 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': True,
-    'show_sight': ancymon_controller,
-    'runs_no': 10,
+    'visualise': False,
+    'show_sight': False,
+    'runs_no': 1000,
 }

@@ -20,7 +20,7 @@ class Hunter:
         self.next_move = None
         self.path = None
 
-        if self.is_enemy_neer(1) == False and self.can_attack():
+        if self.is_enemy_neer(1) == False and self.can_attack(): #Jakaś delta hp, jeżeli się zmienia to nie atakujemy
             self.next_move = characters.Action.ATTACK
             return HUNTER_DECISION.LONG_RANGE_ATTACK
 
@@ -134,17 +134,17 @@ class Hunter:
         if self.environment.weapon.name == 'knife':
             return self.next_target_coord
 
-        elif self.environment.weapon.name == 'sword':
-            for direction in [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]:
-                further_position = self.next_target_coord
-                for i in range(2):
-                    further_position += direction
-                    spot = self.environment.discovered_map.get(further_position)
-                    if spot and spot.type == 'land':
-                        spot_dist = self.path_finder.calculate_path_length(further_position)
-                        if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
-                            new_attack_spot_dist = spot_dist
-                            new_attack_spot = further_position
+        # elif self.environment.weapon.name == 'sword':
+        #     for direction in [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]:
+        #         further_position = self.next_target_coord
+        #         for i in range(2):
+        #             further_position += direction
+        #             spot = self.environment.visible_map.get(further_position)
+        #             if spot and spot.type == 'land':
+        #                 spot_dist = self.path_finder.calculate_path_length(further_position)
+        #                 if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
+        #                     new_attack_spot_dist = spot_dist
+        #                     new_attack_spot = further_position
 
         elif self.environment.weapon.name == 'amulet':
             for direction in [Coords(1, 1), Coords(1, -1), Coords(-1, 1), Coords(-1, -1)]:
