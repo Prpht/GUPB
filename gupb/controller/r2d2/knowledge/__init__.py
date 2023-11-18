@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from gupb.controller.r2d2.utils import LARGEST_ARENA_SHAPE, tiles_mapping
@@ -12,6 +13,7 @@ from gupb.model.characters import ChampionKnowledge
 class R2D2Knowledge:
     chempion_knowledge: ChampionKnowledge
     world_state: WorldState 
+    current_weapon: str
 
 
 class WorldState:
@@ -23,8 +25,15 @@ class WorldState:
 
         # Save the initial state of the arena for decay mechanism
         self.initial_arena = self.matrix.copy()
+
+        # Define the exploration matrix wich stores explored tiles
+        self.explored = self.initial_arena.copy()[:self.arena_shape[0], :self.arena_shape[1]]
+        self.explored = np.logical_or(self.explored == tiles_mapping["sea"], self.explored != tiles_mapping["wall"])
+
+        # Define the decay mask
         self.decay = decay
         self.decay_mask = np.zeros(LARGEST_ARENA_SHAPE, np.int8)
+
         self.menhir_position = None
 
     def update(self, knowledge: ChampionKnowledge):
@@ -33,6 +42,9 @@ class WorldState:
         
         # Update the matrix with the current observation
         self._fill_matrix(knowledge)
+
+        # Update the explored matrix
+        self.update_explored(knowledge)
 
         # Update the state of the agent
         self._update_state(knowledge)
@@ -89,6 +101,10 @@ class WorldState:
                 if "mist" in tile_description.effects:
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
 
+    def update_explored(self, champion_knowledge: ChampionKnowledge):
+        # Update the explored matrix
+        for coords, tile_description in champion_knowledge.visible_tiles.items():
+            self.explored[coords[1], coords[0]] = True
     
 
 

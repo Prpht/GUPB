@@ -31,6 +31,17 @@ weapon_translate = {
     10: "amulet",
 }
 
+items_ranking = {
+    'potion': 0, # 'potion' is not a weapon, but it is the most important item
+    'axe': 1,
+    'sword': 2,
+    'amulet': 3,
+    'knife': 4,
+    'bow': 5,
+    'bow_loaded': 5,
+    'bow_unloaded': 5
+}
+
 update_facing_right = {
     characters.Facing.UP: characters.Facing.RIGHT,
     characters.Facing.RIGHT: characters.Facing.DOWN,
