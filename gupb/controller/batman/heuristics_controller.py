@@ -29,7 +29,7 @@ class BatmanHeuristicsController(controller.Controller):
         self._event_detector = EventDetector()
 
         self._trainer = Trainer()
-        self._last_params = np.array([5])  # default
+        self._params = np.array([5])  # default
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         assert (
@@ -38,6 +38,10 @@ class BatmanHeuristicsController(controller.Controller):
 
         self._episode += 1
         self._knowledge.update(knowledge, self._episode)
+
+        if self._episode == 1:
+            # here becasue we need to know Batman position
+            self._parametrize_strategies()
 
         events = self._event_detector.detect(self._knowledge)
 
@@ -58,7 +62,7 @@ class BatmanHeuristicsController(controller.Controller):
         return action
 
     def praise(self, score: int) -> None:
-        self._trainer.add_to_buffer(self._last_state, self._last_params, score / 1000)
+        self._trainer.add_to_buffer(self._state, self._params, score / 1000)
         self._trainer.force_training_end()
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
@@ -68,15 +72,22 @@ class BatmanHeuristicsController(controller.Controller):
         self._navigation = Navigation(self._knowledge)
         self._passthrough = Passthrough(self._knowledge, self._navigation, samples=1000)
 
-        self._last_state = self._knowledge.arena.one_hot_encoding()
-        self._strategies = StrategiesFactory(self._passthrough)
-        self._last_params = self._select_paarms(self._epsilon())
-
-        self._strategies.set_params(self._last_params)  # type: ignore
-        self._current_strategy = self._strategies.get("hiding")
-
-        if game_no % 5 == 0 and game_no > 0:
+        if game_no % 3 == 0 and game_no > 0:
             self._trainer.train()
+
+    def _parametrize_strategies(self):
+        self._state = np.concatenate(
+            (
+                self._knowledge.arena.one_hot_encoding(),
+                np.array([self._passthrough._passthrough]),
+            )
+        )
+
+        self._strategies = StrategiesFactory(self._passthrough)
+        self._init_position = np.array(self._knowledge.champion.position, dtype=int)
+        self._params = self._select_params(self._epsilon())
+        self._strategies.set_params(self._params)  # type: ignore
+        self._current_strategy = self._strategies.get("hiding")
 
     def _epsilon(self):
         init_eps = 0.7
@@ -85,15 +96,16 @@ class BatmanHeuristicsController(controller.Controller):
 
         return max(min_eps, init_eps * eps_decay**self._game)
 
-    def _select_paarms(self, epsilon):
+    def _select_params(self, epsilon):
         possible_params = list(self._strategies.possible_params())
         if random.random() < epsilon:
-            return random.choice(possible_params)
+            return np.concatenate((random.choice(possible_params), self._init_position))
         else:
             best_reward = 0
-            best_params = self._last_params
+            best_params = self._params
             for params in possible_params:
-                reward = self._trainer.guess_reward(self._last_state, params)
+                params = np.concatenate((params, self._init_position))
+                reward = self._trainer.guess_reward(self._state, params)
                 if reward > best_reward:
                     best_reward = reward
                     best_params = params

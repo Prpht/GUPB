@@ -44,8 +44,7 @@ class StrategiesFactory:
 
     def set_params(self, params: Sequence[float]):
         """params should be from range 0 to 1"""
-        ranges = self._upper_params_limit - self._lower_params_limit
-        self._params = np.array(params) * ranges + self._lower_params_limit
+        self._params = params
         self._set_strategies()
 
     @property
