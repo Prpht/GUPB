@@ -20,16 +20,13 @@ class StrategiesFactory:
         self._upper_params_limit = np.array([8], dtype=int)
 
     def set_params(self, params: Sequence[float]):
-        self._params = np.array(params)
-
-    def _denormalize_param(self, param_id: int) -> float:
-        lower_limit = self._lower_params_limit[param_id]
-        range = self._upper_params_limit[param_id] - lower_limit
-        return self._params[param_id] * range + lower_limit
+        """params should be from range 0 to 1"""
+        ranges = self._upper_params_limit - self._lower_params_limit
+        self._params = np.array(params) * ranges + self._lower_params_limit
 
     @property
     def safe_hampions_alive_count(self) -> int:
-        return int(self._denormalize_param(0))
+        return int(self._params[0])
 
     def get(self, startegy: str):
         if startegy == "defending":
