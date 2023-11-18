@@ -17,7 +17,6 @@ from gupb.view import render
 
 verbose_logger = logging.getLogger('verbose')
 
-
 class Runner:
     def __init__(self, config: dict[str, Any]) -> None:
         self.arenas: list[str] = config['arenas']
