@@ -30,7 +30,12 @@ from gupb.controller.batman.knowledge.knowledge import (
 
 
 class HidingStrategy:
-    def __init__(self, passthrough: Passthrough, hideouts_count: int = 7):
+    def __init__(
+        self,
+        passthrough: Passthrough,
+        hideouts_count: int = 7,
+        safe_hampions_alive_count: int = 5,
+    ):
         self._passthrough = passthrough
         self._navigation = passthrough.navigation
         self._arena_size = passthrough.arena_size
@@ -38,6 +43,7 @@ class HidingStrategy:
         self._hideouts = self._detect_hideouts()
         self._current_objective = None
         self._vulnerable_directions = dict()
+        self._safe_hampions_alive_count = safe_hampions_alive_count
 
     def _detect_hideouts(self) -> list[Coords]:
         potential_hideouts = []
@@ -80,7 +86,10 @@ class HidingStrategy:
         #     return None, "scouting"
 
         # hide until we see mist close enough (10 tiles?) or the number of alive enemies has dropped to less than 5?
-        if knowledge.champions_alive <= 5 or knowledge.mist_distance <= 10:
+        if (
+            knowledge.champions_alive <= self._safe_hampions_alive_count
+            or knowledge.mist_distance <= 10
+        ):
             return None, "rotating"
 
         for event in events:
