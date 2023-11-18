@@ -1,5 +1,5 @@
 OUR_BOT_NAME = 'Aragorn'
-DEBUG = True
+DEBUG = False
 INFINITY: int = 99999999999
 WEAPON_HIERARCHY = {
     "axe" : 3,
