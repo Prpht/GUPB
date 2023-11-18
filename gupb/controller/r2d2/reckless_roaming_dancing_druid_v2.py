@@ -127,7 +127,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # If walked into a worse weapon, drop it
         dropped_weapon = knowledge.visible_tiles[self.champion_position].loot
         if dropped_weapon:
-            if items_ranking[dropped_weapon.name] > items_ranking[r2_knowledge.current_weapon]:
+            if items_ranking[dropped_weapon.name] < items_ranking[r2_knowledge.current_weapon]:
                 return characters.Action.STEP_BACKWARD
 
         # However, if the attack is effective, attack

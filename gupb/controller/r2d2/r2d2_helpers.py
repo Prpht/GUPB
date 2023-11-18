@@ -28,9 +28,17 @@ def scan_for_items(knowledge: R2D2Knowledge) -> Optional[Coords]:
 
     item_tiles = []
     for coords, tile_description in knowledge.chempion_knowledge.visible_tiles.items():
+
+        # If the tile is the one the champion is standing on, ignore it
+        if coords == knowledge.chempion_knowledge.position:
+            continue
+
+        # Interested in weapons that are stronger than the current one
         if tile_description.loot is not None:
-            if items_ranking[tile_description.loot.name] > items_ranking[knowledge.current_weapon]:
+            if items_ranking[tile_description.loot.name] < items_ranking[knowledge.current_weapon]:
                 item_tiles.append((coords, tile_description.loot.name))
+        
+        # Always interested in consumables
         if tile_description.consumable is not None:
             item_tiles.append((coords, tile_description.consumable.name))
     
@@ -105,6 +113,9 @@ def choose_destination_around_menhir(arena_matrix: np.ndarray, menhir_coords: Co
 
     # The list of possible coordinates in np indexing format
     np_coords = list(zip(xs, ys))
+
+    # Filter out the coordinates that takes too long to get to
+    # TODO
 
     # Filter out the coordinates that are too far from the menhir
     np_coords = [c for c in np_coords if manhataan_distance(menhir_coords, Coords(c[1], c[0])) <= radius]

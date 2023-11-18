@@ -75,8 +75,8 @@ class WorldState:
 
         # Create a walkable matrix for pathfinding
         matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
-        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
-        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != 12)
+        matrix_walkable = np.logical_and(matrix_walkable != tiles_mapping["sea"], matrix_walkable != tiles_mapping["wall"])
+        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != tiles_mapping["enymy"])
         self.matrix_walkable = matrix_walkable.astype(int)
 
     def _fill_matrix(self, champion_knowledge: ChampionKnowledge):
