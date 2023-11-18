@@ -11,6 +11,7 @@ class Environment():
         self.visible_map = dict()
         self.position: coordinates.Coords = None
         self.champion = None
+        self.mist_seen = False
         self.menhir: coordinates.Coords = None
         self.weapon = Knife
 
@@ -27,6 +28,10 @@ class Environment():
         for coords, description in visible_tiles.items():
             self.visible_map[coords] = description
             self.discovered_map[coords] = description
+            if self.mist_seen is False:
+                for effect in description.effects:
+                    if effect.type == 'mist':
+                        self.mist_seen = True
             if self.menhir == None and self.discovered_map[coords].type == "menhir":
                 self.menhir = coordinates.Coords(coords[0], coords[1])
             if self.map_known_len < max(coords[0], coords[1]):

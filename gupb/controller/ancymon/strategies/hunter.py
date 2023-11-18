@@ -5,9 +5,9 @@ from gupb.model import characters
 from gupb.model.coordinates import Coords
 
 class Hunter:
-    def __init__(self, environment: Environment, path_finder: Path_Finder):
+    def __init__(self, environment: Environment):
         self.environment: Environment = environment
-        self.path_finder: Path_Finder = path_finder
+        self.path_finder: Path_Finder = None
 
         self.next_target = None
         self.next_target_coord: Coords = None
@@ -15,7 +15,8 @@ class Hunter:
         self.next_move: characters.Action = None
         self.path: list[Coords] = None
 
-    def decide(self):
+    def decide(self, path_finder: Path_Finder):
+        self.path_finder = path_finder
         self.next_move = None
         self.path = None
 
@@ -159,9 +160,8 @@ class Hunter:
 
         elif self.environment.weapon.name == 'axe':
             for direction in [Coords(0, 1), Coords(0, -1)]:
-                further_position = self.next_target_coord
                 for direction_2 in [Coords(0, 0), Coords(1, 0), Coords(-1, 0)]:
-                    further_position = further_position + direction + direction_2
+                    further_position = self.next_target_coord + direction + direction_2
                     spot = self.environment.discovered_map.get(further_position)
                     if spot and spot.type == 'land':
                         spot_dist = self.path_finder.calculate_path_length(further_position)
@@ -170,9 +170,8 @@ class Hunter:
                             new_attack_spot = further_position
 
             for direction in [Coords(1, 0), Coords(-1, 0)]:
-                further_position = self.next_target_coord
                 for direction_2 in [Coords(0, 0), Coords(0, 1), Coords(0, -1)]:
-                    further_position = further_position + direction + direction_2
+                    further_position = self.next_target_coord + direction + direction_2
                     spot = self.environment.discovered_map.get(further_position)
                     if spot and spot.type == 'land':
                         spot_dist = self.path_finder.calculate_path_length(further_position)

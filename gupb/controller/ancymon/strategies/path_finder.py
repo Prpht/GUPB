@@ -6,18 +6,17 @@ from gupb.model import characters
 directions = [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]
 
 class Path_Finder():
-    def __init__(self, environment: Environment):
+    def __init__(self, environment: Environment, avoid_obstacles: bool = False):
         self.environment: Environment = environment
         self.g_score = None
         self.came_from = None
-        self.avoid_players: bool = False
+        self.avoid_obstacles: bool = avoid_obstacles
 
-    def update_paths(self, start: Coords, avoid_enemies: bool = False):
+    def update_paths(self, start: Coords):
         open_set = [(0, start)]
         self.came_from = {}
         self.g_score = {Coords(row, col): float('inf') for row in range(self.environment.map_known_len+1) for col in range(self.environment.map_known_len+1)}
         self.g_score[start] = 0
-        self.avoid_players = avoid_enemies
 
         while open_set:
             _, current = heapq.heappop(open_set)
@@ -37,13 +36,16 @@ class Path_Finder():
     def is_valid(self, point):
         x, y = point
         if 0 <= x <= self.environment.map_known_len and 0 <= y <= self.environment.map_known_len:
-            if self.environment.discovered_map.get(point) == None:
+            field = self.environment.discovered_map.get(point)
+            if field is None:
                 return True
-            if self.avoid_players and self.environment.discovered_map.get(point).character and self.environment.discovered_map.get(point).character.health > self.environment.champion.health:
+            if self.avoid_obstacles and field.character and field.character.controller_name != self.environment.champion.controller_name:
                 return False
-            if self.environment.discovered_map.get(point).type == 'land':
+            if self.avoid_obstacles and self.environment.weapon.name != 'knife' and field.loot is not None and field.loot.name.find('bow') >= 0:
+                return False
+            if field.type == 'land':
                 return True
-            if self.environment.discovered_map.get(point).type == 'menhir':
+            if field.type == 'menhir':
                 return True
         return False
 
@@ -68,7 +70,7 @@ class Path_Finder():
 
         if path and len(path) >= 3:
             if self.environment.champion.facing.value == Coords(1, 0):
-                if self.environment.position + Coords(0,1) == path[1] and self.environment.position + Coords(1,1) == path[2]:
+                if self.environment.position + Coords(0, 1) == path[1] and self.environment.position + Coords(1,1) == path[2]:
                     return characters.Action.STEP_RIGHT, path
                 if self.environment.position + Coords(0,-1) == path[1] and self.environment.position + Coords(1, -1) == path[2]:
                     return characters.Action.STEP_LEFT, path

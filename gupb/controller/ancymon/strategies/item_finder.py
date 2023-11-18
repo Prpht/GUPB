@@ -15,9 +15,9 @@ POSSIBLE_ACTIONS = [
 
 
 class Item_Finder:
-    def __init__(self, environment: Environment, path_finder: Path_Finder):
+    def __init__(self, environment: Environment):
         self.environment: Environment = environment
-        self.path_finder: Path_Finder = path_finder
+        self.path_finder: Path_Finder = None
 
         self.potion_coord: Coords = None
         self.loot_coord: Coords = None
@@ -26,19 +26,26 @@ class Item_Finder:
         self.next_move: characters.Action = None
         self.path: list[Coords] = None
 
-    def decide(self):
+    def decide(self, path_finder: Path_Finder):
+        self.path_finder = path_finder
         self.next_move = None
         self.path = None
         self.update_items_knowladge()
 
         if self.potion_coord:
             self.next_move, self.path = self.path_finder.calculate_next_move(self.potion_coord)
+            if self.next_move is None or self.path is None:
+                print('Potion Finder Alternate path case')
+                return ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH
             if self.is_enemy_on_path():
                 return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
             return ITEM_FINDER_DECISION.GO_FOR_POTION
 
         if self.loot_coord:
             self.next_move, self.path = self.path_finder.calculate_next_move(self.loot_coord)
+            if self.next_move is None or self.path is None:
+                print('Potion Finder Alternate path case')
+                return ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH
             if self.is_enemy_on_path():
                 return ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE
             return ITEM_FINDER_DECISION.GO_FOR_LOOT

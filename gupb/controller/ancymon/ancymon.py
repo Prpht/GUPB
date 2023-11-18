@@ -23,10 +23,11 @@ class AncymonController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
         self.environment: Environment = Environment()
-        self.path_finder: Path_Finder = Path_Finder(self.environment)
-        self.explorer: Explore = Explore(self.environment, self.path_finder)
-        self.item_finder: Item_Finder = Item_Finder(self.environment, self.path_finder)
-        self.hunter: Hunter = Hunter(self.environment, self.path_finder)
+        self.path_finder: Path_Finder = Path_Finder(self.environment, False)
+        self.alternative_path_finder: Path_Finder = Path_Finder(self.environment, True)
+        self.explorer: Explore = Explore(self.environment)
+        self.item_finder: Item_Finder = Item_Finder(self.environment)
+        self.hunter: Hunter = Hunter(self.environment)
         self.i: int = 0
 
     def __eq__(self, other: object) -> bool:
@@ -40,25 +41,30 @@ class AncymonController(controller.Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.environment.update_environment(knowledge)
         self.path_finder.update_paths(self.environment.position)
+        self.alternative_path_finder.update_paths(self.environment.position)
         self.i += 1
         print(self.i, end=' ')
 
         hunter_decision, item_finder_decision, explorer_decision = None, None, None
 
         try:
-            hunter_decision = self.hunter.decide()
+            hunter_decision = self.hunter.decide(self.path_finder)
         except Exception as e:
             print(f"An exception occurred in Hunter strategy: {e}")
             pass
 
         try:
-            item_finder_decision = self.item_finder.decide()
+            item_finder_decision = self.item_finder.decide(self.alternative_path_finder)
+            if item_finder_decision == ITEM_FINDER_DECISION.NO_ALTERNATIVE_PATH:
+                item_finder_decision = self.item_finder.decide(self.path_finder)
         except Exception as e:
             print(f"An exception occurred in Item Finder strategy: {e}")
             pass
 
         try:
-            explorer_decision = self.explorer.decide()
+            explorer_decision = self.explorer.decide(self.alternative_path_finder)
+            if explorer_decision == EXPLORER_DECISION.NO_ALTERNATIVE_PATH:
+                explorer_decision = self.explorer.decide(self.path_finder)
         except Exception as e:
             print(f"An exception occurred in Explorer strategy: {e}")
             pass
@@ -66,9 +72,10 @@ class AncymonController(controller.Controller):
         if hunter_decision != HUNTER_DECISION.NO_ENEMY and item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS: #Podnoś potki zamiast gonić
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
                 if hunter_decision == HUNTER_DECISION.CHASE:
-                    if len(self.hunter.path) > len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health:
-                        print('Go for potion instead of chasing')
-                        return self.item_finder.next_move
+                    if len(self.hunter.path) >= len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health: #Dodać ograniczenie globalne
+                        if len(self.item_finder.path) <= self.environment.enemies_left + 3:
+                            print('Go for potion instead of chasing')
+                            return self.item_finder.next_move
 
 
         if hunter_decision != HUNTER_DECISION.NO_ENEMY:
@@ -79,17 +86,17 @@ class AncymonController(controller.Controller):
                 if self.environment.champion.health >= self.hunter.next_target.health:
                     print('Classic Attack')
                     return self.hunter.next_move
-            if hunter_decision == HUNTER_DECISION.CHASE: #Ostatnio goniliśmy gościa przez pół mapy więc trzeba to uwzględnić że gość może się pchać w mgłę, więc jeżeli się pcha to odpuszczamy
+            if hunter_decision == HUNTER_DECISION.CHASE:
                 if (self.environment.champion.health >= self.hunter.next_target.health
-                        and self.hunter.path is not None and (len(self.hunter.path) <= 4) or self.is_menhir_neer()):
+                        and self.hunter.path is not None and len(self.hunter.path) <= 4):
                     print('Classic chase')
                     return self.hunter.next_move
 
-        if item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS:
+        if item_finder_decision is not ITEM_FINDER_DECISION.NO_ITEMS:
             if item_finder_decision == ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE:
                 if self.item_finder.next_move == characters.Action.STEP_FORWARD:
-                    print('Item finder, enemy next TODO')
-                    return characters.Action.ATTACK #TODO
+                    print('Item finder, enemy on way, no other path, attack')
+                    return characters.Action.ATTACK
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
                 if self.item_finder.path is not None and len(self.item_finder.path) <= self.environment.enemies_left + 3:
                     print('Go for potion')
@@ -103,8 +110,8 @@ class AncymonController(controller.Controller):
         if explorer_decision:
             if explorer_decision == EXPLORER_DECISION.ENEMY_ON_NEXT_MOVE:
                 if self.explorer.next_move == characters.Action.STEP_FORWARD:
-                    print('Explorer: enemy next')
-                    return characters.Action.ATTACK #TODO
+                    print('Explorer, enemy on way, no other path, attack')
+                    return characters.Action.ATTACK
             if explorer_decision == EXPLORER_DECISION.EXPLORE and self.is_menhir_neer() is False:
                 print('Explore')
                 return self.explorer.next_move
@@ -120,7 +127,7 @@ class AncymonController(controller.Controller):
     def is_menhir_neer(self):
         if self.environment.menhir is None:
             return False
-        if len(self.explorer.path) <= self.environment.enemies_left:
+        if self.environment.mist_seen is True and len(self.explorer.path) <= self.environment.enemies_left:
             return True
         return False
 
@@ -130,10 +137,11 @@ class AncymonController(controller.Controller):
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.environment = Environment()
         self.path_finder.environment = self.environment
-        self.explorer.environment = self.environment
-        self.explorer.reset()
+        self.alternative_path_finder.environment = self.environment
         self.hunter.environment = self.environment
         self.item_finder.environment = self.environment
+        self.explorer.environment = self.environment
+        self.explorer.reset()
 
     @property
     def name(self) -> str:
