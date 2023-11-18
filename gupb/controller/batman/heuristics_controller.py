@@ -1,6 +1,7 @@
 from typing import Optional
 
 import numpy as np
+import random
 
 from gupb import controller
 from gupb.model import arenas
@@ -68,20 +69,35 @@ class BatmanHeuristicsController(controller.Controller):
         self._passthrough = Passthrough(self._knowledge, self._navigation, samples=1000)
 
         self._last_state = self._knowledge.arena.one_hot_encoding()
-        best_reward = 0
-
         self._strategies = StrategiesFactory(self._passthrough)
-        for params in self._strategies.possible_params():
-            reward = self._trainer.guess_reward(self._last_state, params)
-            if reward > best_reward:
-                best_reward = reward
-                self._last_params = params
+        self._last_params = self._select_paarms(self._epsilon())
 
         self._strategies.set_params(self._last_params)  # type: ignore
         self._current_strategy = self._strategies.get("hiding")
 
         if game_no % 5 == 0 and game_no > 0:
             self._trainer.train()
+
+    def _epsilon(self):
+        init_eps = 0.7
+        eps_decay = 0.995
+        min_eps = 0.1
+
+        return max(min_eps, init_eps * eps_decay**self._game)
+
+    def _select_paarms(self, epsilon):
+        possible_params = list(self._strategies.possible_params())
+        if random.random() < epsilon:
+            return random.choice(possible_params)
+        else:
+            best_reward = 0
+            best_params = self._last_params
+            for params in possible_params:
+                reward = self._trainer.guess_reward(self._last_state, params)
+                if reward > best_reward:
+                    best_reward = reward
+                    best_params = params
+            return best_params
 
     @property
     def name(self) -> str:
