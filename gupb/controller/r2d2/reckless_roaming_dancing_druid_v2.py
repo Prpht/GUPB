@@ -37,10 +37,11 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # The state of the agend
         self.counter = 0
 
-        self.weapon_strategy = WeaponFinder()
-        self.menhir_strategy = MenhirFinder(menhir_eps)
-        self.menhir_observer = MenhirObserver(menhir_eps)
+        # self.weapon_strategy = WeaponFinder()
+        # self.menhir_strategy = MenhirFinder(menhir_eps)
+        # self.menhir_observer = MenhirObserver(menhir_eps)
         self.exploration_strategy = ExplorationStrategy()
+        self.menhir_strategy = MenhirStrategy(menhir_eps)
 
 
     def __eq__(self, other: object) -> bool:
@@ -122,7 +123,16 @@ class RecklessRoamingDancingDruid(controller.Controller):
         #     next_action = self.menhir_observer.decide(r2_knowledge, self.state_machine)
 
         # DEBUG - just explore
-        next_action = self.exploration_strategy.decide(r2_knowledge)
+        if (
+            self.world_state.menhir_position and (
+                items_ranking[r2_knowledge.current_weapon] < items_ranking["knife"] or
+                r2_knowledge.world_state.mist_present or
+                r2_knowledge.world_state.step_counter > MAX_STEPS_EXPLORING
+            )
+        ):
+            next_action = self.menhir_strategy.decide(r2_knowledge)
+        else:
+            next_action = self.exploration_strategy.decide(r2_knowledge)
 
         # If walked into a worse weapon, drop it
         dropped_weapon = knowledge.visible_tiles[self.champion_position].loot

@@ -41,22 +41,22 @@ class ExplorationStrategy(Strategy):
 
 
 class MenhirStrategy(Strategy):
-    def __init__(self, menhir_position: Coords, menhir_eps: int=3):
+    def __init__(self, menhir_eps: int=3):
         self.menhir_eps = menhir_eps
-        self.menhir_position = menhir_position
         self.destination = None
 
     def decide(self, knowledge: R2D2Knowledge) -> Action:
 
         champion_position = knowledge.chempion_knowledge.position
+        menhir_position = knowledge.world_state.menhir_position
         
         # If further than menhir_eps from the menhir, the destination is menhir
-        if manhataan_distance(champion_position, self.menhir_position) > self.menhir_eps:
-            self.destination = self.menhir_position
+        if manhataan_distance(champion_position, menhir_position) > self.menhir_eps:
+            self.destination = menhir_position
         
         # If no destination choosen, random walk around the menhir
         if self.destination is None:
-            self.destination = choose_destination_around_menhir(knowledge.world_state.matrix, self.menhir_position, self.menhir_eps)
+            self.destination = choose_destination_around_menhir(knowledge.world_state.matrix, menhir_position, self.menhir_eps)
 
         # Update the destination if you see any items (weapons or potions), but with a distance constraint
         # TODO add distance constraint

@@ -18,6 +18,7 @@ class R2D2Knowledge:
 
 class WorldState:
     def __init__(self, arena: Arena, decay: int = 5):
+        self.step_counter = 0
         self.matrix = np.zeros(LARGEST_ARENA_SHAPE, dtype=np.int8)
         self.arena_shape = arena.size[1], arena.size[0]
         for coords, tile in arena.terrain.items():
@@ -35,6 +36,7 @@ class WorldState:
         self.decay_mask = np.zeros(LARGEST_ARENA_SHAPE, np.int8)
 
         self.menhir_position = None
+        self.mist_present = False
 
     def update(self, knowledge: ChampionKnowledge):
         # Apply decay and update the decay mask
@@ -48,6 +50,8 @@ class WorldState:
 
         # Update the state of the agent
         self._update_state(knowledge)
+
+        self.step_counter += 1
 
     def _decay_step(self, champion_knowledge: ChampionKnowledge):
         
@@ -100,6 +104,7 @@ class WorldState:
             if tile_description.effects:
                 if "mist" in tile_description.effects:
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
+                    self.mist_present = True
 
     def update_explored(self, champion_knowledge: ChampionKnowledge):
         # Update the explored matrix

@@ -3,6 +3,7 @@ from gupb.model.coordinates import Coords
 
 
 LARGEST_ARENA_SHAPE = (100, 100)
+MAX_STEPS_EXPLORING = 250
 
 # Non walking tiles are: [0, 2, 3]
 tiles_mapping = {
