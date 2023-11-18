@@ -246,21 +246,9 @@ class KnowledgeBase():
     def __init__(self):
         self.mapBase = None
         self.round_counter=0
-        self.actionsToMake=None
+        self.actionsToMake=[]
         self.actionsTarget=None
         self.tileNeighbourhood = 16
-
-    def findTarget(self):
-        '''Looks for opponent or worthy consumable. If opponent found, change self.MODE'''
-        pass
-
-    def fightOpponent(self):
-        '''starts or continues a fight'''
-        pass
-
-    def avoidOpponent(self):
-        '''Avoids fights in cases of low HP'''
-        pass
 
     def stepPossible(self, step):
         if step == characters.Action.STEP_FORWARD:
@@ -276,26 +264,15 @@ class KnowledgeBase():
             nextStep = self.actionsToMake[0]
             self.actionsToMake.pop(0)
             if not self.stepPossible(nextStep):
-                self.actionsToMake=None
+                self.actionsToMake=[]
                 self.actionsTarget=None
                 nextStep = None
         if nextStep is None:
-            self.actionsToMake=None
+            self.actionsToMake=[]
             self.actionsTarget=None
             inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
             nextStep = self.checkPossibleAction(self.mapBase.map[inFrontCoords.x][inFrontCoords.y])
         return nextStep
-    
-    # def isMistNear(self):
-    #     target = effects.EffectDescription('mist')
-    #     mistPath, mistTile = self.mapBase.findTarget(
-    #         target, 
-    #         radius=self.tileNeighbourhood
-    #     )
-    #     if len(mistPath) > 0:
-    #         pass
-    #         # return self.followTarget() away from mist
-    #     return None
 
     def choice(self):
         '''
