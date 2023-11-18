@@ -7,9 +7,10 @@ from .scouting import ScoutingStrategy
 
 from gupb.controller.batman.heuristic.passthrough import Passthrough
 
-
 from typing import Sequence
 import numpy as np
+
+from itertools import product
 
 
 class StrategiesFactory:
@@ -18,6 +19,14 @@ class StrategiesFactory:
         self._params = np.array([5])
         self._lower_params_limit = np.array([3], dtype=int)
         self._upper_params_limit = np.array([8], dtype=int)
+
+    def possible_params(self):
+        possible_params = [
+            [p for p in range(lower, upper + 1)]
+            for lower, upper in zip(self._lower_params_limit, self._upper_params_limit)
+        ]
+        for params in product(*possible_params):
+            yield np.array(params)
 
     def set_params(self, params: Sequence[float]):
         """params should be from range 0 to 1"""
