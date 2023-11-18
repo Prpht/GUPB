@@ -11,17 +11,6 @@ R2D2StateValue("SearchingForMenhir", 1, "None")
 
 class R2D2StateMachine(StateMachine):
 
-    # Define StateMachine states
-    searching_for_menhir = State('SearchingForMenhir', value="SearchingForMenhir", initial=True)
-    approaching_menhir = State('ApproachingMenhir', value="ApproachingMenhir")
-    defending = State('Defending', value="Defending")
-
-    # Define the transitions of the StateMachine
-    approach_menhir = searching_for_menhir.to(approaching_menhir)
-    defend = approaching_menhir.to(defending)
-
-class R2D2StateMachineV2(StateMachine):
-
     # Define states
     # - Stage I (Find Weapons)
     st1_choose_destination = State('ChooseDestinationStI', value=R2D2StateValue(

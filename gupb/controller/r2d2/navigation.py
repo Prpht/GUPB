@@ -1,4 +1,4 @@
-from gupb.controller.r2d2.knowledge import WorldState
+from gupb.controller.r2d2.knowledge import R2D2Knowledge, WorldState
 from gupb.model import characters
 from gupb.model.coordinates import Coords
 from pathfinding.core.grid import Grid
@@ -11,8 +11,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 def get_move_towards_target(
     current_position: Coords, 
     target_coords: Coords, 
-    knowledge: characters.ChampionKnowledge, 
-    world_state: WorldState,
+    knowledge: R2D2Knowledge
 ) -> tuple[characters.Action, bool]:
     "Returns the next action to move to the target_coords and a flag indicating if the target was reached"
     
@@ -22,7 +21,7 @@ def get_move_towards_target(
     
     # Find a path to the target
     # - Translate the matrix into an appropriate format for the pathfinding algorithm
-    grid = Grid(matrix=world_state.matrix_walkable)
+    grid = Grid(matrix=knowledge.world_state.matrix_walkable)
     start = grid.node(*current_position)
     end = grid.node(*target_coords)
 
@@ -33,7 +32,7 @@ def get_move_towards_target(
 
     # - Move to the next tile
     delta = next_tile_coords - current_position
-    facing = knowledge.visible_tiles[current_position].character.facing
+    facing = knowledge.chempion_knowledge.visible_tiles[current_position].character.facing
 
     if facing.value == characters.Facing.UP.value:
         if delta == characters.Facing.UP.value:

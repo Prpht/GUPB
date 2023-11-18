@@ -12,7 +12,7 @@ from gupb.model.arenas import Arena
 from gupb.model.characters import ChampionKnowledge
 from gupb.model.coordinates import Coords
 
-from .r2d2_state_machine import R2D2StateMachineV2 as R2D2StateMachine
+from .r2d2_state_machine import R2D2StateMachine
 from .utils import *
 
 
