@@ -41,7 +41,7 @@ class ExplorationStrategy(Strategy):
 
 
 class MenhirStrategy(Strategy):
-    def __init__(self, menhir_eps: int=3):
+    def __init__(self, menhir_eps):
         self.menhir_eps = menhir_eps
         self.destination = None
 
@@ -51,16 +51,16 @@ class MenhirStrategy(Strategy):
         menhir_position = knowledge.world_state.menhir_position
         
         # If further than menhir_eps from the menhir, the destination is menhir
-        if manhataan_distance(champion_position, menhir_position) > self.menhir_eps:
+        if walking_distance(champion_position, menhir_position, knowledge.world_state.matrix_walkable) > self.menhir_eps:
             self.destination = menhir_position
         
         # If no destination choosen, random walk around the menhir
         if self.destination is None:
-            self.destination = choose_destination_around_menhir(knowledge.world_state.matrix, menhir_position, self.menhir_eps)
+            self.destination = choose_destination_around_menhir(knowledge, menhir_position, self.menhir_eps)
 
         # Update the destination if you see any items (weapons or potions), but with a distance constraint
         # TODO add distance constraint
-        tempting_destination = scan_for_items(knowledge)
+        tempting_destination = scan_for_items(knowledge, self.menhir_eps)
         if tempting_destination:
             self.destination = tempting_destination
 
@@ -189,7 +189,7 @@ class MenhirObserver(Strategy):
             # - choose a destination and transition to the approach destination state
             if knowledge.world_state.menhir_position is None:
                 raise ValueError("Menhir position is None")
-            self.destination = choose_destination_around_menhir(knowledge.world_state.matrix, knowledge.world_state.menhir_position, self.menhir_eps)
+            self.destination = choose_destination_around_menhir(knowledge, knowledge.world_state.menhir_position, self.menhir_eps)
             state_machine.st3_destination_chosen()
         
         if state_machine.current_state.value.name == "ApproachDestinationStIII":

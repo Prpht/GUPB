@@ -17,7 +17,16 @@ from .r2d2_state_machine import R2D2StateMachine
 from .utils import *
 
 
-def scan_for_items(knowledge: R2D2Knowledge) -> Optional[Coords]:
+def walking_distance(start: Coords, end: Coords, matrix_walkable: np.ndarray) -> int:
+
+    grid = Grid(matrix=matrix_walkable)
+    finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
+    path, _ = finder.find_path(grid.node(*start), grid.node(*end), grid)
+
+    return len(path) - 1
+
+
+def scan_for_items(knowledge: R2D2Knowledge, distance: int = 1000) -> Optional[Coords]:
     """
     Scan for items in the visible tiles. If there are more than one, choose acord to the items ranking.
     If there are no items in the visible tiles, return None.
@@ -36,7 +45,10 @@ def scan_for_items(knowledge: R2D2Knowledge) -> Optional[Coords]:
         # Interested in weapons that are stronger than the current one
         if tile_description.loot is not None:
             if items_ranking[tile_description.loot.name] < items_ranking[knowledge.current_weapon]:
-                item_tiles.append((coords, tile_description.loot.name))
+                if knowledge.world_state.menhir_position is None:
+                    item_tiles.append((coords, tile_description.loot.name))
+                elif walking_distance(coords, knowledge.world_state.menhir_position, knowledge.world_state.matrix_walkable) <= distance:
+                    item_tiles.append((coords, tile_description.loot.name))
         
         # Always interested in consumables
         if tile_description.consumable is not None:
@@ -89,16 +101,16 @@ def choose_destination(arena_matrix: np.ndarray, explored: Optional[np.ndarray] 
 
     return destination
 
-def choose_destination_around_menhir(arena_matrix: np.ndarray, menhir_coords: Coords, radius: int) -> Coords:
+def choose_destination_around_menhir(knowledge: R2D2Knowledge, menhir_coords: Coords, distance: int) -> Coords:
     """
     Randomly choose a destination for the champion, within the radius from the menhir. Decision is made
     based only on the arena topology, regardless of the visible items nor enemies. Only a Land or
     Menhir tiles are considered as possible destinations. Cannot choose a tile with the mist effect
     as a plausable destination.
-
-    :param arena_matrix: the matrix representing the currently assumed arena state
-    :return: destination coordinates
     """
+
+    arena_matrix = knowledge.world_state.matrix
+    walkable_matrix = knowledge.world_state.matrix_walkable
 
     xs, ys = np.where(
         (arena_matrix == 1) |   # Land
@@ -114,11 +126,8 @@ def choose_destination_around_menhir(arena_matrix: np.ndarray, menhir_coords: Co
     # The list of possible coordinates in np indexing format
     np_coords = list(zip(xs, ys))
 
-    # Filter out the coordinates that takes too long to get to
-    # TODO
-
     # Filter out the coordinates that are too far from the menhir
-    np_coords = [c for c in np_coords if manhataan_distance(menhir_coords, Coords(c[1], c[0])) <= radius]
+    np_coords = [c for c in np_coords if walking_distance(menhir_coords, Coords(c[1], c[0]), walkable_matrix) <= distance]
 
     # Randomly choose a destination in np indexing format
     sample = np_coords[np.random.choice(len(np_coords))]

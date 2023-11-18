@@ -15,7 +15,7 @@ from .utils import *
 
 class RecklessRoamingDancingDruid(controller.Controller):
     
-    def __init__(self, first_name: str, decay: int = 5, menhir_eps=3):
+    def __init__(self, first_name: str, decay: int = 1, menhir_eps=8):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
@@ -37,9 +37,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # The state of the agend
         self.counter = 0
 
-        # self.weapon_strategy = WeaponFinder()
-        # self.menhir_strategy = MenhirFinder(menhir_eps)
-        # self.menhir_observer = MenhirObserver(menhir_eps)
         self.exploration_strategy = ExplorationStrategy()
         self.menhir_strategy = MenhirStrategy(menhir_eps)
 
@@ -112,15 +109,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
             self.world_state,
             knowledge.visible_tiles[self.champion_position].character.weapon.name
         )
-        
-        # Chose next action acording to the stage
-        # next_action = characters.Action.TURN_RIGHT # Better than nothing
-        # if self.state_machine.current_state.value.stage == 1:
-        #     next_action = self.weapon_strategy.decide(r2_knowledge, self.state_machine)
-        # elif self.state_machine.current_state.value.stage == 2:
-        #     next_action = self.menhir_strategy.decide(r2_knowledge, self.state_machine)
-        # elif self.state_machine.current_state.value.stage == 3:
-        #     next_action = self.menhir_observer.decide(r2_knowledge, self.state_machine)
 
         # DEBUG - just explore
         if (
