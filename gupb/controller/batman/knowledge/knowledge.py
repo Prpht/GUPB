@@ -1,5 +1,7 @@
 from typing import Optional
 
+import numpy as np
+
 from gupb.model import arenas, tiles, characters, weapons, coordinates, consumables
 from gupb.controller.batman.utils.copyable import Copyable
 
@@ -104,6 +106,20 @@ class ArenaKnowledge(Copyable):
 
             if tile_desc.type == "menhir":
                 self.menhir_position = position
+
+    def one_hot_encoding(self) -> np.ndarray:
+        encoding = np.zeros((2, *self.arena_size))
+
+        if self.arena is None:
+            return encoding
+
+        for (x, y), tile in self.arena.terrain.items():
+            if tile.terrain_passable:
+                encoding[0, x, y] = 1.0
+            if tile.terrain_transparent:
+                encoding[1, x, y] = 1.0
+
+        return encoding
 
 
 class Knowledge(Copyable):
