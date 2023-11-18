@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+import math
 from typing import NamedTuple, List
 
 from gupb.model import arenas
@@ -29,6 +31,10 @@ class Weapon(ABC):
     @abstractmethod
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         raise NotImplementedError
+
+    @classmethod
+    def prescience(cls, position: coordinates.Coords, facing: characters.Facing) -> list[coordinates.Coords]:
+        return []
 
     @classmethod
     def droppable(cls) -> bool:
@@ -67,6 +73,23 @@ class LineWeapon(Weapon, ABC):
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
             self.cut_transparent(arena, cut_position)
+
+
+class PropheticWeapon(Weapon, ABC):
+    @classmethod
+    def prescience(cls, position: coordinates.Coords, facing: characters.Facing) -> list[coordinates.Coords]:
+        radius = cls.prescience_radius()
+        visible_coordinates = []
+        for x in range(position.x - radius, position.x + radius + 1):
+            for y in range(position.y - radius, position.y + radius + 1):
+                if math.sqrt((x - position.x) ** 2 + (y - position.y) ** 2) <= radius:
+                    visible_coordinates.append(coordinates.Coords(x, y))
+        return visible_coordinates
+
+    @staticmethod
+    @abstractmethod
+    def prescience_radius() -> int:
+        raise NotImplementedError
 
 
 class Knife(LineWeapon):
@@ -122,7 +145,11 @@ class Axe(Weapon):
             self.cut_transparent(arena, cut_position)
 
 
-class Amulet(Weapon):
+class Amulet(PropheticWeapon, Weapon):
+    @staticmethod
+    def prescience_radius() -> int:
+        return 4
+
     @classmethod
     def cut_positions(
             cls,
