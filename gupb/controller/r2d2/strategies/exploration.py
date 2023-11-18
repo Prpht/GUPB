@@ -40,7 +40,6 @@ class WeaponFinder(Strategy):
 
             # - if no weapon is not visible, move to the destination
             else:
-                print("action3")
                 next_action, reached = get_move_towards_target(champion_position, self.destination, knowledge)
                 if reached:
                     self.destination = None

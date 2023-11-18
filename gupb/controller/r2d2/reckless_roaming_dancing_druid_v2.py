@@ -117,11 +117,9 @@ class RecklessRoamingDancingDruid(controller.Controller):
         elif self.state_machine.current_state.value.stage == 3:
             next_action = self.menhir_observer.decide(r2_knowledge, self.state_machine)
 
-        print("action1", next_action)
         # However, if the attack is effective, attack
         if self._attack_is_effective(knowledge, self.world_state):
             return characters.Action.ATTACK
-        print("action2", next_action)
         
         return next_action
 
