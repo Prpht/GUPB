@@ -19,6 +19,20 @@ class StrategiesFactory:
         self._params = np.array([5])
         self._lower_params_limit = np.array([3], dtype=int)
         self._upper_params_limit = np.array([8], dtype=int)
+        self._set_strategies()
+
+    def _set_strategies(self):
+        self._startegies = {
+            "defending": DefendingStrategy(),
+            "fighting": FightingStrategy(),
+            "rotating": RotatingStrategy(),
+            "running_away": RunningAwayStrategy(),
+            "scouting": ScoutingStrategy(),
+            "hiding": HidingStrategy(
+                self._passthrough,
+                safe_hampions_alive_count=self.safe_hampions_alive_count,
+            ),
+        }
 
     def possible_params(self):
         possible_params = [
@@ -32,24 +46,11 @@ class StrategiesFactory:
         """params should be from range 0 to 1"""
         ranges = self._upper_params_limit - self._lower_params_limit
         self._params = np.array(params) * ranges + self._lower_params_limit
+        self._set_strategies()
 
     @property
     def safe_hampions_alive_count(self) -> int:
         return int(self._params[0])
 
     def get(self, startegy: str):
-        if startegy == "defending":
-            return DefendingStrategy()
-        if startegy == "fighting":
-            return FightingStrategy()
-        if startegy == "rotating":
-            return RotatingStrategy()
-        if startegy == "running_away":
-            return RunningAwayStrategy()
-        if startegy == "scouting":
-            return ScoutingStrategy()
-        else:  # if startegy == "hiding": (Default)
-            return HidingStrategy(
-                self._passthrough,
-                safe_hampions_alive_count=self.safe_hampions_alive_count,
-            )
+        return self._startegies[startegy]
