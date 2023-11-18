@@ -1,12 +1,6 @@
-from typing import Tuple
-
-import numpy as np
-from pathfinding.finder.bi_a_star import BiAStarFinder
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-
 from gupb import controller
 from gupb.controller.r2d2.knowledge import WorldState
+from gupb.controller.r2d2.navigation import get_move_towards_target
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.arenas import Arena
@@ -39,7 +33,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
         self.champion_position = None
         self.menhir_eps = menhir_eps
         self.defending_attack = False # TODO This is a hack, use the state machine instead
-        self.finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
 
         # The state of the agend
         self.counter = 0
@@ -52,57 +45,6 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
     def __hash__(self) -> int:
         return hash(self.first_name)
-    
-    def _move_to(
-            self, target_coords: Coords, knowledge: characters.ChampionKnowledge, world_state: WorldState
-        ) -> Tuple[characters.Action, bool]:
-        "Returns the next action to move to the target_coords and a flag indicating if the target was reached"
-        
-        # If already in 
-        if self.champion_position == target_coords:
-            return characters.Action.TURN_RIGHT, True   # Always better turn than do nothing
-        
-        # Find a path to the target
-        # - Translate the matrix into an appropriate format for the pathfinding algorithm
-        grid = Grid(matrix=world_state.matrix_walkable)
-        start = grid.node(*self.champion_position)
-        end = grid.node(*target_coords)
-
-        # - Find the path
-        path, _ = self.finder.find_path(start, end, grid)
-        next_tile_coords = Coords(path[1].x, path[1].y)
-
-        # - Move to the next tile
-        delta = next_tile_coords - self.champion_position
-        facing = knowledge.visible_tiles[self.champion_position].character.facing
-
-        if facing.value == characters.Facing.UP.value:
-            if delta == characters.Facing.UP.value:
-                return characters.Action.STEP_FORWARD, False
-            if delta == characters.Facing.LEFT.value:
-                return characters.Action.TURN_LEFT, False
-            return characters.Action.TURN_RIGHT, False
-        
-        if facing.value == characters.Facing.RIGHT.value:
-            if delta == characters.Facing.RIGHT.value:
-                return characters.Action.STEP_FORWARD, False
-            if delta == characters.Facing.UP.value:
-                return characters.Action.TURN_LEFT, False
-            return characters.Action.TURN_RIGHT, False
-        
-        if facing.value == characters.Facing.DOWN.value:
-            if delta == characters.Facing.DOWN.value:
-                return characters.Action.STEP_FORWARD, False
-            if delta == characters.Facing.RIGHT.value:
-                return characters.Action.TURN_LEFT, False
-            return characters.Action.TURN_RIGHT, False
-        
-        if facing.value == characters.Facing.LEFT.value:
-            if delta == characters.Facing.LEFT.value:
-                return characters.Action.STEP_FORWARD, False
-            if delta == characters.Facing.DOWN.value:
-                return characters.Action.TURN_LEFT, False
-            return characters.Action.TURN_RIGHT, False
     
     def _attack_is_effective(self, knowledge: characters.ChampionKnowledge, world_state: WorldState) -> bool:
         """
@@ -179,7 +121,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
             # - if no weapon is not visible, move to the destination
             else:
                 print("action3")
-                next_action, reached = self._move_to(self.destination, knowledge, world_state)
+                next_action, reached = get_move_towards_target(self.champion_position, self.destination, knowledge, world_state)
                 if reached:
                     self.destination = None
                     self.state_machine.st1_destination_reached()
@@ -193,7 +135,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
 
             # - if the weapon is still on board, move to the weapon
             elif world_state.matrix[self.weapon_destination[1], self.weapon_destination[0]] == tiles_mapping[self.weapon_destination_type]:
-                next_action, _ = self._move_to(self.weapon_destination, knowledge, world_state)
+                next_action, _ = get_move_towards_target(self.champion_position, self.weapon_destination, knowledge, world_state)
                 return next_action
             
             # - if the weapon is not visible, return to the 'choose destination' state
@@ -212,7 +154,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # Act according to the state in stage II - Find Menhir
         if self.state_machine.current_state.value.name == "ChooseDestinationStII":
             # - choose a destination and transition to the approach destination state
-            self.destination = choose_destination(self.matrix)
+            self.destination = choose_destination(world_state.matrix)
             self.state_machine.st2_destination_chosen()
         
         if self.state_machine.current_state.value.name == "ApproachDestinationStII":
@@ -222,7 +164,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
             
             # - If menhir is not found, move to the destination
             else:
-                next_action, reached = self._move_to(self.destination, knowledge)
+                next_action, reached = get_move_towards_target(self.champion_position, self.destination, knowledge, world_state)
                 if reached:
                     self.destination = None
                     self.state_machine.st2_destination_reached()
@@ -235,7 +177,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
             
             # - If menhir is not reached, move to the menhir
             else:
-                next_action, _ = self._move_to(menhir_position, knowledge, world_state)
+                next_action, _ = get_move_towards_target(self.champion_position, menhir_position, knowledge, world_state)
                 return next_action
         
         return characters.Action.TURN_RIGHT # Better than nothing
@@ -256,7 +198,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
         
         if self.state_machine.current_state.value.name == "ApproachDestinationStIII":
             # - move to the destination
-            next_action, reached = self._move_to(self.destination, knowledge, world_state)
+            next_action, reached = get_move_towards_target(self.champion_position, self.destination, knowledge, world_state)
             if reached:
                 self.destination = None
                 self.state_machine.st3_destination_reached()
