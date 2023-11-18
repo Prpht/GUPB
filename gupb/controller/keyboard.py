@@ -37,11 +37,17 @@ class KeyboardController(controller.Controller):
         if key == pygame.K_UP:
             self.action_queue.put(characters.Action.STEP_FORWARD)
         elif key == pygame.K_DOWN:
-            self.action_queue.put(characters.Action.ATTACK)
+            self.action_queue.put(characters.Action.STEP_BACKWARD)
         elif key == pygame.K_LEFT:
-            self.action_queue.put(characters.Action.TURN_LEFT)
+            self.action_queue.put(characters.Action.STEP_LEFT)
         elif key == pygame.K_RIGHT:
+            self.action_queue.put(characters.Action.STEP_RIGHT)
+        elif key == pygame.K_z:
+            self.action_queue.put(characters.Action.TURN_LEFT)
+        elif key == pygame.K_x:
             self.action_queue.put(characters.Action.TURN_RIGHT)
+        elif key == pygame.K_SPACE:
+            self.action_queue.put(characters.Action.ATTACK)
 
     @property
     def name(self) -> str:
