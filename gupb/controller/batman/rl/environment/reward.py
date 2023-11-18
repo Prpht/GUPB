@@ -3,7 +3,7 @@ from collections import deque
 import numpy as np
 import scipy.stats as stats
 
-from gupb.controller.batman.environment.knowledge import Knowledge
+from gupb.controller.batman.knowledge.knowledge import Knowledge
 from gupb.model.coordinates import Coords
 
 
@@ -28,10 +28,12 @@ class AccumulatedReward(SomeReward):
         self._weighted_reward = weighted_reward
 
     def _compute(self, knowledge: Knowledge) -> float:
-        return sum([
-            reward(knowledge) * weight
-            for reward, weight in self._weighted_reward
-        ]) / self._total_weight
+        return (
+            sum(
+                [reward(knowledge) * weight for reward, weight in self._weighted_reward]
+            )
+            / self._total_weight
+        )
 
 
 def distance(a: Coords, b: Coords) -> float:
@@ -68,16 +70,17 @@ class UpdatedKnowledgeReward(SomeReward):
         self._radius = radius
 
     def _compute(self, knowledge: Knowledge) -> float:
-        episodes = np.array([
-            tile.last_seen
-            for tile in list(knowledge.arena.explored_map.values())
-            if distance(knowledge.position, tile.coords) <= self._radius
-        ])
+        episodes = np.array(
+            [
+                tile.last_seen
+                for tile in list(knowledge.arena.explored_map.values())
+                if distance(knowledge.position, tile.coords) <= self._radius
+            ]
+        )
         if episodes.size == 0:
             return 0
         penalty = min(
-            np.mean((knowledge.episode - episodes) / self._uptodate_till),
-            1.0
+            np.mean((knowledge.episode - episodes) / self._uptodate_till), 1.0
         )
         return float(1 - 2 * penalty**2)
 
@@ -135,7 +138,7 @@ class FindingWeaponReward(SomeReward):
         champion = tile.character
         weapon_name = champion.weapon.name
 
-        if weapon_name == 'knife':
+        if weapon_name == "knife":
             penalty = min(
                 knowledge.episode / self._episodes_to_find_weapon,
                 1.0,

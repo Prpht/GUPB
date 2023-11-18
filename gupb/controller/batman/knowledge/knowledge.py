@@ -1,7 +1,7 @@
 from typing import Optional
 
 from gupb.model import arenas, tiles, characters, weapons, coordinates, consumables
-from gupb.controller.batman.copyable import Copyable
+from gupb.controller.batman.utils.copyable import Copyable
 
 
 def manhattan_distance(start: coordinates.Coords, end: coordinates.Coords) -> int:
@@ -37,7 +37,11 @@ class TileKnowledge(Copyable):
 
 
 class ChampionKnowledge(Copyable):
-    def __init__(self, champion_description: characters.ChampionDescription, position: coordinates.Coords) -> None:
+    def __init__(
+        self,
+        champion_description: characters.ChampionDescription,
+        position: coordinates.Coords,
+    ) -> None:
         self.name = champion_description.controller_name
         self.position = position
         self.health = champion_description.health
@@ -46,13 +50,21 @@ class ChampionKnowledge(Copyable):
 
 
 class WeaponKnowledge(Copyable):
-    def __init__(self, weapon_description: weapons.WeaponDescription, position: coordinates.Coords) -> None:
+    def __init__(
+        self,
+        weapon_description: weapons.WeaponDescription,
+        position: coordinates.Coords,
+    ) -> None:
         self.name = weapon_description.name
         self.position = position
 
 
 class ConsumableKnowledge(Copyable):
-    def __init__(self, consumable_description: consumables.ConsumableDescription, position: coordinates.Coords) -> None:
+    def __init__(
+        self,
+        consumable_description: consumables.ConsumableDescription,
+        position: coordinates.Coords,
+    ) -> None:
         self.name = consumable_description.name
         self.position = position
 
@@ -154,6 +166,8 @@ class Knowledge(Copyable):
 
             for effect in tile_desc.effects:
                 if effect.type == "mist":
-                    self.mist_distance = min(self.mist_distance, manhattan_distance(self.position, position))
+                    self.mist_distance = min(
+                        self.mist_distance, manhattan_distance(self.position, position)
+                    )
 
         self.arena.update(self.visible_tiles, episode)

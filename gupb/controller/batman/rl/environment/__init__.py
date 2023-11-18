@@ -4,10 +4,13 @@ from gymnasium.envs.registration import register
 import numpy as np
 from typing import Any
 
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.environment.observation import SomeObservation
-from gupb.controller.batman.environment.observer import Observer, Observable
-from gupb.controller.batman.environment.reward import SomeReward
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+
+from gupb.controller.batman.rl.environment.observation import SomeObservation
+from gupb.controller.batman.rl.environment.reward import SomeReward
+
+from gupb.controller.batman.utils.observer import Observer, Observable
+
 from gupb.model.characters import Action
 
 

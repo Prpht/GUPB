@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod, abstractproperty
 import numpy as np
 from typing import Sequence
 
-from gupb.controller.batman.environment.knowledge import Knowledge, TileKnowledge
-from gupb.controller.batman.environment.analyzers.knowledge_analyzer import KnowledgeAnalyzer
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.knowledge.analyzers.knowledge_analyzer import (
+    KnowledgeAnalyzer,
+)
 from gupb.model.coordinates import Coords, sub_coords, add_coords
 from gupb.model.characters import CHAMPION_STARTING_HP
 
@@ -47,7 +49,9 @@ class SimpleObservation(SomeObservation):
         """
         return 1 - (1 / (t * value + 1))
 
-    def _normalize_to_zero_one(self, value: float, min_value: float, max_value: float) -> float:
+    def _normalize_to_zero_one(
+        self, value: float, min_value: float, max_value: float
+    ) -> float:
         """
         Maps values from [min_value, max_value] to [0, 1] range.
         """
@@ -57,39 +61,42 @@ class SimpleObservation(SomeObservation):
         analyzer = KnowledgeAnalyzer(knowledge)
         tile_analyzer = analyzer.tile_analyzer(position)
 
-        embedding = np.array([
-            # tile properties (7)
-            tile_analyzer.is_out_of_map,
-            tile_analyzer.is_wall,
-            tile_analyzer.is_water,
-            tile_analyzer.is_menhir,
-            tile_analyzer.is_attacked,
-            tile_analyzer.has_mist,
-            self._map_zero_infinity_to_zero_one(tile_analyzer.last_seen, t=0.2),
-
-            # weapons (5)
-            tile_analyzer.has_knife,
-            tile_analyzer.has_sword,
-            tile_analyzer.has_bow,
-            tile_analyzer.has_axe,
-            tile_analyzer.has_amulet,
-
-            # characters (11)
-            tile_analyzer.has_enemy,
-            self._normalize_to_zero_one(tile_analyzer.character_health, min_value=0, max_value=CHAMPION_STARTING_HP),
-            tile_analyzer.has_character_with_knife,
-            tile_analyzer.has_character_with_sword,
-            tile_analyzer.has_character_with_bow,
-            tile_analyzer.has_character_with_axe,
-            tile_analyzer.has_character_with_amulet,
-            tile_analyzer.has_character_facing_up,
-            tile_analyzer.has_character_facing_down,
-            tile_analyzer.has_character_facing_left,
-            tile_analyzer.has_character_facing_right,
-
-            # consumables (1)
-            tile_analyzer.has_potion,
-        ])
+        embedding = np.array(
+            [
+                # tile properties (7)
+                tile_analyzer.is_out_of_map,
+                tile_analyzer.is_wall,
+                tile_analyzer.is_water,
+                tile_analyzer.is_menhir,
+                tile_analyzer.is_attacked,
+                tile_analyzer.has_mist,
+                self._map_zero_infinity_to_zero_one(tile_analyzer.last_seen, t=0.2),
+                # weapons (5)
+                tile_analyzer.has_knife,
+                tile_analyzer.has_sword,
+                tile_analyzer.has_bow,
+                tile_analyzer.has_axe,
+                tile_analyzer.has_amulet,
+                # characters (11)
+                tile_analyzer.has_enemy,
+                self._normalize_to_zero_one(
+                    tile_analyzer.character_health,
+                    min_value=0,
+                    max_value=CHAMPION_STARTING_HP,
+                ),
+                tile_analyzer.has_character_with_knife,
+                tile_analyzer.has_character_with_sword,
+                tile_analyzer.has_character_with_bow,
+                tile_analyzer.has_character_with_axe,
+                tile_analyzer.has_character_with_amulet,
+                tile_analyzer.has_character_facing_up,
+                tile_analyzer.has_character_facing_down,
+                tile_analyzer.has_character_facing_left,
+                tile_analyzer.has_character_facing_right,
+                # consumables (1)
+                tile_analyzer.has_potion,
+            ]
+        )
 
         return embedding.astype(np.float32)
 

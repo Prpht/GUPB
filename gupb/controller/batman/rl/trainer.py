@@ -1,13 +1,12 @@
 from threading import Thread
 
-from gupb.controller.batman.algo import DQN, AlgoConfig
+from gupb.controller.batman.rl import DQN, AlgoConfig
 
-# from gupb.controller.batman.controller import BatmanController
 from gupb.model.characters import CHAMPION_STARTING_HP
-from gupb.controller.batman.environment import GUPBEnv
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.environment.observation import SimpleObservation
-from gupb.controller.batman.environment.reward import (
+
+from gupb.controller.batman.rl.environment import GUPBEnv
+from gupb.controller.batman.rl.environment.observation import SimpleObservation
+from gupb.controller.batman.rl.environment.reward import (
     AccumulatedReward,
     MenhirProximityReward,
     MotionEntropyReward,
@@ -16,6 +15,8 @@ from gupb.controller.batman.environment.reward import (
     StayingHealthyReward,
     FindingWeaponReward,
 )
+
+from gupb.controller.batman.knowledge.knowledge import Knowledge
 
 
 # TODO config
@@ -39,14 +40,16 @@ class Trainer:
         staying_healthy = StayingHealthyReward(CHAMPION_STARTING_HP)
         finding_weapon = FindingWeaponReward(30)
 
-        reward_function = AccumulatedReward([
-            (menhir_proximity, 5),
-            (updated_knowledge, 2),
-            (motion_entropy, 10),
-            (staying_alive, 20),
-            (staying_healthy, 15),
-            (finding_weapon, 5),
-        ])
+        reward_function = AccumulatedReward(
+            [
+                (menhir_proximity, 5),
+                (updated_knowledge, 2),
+                (motion_entropy, 10),
+                (staying_alive, 20),
+                (staying_healthy, 15),
+                (finding_weapon, 5),
+            ]
+        )
 
         # env
         self._env = GUPBEnv(reward_function, observation_function)

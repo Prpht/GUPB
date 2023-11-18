@@ -5,8 +5,8 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.vec_env import DummyVecEnv
 import stable_baselines3.dqn as dqn
 
-from gupb.controller.batman.environment import GUPBEnv
-from gupb.controller.batman.environment.feature_extractors import NeighborhoodCNN
+from gupb.controller.batman.rl.environment import GUPBEnv
+from gupb.controller.batman.rl.environment.feature_extractors import NeighborhoodCNN
 
 
 @dataclass
@@ -63,6 +63,6 @@ class DQN(SomeAlgo):
             gamma=config.gamma,
             verbose=1,
             policy_kwargs={
-                'features_extractor_class': config.feature_extractor_class,
-            }
+                "features_extractor_class": config.feature_extractor_class,
+            },
         )

@@ -3,12 +3,18 @@ import random
 import numpy as np
 
 from gupb.model.coordinates import Coords
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.navigation import Navigation
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.heuristic.navigation import Navigation
 
 
 class Passthrough:
-    def __init__(self, knowledge: Knowledge, navigation: Navigation, samples: int = 1000, seed: int = 0):
+    def __init__(
+        self,
+        knowledge: Knowledge,
+        navigation: Navigation,
+        samples: int = 1000,
+        seed: int = 0,
+    ):
         self._knowledge = knowledge
         self.arena_size = knowledge.arena.arena_size
         self.navigation = navigation
