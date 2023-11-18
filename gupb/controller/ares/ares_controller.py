@@ -16,8 +16,25 @@ POSSIBLE_ACTIONS = [
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
+    characters.Action.STEP_BACKWARD,
+    characters.Action.STEP_LEFT,
+    characters.Action.STEP_RIGHT
 ]
 
+
+def tileIsMist(tile):
+    for effect in tile.effects:
+        if effect.type == 'mist':
+            return True
+    return False
+
+def tilePassable(tile):
+    if type(tile) == tiles.TileDescription:
+        if tile.type in ['land', 'menhir']:
+            return True
+    elif type(tile) == tiles.Tile:
+        return tile.passable
+    return False
 
 def tileIsMist(tile):
     for effect in tile.effects:
@@ -97,36 +114,66 @@ class Map():
                     neighbours.append(new)
         return neighbours
     
+    def getTargetFace(self, X, Y):
+        x, y = X.x - Y.x, X.y - Y.y
+        if x == 0:
+            return characters.Facing.UP if y > 0 else characters.Facing.DOWN
+        else:  #elif y == 0:
+            if(y != 0):
+                raise Exception("WRONG TARGET FACE")
+            return characters.Facing.LEFT if x > 0 else characters.Facing.RIGHT
+    
     def dirChange(self, current, face, step):
         '''
         Returns a list of direction changes and a new facing direction 
         when moving from 'current' tile to 'step' tile
         '''
-        actions = []
+        current_face = face
+        target_face = self.getTargetFace(current, step)
+        if target_face == current_face:
+            return [], current_face
+        for axis in [[characters.Facing.UP, characters.Facing.DOWN], [characters.Facing.RIGHT, characters.Facing.LEFT]]:
+            if target_face in axis and current_face in axis:
+                return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT], target_face
+        res = [characters.Action.TURN_LEFT]
+        arr = [current_face, target_face]
+        right_possibilities = [
+            [characters.Facing.UP, characters.Facing.RIGHT],
+            [characters.Facing.RIGHT, characters.Facing.DOWN],
+            [characters.Facing.DOWN, characters.Facing.LEFT],
+            [characters.Facing.LEFT, characters.Facing.UP]
+        ]
+        if arr in right_possibilities:
+            res =  [characters.Action.TURN_RIGHT]
+        return res, target_face
+    
+    def showActions(self, actions):
+        str_action = ""
+        for a in actions:
+            if a == characters.Action.STEP_FORWARD:
+                str_action = "FORWARD"
+            elif a == characters.Action.TURN_RIGHT:
+                str_action = "RIGHT"
+            elif a == characters.Action.TURN_LEFT:
+                str_action = "LEFT"
+            elif a == characters.Action.DO_NOTHING:
+                str_action = "NONE"
+            else:
+                str_action = "ATTACK"
         
-        for _ in range(4):
-            if (current.x + face.value.y) == step.x and (current.y + face.value.x) == step.y:
-                break
-            face = face.turn_right()
-            actions.append(characters.Action.TURN_RIGHT)
-        if len(actions) == 3:
-            actions = [characters.Action.TURN_LEFT]
-        if len(actions) == 4:
-            pass
-        return actions, face
-        
-    def getActions(self, current, path):
+    def getActions(self, position, path):
         '''Returns a list of actions needed to be performed to walk the given path.'''
         actions = []
-        face = self.description.facing
-        for step in path:
-            # face right dir
-            dirs, face = self.dirChange(current, face, step)
+        current_face = self.description.facing
+        current_pos = position
+
+        for next_pos in path:
+            dirs, current_face = self.dirChange(current_pos, current_face, next_pos)
             for d in dirs:
                 actions.append(d)
             # step forward
             actions.append(characters.Action.STEP_FORWARD)
-            current = step
+            current_pos = next_pos
         return actions
 
     def targetFound(self, v, target):
@@ -138,6 +185,7 @@ class Map():
         if type(target) is str:
             if target == 'passable':
                 tile = self.map[v.x][v.y]
+                return tile.passable and not tileIsMist(tile)
                 return tile.passable and not tileIsMist(tile)
         if type(target) is coordinates.Coords:
             if v.x == target.x and v.y == target.y:
@@ -171,6 +219,9 @@ class Map():
         r = 0
         while len(Q) > 0 and (radius is None or r <= radius):
             r += 1
+        r = 0
+        while len(Q) > 0 and (radius is None or r <= radius):
+            r += 1
             v = Q.pop(0)
             if self.targetFound(v, target):
                 # find path
@@ -179,7 +230,7 @@ class Map():
                 while Visited[v.x][v.y] is not v:
                     path.append(Visited[v.x][v.y])
                     v = Visited[v.x][v.y]
-                path.pop()  #remove root from path
+                path.pop()  # remove root from path
                 path.reverse()
                 return self.getActions(root, path), found
             for p in self.getNeighbours(v, mode):
@@ -205,28 +256,41 @@ class Map():
         return: tuple = (shortest path to the target, target coordinates). 
             If target not found, returns tuple = ([], self.position)
         '''
-        return self.shortestPath(self.position, target, radius=radius)
+        path, tile = self.shortestPath(self.position, target, radius=radius)
+        return path, tile
 
 class KnowledgeBase():
     
     def __init__(self):
         self.mapBase = None
         self.round_counter=0
-        self.actionsToMake=None
+        self.actionsToMake=[]
         self.actionsTarget=None
         self.tileNeighbourhood = 16
 
-    def findTarget(self):
-        '''Looks for opponent or worthy consumable. If opponent found, change self.MODE'''
-        pass
+    def stepPossible(self, step):
+        if step == characters.Action.STEP_FORWARD:
+            frontCoords=self.mapBase.description.facing.value+self.mapBase.position
+            frontTile=self.mapBase.map[frontCoords.x][frontCoords.y]
+            if not tilePassable(frontTile) or tileIsMist(frontTile):
+                return False
+        return True
 
-    def fightOpponent(self):
-        '''starts or continues a fight'''
-        pass
-
-    def avoidOpponent(self):
-        '''Avoids fights in cases of low HP'''
-        pass
+    def followTarget(self):
+        nextStep = None
+        if len(self.actionsToMake) > 0:
+            nextStep = self.actionsToMake[0]
+            self.actionsToMake.pop(0)
+            if not self.stepPossible(nextStep):
+                self.actionsToMake=[]
+                self.actionsTarget=None
+                nextStep = None
+        if nextStep is None:
+            self.actionsToMake=[]
+            self.actionsTarget=None
+            inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
+            nextStep = self.checkPossibleAction(self.mapBase.map[inFrontCoords.x][inFrontCoords.y])
+        return nextStep
 
     def stepPossible(self, step):
         if step == characters.Action.STEP_FORWARD:
@@ -270,26 +334,45 @@ class KnowledgeBase():
         Additionally, it could take into account changing weapons, strategy, ect.
         
         '''
-        inFrontCoords=self.mapBase.description.facing.value+self.mapBase.position
+        inFrontCoords, inBackCoords, inRightCoords, inLeftCoords=self.getCoordsTiles()
         inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
-        try:
-            
-            # action = self.isMistNear()
-            # if action is not None:
-            #     return action
-            
+        inBackTile=self.mapBase.map[inBackCoords.x][inBackCoords.y]
+        inRightTile=self.mapBase.map[inRightCoords.x][inRightCoords.y]
+        inLeftTile=self.mapBase.map[inLeftCoords.x][inLeftCoords.y]
+        currentWeaponName=self.mapBase.description.weapon.name
+        bowReady=False
+        try:            
             potionPath, potionTile = self.mapBase.findTarget(
                 consumables.ConsumableDescription('potion'), 
                 radius=self.tileNeighbourhood
             )
             
-            if inFrontTile.character is not None: # depending on a weapon!!!
+            if inFrontTile.character: # depending on a weapon!!!
+                # action=characters.Action.ATTACK
+                if currentWeaponName!="amulet":
+                    action=characters.Action.ATTACK
+                else:
+                    if tilePassable(inRightTile):
+                        action=characters.Action.STEP_RIGHT
+                    elif tilePassable(inLeftTile):
+                        action=characters.Action.STEP_LEFT
+                    elif tilePassable(inBackTile):
+                        action=characters.Action.STEP_BACKWARD
+                    else:
+                        action=characters.Action.ATTACK
+            elif currentWeaponName=="bow" and bowReady!=False:
                 action=characters.Action.ATTACK
+            elif currentWeaponName=="amulet" and self.amuletCharactersToAttack():
+                action=characters.Action.ATTACK
+            # elif currentWeaponName=="axe" and self.axeCharactersToAttack():
+            #     action=characters.Action.ATTACK
+            # elif currentWeaponName=="bow" and bowReady and self.bowCharactersToAttack():
+            #     action=characters.Action.ATTACK
             elif self.round_counter<3:
                 action=characters.Action.TURN_RIGHT
                 self.round_counter+=1
-            elif self.actionsTarget is not None:
-                action = self.followTarget()
+            elif self.actionsToMake is not None and len(self.actionsToMake) > 0:
+                action=self.followTarget()
             elif potionPath != [] and len(potionTile) < self.tileNeighbourhood:
                 self.actionsToMake, self.actionsTarget = potionPath, potionTile
                 action = self.followTarget()
@@ -297,18 +380,75 @@ class KnowledgeBase():
                 self.actionsToMake, self.actionsTarget = self.mapBase.findTarget(self.mapBase.menhir)
                 if len(self.actionsToMake) > self.tileNeighbourhood:
                     action = self.followTarget()
+                else:
+                    self.actionsToMake, self.actionsTarget = [], None
+                    action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
             else:
-                action = self.checkPossibleAction(inFrontTile)
+                action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
         except:
-            action = self.checkPossibleAction(inFrontTile)
+            action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
         return action
     
-    def checkPossibleAction(self, inFrontTile: tiles.TileDescription):
+    def checkPossibleAction(self, inFrontTile: tiles.TileDescription, inRightTile:tiles.TileDescription, \
+                            inLeftTile:tiles.TileDescription, inBackTile:tiles.TileDescription):
         '''checks if tile in front is passable and if not turns randomly'''
-        if not tilePassable(inFrontTile):
-            return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT])
+        actionsList=[
+                characters.Action.TURN_LEFT, 
+                characters.Action.TURN_RIGHT
+            ]
+        if tilePassable(inFrontTile):
+            actionsList.append(characters.Action.STEP_FORWARD)
+            actionsList.append(characters.Action.STEP_FORWARD)
+            actionsList.append(characters.Action.STEP_FORWARD)
+            actionsList.append(characters.Action.STEP_FORWARD)
+        if tilePassable(inRightTile):
+            actionsList.append(characters.Action.STEP_RIGHT)
+        if tilePassable(inLeftTile):
+            actionsList.append(characters.Action.STEP_LEFT)
+        if tilePassable(inBackTile):
+            actionsList.append(characters.Action.STEP_BACKWARD)
+        return random.choice(actionsList)
+        
+    def getCoordsTiles(self):
+        '''getting coords of surrounding tiles'''
+        currentPosition, facingCoords=self.mapBase.position, self.mapBase.description.facing.value
+        inFrontCoords=facingCoords+currentPosition
+        if facingCoords.x==0 and facingCoords.y==1:
+            inBackCoords=currentPosition+coordinates.Coords(0, -1)
+            inRightCoords=currentPosition+coordinates.Coords(1, 0)
+            inLeftCoords=currentPosition+coordinates.Coords(-1, 0)
+        elif facingCoords.x==0 and facingCoords.y==-1:
+            inBackCoords=currentPosition+coordinates.Coords(0, 1)
+            inRightCoords=currentPosition+coordinates.Coords(-1, 0)
+            inLeftCoords=currentPosition+coordinates.Coords(1, 0)
+        elif facingCoords.x==1 and facingCoords.y==0:
+            inBackCoords=currentPosition+coordinates.Coords(-1, 0)
+            inRightCoords=currentPosition+coordinates.Coords(0, -1)
+            inLeftCoords=currentPosition+coordinates.Coords(0, 1)
         else:
-            return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD])
+            inBackCoords=currentPosition+coordinates.Coords(1, 0)
+            inRightCoords=currentPosition+coordinates.Coords(0, 1)
+            inLeftCoords=currentPosition+coordinates.Coords(0, -1)
+        
+        return inFrontCoords, inBackCoords, inRightCoords, inLeftCoords
+    
+    def amuletCharactersToAttack(self):
+        '''checks if there are characters to be attacked by amulet in our range'''
+        coordsInRange=[(1, 1), (-1, 1), (1, -1), (-1, -1), (2, 2),(-2, 2), (2, -2), (-2, -2)]
+        for element in coordsInRange:
+            coordInRange=coordinates.Coords(element)+self.mapBase.position
+            if self.mapBase.map[coordInRange.x][coordInRange.y].character:
+                return True
+        return False
+    
+    # def axeCharactersToAttack(self, ):
+    #     '''checks if there are characters to be attacked by axe in our range'''
+    #     coordsInRange=[(1, 1), (-1, 1), (1, -1), (-1, -1), (2, 2),(-2, 2), (2, -2), (-2, -2)]
+    #     for element in coordsInRange:
+    #         coordInRange=coordinates.Coords(element)+self.mapBase.position
+    #         if self.mapBase.map[coordInRange.x][coordInRange.y].character:
+    #             return True
+    #     return False
     
     def update(self, knowledge: characters.ChampionKnowledge):
         self.mapBase.update(knowledge)
