@@ -197,3 +197,6 @@ class PatIKotController:
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.PIKACHU
+
+    def praise(self, score: int) -> None:
+        pass
