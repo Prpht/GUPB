@@ -10,7 +10,7 @@ from gupb.controller.batman.trainer.net import GuessRewardNet
 
 
 class Trainer:
-    def __init__(self, buffer_size: int = 500, sample_limit: int = 200) -> None:
+    def __init__(self, buffer_size: int = 1000, sample_limit: int = 250) -> None:
         self.reset_buffer()
         self._buffer_size = buffer_size
         self._sample_limit = sample_limit
@@ -32,6 +32,9 @@ class Trainer:
         self._rewards = []
 
     def add_to_buffer(self, state: np.ndarray, params: np.ndarray, reward: float):
+        if len(params) != 3:
+            return  # it shouldn't happen
+
         self._states.append(state)
         self._params.append(params)
         self._rewards.append(reward)

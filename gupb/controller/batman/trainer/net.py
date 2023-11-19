@@ -12,11 +12,11 @@ class GuessRewardNet(nn.Module):
             self._feature_extractor = nn.Identity()
         elif len(state_shape) == 3:
             self._feature_extractor = nn.Sequential(
-                nn.Conv2d(state_shape[0], 16, 1),
+                nn.Conv2d(state_shape[0], 1, 1),
                 nn.ReLU(),
-                nn.Conv2d(16, 8, 3),
+                nn.Conv2d(1, 1, 3),
                 nn.ReLU(),
-                nn.Conv2d(8, 4, 3),
+                nn.Conv2d(1, 1, 3),
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2),
                 nn.Flatten(),
@@ -47,3 +47,4 @@ class GuessRewardNet(nn.Module):
 
     def save(self):
         save(self.state_dict(), PATH_TO_MODEL)
+        save(self._feature_extractor.state_dict(), f"{PATH_TO_MODEL}_cnn")
