@@ -30,18 +30,24 @@ class KeyboardController(controller.Controller):
     def praise(self, score: int) -> None:
         pass
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         pass
 
     def register(self, key):
         if key == pygame.K_UP:
             self.action_queue.put(characters.Action.STEP_FORWARD)
         elif key == pygame.K_DOWN:
-            self.action_queue.put(characters.Action.ATTACK)
+            self.action_queue.put(characters.Action.STEP_BACKWARD)
         elif key == pygame.K_LEFT:
-            self.action_queue.put(characters.Action.TURN_LEFT)
+            self.action_queue.put(characters.Action.STEP_LEFT)
         elif key == pygame.K_RIGHT:
+            self.action_queue.put(characters.Action.STEP_RIGHT)
+        elif key == pygame.K_z:
+            self.action_queue.put(characters.Action.TURN_LEFT)
+        elif key == pygame.K_x:
             self.action_queue.put(characters.Action.TURN_RIGHT)
+        elif key == pygame.K_SPACE:
+            self.action_queue.put(characters.Action.ATTACK)
 
     @property
     def name(self) -> str:
@@ -49,7 +55,7 @@ class KeyboardController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.PINK
+        return characters.Tabard.BLUE
 
 
 POTENTIAL_CONTROLLERS = [

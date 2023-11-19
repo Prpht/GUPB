@@ -17,7 +17,6 @@ from gupb.view import render
 
 verbose_logger = logging.getLogger('verbose')
 
-
 class Runner:
     def __init__(self, config: dict[str, Any]) -> None:
         self.arenas: list[str] = config['arenas']
@@ -48,14 +47,19 @@ class Runner:
         RandomArenaPickReport(arena).log(logging.DEBUG)
         if not self.start_balancing or game_no % len(self.controllers) == 0:
             random.shuffle(self.controllers)
-            game = games.Game(arena, self.controllers)
+            game = games.Game(
+                game_no=game_no,
+                arena_name=arena,
+                to_spawn=self.controllers,
+            )
         else:
             self.controllers = self.controllers[1:] + [self.controllers[0]]
             game = games.Game(
-                self._last_arena,
-                self.controllers,
-                self._last_menhir_position,
-                self._last_initial_positions
+                game_no=game_no,
+                arena_name=self._last_arena,
+                to_spawn=self.controllers,
+                menhir_position=self._last_menhir_position,
+                initial_champion_positions=self._last_initial_positions,
             )
         self._last_arena = game.arena.name
         self._last_menhir_position = game.arena.menhir_position
@@ -79,7 +83,7 @@ class Runner:
         verbose_logger.info(f"Final scores.")
         scores_to_log = []
         for i, (name, score) in enumerate(sorted(self.scores.items(), key=lambda x: x[1], reverse=True)):
-            score_line = f"{i + 1}.   {name}: {score}."
+            score_line = f"{int(i) + 1}.   {name}: {score}."
             verbose_logger.info(score_line)
             scores_to_log.append(ControllerScoreReport(name, score))
             print(score_line)

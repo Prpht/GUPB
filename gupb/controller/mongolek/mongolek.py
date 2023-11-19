@@ -16,6 +16,7 @@ POSSIBLE_ACTIONS = [
     Action.STEP_FORWARD,
     Action.ATTACK,
 ]
+
 POSSIBLE_MOVES = [
     Action.TURN_LEFT,
     Action.TURN_RIGHT,
@@ -111,7 +112,6 @@ class Mongolek(controller.Controller):
         pass
 
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
-
         self.facing = None
         self.health = None
         self.weapon = None

@@ -28,11 +28,13 @@ class Game(statemachine.StateMachine):
 
     def __init__(
             self,
+            game_no: int,
             arena_name: str,
             to_spawn: list[controller.Controller],
             menhir_position: Optional[coordinates.Coords] = None,
             initial_champion_positions: Optional[list[coordinates.Coords]] = None,
     ) -> None:
+        self.game_no: int = game_no
         self.arena: arenas.Arena = arenas.Arena.load(arena_name)
         self.arena.spawn_menhir(menhir_position)
         self._prepare_controllers(to_spawn)
@@ -61,7 +63,7 @@ class Game(statemachine.StateMachine):
 
     def _prepare_controllers(self, to_spawn: list[controller.Controller]):
         for controller_to_spawn in to_spawn:
-            controller_to_spawn.reset(self.arena.description())
+            controller_to_spawn.reset(self.game_no, self.arena.description())
 
     def _spawn_champions(
             self,
@@ -122,11 +124,13 @@ class Game(statemachine.StateMachine):
 
     @staticmethod
     def _fibonacci() -> Iterator[int]:
-        a = 1
-        b = 2
+        yield 1
+        yield 2
+        a = 3
+        b = 4
         while True:
-            yield a
-            a, b = b, a + b
+            yield int(a)
+            a, b = b, (a / 2.2) + b
 
 
 @dataclass(frozen=True)
