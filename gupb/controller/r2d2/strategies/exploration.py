@@ -16,7 +16,7 @@ class ExplorationStrategy(Strategy):
 
     def decide(self, knowledge: R2D2Knowledge) -> Action:
 
-        champion_position = knowledge.chempion_knowledge.position
+        champion_position = knowledge.champion_knowledge.position
         
         # First, choose a destination, preferably unexplored
         if self.destination is None:
@@ -47,7 +47,7 @@ class MenhirStrategy(Strategy):
 
     def decide(self, knowledge: R2D2Knowledge) -> Action:
 
-        champion_position = knowledge.chempion_knowledge.position
+        champion_position = knowledge.champion_knowledge.position
         menhir_position = knowledge.world_state.menhir_position
         
         # If further than menhir_eps from the menhir, the destination is menhir

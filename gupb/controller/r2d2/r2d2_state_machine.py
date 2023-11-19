@@ -42,6 +42,10 @@ class R2D2StateMachine(StateMachine):
         name="ApproachDestinationStIII", stage=3, description=""
     ))
 
+    # st4_runaway = State('RunawayStIV', value=R2D2StateValue(
+    #     name="Runaway", stage=4, description=""
+    # ))
+
     # Define transitions
     # - Stage I (Find Weapons)
     st1_destination_chosen = st1_choose_destination.to(st1_approach_destination)
@@ -59,3 +63,6 @@ class R2D2StateMachine(StateMachine):
     # - Stage III (Defend Menhir)
     st3_destination_chosen = st3_choose_destination.to(st3_approach_destination)
     st3_destination_reached = st3_approach_destination.to(st3_choose_destination)
+
+    # - Stage IV (Runaway)
+    # st4_runaway = st3_choose_destination.to(st4_runaway)

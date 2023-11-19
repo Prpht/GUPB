@@ -2,6 +2,7 @@ from gupb import controller
 from gupb.controller.r2d2.knowledge import R2D2Knowledge, WorldState, decide_whether_attack, get_all_enemies, get_cut_positions, get_threating_enemies_map
 from gupb.controller.r2d2.navigation import get_move_towards_target
 from gupb.controller.r2d2.strategies.exploration import MenhirFinder, MenhirObserver, WeaponFinder
+from gupb.controller.r2d2.strategies.potion import PotionPicker, get_nearby_potions
 from gupb.controller.r2d2.strategies.runaway import Runaway
 from gupb.controller.r2d2.strategies.exploration import *
 from gupb.model import arenas
@@ -17,7 +18,7 @@ from .utils import *
 
 class RecklessRoamingDancingDruid(controller.Controller):
     
-    def __init__(self, first_name: str, decay: int = 1, menhir_eps=8):
+    def __init__(self, first_name: str, decay: int = 1, menhir_eps=3):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
@@ -114,7 +115,15 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 knowledge.visible_tiles[self.champion_position].character.weapon.name
             )
 
-            # DEBUG - just explore
+            # priorities 
+            if decide_whether_attack(r2_knowledge):
+                return characters.Action.ATTACK
+            if self._is_threat_nearby(r2_knowledge):
+                return Runaway().decide(r2_knowledge, self.state_machine)
+            if len(get_nearby_potions(r2_knowledge)) > 0:
+                return PotionPicker().decide(r2_knowledge, self.state_machine)
+            
+            # exploration
             if (
                 self.world_state.menhir_position and (
                     items_ranking[r2_knowledge.current_weapon] < items_ranking["knife"] or
@@ -132,22 +141,11 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 if items_ranking[dropped_weapon.name] < items_ranking[r2_knowledge.current_weapon]:
                     return characters.Action.STEP_BACKWARD
         except Exception as e:
-            import traceback
-            print(e)
-            traceback.print_exc()
+            # import traceback
+            # print(e)
+            # traceback.print_exc()
             return characters.Action.TURN_RIGHT
 
-        try:
-            if self._is_threat_nearby(r2_knowledge):
-                next_action = Runaway().decide(r2_knowledge, self.state_machine)
-            # However, if the attack is effective, attack
-            if decide_whether_attack(r2_knowledge):
-                return characters.Action.ATTACK
-        except Exception as e:
-            import traceback
-            print(e)
-            traceback.print_exc()
-            return characters.Action.TURN_RIGHT
 
         return next_action
     
@@ -155,12 +153,11 @@ class RecklessRoamingDancingDruid(controller.Controller):
         """
         Check if there is a threat nearby.
         """
-        def manhatan_dinstance(a: Coords, b: Coords) -> int:
-            return abs(a[0] - b[0]) + abs(a[1] - b[1])
         
         threating_coords = get_threating_enemies_map(knowledge)
         my_coord = knowledge.champion_knowledge.position
-        return any([manhatan_dinstance(my_coord, coords) <= 4 for coords, _ in threating_coords])
+        # return true if there is a threat in the range of 4 walking distance
+        return any([walking_distance(my_coord, coords, knowledge.world_state.matrix_walkable) <= 4 for coords, enemy in threating_coords])
         
 
     def praise(self, score: int) -> None:

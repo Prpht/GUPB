@@ -36,10 +36,10 @@ def scan_for_items(knowledge: R2D2Knowledge, distance: int = 1000) -> Optional[C
     """
 
     item_tiles = []
-    for coords, tile_description in knowledge.chempion_knowledge.visible_tiles.items():
+    for coords, tile_description in knowledge.champion_knowledge.visible_tiles.items():
 
         # If the tile is the one the champion is standing on, ignore it
-        if coords == knowledge.chempion_knowledge.position:
+        if coords == knowledge.champion_knowledge.position:
             continue
 
         # Interested in weapons that are stronger than the current one

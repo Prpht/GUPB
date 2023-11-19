@@ -82,9 +82,11 @@ class WorldState:
         self.matrix[champion_knowledge.position.y, champion_knowledge.position.x] = tiles_mapping["champion"]
 
         # Create a walkable matrix for pathfinding
-        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
-        matrix_walkable = np.logical_and(matrix_walkable != tiles_mapping["sea"], matrix_walkable != tiles_mapping["wall"])
-        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != tiles_mapping["enymy"])
+        matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]].copy()
+        matrix_walkable[matrix_walkable == tiles_mapping["sea"]] = 0
+        matrix_walkable[matrix_walkable == tiles_mapping["wall"]] = 0
+        matrix_walkable[matrix_walkable == tiles_mapping["enymy"]] = 0
+        matrix_walkable[matrix_walkable > 0] = 1
         self.matrix_walkable = matrix_walkable.astype(int)
 
     def _fill_matrix(self, champion_knowledge: ChampionKnowledge):
@@ -116,7 +118,7 @@ class WorldState:
         for coords, tile_description in champion_knowledge.visible_tiles.items():
             self.explored[coords[1], coords[0]] = True
 
-            
+
 def get_threating_enemies_map(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
     """
     Get a map of enemies that are a threat to the agent.
@@ -168,8 +170,9 @@ def get_enemies_in_cut_range(knowledge: R2D2Knowledge) -> list[tuple[Coords, Cha
     for coords in get_cut_positions(coords, my_description, knowledge):
         if coords == knowledge.champion_knowledge.position:
             continue
-        if (enymy := knowledge.champion_knowledge.visible_tiles[coords].character):
-            enemies_in_range.append((coords, enymy))
+        if (enymy := knowledge.champion_knowledge.visible_tiles.get(coords, None)):
+            if enymy.character:
+                enemies_in_range.append((coords, enymy.character))
     return enemies_in_range
 
 def decide_whether_attack(knowledge: R2D2Knowledge):
@@ -184,7 +187,7 @@ def decide_whether_attack(knowledge: R2D2Knowledge):
     in_enemies_cut_range = knowledge.champion_knowledge.position in enemies_cut_ranges
     
     all_weaker = all([enemy.health <= my_description.health for _, enemy in enemies_in_range])
-    return all_weaker
+    return all_weaker or (enemies_in_range and not in_enemies_cut_range)
 
 def get_all_enemies(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
     """
