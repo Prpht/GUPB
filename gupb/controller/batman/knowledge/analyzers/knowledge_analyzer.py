@@ -1,6 +1,10 @@
 from gupb.model.coordinates import Coords
-from gupb.controller.batman.environment.knowledge import Knowledge, ArenaKnowledge, TileKnowledge
-from gupb.controller.batman.environment.analyzers.tile_analyzer import TileAnalyzer
+from gupb.controller.batman.knowledge.knowledge import (
+    Knowledge,
+    ArenaKnowledge,
+    TileKnowledge,
+)
+from gupb.controller.batman.knowledge.analyzers.tile_analyzer import TileAnalyzer
 
 
 class KnowledgeAnalyzer:

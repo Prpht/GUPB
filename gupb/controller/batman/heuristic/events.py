@@ -1,15 +1,14 @@
 from typing import Optional
-from enum import IntEnum, auto
 from copy import deepcopy
 
 from gupb.model.characters import PENALISED_IDLE_TIME
-from gupb.controller.batman.environment.knowledge import (
+from gupb.controller.batman.knowledge.knowledge import (
     Knowledge,
     ArenaKnowledge,
     TileKnowledge,
     ChampionKnowledge,
     WeaponKnowledge,
-    ConsumableKnowledge
+    ConsumableKnowledge,
 )
 
 
@@ -84,7 +83,10 @@ class EventDetector:
         if self._previous_knowledge is None:
             return []
 
-        if self._previous_knowledge.arena.menhir_position != knowledge.arena.menhir_position:
+        if (
+            self._previous_knowledge.arena.menhir_position
+            != knowledge.arena.menhir_position
+        ):
             return [MenhirFoundEvent(knowledge.arena.menhir_position)]
         return []
 
@@ -95,7 +97,9 @@ class EventDetector:
         new_weapons = knowledge.weapons.keys() - self._previous_knowledge.weapons.keys()
         return [WeaponFoundEvent(knowledge.weapons[weapon]) for weapon in new_weapons]
 
-    def _detect_weapon_picked_up(self, knowledge: Knowledge) -> list[WeaponPickedUpEvent]:
+    def _detect_weapon_picked_up(
+        self, knowledge: Knowledge
+    ) -> list[WeaponPickedUpEvent]:
         if self._previous_knowledge is None:
             return []
 
@@ -103,13 +107,18 @@ class EventDetector:
             return [WeaponPickedUpEvent(knowledge.champion.weapon)]
         return []
 
-    def _detect_consumable_found(self, knowledge: Knowledge) -> list[ConsumableFoundEvent]:
+    def _detect_consumable_found(
+        self, knowledge: Knowledge
+    ) -> list[ConsumableFoundEvent]:
         if self._previous_knowledge is None:
             return []
 
         consumables = []
         for position, consumable in knowledge.consumables.items():
-            if position in knowledge.visible_tiles and knowledge.visible_tiles[position].consumable is not None:
+            if (
+                position in knowledge.visible_tiles
+                and knowledge.visible_tiles[position].consumable is not None
+            ):
                 consumables.append(consumable)
 
         return [ConsumableFoundEvent(consumable) for consumable in consumables]
@@ -127,10 +136,13 @@ class EventDetector:
         # enemies can be detected multiple times, we trigger this event each time we see them
         new_enemies = []
         for enemy in knowledge.champions.values():
-            if enemy.position in knowledge.visible_tiles \
-                    and enemy.name != "Batman" \
-                    and knowledge.visible_tiles[enemy.position].character is not None \
-                    and knowledge.visible_tiles[enemy.position].character.controller_name == enemy.name:
+            if (
+                enemy.position in knowledge.visible_tiles
+                and enemy.name != "Batman"
+                and knowledge.visible_tiles[enemy.position].character is not None
+                and knowledge.visible_tiles[enemy.position].character.controller_name
+                == enemy.name
+            ):
                 new_enemies.append(enemy)
         return [EnemyFoundEvent(enemy) for enemy in new_enemies]
 
@@ -138,13 +150,19 @@ class EventDetector:
         if self._previous_knowledge is None:
             return [IdlePenaltyEvent(episodes_to_penalty=PENALISED_IDLE_TIME)]
 
-        if self._previous_knowledge.champion.position == knowledge.champion.position \
-                and self._previous_knowledge.champion.facing == knowledge.champion.facing:
+        if (
+            self._previous_knowledge.champion.position == knowledge.champion.position
+            and self._previous_knowledge.champion.facing == knowledge.champion.facing
+        ):
             self._idle_episodes += 1
         else:
             self._idle_episodes = 0
 
-        return [IdlePenaltyEvent(episodes_to_penalty=PENALISED_IDLE_TIME - self._idle_episodes)]
+        return [
+            IdlePenaltyEvent(
+                episodes_to_penalty=PENALISED_IDLE_TIME - self._idle_episodes
+            )
+        ]
 
     def detect(self, knowledge: Knowledge) -> list[Event]:
         events = []

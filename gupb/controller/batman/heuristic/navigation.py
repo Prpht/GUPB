@@ -7,35 +7,39 @@ from pathfinding.finder.bi_a_star import BiAStarFinder
 
 from gupb.model.characters import Action, Facing
 from gupb.model.coordinates import Coords, add_coords, sub_coords
-from gupb.controller.batman.environment.knowledge import Knowledge, ArenaKnowledge, ChampionKnowledge
+from gupb.controller.batman.knowledge.knowledge import (
+    Knowledge,
+    ArenaKnowledge,
+    ChampionKnowledge,
+)
 
 
 FACING_TO_COORDS = {
-    Facing.UP:    Coords( 0, -1),
-    Facing.RIGHT: Coords( 1,  0),
-    Facing.DOWN:  Coords( 0,  1),
-    Facing.LEFT:  Coords(-1,  0),
+    Facing.UP: Coords(0, -1),
+    Facing.RIGHT: Coords(1, 0),
+    Facing.DOWN: Coords(0, 1),
+    Facing.LEFT: Coords(-1, 0),
 }
 
 FACING_TURN_LEFT = {
-    Facing.UP:    Facing.LEFT,
+    Facing.UP: Facing.LEFT,
     Facing.RIGHT: Facing.UP,
-    Facing.DOWN:  Facing.RIGHT,
-    Facing.LEFT:  Facing.DOWN,
+    Facing.DOWN: Facing.RIGHT,
+    Facing.LEFT: Facing.DOWN,
 }
 
 FACING_TURN_RIGHT = {
-    Facing.UP:    Facing.RIGHT,
+    Facing.UP: Facing.RIGHT,
     Facing.RIGHT: Facing.DOWN,
-    Facing.DOWN:  Facing.LEFT,
-    Facing.LEFT:  Facing.UP,
+    Facing.DOWN: Facing.LEFT,
+    Facing.LEFT: Facing.UP,
 }
 
 FACING_TURN_BACK = {
-    Facing.UP:    Facing.DOWN,
+    Facing.UP: Facing.DOWN,
     Facing.RIGHT: Facing.LEFT,
-    Facing.DOWN:  Facing.UP,
-    Facing.LEFT:  Facing.RIGHT,
+    Facing.DOWN: Facing.UP,
+    Facing.LEFT: Facing.RIGHT,
 }
 
 
@@ -103,12 +107,14 @@ class Navigation:
 
     def is_corner_tile(self, position: Coords) -> bool:
         facing = Facing.UP
-        passable_tiles = sum([
-            self.is_passable_tile(self.front_tile(position, facing)),
-            self.is_passable_tile(self.right_tile(position, facing)),
-            self.is_passable_tile(self.left_tile(position, facing)),
-            self.is_passable_tile(self.back_tile(position, facing)),
-        ])
+        passable_tiles = sum(
+            [
+                self.is_passable_tile(self.front_tile(position, facing)),
+                self.is_passable_tile(self.right_tile(position, facing)),
+                self.is_passable_tile(self.left_tile(position, facing)),
+                self.is_passable_tile(self.back_tile(position, facing)),
+            ]
+        )
         return passable_tiles <= 2
 
     def find_closest_free_tile(self, knowledge: Knowledge) -> Coords:
@@ -124,7 +130,9 @@ class Navigation:
         else:
             return self.back_tile(position, facing)
 
-    def iterate_tiles_in_region_boundary(self, lower_left: Coords, upper_right: Coords) -> Iterator[Coords]:
+    def iterate_tiles_in_region_boundary(
+        self, lower_left: Coords, upper_right: Coords
+    ) -> Iterator[Coords]:
         for x in range(lower_left.x, upper_right.x + 1):
             yield Coords(x, lower_left.y)
             yield Coords(x, upper_right.y)
@@ -140,11 +148,14 @@ class Navigation:
             cost += grid[coords.y, coords.x]
         return cost
 
-    def find_nearest_safe_tile(self, knowledge: Knowledge, danger_grid: np.ndarray, distance: int = 2) -> Coords:
+    def find_nearest_safe_tile(
+        self, knowledge: Knowledge, danger_grid: np.ndarray, distance: int = 2
+    ) -> Coords:
         delta = Coords(distance, distance)
         tiles2path_danger = dict()
-        for candidate_tile in self.iterate_tiles_in_region_boundary(sub_coords(knowledge.position, delta),
-                                                                    add_coords(knowledge.position, delta)):
+        for candidate_tile in self.iterate_tiles_in_region_boundary(
+            sub_coords(knowledge.position, delta), add_coords(knowledge.position, delta)
+        ):
             if not self.is_passable_tile(candidate_tile):
                 continue
 
@@ -190,7 +201,9 @@ class Navigation:
             return Facing.LEFT
         return Facing.DOWN
 
-    def turn(self, current_direction: Facing, target_direction: Facing) -> Optional[Action]:
+    def turn(
+        self, current_direction: Facing, target_direction: Facing
+    ) -> Optional[Action]:
         if current_direction == target_direction:
             return None
 
@@ -215,7 +228,9 @@ class Navigation:
             else:
                 return Action.TURN_LEFT
 
-    def next_step(self, knowledge: Knowledge, target: Coords, grid: Grid = None) -> Action:
+    def next_step(
+        self, knowledge: Knowledge, target: Coords, grid: Grid = None
+    ) -> Action:
         path = self.find_path(knowledge.position, target, grid=grid)
 
         # find_path returns the start and end point as well
@@ -234,3 +249,29 @@ class Navigation:
             return Action.STEP_FORWARD
 
         return turn_action
+
+    def next_fastest_step(
+        self, knowledge: Knowledge, target: Coords, grid: Grid = None
+    ) -> Action:
+        path = self.find_path(knowledge.position, target, grid=grid)
+
+        # find_path returns the start and end point as well
+        if len(path) == 0 or len(path) == 1:
+            return Action.DO_NOTHING
+
+        current_coord = knowledge.position
+        next_coord = path[1]
+
+        facing = knowledge.champion.facing
+        should_be_facing = self.direction_to(current_coord, next_coord)
+
+        if facing == should_be_facing:
+            return Action.STEP_FORWARD
+
+        if FACING_TURN_LEFT.get(facing) == should_be_facing:
+            return Action.STEP_LEFT
+
+        if FACING_TURN_RIGHT.get(facing) == should_be_facing:
+            return Action.STEP_RIGHT
+
+        return Action.STEP_BACKWARD

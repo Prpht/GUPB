@@ -3,7 +3,11 @@ from functools import cached_property
 
 from gupb.model.coordinates import Coords
 from gupb.model.characters import Facing
-from gupb.controller.batman.environment.knowledge import Knowledge, ArenaKnowledge, TileKnowledge
+from gupb.controller.batman.knowledge.knowledge import (
+    Knowledge,
+    ArenaKnowledge,
+    TileKnowledge,
+)
 
 
 class TileAnalyzer:
@@ -11,7 +15,9 @@ class TileAnalyzer:
         self.knowledge = knowledge
         self.arena = knowledge.arena
         self.position = position
-        self.tile_knowledge = self.arena.explored_map.get(position, TileKnowledge(position))
+        self.tile_knowledge = self.arena.explored_map.get(
+            position, TileKnowledge(position)
+        )
 
     @cached_property
     def is_out_of_map(self):
@@ -55,7 +61,11 @@ class TileAnalyzer:
     # weapons
     @cached_property
     def weapon(self) -> str:
-        return self.tile_knowledge.weapon.name if self.tile_knowledge.weapon is not None else "none"
+        return (
+            self.tile_knowledge.weapon.name
+            if self.tile_knowledge.weapon is not None
+            else "none"
+        )
 
     @property
     def has_knife(self) -> bool:
@@ -80,8 +90,10 @@ class TileAnalyzer:
     # characters
     @property
     def has_enemy(self) -> bool:
-        return self.tile_knowledge.character is not None \
+        return (
+            self.tile_knowledge.character is not None
             and self.position != self.knowledge.position
+        )
 
     @property
     def character_health(self) -> int:
@@ -137,7 +149,11 @@ class TileAnalyzer:
     # consumables
     @cached_property
     def consumable(self) -> str:
-        return self.tile_knowledge.consumable.name if self.tile_knowledge.consumable is not None else "none"
+        return (
+            self.tile_knowledge.consumable.name
+            if self.tile_knowledge.consumable is not None
+            else "none"
+        )
 
     @property
     def has_potion(self) -> bool:
