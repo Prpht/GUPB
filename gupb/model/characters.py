@@ -47,6 +47,7 @@ class Tabard(Enum):
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
+    ALPHA = "AlphaGUPB"
     ANCYMON = "Ancymon"
     ARAGORN = 'Aragorn'
     FROG = 'Frog'
@@ -135,7 +136,16 @@ class Champion:
         ChampionFacingReport(self.controller.name, self.facing.value).log(logging.DEBUG)
 
     def step_forward(self) -> None:
-        self.arena.step_forward(self)
+        self.arena.step(self, arenas.StepDirection.FORWARD)
+
+    def step_backward(self) -> None:
+        self.arena.step(self, arenas.StepDirection.BACKWARD)
+
+    def step_left(self) -> None:
+        self.arena.step(self, arenas.StepDirection.LEFT)
+
+    def step_right(self) -> None:
+        self.arena.step(self, arenas.StepDirection.RIGHT)
 
     def attack(self) -> None:
         self.weapon.cut(self.arena, self.position, self.facing)
@@ -199,11 +209,24 @@ class Facing(Enum):
         elif self == Facing.LEFT:
             return Facing.UP
 
+    def opposite(self) -> Facing:
+        if self == Facing.UP:
+            return Facing.DOWN
+        elif self == Facing.RIGHT:
+            return Facing.LEFT
+        elif self == Facing.DOWN:
+            return Facing.UP
+        elif self == Facing.LEFT:
+            return Facing.RIGHT
+
 
 class Action(Enum):
     TURN_LEFT = partial(Champion.turn_left)
     TURN_RIGHT = partial(Champion.turn_right)
     STEP_FORWARD = partial(Champion.step_forward)
+    STEP_BACKWARD = partial(Champion.step_backward)
+    STEP_LEFT = partial(Champion.step_left)
+    STEP_RIGHT = partial(Champion.step_right)
     ATTACK = partial(Champion.attack)
     DO_NOTHING = partial(Champion.do_nothing)
 
