@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from gupb.controller.r2d2.utils import LARGEST_ARENA_SHAPE, tiles_mapping
@@ -16,10 +17,12 @@ class R2D2Knowledge:
     champion_knowledge: ChampionKnowledge
     world_state: WorldState 
     arena: Arena
+    current_weapon: str
 
 
 class WorldState:
     def __init__(self, arena: Arena, decay: int = 5):
+        self.step_counter = 0
         self.matrix = np.zeros(LARGEST_ARENA_SHAPE, dtype=np.int8)
         self.arena_shape = arena.size[1], arena.size[0]
         for coords, tile in arena.terrain.items():
@@ -27,9 +30,17 @@ class WorldState:
 
         # Save the initial state of the arena for decay mechanism
         self.initial_arena = self.matrix.copy()
+
+        # Define the exploration matrix wich stores explored tiles
+        self.explored = self.initial_arena.copy()[:self.arena_shape[0], :self.arena_shape[1]]
+        self.explored = np.logical_or(self.explored == tiles_mapping["sea"], self.explored != tiles_mapping["wall"])
+
+        # Define the decay mask
         self.decay = decay
         self.decay_mask = np.zeros(LARGEST_ARENA_SHAPE, np.int8)
+
         self.menhir_position = None
+        self.mist_present = False
 
     def update(self, knowledge: ChampionKnowledge):
         # Apply decay and update the decay mask
@@ -38,8 +49,13 @@ class WorldState:
         # Update the matrix with the current observation
         self._fill_matrix(knowledge)
 
+        # Update the explored matrix
+        self.update_explored(knowledge)
+
         # Update the state of the agent
         self._update_state(knowledge)
+
+        self.step_counter += 1
 
     def _decay_step(self, champion_knowledge: ChampionKnowledge):
         
@@ -67,8 +83,8 @@ class WorldState:
 
         # Create a walkable matrix for pathfinding
         matrix_walkable = self.matrix[:self.arena_shape[0], :self.arena_shape[1]]
-        matrix_walkable = np.logical_and(matrix_walkable != 2, matrix_walkable != 3)
-        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != 12)
+        matrix_walkable = np.logical_and(matrix_walkable != tiles_mapping["sea"], matrix_walkable != tiles_mapping["wall"])
+        matrix_walkable = np.logical_and(matrix_walkable, matrix_walkable != tiles_mapping["enymy"])
         self.matrix_walkable = matrix_walkable.astype(int)
 
     def _fill_matrix(self, champion_knowledge: ChampionKnowledge):
@@ -92,8 +108,15 @@ class WorldState:
             if tile_description.effects:
                 if "mist" in tile_description.effects:
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
+                    self.mist_present = True
 
 
+    def update_explored(self, champion_knowledge: ChampionKnowledge):
+        # Update the explored matrix
+        for coords, tile_description in champion_knowledge.visible_tiles.items():
+            self.explored[coords[1], coords[0]] = True
+
+            
 def get_threating_enemies_map(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
     """
     Get a map of enemies that are a threat to the agent.
@@ -106,7 +129,6 @@ def get_threating_enemies_map(knowledge: R2D2Knowledge) -> list[tuple[Coords, Ch
             if is_enemy_a_threat(my_coords, coords, my_description, tile_description.character, knowledge):
                 threating_enemies.append((coords, tile_description.character))
     return threating_enemies
-
     
 def is_enemy_a_threat(my_coords, enemy_coords, me: ChampionDescription, enemy: ChampionDescription, knowledge: R2D2Knowledge) -> bool:
     """

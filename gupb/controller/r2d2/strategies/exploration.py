@@ -1,19 +1,83 @@
+import numpy as np
+
 from typing import Any
 from gupb.controller.r2d2.knowledge import R2D2Knowledge
 from gupb.controller.r2d2.navigation import get_move_towards_target
-from gupb.controller.r2d2.r2d2_helpers import choose_destination, choose_destination_around_menhir, scan_for_weapons
+from gupb.controller.r2d2.r2d2_helpers import *
 from gupb.controller.r2d2.r2d2_state_machine import R2D2StateMachine
 from gupb.controller.r2d2.strategies import Strategy
 from gupb.controller.r2d2.utils import *
 from gupb.model.characters import Action
 
 
+class ExplorationStrategy(Strategy):
+    def __init__(self):
+        self.destination = None
+
+    def decide(self, knowledge: R2D2Knowledge) -> Action:
+
+        champion_position = knowledge.chempion_knowledge.position
+        
+        # First, choose a destination, preferably unexplored
+        if self.destination is None:
+            self.destination = choose_destination(knowledge.world_state.matrix, knowledge.world_state.explored)
+        
+        # Update the destination if you see any items (weapons or potions)
+        tempting_destination = scan_for_items(knowledge)
+        if tempting_destination:
+            self.destination = tempting_destination
+
+        # Avoid other champions TODO?
+        # self.destination = self._avoid_champions(knowledge, self.destination)
+
+        # Move towards the destination
+        next_action, reached = get_move_towards_target(champion_position, self.destination, knowledge)
+
+        # If the destination is reached, reset the destination
+        if reached:
+            self.destination = None
+
+        return next_action
+
+
+class MenhirStrategy(Strategy):
+    def __init__(self, menhir_eps):
+        self.menhir_eps = menhir_eps
+        self.destination = None
+
+    def decide(self, knowledge: R2D2Knowledge) -> Action:
+
+        champion_position = knowledge.chempion_knowledge.position
+        menhir_position = knowledge.world_state.menhir_position
+        
+        # If further than menhir_eps from the menhir, the destination is menhir
+        if walking_distance(champion_position, menhir_position, knowledge.world_state.matrix_walkable) > self.menhir_eps:
+            self.destination = menhir_position
+        
+        # If no destination choosen, random walk around the menhir
+        if self.destination is None:
+            self.destination = choose_destination_around_menhir(knowledge, menhir_position, self.menhir_eps)
+
+        # Update the destination if you see any items (weapons or potions), but with a distance constraint
+        # TODO add distance constraint
+        tempting_destination = scan_for_items(knowledge, self.menhir_eps)
+        if tempting_destination:
+            self.destination = tempting_destination
+
+        # Move towards the destination
+        next_action, reached = get_move_towards_target(champion_position, self.destination, knowledge)
+
+        # If the destination is reached, reset the destination
+        if reached:
+            self.destination = None
+        
+        return next_action
+
 class WeaponFinder(Strategy):
     def __init__(self):
         self.destination = None
         self.weapon_destination = None
         self.weapon_destination_type = None
-        self.current_weapon = None
 
     def decide(self, knowledge: R2D2Knowledge, state_machine: R2D2StateMachine) -> Action:
         """
@@ -49,7 +113,6 @@ class WeaponFinder(Strategy):
         if state_machine.current_state.value.name == "ApproachWeaponStI":
             # - if the weapon is reached, transition to the stage II
             if champion_position == self.weapon_destination:
-                self.current_weapon = self.weapon_destination_type
                 state_machine.st1_weapon_collected()
 
             # - if the weapon is still on board, move to the weapon
@@ -126,7 +189,7 @@ class MenhirObserver(Strategy):
             # - choose a destination and transition to the approach destination state
             if knowledge.world_state.menhir_position is None:
                 raise ValueError("Menhir position is None")
-            self.destination = choose_destination_around_menhir(knowledge.world_state.matrix, knowledge.world_state.menhir_position, self.menhir_eps)
+            self.destination = choose_destination_around_menhir(knowledge, knowledge.world_state.menhir_position, self.menhir_eps)
             state_machine.st3_destination_chosen()
         
         if state_machine.current_state.value.name == "ApproachDestinationStIII":

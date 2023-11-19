@@ -3,6 +3,7 @@ from gupb.controller.r2d2.knowledge import R2D2Knowledge, WorldState, decide_whe
 from gupb.controller.r2d2.navigation import get_move_towards_target
 from gupb.controller.r2d2.strategies.exploration import MenhirFinder, MenhirObserver, WeaponFinder
 from gupb.controller.r2d2.strategies.runaway import Runaway
+from gupb.controller.r2d2.strategies.exploration import *
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.arenas import Arena
@@ -16,7 +17,7 @@ from .utils import *
 
 class RecklessRoamingDancingDruid(controller.Controller):
     
-    def __init__(self, first_name: str, decay: int = 5, menhir_eps=3):
+    def __init__(self, first_name: str, decay: int = 1, menhir_eps=8):
         self.first_name: str = first_name
 
         # Controls the memory of the agent. Decay of n, means that the agent will assume that
@@ -38,9 +39,8 @@ class RecklessRoamingDancingDruid(controller.Controller):
         # The state of the agend
         self.counter = 0
 
-        self.weapon_strategy = WeaponFinder()
-        self.menhir_strategy = MenhirFinder(menhir_eps)
-        self.menhir_observer = MenhirObserver(menhir_eps)
+        self.exploration_strategy = ExplorationStrategy()
+        self.menhir_strategy = MenhirStrategy(menhir_eps)
 
 
     def __eq__(self, other: object) -> bool:
@@ -51,40 +51,40 @@ class RecklessRoamingDancingDruid(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
     
-    def _attack_is_effective(self, knowledge: characters.ChampionKnowledge, world_state: WorldState) -> bool:
+    def _attack_is_effective(self, knowledge: R2D2Knowledge) -> bool:
         """
         Check if the attack is effective. The attack is effective if the enemy is in the range of the weapon.
         """
         
         # Determine facing
-        facing = knowledge.visible_tiles[self.champion_position].character.facing
+        facing = knowledge.chempion_knowledge.visible_tiles[self.champion_position].character.facing
 
-        if self.current_weapon == "knife":
+        if knowledge.current_weapon == "knife":
             # - if the enemy is in the range of the knife, attack
             range = [self.champion_position + facing.value]
-            pot = [world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            pot = [knowledge.world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
             return any(pot)
 
-        if self.current_weapon == "sword":
+        if knowledge.current_weapon == "sword":
             range = [self.champion_position + i * facing.value for i in [1, 2, 3]]
-            pot = [world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            pot = [knowledge.world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
             return any(pot)
 
-        if self.current_weapon == "bow":
+        if knowledge.current_weapon == "bow":
             range = [self.champion_position + i * facing.value for i in [1, 2, 3, 4, 5]]
-            pot = [world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            pot = [knowledge.world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
             return any(pot)
 
-        if self.current_weapon == "axe":
+        if knowledge.current_weapon == "axe":
             range = [
                 self.champion_position + facing.value,
                 self.champion_position + facing.value + facing.turn_left().value,
                 self.champion_position + facing.value + facing.turn_right().value,
             ]
-            pot = [world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            pot = [knowledge.world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
             return any(pot)
 
-        if self.current_weapon == "amulet":
+        if knowledge.current_weapon == "amulet":
             position = self.champion_position
             range = [
                 Coords(*position + (1, 1)),
@@ -96,27 +96,46 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 Coords(*position + (2, -2)),
                 Coords(*position + (-2, -2)),
             ]
-            pot = [world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
+            pot = [knowledge.world_state.matrix[r[1], r[0]] == tiles_mapping["enymy"] for r in range]
             return any(pot)
 
         return False
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.counter += 1
-        self.champion_position = knowledge.position
-        self.current_weapon = knowledge.visible_tiles[self.champion_position].character.weapon.name
-        self.world_state.update(knowledge)
+        try:
+            self.champion_position = knowledge.position
+            self.world_state.update(knowledge)
 
-        r2_knowledge = R2D2Knowledge(knowledge, self.world_state, self.arena)
-        
-        # Chose next action acording to the stage
-        next_action = characters.Action.TURN_RIGHT # Better than nothing
-        if self.state_machine.current_state.value.stage == 1:
-            next_action = self.weapon_strategy.decide(r2_knowledge, self.state_machine)
-        elif self.state_machine.current_state.value.stage == 2:
-            next_action = self.menhir_strategy.decide(r2_knowledge, self.state_machine)
-        elif self.state_machine.current_state.value.stage == 3:
-            next_action = self.menhir_observer.decide(r2_knowledge, self.state_machine)
+            r2_knowledge = R2D2Knowledge(
+                knowledge,
+                self.world_state,
+                self.arena,
+                knowledge.visible_tiles[self.champion_position].character.weapon.name
+            )
+
+            # DEBUG - just explore
+            if (
+                self.world_state.menhir_position and (
+                    items_ranking[r2_knowledge.current_weapon] < items_ranking["knife"] or
+                    r2_knowledge.world_state.mist_present or
+                    r2_knowledge.world_state.step_counter > MAX_STEPS_EXPLORING
+                )
+            ):
+                next_action = self.menhir_strategy.decide(r2_knowledge)
+            else:
+                next_action = self.exploration_strategy.decide(r2_knowledge)
+
+            # If walked into a worse weapon, drop it
+            dropped_weapon = knowledge.visible_tiles[self.champion_position].loot
+            if dropped_weapon:
+                if items_ranking[dropped_weapon.name] < items_ranking[r2_knowledge.current_weapon]:
+                    return characters.Action.STEP_BACKWARD
+        except Exception as e:
+            import traceback
+            print(e)
+            traceback.print_exc()
+            return characters.Action.TURN_RIGHT
 
         try:
             if self._is_threat_nearby(r2_knowledge):
@@ -129,7 +148,7 @@ class RecklessRoamingDancingDruid(controller.Controller):
             print(e)
             traceback.print_exc()
             return characters.Action.TURN_RIGHT
-        
+
         return next_action
     
     def _is_threat_nearby(self, knowledge: R2D2Knowledge) -> bool:
