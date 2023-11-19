@@ -1,6 +1,5 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller.rodger import roger
 
 keyboard_controller = keyboard.KeyboardController()
 
@@ -10,18 +9,13 @@ CONFIGURATION = {
     ],
     'controllers': [
         keyboard_controller,
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
-        roger.Roger('1'),
+        random.RandomController("Alice"),
+        random.RandomController("Bob"),
+        random.RandomController("Cecilia"),
+        random.RandomController("Darius"),
+        random.RandomController("Asd"),
+        random.RandomController("Bo"),
+        random.RandomController("Ce"),
     ],
     'start_balancing': False,
     'visualise': True,

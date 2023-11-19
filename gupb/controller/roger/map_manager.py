@@ -3,8 +3,8 @@ import os
 from typing import Dict, Optional, List, Tuple, Callable
 from math import inf
 
-from gupb.controller.rodger.constans_and_types import SeenWeapon, EpochNr, T, SeenEnemy
-from gupb.controller.rodger.utils import get_distance
+from gupb.controller.roger.constans_and_types import SeenWeapon, EpochNr, T, SeenEnemy
+from gupb.controller.roger.utils import get_distance
 from gupb.model import coordinates, tiles
 from gupb.model.arenas import Terrain, TILE_ENCODING, WEAPON_ENCODING
 from gupb.model.characters import ChampionDescription
@@ -30,6 +30,7 @@ class MapManager:
         self.weapons_coords = {}
         self.load_arena(arena_name)
         self.potions_coords = {}
+        self.mist_coords = []
 
     def update(self, current_position: coordinates.Coords, epoch_nr: EpochNr,
                tiles: Dict[coordinates.Coords, tiles.TileDescription]):

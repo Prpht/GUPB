@@ -1,6 +1,6 @@
 from typing import List
 
-from gupb.controller.rodger.map_manager import MapManager
+from gupb.controller.roger.map_manager import MapManager
 from gupb.model.coordinates import Coords
 
 

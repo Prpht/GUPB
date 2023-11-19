@@ -8,10 +8,10 @@ from pathfinding.core.node import GridNode
 from pathfinding.finder.a_star import AStarFinder
 
 from gupb import controller
-from gupb.controller.rodger.map_manager import MapManager
-from gupb.controller.rodger.weapon_manager import WeaponManager
-from gupb.controller.rodger.constans_and_types import WeaponValue, States, EpochNr
-from gupb.controller.rodger.utils import get_distance
+from gupb.controller.roger.map_manager import MapManager
+from gupb.controller.roger.weapon_manager import WeaponManager
+from gupb.controller.roger.constans_and_types import WeaponValue, States, EpochNr
+from gupb.controller.roger.utils import get_distance
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.coordinates import Coords
@@ -45,24 +45,21 @@ class Roger(controller.Controller):
         return hash(self._id)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        try:
-            self.repair_knowledge(knowledge)
-            self.update_state(knowledge)
-            match self.current_state:
-                case States.RANDOM_WALK:
-                    return self.random_walk()
-                case States.HEAD_TO_WEAPON:
-                    return self.head_to_weapon([])
-                case States.HEAD_TO_MENHIR:
-                    return self.head_to_menhir([])
-                case States.FINAL_DEFENCE:
-                    return self.final_defence()
-                case States.HEAD_TO_CENTER:
-                    return self.head_to_center([])
-                case States.HEAD_TO_POTION:
-                    return self.head_to_potion([])
-        except Exception:
-            print(traceback.format_exc())
+        self.repair_knowledge(knowledge)
+        self.update_state(knowledge)
+        match self.current_state:
+            case States.RANDOM_WALK:
+                return self.random_walk()
+            case States.HEAD_TO_WEAPON:
+                return self.head_to_weapon([])
+            case States.HEAD_TO_MENHIR:
+                return self.head_to_menhir([])
+            case States.FINAL_DEFENCE:
+                return self.final_defence()
+            case States.HEAD_TO_CENTER:
+                return self.head_to_center([])
+            case States.HEAD_TO_POTION:
+                return self.head_to_potion([])
 
     def repair_knowledge(self, knowledge: characters.ChampionKnowledge):
         new_visible_tiles = {}
@@ -143,13 +140,36 @@ class Roger(controller.Controller):
                     best_coords = coords
         return best_coords
 
+    def chose_next_tile_neighbourhood(self) -> Coords:
+        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.arena.terrain.items()))
+        walkable_coords = list(map(lambda x: x[0], walkable))
+        nearest_walkable_coords = set(filter(lambda x: get_distance(self.current_position, x) < 5, walkable_coords))
+        seen_coords = set(self.arena.seen_tiles.keys())
+        unseen_coords = nearest_walkable_coords - seen_coords
+        unseen_coords = list(unseen_coords)
+        best_coords = random.choices(list(walkable_coords), k=1)[0]
+        if unseen_coords:
+            k = min(10, len(unseen_coords))
+            random_unseen = random.choices(unseen_coords, k=k)
+        else:
+            return best_coords
+        longest_path_len = 0
+        for coords in random_unseen:
+            path = self.get_path(coords)
+            if path:
+                path_len = len(self.map_path_to_action_list(self.current_position, path))
+                if path_len > longest_path_len:
+                    longest_path_len = path_len
+                    best_coords = coords
+        return best_coords
+
     def explore_map(self):
         if self.actions and self.actions_iterator >= len(self.actions):
             self.actions = None
             self.actions_iterator = 0
 
         if not self.actions:
-            new_aim = self.chose_next_tile()
+            new_aim = self.chose_next_tile_neighbourhood()
             path = self.get_path(new_aim)
             actions = self.map_path_to_action_list(self.current_position, path)
             self.actions = actions
@@ -185,7 +205,7 @@ class Roger(controller.Controller):
                 self.current_state = States.HEAD_TO_MENHIR
                 return self.head_to_menhir(path)
         else:
-            path = self.get_path(Coords(9, 9))
+            path = self.get_path(Coords(self.arena.arena_size[0]//2, self.arena.arena_size[1]//2))
             if path:
                 self.actions = None
                 self.actions_iterator = 0
@@ -352,7 +372,4 @@ class Roger(controller.Controller):
 
 
 
-POTENTIAL_CONTROLLERS = [
-    Roger('1'),
-]  # todo czy to powinno być w __init__.py?
 
