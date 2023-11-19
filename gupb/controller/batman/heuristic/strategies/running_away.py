@@ -37,7 +37,7 @@ class RunningAwayStrategy:
         if knowledge.position == self._current_objective:
             self._map_grid = None
             self._current_objective = None
-            return None, "scouting"
+            return None, "hiding"
 
         if self._current_objective is None:
             grid = navigation.base_grid()
@@ -77,7 +77,7 @@ class RunningAwayStrategy:
                 knowledge, self._map_grid
             )
 
-        action = navigation.next_step(knowledge, self._current_objective)
+        action = navigation.next_fastest_step(knowledge, self._current_objective)
 
         # if there is a champion in front of us, and we need to step forward
         # we reset the grid and the objective, and try to run away again
@@ -98,8 +98,8 @@ class RunningAwayStrategy:
 
                 if self._recursion_depth > 3:
                     position = navigation.find_closest_free_tile(knowledge)
-                    action = navigation.next_step(knowledge, position)
-                    return action, "scouting"
+                    action = navigation.next_fastest_step(knowledge, position)
+                    return action, "hiding"
 
                 self._map_grid = None
                 self._current_objective = None

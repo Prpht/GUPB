@@ -29,7 +29,7 @@ class BatmanHeuristicsController(controller.Controller):
         self._event_detector = EventDetector()
 
         self._trainer = Trainer()
-        self._params = np.array([5])  # default
+        self._params = np.array([3])  # default
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         assert (

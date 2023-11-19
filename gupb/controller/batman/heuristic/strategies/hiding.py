@@ -33,7 +33,7 @@ class HidingStrategy:
     def __init__(
         self,
         passthrough: Passthrough,
-        hideouts_count: int = 7,
+        hideouts_count: int = 21,
         safe_hampions_alive_count: int = 5,
     ):
         self._passthrough = passthrough
@@ -44,6 +44,8 @@ class HidingStrategy:
         self._current_objective = None
         self._vulnerable_directions = dict()
         self._safe_hampions_alive_count = safe_hampions_alive_count
+
+        self._last_position_moving_backwards = None
 
     def _detect_hideouts(self) -> list[Coords]:
         potential_hideouts = []
@@ -99,7 +101,7 @@ class HidingStrategy:
                 ):
                     return None, "fighting"
                 # case ConsumableFoundEvent(consumable) \
-                #         if navigation.manhattan_terrain_distance(consumable.position, knowledge.position) <= 15:
+                #         if navigation.manhattan_terrain_distance(consumable.position, knowledge.position) <= 2:
                 #     return None, "scouting"
                 case IdlePenaltyEvent(episodes_to_penalty) if episodes_to_penalty <= 2:
                     return (
@@ -124,11 +126,38 @@ class HidingStrategy:
             self._current_objective = None
 
         if self._current_objective is not None:
-            self._vulnerable_directions = dict()
-            return (
-                self._navigation.next_step(knowledge, self._current_objective),
-                "hiding",
+            best_objective = min(
+                self._hideouts,
+                key=lambda hideout: navigation.manhattan_terrain_distance(
+                    hideout, knowledge.position
+                ),
             )
+
+            if best_objective != self._current_objective:
+                self._current_objective = best_objective
+
+            self._vulnerable_directions = dict()
+            action = self._navigation.next_fastest_step(knowledge, self._current_objective)
+
+            # if action == Action.STEP_BACKWARD:
+            #     if self._last_position_moving_backwards is not None \
+            #             and self._last_position_moving_backwards == knowledge.position:
+            #         return navigation.next_step(knowledge, self._current_objective), "hiding"
+            #     else:
+            #         self._last_position_moving_backwards = knowledge.position
+            # else:
+            #     self._last_position_moving_backwards = None
+
+            if action == Action.STEP_LEFT:
+                left_tile_coords = navigation.left_tile(knowledge.position, knowledge.champion.facing)
+                if knowledge.visible_tiles[left_tile_coords].character is not None:
+                    return Action.TURN_LEFT, "hiding"
+            elif action == Action.STEP_RIGHT:
+                right_tile_coords = navigation.right_tile(knowledge.position, knowledge.champion.facing)
+                if knowledge.visible_tiles[right_tile_coords].character is not None:
+                    return Action.TURN_RIGHT, "hiding"
+
+            return action, "hiding"
 
         if knowledge.champion.facing in self._vulnerable_directions:
             self._vulnerable_directions[knowledge.champion.facing] = knowledge.episode

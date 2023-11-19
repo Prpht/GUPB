@@ -249,3 +249,29 @@ class Navigation:
             return Action.STEP_FORWARD
 
         return turn_action
+
+    def next_fastest_step(
+        self, knowledge: Knowledge, target: Coords, grid: Grid = None
+    ) -> Action:
+        path = self.find_path(knowledge.position, target, grid=grid)
+
+        # find_path returns the start and end point as well
+        if len(path) == 0 or len(path) == 1:
+            return Action.DO_NOTHING
+
+        current_coord = knowledge.position
+        next_coord = path[1]
+
+        facing = knowledge.champion.facing
+        should_be_facing = self.direction_to(current_coord, next_coord)
+
+        if facing == should_be_facing:
+            return Action.STEP_FORWARD
+
+        if FACING_TURN_LEFT.get(facing) == should_be_facing:
+            return Action.STEP_LEFT
+
+        if FACING_TURN_RIGHT.get(facing) == should_be_facing:
+            return Action.STEP_RIGHT
+
+        return Action.STEP_BACKWARD
