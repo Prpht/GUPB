@@ -1,101 +1,85 @@
-from gupb.model import arenas, coordinates, weapons
-from gupb.model import characters
+from gupb.model import arenas, characters, coordinates, weapons
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
+from gupb.controller.aragorn import utils
+from gupb.controller.aragorn.constants import DEBUG, INFINITY
 
 
 
 class Brain:
     def __init__(self):
         self.memory = Memory()
-        self.actions = {
-            'spin': SpinAction(),
-            'go_to': GoToAction(),
-            'random': RandomAction(),
-            'attack': AttackAction(),
-        }
-        self.state = 0
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
 
         actions = []
-        dstFacing = None
-
-
-        # ---
 
         if self.memory.willGetIdlePenalty():
-            spinAction = self.actions['spin']
+            spinAction = SpinAction()
             spinAction.setSpin(characters.Action.TURN_LEFT)
             actions.append(spinAction)
 
         if self.memory.hasOponentInFront():
-            attackAction = self.actions['attack']
+            attackAction = AttackAction()
             actions.append(attackAction)
-        
+
+        if self.memory.hasOponentOnRight():
+            spinAction = SpinAction()
+            spinAction.setSpin(characters.Action.TURN_RIGHT)
+            actions.append(spinAction)
+
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
+        if self.memory.hasOponentOnLeft():
+            spinAction = SpinAction()
+            spinAction.setSpin(characters.Action.TURN_LEFT)
+            actions.append(spinAction)
+
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
-        
-        if closestPotionDistance is not None and closestPotionDistance < 5:
+
+        if closestPotionDistance is not None and closestPotionDistance < 8:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
             actions.append(goToPotionAction)
 
-        # ---
+        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
 
-        if self.state == 0:
-            # go to pick up a sword
-            dstPos = self.memory.map.getWeaponPos(weapons.Sword)
-            attackAction = False
+        if closestWeaponDistance is not None and closestWeaponDistance < 8:
+            goToWeaponAction = GoToAction()
+            goToWeaponAction.setDestination(closestWeaponCoords)
+            actions.append(goToWeaponAction)
+                
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
-            if dstPos == self.memory.position:
-                self.state += 1
+        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
+            goToAroundAction = GoToAroundAction()
+            goToAroundAction.setDestination(menhirPos)
+            actions.append(goToAroundAction)
         
-        if self.state == 1:
-            # go to camping spot
-            [dstPos, dstFacing] = self.memory.map.hidingSpot
-            attackAction = False
+        closestEnemy = None
+        closestEnemyDistance = INFINITY
 
-            if dstPos == self.memory.position and dstFacing == self.memory.facing:
-                self.state += 1
+        for coords in self.memory.map.terrain:
+            if self.memory.map.terrain[coords].character is not None and self.memory.position != coords:
+                distance = utils.coordinatesDistance(self.memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
         
-        if self.state == 2:
-            # continously attack
-            [tmp_dstPos, tmp_dstFacing] = self.memory.map.hidingSpot
-            
-            if self.memory.facing != tmp_dstFacing:
-                dstPos = tmp_dstPos
-                dstFacing = tmp_dstFacing
-                attackAction = False
-            else:
-                dstPos = None
-                attackAction = True
+        if closestEnemy is not None:
+            goToAttackAction = GoToAroundAction()
+            goToAttackAction.setDestination(closestEnemy)
+            actions.append(goToAttackAction)
 
-            # if mist is comming - go to the next stage
-            if self.memory.map.mist_radius < self.memory.map.size[0] * 4 / 5:
-                self.state += 1
         
-        if self.state >= 3:
-            # go to map center
-            dstPos = self.memory.map.passableCenter
-            attackAction = False
-
-            if dstPos == self.memory.position:
-                self.state += 1
-
-        if dstPos is not None:
-            goToAction = self.actions['go_to']
-            goToAction.setDestination(dstPos)
-            if dstFacing is not None:
-                goToAction.setDestinationFacing(dstFacing)
-            actions.append(goToAction)
-        
-        if attackAction:
-            attackAction = self.actions['attack']
-            actions.append(attackAction)
-
-        spinAction = self.actions['spin']
+        spinAction = SpinAction()
         actions.append(spinAction)
         
         for action in actions:
@@ -108,14 +92,13 @@ class Brain:
         self.onDecisionReturning(characters.Action.TURN_RIGHT)
         return characters.Action.TURN_RIGHT
     
+    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+        self.memory.reset(arena_description)
+    
     def onDecisionReturning(self, action: characters.Action):
-        # print(action)
         if action in [
             characters.Action.TURN_LEFT,
             characters.Action.TURN_RIGHT,
             characters.Action.STEP_FORWARD,
         ]:
             self.memory.resetIdle()
-    
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
-        self.memory.reset(arena_description)

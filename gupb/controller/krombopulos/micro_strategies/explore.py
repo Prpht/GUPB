@@ -12,16 +12,19 @@ class ExploreMicroStrat(MicroStrategy):
         if precedence is None:
             self.precedence = StrategyPrecedence.LOW
 
-    def decide_and_get_next(self) -> tuple[characters.Action, MicroStrategy]:
+    def decide_and_get_next(self) -> tuple[characters.Action, bool]:
+        # move if champion has not moved in 5 epochs
+        if action := self.avoid_afk():
+            return action, False
         front_tile = self.knowledge_sources.get_tile_info_in_front_of()
         actions_to_choose_from = []
         probs = []
         if front_tile.consumable:
-            return characters.Action.STEP_FORWARD, self
+            return characters.Action.STEP_FORWARD, True
         elif front_tile.character:
-            return characters.Action.ATTACK, self
+            return characters.Action.ATTACK, True
         elif front_tile.loot:
-            return characters.Action.STEP_FORWARD, self
+            return characters.Action.STEP_FORWARD, True
 
         left_tile = self.knowledge_sources.get_tile_in_direction(
             self.knowledge_sources.players.own_player_facing.turn_left())
@@ -33,16 +36,15 @@ class ExploreMicroStrat(MicroStrategy):
         if self.queued_action:
             temp = self.queued_action
             self.queued_action = None
-            print(temp)
-            return temp, self
+            return temp, True
 
         # stuck in a hole
         if left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_RIGHT
-            return characters.Action.TURN_RIGHT, self
+            return characters.Action.TURN_RIGHT, True
         elif right_tile and right_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_LEFT
-            return characters.Action.TURN_LEFT, self
+            return characters.Action.TURN_LEFT, True
 
         if front_tile.type in ('land', 'menhir'):
             actions_to_choose_from.append(characters.Action.STEP_FORWARD)
@@ -59,4 +61,4 @@ class ExploreMicroStrat(MicroStrategy):
         actions_to_choose_from.append(characters.Action.ATTACK)
         probs.append(0.05)
 
-        return random.choices(actions_to_choose_from, weights=probs)[0], self
+        return random.choices(actions_to_choose_from, weights=probs)[0], True

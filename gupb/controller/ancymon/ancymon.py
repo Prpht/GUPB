@@ -1,10 +1,15 @@
 import random
 
 from gupb import controller
-from gupb.model import arenas, characters
+from gupb.model import arenas
+from gupb.model import characters
+from gupb.model.coordinates import Coords
+from gupb.controller.ancymon.environment import Environment
+from gupb.controller.ancymon.strategies.explore import Explore
+from gupb.controller.ancymon.strategies.hunter import Hunter
+from gupb.controller.ancymon.strategies.item_finder import Item_Finder
+from gupb.controller.ancymon.strategies.path_finder import Path_Finder
 from gupb.model.weapons import Knife
-from gupb.model import tiles
-from gupb.model import coordinates
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -13,18 +18,15 @@ POSSIBLE_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-# PRIORITY_LIST = {1: "consumable", 2: "character", 3: "loot", 4: "type"}
-
-
 class AncymonController(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.discovered_map = dict()
-        self.champion = None
-        self.position = None
-        self.menhir = None
-        self.weapon = Knife
-        # self.priority_neighbors = None
+        self.environment: Environment = Environment()
+        self.path_finder: Path_Finder = Path_Finder(self.environment)
+        self.explore: Explore = Explore(self.environment, self.path_finder)
+        self.item_finder: Item_Finder = Item_Finder(self.environment, self.path_finder)
+        self.hunter: Hunter = Hunter(self.environment, self.path_finder)
+        self.i: int = 0
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AncymonController):
@@ -35,102 +37,80 @@ class AncymonController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.position = knowledge.position
-        self.champion = knowledge.visible_tiles[knowledge.position].character
-        self.update_discovered_map(knowledge.visible_tiles)
+        self.environment.update_environment(knowledge)
+        self.i +=1
 
-        # self.priority_neighbors = self.check_surrounding()
-        # # if not self.priority_neighbors:
-        new_position = self.position + self.champion.facing.value
-        if self.collect_loot(new_position):
-            return POSSIBLE_ACTIONS[2]
-        elif self.should_attack(new_position):
-            return POSSIBLE_ACTIONS[3]
-        elif self.can_move_forward():
-            return random.choices(
-                population=POSSIBLE_ACTIONS[:3], weights=(20, 20, 60), k=1
-            )[0]
-        else:
-            return random.choice([POSSIBLE_ACTIONS[0], POSSIBLE_ACTIONS[1]])
+        decision = None
+        strategy = "HUNTER"
 
-    def update_discovered_map(self, visible_tiles):
-        for coords, description in visible_tiles.items():
-            self.discovered_map[coords] = description
-            if self.discovered_map[coords].type == "menhir":
-                self.menhir = coords
+        try:
+            decision = self.hunter.decide()
+            if decision:
+                # print(self.i, strategy)
+                return decision
+        except Exception as e:
+            # print(f"An exception occurred in Hunter strategy: {e}")
+            pass
 
-    def can_move_forward(self):
-        new_position = self.position + self.champion.facing.value
+        try:
+            decision = self.item_finder.decide()
+            strategy = "ITEM FINDER"
+            if decision:
+                # print(self.i, strategy)
+                return decision
+        except Exception as e:
+            # print(f"An exception occurred in Item Finder strategy: {e}")
+            pass
 
-        if self.is_mist(new_position):
-            return False
-        return (
-            self.discovered_map[new_position].type == "land"
-            and not self.discovered_map[new_position].character
-        )
+        try:
+            decision = self.explore.decide()
+            strategy = "EXPLORE"
+        except Exception as e:
+            # print(f"An exception occurred in Explore strategy: {e}")
+            pass
 
-    def should_attack(self, new_position):
-        if self.discovered_map[new_position].character:
-            if (
-                self.discovered_map[new_position].character.health
-                <= self.discovered_map[self.position].character.health
-            ):
-                return True
-            # opponent is not facing us
-            elif (
-                new_position + self.discovered_map[new_position].character.facing.value
-                == self.position
-            ):
-                return False
+        #After providing hunter decider nothing below should be requierd
 
-        return False
+        try:
+            new_position = self.environment.position + self.environment.discovered_map[
+                self.environment.position].character.facing.value
+            if self.collect_loot(new_position):
+                # print(self.i, "COLLECT LOOT")
+                return POSSIBLE_ACTIONS[2]
+            if self.is_menhir_neer():
+                # print(self.i, "EXPLORE MENHIR")
+                if self.environment.discovered_map.get(new_position).loot and self.environment.discovered_map.get(new_position).loot.name == 'amulet':
+                    return random.choices(
+                        population=POSSIBLE_ACTIONS[:2], weights=(50, 50), k=1
+                    )[0]
+                return random.choices(
+                    population=POSSIBLE_ACTIONS[:3], weights=(20, 20, 60), k=1
+                )[0]
+        except Exception as e:
+            # print(f"An exception occurred: {e}")
+            pass
 
-    def collect_loot(self, new_position):
-        return (
-            self.discovered_map[new_position].loot and self.weapon == Knife
-        ) or self.discovered_map[new_position].consumable
+        # print(self.i, strategy)
+        return decision
 
-    # freezes when stuck in mist
-    def is_mist(self, new_position):
-        tile = self.discovered_map[new_position].effects
-        if tile:
-            effect = tile[0].type
-            if effect == "mist":
-                return True
-        return False
-
-    # def check_surrounding(self):
-    #     tile = self.position
-
-    #     neighbourhood = [
-    #         coordinates.Coords(tile.x, tile.y + 1),
-    #         coordinates.Coords(tile.x + 1, tile.y + 1),
-    #         coordinates.Coords(tile.x + 1, tile.y),
-    #         coordinates.Coords(tile.x + 1, tile.y - 1),
-    #         coordinates.Coords(tile.x, tile.y - 1),
-    #         coordinates.Coords(tile.x - 1, tile.y - 1),
-    #         coordinates.Coords(tile.x - 1, tile.y),
-    #         coordinates.Coords(tile.x - 1, tile.y - 1),
-    #     ]
-    #     neighbours = {}
-
-    #     for neighbour in neighbourhood:
-    #         new_position = tile + neighbour
-    #         if new_position in self.discovered_map:
-    #             tile_description = self.discovered_map[new_position]
-    #             neighbours[neighbour] = tile_description
-
-    #     sorted_neighbours = sorted(neighbours.items(), key=lambda x: x[1], reverse=True)
-
-    #     if sorted_neighbours:
-    #         return sorted_neighbours[0]
-    #     return None
+    def is_menhir_neer(self):
+        if self.environment.menhir != None:
+            margin = self.environment.enemies_left
+            # margin = 4
+            if len(self.environment.discovered_map[self.environment.position].effects) > 0:
+                margin = 0
+            return (abs(self.environment.menhir[0] - self.environment.position.x) < margin and
+                    abs(self.environment.menhir[1] - self.environment.position.y) < margin)
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        pass
+        self.environment = Environment()
+        self.path_finder.environment = self.environment
+        self.explore.environment = self.environment
+        self.hunter.environment = self.environment
+        self.item_finder.environment = self.environment
 
     @property
     def name(self) -> str:
@@ -140,7 +120,7 @@ class AncymonController(controller.Controller):
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.ANCYMON
 
-    # TODO
-    # def chaise_enemy()
-    # def avoid_mist()
-    # def go_to_menhir
+    def collect_loot(self, new_position):
+        return (
+            self.environment.discovered_map[new_position].loot and self.environment.weapon == Knife
+        ) or self.environment.discovered_map[new_position].consumable

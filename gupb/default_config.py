@@ -5,7 +5,7 @@ keyboard_controller = keyboard.KeyboardController()
 
 CONFIGURATION = {
     'arenas': [
-        'ordinary_chaos',
+        'ordinary_chaos'
     ],
     'controllers': [
         keyboard_controller,
@@ -13,6 +13,9 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        random.RandomController("Asd"),
+        random.RandomController("Bo"),
+        random.RandomController("Ce"),
     ],
     'start_balancing': False,
     'visualise': True,
