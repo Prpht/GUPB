@@ -17,7 +17,7 @@ from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(20),
+    'arenas': arena_generator.generate_arenas(50),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -39,5 +39,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': False,
-    'runs_no': 300,
+    'runs_no': 1000,
 }
