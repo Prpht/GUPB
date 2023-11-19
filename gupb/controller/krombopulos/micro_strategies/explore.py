@@ -16,21 +16,21 @@ class ExploreMicroStrat(MicroStrategy):
         # move if champion has not moved in 5 epochs
         if action := self.avoid_afk():
             return action, False
+
+        # decision overrides in the base class
+        if action := self.decide_override():
+            return action, True
+
         front_tile = self.knowledge_sources.get_tile_info_in_front_of()
-        actions_to_choose_from = []
-        probs = []
-        if front_tile.consumable:
-            return characters.Action.STEP_FORWARD, True
-        elif front_tile.character:
-            return characters.Action.ATTACK, True
-        elif front_tile.loot:
-            return characters.Action.STEP_FORWARD, True
 
         left_tile = self.knowledge_sources.get_tile_in_direction(
             self.knowledge_sources.players.own_player_facing.turn_left())
 
         right_tile = self.knowledge_sources.get_tile_in_direction(
             self.knowledge_sources.players.own_player_facing.turn_right())
+
+        actions_to_choose_from = []
+        probs = []
 
         # queued action
         if self.queued_action:
@@ -41,22 +41,30 @@ class ExploreMicroStrat(MicroStrategy):
         # stuck in a hole
         if left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_RIGHT
-            return characters.Action.TURN_RIGHT, True
+            return characters.Action.STEP_RIGHT, True
         elif right_tile and right_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_LEFT
-            return characters.Action.TURN_LEFT, True
+            return characters.Action.STEP_LEFT, True
+        elif (left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall') and
+              right_tile and right_tile.type in ('sea', 'wall')):
+            self.queued_action = characters.Action.TURN_RIGHT
+            return characters.Action.STEP_BACKWARD, True
 
         if front_tile.type in ('land', 'menhir'):
             actions_to_choose_from.append(characters.Action.STEP_FORWARD)
-            probs.append(0.3)
+            probs.append(0.2)
 
         if left_tile and left_tile.type in ('land', 'menhir') or not left_tile:
-            actions_to_choose_from.append(characters.Action.TURN_LEFT)
+            actions_to_choose_from.append(characters.Action.STEP_LEFT)
             probs.append(0.1)
+            actions_to_choose_from.append(characters.Action.TURN_LEFT)
+            probs.append(0.05)
 
         if right_tile and right_tile.type in ('land', 'menhir') or not right_tile:
-            actions_to_choose_from.append(characters.Action.TURN_RIGHT)
+            actions_to_choose_from.append(characters.Action.STEP_RIGHT)
             probs.append(0.1)
+            actions_to_choose_from.append(characters.Action.TURN_RIGHT)
+            probs.append(0.05)
 
         actions_to_choose_from.append(characters.Action.ATTACK)
         probs.append(0.05)
