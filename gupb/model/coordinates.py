@@ -14,6 +14,8 @@ def sub_coords(self: Coords, other: Coords) -> Coords:
 def mul_coords(self: Coords, other) -> Coords:
     if isinstance(other, int):
         return Coords(self[0] * other, self[1] * other)
+    elif isinstance(other, float):
+        return Coords(int(self[0] * other), int(self[1] * other))
     else:
         raise NotImplementedError
 

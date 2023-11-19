@@ -52,4 +52,35 @@ def next_pos_to_action(next_x: int, next_y: int, facing: characters.Facing, posi
         elif facing == characters.Facing.RIGHT:
             return characters.Action.TURN_LEFT
     else:
-        return characters.Action.ATTACK
+        return characters.Action.DO_NOTHING
+
+
+def next_facing(facing: characters.Facing, action: characters.Action) -> characters.Facing:
+    if facing == characters.Facing.UP:
+        if action == characters.Action.TURN_LEFT:
+            return characters.Facing.LEFT
+        elif action == characters.Action.TURN_RIGHT:
+            return characters.Facing.RIGHT
+        else:
+            return facing
+    elif facing == characters.Facing.RIGHT:
+        if action == characters.Action.TURN_LEFT:
+            return characters.Facing.UP
+        elif action == characters.Action.TURN_RIGHT:
+            return characters.Facing.DOWN
+        else:
+            return facing
+    elif facing == characters.Facing.DOWN:
+        if action == characters.Action.TURN_LEFT:
+            return characters.Facing.RIGHT
+        elif action == characters.Action.TURN_RIGHT:
+            return characters.Facing.LEFT
+        else:
+            return facing
+    elif facing == characters.Facing.LEFT:
+        if action == characters.Action.TURN_LEFT:
+            return characters.Facing.DOWN
+        elif action == characters.Action.TURN_RIGHT:
+            return characters.Facing.UP
+        else:
+            return facing

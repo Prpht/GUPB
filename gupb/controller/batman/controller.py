@@ -2,12 +2,10 @@ from typing import Optional
 
 from gupb import controller
 from gupb.model import arenas
-from gupb.controller.batman.algo.trainer import Trainer
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.environment.observer import Observer, Observable
+from gupb.controller.batman.rl.trainer import Trainer
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.utils.observer import Observer, Observable
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
-
-import time
 
 
 class BatmanController(controller.Controller, Observer[Action], Observable[Knowledge]):
