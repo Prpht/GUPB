@@ -570,7 +570,7 @@ class AlphaGUPB(controller.Controller):
             self.menhir = self.get_menhir()
 
         if (self.closest_enemy and (self.weapon.name in ['bow_loaded', 'bow_unloaded'])):
-            #print("close enemy and bow")
+            #print("close enemy and bow") 
             distance = self.distance(self.position, self.closest_enemy)
             if(distance < 4):
                 furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
