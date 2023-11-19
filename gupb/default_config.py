@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller.predator import predator
+
 
 keyboard_controller = keyboard.KeyboardController()
 
