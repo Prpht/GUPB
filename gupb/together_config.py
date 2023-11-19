@@ -5,7 +5,6 @@ from gupb.controller import ares
 from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
-from gupb.controller import frog
 from gupb.controller import forrest_gump
 from gupb.controller import frog
 from gupb.controller import krombopulos
@@ -18,7 +17,7 @@ from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(25),
+    'arenas': arena_generator.generate_arenas(20),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -26,7 +25,7 @@ CONFIGURATION = {
         ares.AresController("Nike"),
         bob.FSMBot(),
         batman.BatmanHeuristicsController('Batman'),
-        cynamonka.CynamonkaController("CynamonkaController"),
+        cynamonka.CynamonkaController("Cynamonka"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         frog.FrogController('Frog'),
         krombopulos.KrombopulosMichaelController(),
@@ -40,6 +39,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': False,
-    'runs_no': 500,
-
+    'runs_no': 300,
 }
