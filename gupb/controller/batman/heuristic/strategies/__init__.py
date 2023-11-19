@@ -16,9 +16,9 @@ from itertools import product
 class StrategiesFactory:
     def __init__(self, passthrough: Passthrough) -> None:
         self._passthrough = passthrough
-        self._params = np.array([5])
-        self._lower_params_limit = np.array([3], dtype=int)
-        self._upper_params_limit = np.array([8], dtype=int)
+        self._params = np.array([3])
+        self._lower_params_limit = np.array([2], dtype=int)
+        self._upper_params_limit = np.array([5], dtype=int)
         self._set_strategies()
 
     def _set_strategies(self):

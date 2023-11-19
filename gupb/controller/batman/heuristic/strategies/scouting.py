@@ -43,15 +43,15 @@ class ScoutingStrategy:
                 # case MenhirFoundEvent(_):
                 #     self._current_objective = None
                 #     self._current_objective_name = None
+                case ConsumableFoundEvent(consumable):
+                    self._current_objective = consumable.position
+                    self._current_objective_name = consumable.name
                 case WeaponFoundEvent(weapon) if (
                     knowledge.champion.weapon == "knife"
                     and self._current_objective_name != "axe"
                 ) or (weapon.name == "axe" and knowledge.champion.weapon != "axe"):
                     self._current_objective = weapon.position
                     self._current_objective_name = weapon.name
-                case ConsumableFoundEvent(consumable):
-                    self._current_objective = consumable.position
-                    self._current_objective_name = consumable.name
                 case EnemyFoundEvent(enemy) if enemy.position in weapon_cut_positions(
                     knowledge.champion, knowledge
                 ):
@@ -74,7 +74,7 @@ class ScoutingStrategy:
         if (
             self._current_objective is None
             and knowledge.arena.menhir_position
-            and knowledge.champion.weapon != "knife"
+            # and knowledge.champion.weapon != "knife"
         ):
             return None, "hiding"
 

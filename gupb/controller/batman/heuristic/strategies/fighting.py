@@ -55,6 +55,6 @@ class FightingStrategy:
                     # moves_to_be_able_to_attack = ...
                     # if enemy.health < me.health - moves_to_be_able_to_attack * damage:
                     #     then fight
-                    pass
+                    return None, "running_away"
 
-        return None, "scouting"
+        return None, "hiding"
