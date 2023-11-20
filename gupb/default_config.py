@@ -9,15 +9,11 @@ CONFIGURATION = {
         'ordinary_chaos'
     ],
     'controllers': [
-        # keyboard_controller,
+        keyboard_controller,
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        random.RandomController("Asd"),
-        random.RandomController("Bo"),
-        random.RandomController("Ce")
-
     ],
     'start_balancing': False,
     'visualise': False,
