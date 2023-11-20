@@ -5,6 +5,8 @@ from gupb.controller import ares
 from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
+from gupb.controller import cynamonka_v2
+from gupb.controller import cynamonka_v3
 from gupb.controller import forrest_gump
 from gupb.controller import frog
 from gupb.controller import krombopulos
@@ -26,6 +28,8 @@ CONFIGURATION = {
         bob.FSMBot(),
         batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("Cynamonka"),
+        cynamonka_v2.CynamonkaController("Cynamonka2"),
+        cynamonka_v3.CynamonkaController("Cynamonka3"),
         # forrest_gump.ForrestGumpController("Forrest Gump"),
         # frog.FrogController('Frog'),
         krombopulos.KrombopulosMichaelController(),
