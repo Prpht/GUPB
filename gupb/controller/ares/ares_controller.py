@@ -219,6 +219,9 @@ class Map():
         r = 0
         while len(Q) > 0 and (radius is None or r <= radius):
             r += 1
+        r = 0
+        while len(Q) > 0 and (radius is None or r <= radius):
+            r += 1
             v = Q.pop(0)
             if self.targetFound(v, target):
                 # find path

@@ -6,7 +6,7 @@ from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
 
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY
 
 
 
@@ -100,9 +100,15 @@ class Memory:
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
-
+        current_weapon = self.map.terrain[self.position].character.weapon.name
+   
         for coords in self.map.terrain:
-            if self.map.terrain[coords].loot == weapons.Weapon:
+            if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
+                possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
+                #TODO: assign correct weights for weapons when the proper usage of each of them is known
+                if WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
+                    continue
+
                 distance = utils.coordinatesDistance(self.position, coords)
 
                 if distance < minDistance:
@@ -231,7 +237,7 @@ class Map:
             return weapons.Sword
         elif weaponDescription.name == 'axe':
             return weapons.Axe
-        elif weaponDescription.name == 'bow':
+        elif weaponDescription.name in ['bow' 'bow_loaded' 'bow_unloaded']:
             return weapons.Bow
         elif weaponDescription.name == 'amulet':
             return weapons.Amulet
@@ -288,6 +294,30 @@ class Map:
                     closestDistance = distance
         
         return closestCoords
+    
+    def getDangerousTiles(self):
+        """
+        Returns list of tiles that are in range of enemy weapon
+        """
+
+        dangerousTiles = []
+
+        for coords in self.terrain:
+            enemyDescription = self.terrain[coords].character
+            
+            if enemyDescription is not None:
+                weapon = self.weaponDescriptionConverter(enemyDescription.weapon)
+
+                if weapon is None:
+                    continue
+
+                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
+
+                for position in positions:
+                    if position not in dangerousTiles:
+                        dangerousTiles.append(coords)
+        
+        return dangerousTiles
 
 class MenhirCalculator:
     def __init__(self, map :Map) -> None:
