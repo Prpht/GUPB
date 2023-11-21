@@ -20,6 +20,10 @@ TODO: sprawdza przeciwnikow w szerszym obszarze i jesli widzi jakeigo w poblizu 
 TODO: uciekanie przed mgłą
 """
 
+"""
+KONFIGURACJA KTORA WYSLALYSMY NA PROJEKTOWE 3
+"""
+
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,

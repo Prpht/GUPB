@@ -20,6 +20,10 @@ TODO: sprawdza przeciwnikow w szerszym obszarze i jesli widzi jakeigo w poblizu 
 TODO: uciekanie przed mgłą
 """
 
+"""
+OPCJA MILENKI
+"""
+
 
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -108,7 +112,7 @@ class CynamonkaController(controller.Controller):
                     # here should be runaway from mist function
                     self.times_in_row_amulet = 0
                     #return self.go_to_center()
-                    return self.go_randomly()
+                    return self.runaway_from_mist()
             # player do not see mist so it is not its priority to run away
             else:
                 # TODO: mozna tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
