@@ -5,6 +5,7 @@ from math import inf
 
 from gupb.controller.roger.constans_and_types import SeenWeapon, EpochNr, T, SeenEnemy
 from gupb.controller.roger.utils import get_distance
+from gupb.controller.roger.weapon_manager import get_weapon_cut_positions
 from gupb.model import coordinates, tiles
 from gupb.model.arenas import Terrain, TILE_ENCODING, WEAPON_ENCODING
 from gupb.model.characters import ChampionDescription
@@ -20,9 +21,11 @@ class MapManager:
         self.weapons_coords: Dict[coordinates.Coords, SeenWeapon] = {}
         self.potions_coords: Dict[coordinates.Coords, EpochNr] = {}
         self.enemies_coords: Dict[coordinates.Coords, SeenEnemy] = {}
+        self.potential_attackers: Dict[coordinates.Coords, SeenEnemy] = {}
         self.mist_coords: List[coordinates.Coords] = []
         self.current_position: Optional[coordinates.Coords] = None
         self.epoch: EpochNr = 0
+        self.in_cut_range = False
 
     def reset(self, arena_name: str):
         self.seen_tiles = {}
@@ -30,10 +33,14 @@ class MapManager:
         self.weapons_coords = {}
         self.load_arena(arena_name)
         self.potions_coords = {}
+        self.enemies_coords = {}
+        self.potential_attackers = {}
         self.mist_coords = []
+        self.in_cut_range = False
 
     def update(self, current_position: coordinates.Coords, epoch_nr: EpochNr,
                tiles: Dict[coordinates.Coords, tiles.TileDescription]):
+        self.in_cut_range = False
         self.current_position = current_position
         self.epoch = epoch_nr
         self.seen_tiles.update(dict((x[0], (x[1], self.epoch)) for x in tiles.items()))
@@ -70,11 +77,20 @@ class MapManager:
                 self.mist_coords.append(coords)
 
     def check_enemy(self, coords: coordinates.Coords, tile: tiles.TileDescription):
+        self.potential_attackers = {}
         if tile.character:
             if coords != self.current_position:
                 self.enemies_coords[coords] = SeenEnemy(tile.character, self.epoch)
+                self.check_if_potential_attacker(coords)
+
         else:
             self.enemies_coords.pop(coords, None)
+
+    def check_if_potential_attacker(self, coords):
+        cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, coords, self.enemies_coords[coords].enemy.weapon.name)
+        if self.current_position in cut_positions:
+            self.potential_attackers[coords] = self.enemies_coords[coords]
+            self.in_cut_range = True
 
     def find_nearest_mist_coords(self) -> Optional[coordinates.Coords]:
         min_distance_squared = 2 * self.arena_size[0] ** 2

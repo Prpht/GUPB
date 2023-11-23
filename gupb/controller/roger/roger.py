@@ -9,7 +9,7 @@ from pathfinding.finder.a_star import AStarFinder
 
 from gupb import controller
 from gupb.controller.roger.map_manager import MapManager
-from gupb.controller.roger.weapon_manager import WeaponManager
+from gupb.controller.roger.weapon_manager import get_weapon_cut_positions
 from gupb.controller.roger.constans_and_types import WeaponValue, States, EpochNr
 from gupb.controller.roger.utils import get_distance
 from gupb.model import arenas, coordinates
@@ -34,7 +34,6 @@ class Roger(controller.Controller):
         self.current_state = States.RANDOM_WALK
         self.beginning_iterator = 0
         self.arena = MapManager()
-        self.weapon_manager = WeaponManager()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Roger):
@@ -181,7 +180,7 @@ class Roger(controller.Controller):
 
     def return_attack_if_enemy_in_cut_range(self, action: characters.Action):
         if not action == characters.Action.ATTACK:
-            cut_positions = self.weapon_manager.get_weapon_cut_positions(self.arena, self.current_position, self.current_weapon().name)
+            cut_positions = get_weapon_cut_positions(self.arena.seen_tiles, self.arena.terrain, self.current_position, self.current_weapon().name)
             for cut_position in cut_positions:
                 if self.arena.seen_tiles.get(cut_position):
                     if self.arena.seen_tiles[cut_position][1] == self.epoch and self.arena.seen_tiles[cut_position][0].character:
@@ -189,6 +188,11 @@ class Roger(controller.Controller):
                         return characters.Action.ATTACK
         return action
 
+    def set_potential_duel_decision(self):
+        if len(self.arena.potential_attackers.items()) > 1:
+            pass
+        else:
+            pass
 
 
     # def return_attack_if_enemy_on_the_road(self, action: characters.Action):
@@ -245,7 +249,7 @@ class Roger(controller.Controller):
 
     def head_to_menhir(self, path: List[GridNode]) -> characters.Action:
         if not self.actions:
-            self.actions = self.map_path_to_action_list(self.current_position, path)
+            self.actions = self.map_path_to_action_list(self.current_position, path, True)
         if self.actions_iterator >= len(self.actions):
             self.actions = None
             self.actions_iterator = 0
@@ -258,7 +262,7 @@ class Roger(controller.Controller):
         return action
 
     def final_defence(self) -> characters.Action:
-        self.actions = [characters.Action.TURN_RIGHT, characters.Action.ATTACK]
+        self.actions = [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.TURN_LEFT]
         action = self.actions[self.actions_iterator % 2]
         self.actions_iterator += 1
         action = self.return_attack_if_enemy_in_cut_range(action)
@@ -266,7 +270,7 @@ class Roger(controller.Controller):
 
     def head_to_center(self, path) -> characters.Action:
         if not self.actions:
-            self.actions = self.map_path_to_action_list(self.current_position, path)
+            self.actions = self.map_path_to_action_list(self.current_position, path, True)
         if self.actions_iterator >= len(self.actions):
             self.actions = None
             self.actions_iterator = 0
@@ -279,7 +283,7 @@ class Roger(controller.Controller):
 
     def head_to_potion(self, path: List[GridNode]) -> characters.Action:
         if not self.actions:
-            self.actions = self.map_path_to_action_list(self.current_position, path)
+            self.actions = self.map_path_to_action_list(self.current_position, path, True)
         if self.actions_iterator >= len(self.actions):
             self.actions = None
             self.actions_iterator = 0
@@ -297,16 +301,33 @@ class Roger(controller.Controller):
         self.current_position = Coords(*knowledge.position)
         self.arena.update(self.current_position, self.epoch, knowledge.visible_tiles)
 
-    def map_path_to_action_list(self, current_position: Coords, path: List[GridNode]) -> List[characters.Action]:
+    def map_path_to_action_list(self, current_position: Coords, path: List[GridNode], fast_mode: bool = False) -> List[characters.Action]:
+        if fast_mode:
+            return self.map_path_to_fast_action_list(current_position, path)
         initial_facing = self.arena.seen_tiles[current_position][0].character.facing
         facings: List[characters.Facing] = list(
             map(lambda a: characters.Facing(Coords(a[1].x - a[0].x, a[1].y - a[0].y)), list(zip(path[:-1], path[1:]))))
         actions: List[characters.Action] = []
         for a, b in zip([initial_facing, *facings[:-1]], facings):
-            actions.extend(self.map_facings_to_actions(a, b))
+            actions.extend(self.map_facings_to_actions(a, b, False))
         return actions
 
-    def map_facings_to_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
+    def map_path_to_fast_action_list(self, current_position: Coords, path: List[GridNode]) -> List[characters.Action]:
+        initial_facing = self.arena.seen_tiles[current_position][0].character.facing
+        facings: List[characters.Facing] = list(
+            map(lambda a: characters.Facing(Coords(a[1].x - a[0].x, a[1].y - a[0].y)), list(zip(path[:-1], path[1:]))))
+        actions: List[characters.Action] = []
+        for a, b in zip([initial_facing for _ in range(len(facings))], facings):
+            actions.extend(self.map_facings_to_actions(a, b, True))
+        return actions
+
+    def map_facings_to_actions(self, f1: characters.Facing, f2: characters.Facing, fast_mode: bool) -> List[characters.Action]:
+        if fast_mode:
+            return self.map_facings_to_fast_actions(f1, f2)
+        else:
+            return self.map_facings_to_slow_actions(f1, f2)
+
+    def map_facings_to_slow_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
         if f1 == f2:
             return [characters.Action.STEP_FORWARD]
         elif f1.turn_left() == f2:
@@ -315,6 +336,16 @@ class Roger(controller.Controller):
             return [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
         else:
             return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
+
+    def map_facings_to_fast_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
+        if f1 == f2:
+            return [characters.Action.STEP_FORWARD]
+        elif f1.turn_left() == f2:
+            return [characters.Action.STEP_LEFT]
+        elif f1.turn_right() == f2:
+            return [characters.Action.STEP_RIGHT]
+        else:
+            return [characters.Action.STEP_BACKWARD]
 
     def praise(self, score: int) -> None:
         pass
@@ -326,7 +357,6 @@ class Roger(controller.Controller):
         self.actions_iterator = 0
         self.current_state = States.RANDOM_WALK
         self.arena.reset(arena_description.name)
-
 
     def extract_walkable_tiles(self, items=None):
         if items is None:
@@ -363,7 +393,7 @@ class Roger(controller.Controller):
         tiles_available_set = set(tiles_available)
         unsafe_tiles = []
         for coords, seen_enemy in self.arena.enemies_coords.items():
-            cut_tiles = self.weapon_manager.get_weapon_cut_positions(self.arena, coords, seen_enemy.enemy.weapon.name)
+            cut_tiles = get_weapon_cut_positions(self.arena.seen_tiles, self.arena.terrain, coords, seen_enemy.enemy.weapon.name)
             unsafe_tiles.extend(cut_tiles)
         unsafe_tiles_set = set(unsafe_tiles)
         safe_tiles = tiles_available_set.difference(unsafe_tiles_set)
