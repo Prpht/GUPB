@@ -67,11 +67,13 @@ class Mist(Effect):
 
 
 class WeaponCut(Effect):
-    @staticmethod
-    def instant(champion: characters.Champion) -> None:
+    def __init__(self, damage: int = CUT_DAMAGE):
+        self.damage: int = damage
+
+    def instant(self, champion: characters.Champion) -> None:
         verbose_logger.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
-        ChampionDamagedByWeaponCutReport(champion.controller.name, CUT_DAMAGE).log(logging.DEBUG)
-        champion.damage(CUT_DAMAGE)
+        ChampionDamagedByWeaponCutReport(champion.controller.name, self.damage).log(logging.DEBUG)
+        champion.damage(self.damage)
 
     @staticmethod
     def stay(champion: characters.Champion) -> None:
