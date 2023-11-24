@@ -53,8 +53,14 @@ class Memory:
 
         self.health = knowledge.visible_tiles[self.position].character.health
 
-    def getCurrentWeapon(self):
+    def getCurrentWeaponDescription(self):
         return self.map.terrain[self.position].character.weapon
+    
+    def getCurrentWeaponName(self):
+        return self.getCurrentWeaponDescription().name
+
+    def getCurrentWeaponClass(self):
+        return Map.weaponDescriptionConverter(self.getCurrentWeaponDescription())
 
     def hasOponentInFront(self):
         frontCell = coordinates.add_coords(self.position, self.facing.value)
@@ -65,7 +71,11 @@ class Memory:
         return False
     
     def hasOponentInRange(self):
-        currentWeapon = self.getCurrentWeapon()
+        currentWeapon = self.getCurrentWeaponClass()
+
+        if currentWeapon is None:
+            return False
+
         rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
 
         for cellCoords in rangeCells:
@@ -118,7 +128,7 @@ class Memory:
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
-        current_weapon = self.getCurrentWeapon().name
+        current_weapon = self.getCurrentWeaponName()
    
         for coords in self.map.terrain:
             # if self.map.terrain[coords].loot is not None:
@@ -346,6 +356,7 @@ class MenhirCalculator:
 
         self.menhirPos = None
         self.mistCoordinates = []
+        self.recentlyChanged = True
 
     def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
         if not isinstance(menhirPos, coordinates.Coords):
@@ -354,6 +365,7 @@ class MenhirCalculator:
     
     def addMist(self, mistPos: coordinates.Coords) -> None:
         if mistPos not in self.mistCoordinates:
+            self.recentlyChanged = True
             self.mistCoordinates.append(mistPos)
     
     def isMenhirPosFound(self) -> bool:
@@ -413,4 +425,5 @@ class MenhirCalculator:
                     bestMenhirPos = try_menhir
                     bestMistAmount = mistFound/mistMax
         
+        self.recentlyChanged = False
         return bestMenhirPos, bestMistAmount
