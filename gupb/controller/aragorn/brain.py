@@ -27,18 +27,6 @@ class Brain:
             spinAction = SpinAction()
             spinAction.setSpin(characters.Action.TURN_LEFT)
             actions.append(spinAction)
-
-        # ------------------------------------------
-
-        # MIST FORCED MOVEMENT
-
-        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
-
-        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
-            if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
-            goToAroundAction = GoToAroundAction()
-            goToAroundAction.setDestination(menhirPos)
-            actions.append(goToAroundAction)
         
         # ------------------------------------------
 
@@ -91,9 +79,11 @@ class Brain:
         
         # ------------------------------------------
 
-        # MIST SUGGESTED MOVEMENT
+        # MIST FORCED MOVEMENT
 
-        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 4:
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
+
+        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
             if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
