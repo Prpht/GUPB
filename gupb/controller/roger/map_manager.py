@@ -26,6 +26,7 @@ class MapManager:
         self.current_position: Optional[coordinates.Coords] = None
         self.epoch: EpochNr = 0
         self.in_cut_range = False
+        self.current_cut_range_tiles: List[coordinates.Coords] = []
 
     def reset(self, arena_name: str):
         self.seen_tiles = {}
@@ -37,10 +38,12 @@ class MapManager:
         self.potential_attackers = {}
         self.mist_coords = []
         self.in_cut_range = False
+        self.current_cut_range_tiles = []
 
     def update(self, current_position: coordinates.Coords, epoch_nr: EpochNr,
                tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         self.in_cut_range = False
+        self.current_cut_range_tiles = []
         self.current_position = current_position
         self.epoch = epoch_nr
         self.seen_tiles.update(dict((x[0], (x[1], self.epoch)) for x in tiles.items()))
@@ -88,6 +91,7 @@ class MapManager:
 
     def check_if_potential_attacker(self, coords):
         cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, coords, self.enemies_coords[coords].enemy.weapon.name)
+        self.current_cut_range_tiles.extend(cut_positions)
         if self.current_position in cut_positions:
             self.potential_attackers[coords] = self.enemies_coords[coords]
             self.in_cut_range = True
@@ -144,10 +148,11 @@ class MapManager:
         return nearest_coords, items[nearest_coords]
 
     def get_4_tiles_around(self):
-        tiles = []
-        tiles.append(self.current_position + Coords(0, 1))
-        tiles.append(self.current_position + Coords(0, -1))
-        tiles.append(self.current_position + Coords(1, 0))
-        tiles.append(self.current_position + Coords(-1, 0))
+        tiles = [
+            self.current_position + Coords(0, 1),
+            self.current_position + Coords(0, -1),
+            self.current_position + Coords(1, 0),
+            self.current_position + Coords(-1, 0)
+        ]
         return tiles
 
