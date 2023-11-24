@@ -17,14 +17,14 @@ from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(50, arena_generator.random_size_generator()),
+    'arenas': arena_generator.generate_arenas(10, arena_generator.random_size_generator()),
     'controllers': [
         # alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         # ares.AresController("Nike"),
         bob.FSMBot(),
-        batman.BatmanHeuristicsController('Batman'),
+        #batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("Cynamonka"),
         # forrest_gump.ForrestGumpController("Forrest Gump"),
         # frog.FrogController('Frog'),
@@ -39,5 +39,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': False,
-    'runs_no': 1000,
+    'runs_no': 100,
 }
