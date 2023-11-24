@@ -33,7 +33,8 @@ class Memory:
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
 
-        self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
+        # self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
+        self.map = Map.load(arena_description.name)
         self.environment = Environment(self.map)
 
         self.health: int = 0
@@ -103,6 +104,8 @@ class Memory:
         current_weapon = self.map.terrain[self.position].character.weapon.name
    
         for coords in self.map.terrain:
+            # if self.map.terrain[coords].loot is not None:
+            #     print(self.map.terrain[coords].loot)
             if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
                 #TODO: assign correct weights for weapons when the proper usage of each of them is known
@@ -164,7 +167,7 @@ class Map:
                             terrain[position] = arenas.TILE_ENCODING[character]()
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
-                            terrain[position].loot = arenas.WEAPON_ENCODING[character]()
+                            terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
         return Map(name, terrain)
     
     @staticmethod
@@ -217,7 +220,7 @@ class Map:
                 self.terrain[coords] = newType()
             
             self.terrain[coords].tick = currentTick
-            self.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
+            self.terrain[coords].loot = Map.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
             
@@ -227,7 +230,8 @@ class Map:
             if effects.Mist in tileEffects:
                 self.menhirCalculator.addMist(coords)
     
-    def weaponDescriptionConverter(self, weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
+    @staticmethod
+    def weaponDescriptionConverter(weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
         if weaponDescription is None or not isinstance(weaponDescription, weapons.WeaponDescription):
             return None
         
@@ -306,7 +310,7 @@ class Map:
             enemyDescription = self.terrain[coords].character
             
             if enemyDescription is not None:
-                weapon = self.weaponDescriptionConverter(enemyDescription.weapon)
+                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
 
                 if weapon is None:
                     continue

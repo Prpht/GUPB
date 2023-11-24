@@ -17,12 +17,30 @@ class Brain:
         actions = []
         if DEBUG: dbg_ac_msgs = []
 
+        # ------------------------------------------
+
+        # PREVENT IDLE PENALTY
+
         if self.memory.willGetIdlePenalty():
             # TODO: allow to decide action, afterwards, if pos will no change - force spin
             if DEBUG: dbg_ac_msgs.append("Spinning to prevent idle penalty")
             spinAction = SpinAction()
             spinAction.setSpin(characters.Action.TURN_LEFT)
             actions.append(spinAction)
+
+        # ------------------------------------------
+
+        # MIST FORCED MOVEMENT
+
+        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
+
+        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
+            if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
+            goToAroundAction = GoToAroundAction()
+            goToAroundAction.setDestination(menhirPos)
+            actions.append(goToAroundAction)
+        
+        # ------------------------------------------
 
         # ATTACKING
 
@@ -56,7 +74,7 @@ class Brain:
         # potion
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
 
-        if closestPotionDistance is not None and closestPotionDistance < 8:
+        if closestPotionDistance is not None and closestPotionDistance < 5:
             if DEBUG: dbg_ac_msgs.append("Picking nearby potion")
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
@@ -65,7 +83,7 @@ class Brain:
         [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
         
         # weapon
-        if closestWeaponDistance is not None and closestWeaponDistance < 8:
+        if closestWeaponDistance is not None and closestWeaponDistance < 5:
             if DEBUG: dbg_ac_msgs.append("Picking nearby weapon")
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
@@ -73,18 +91,17 @@ class Brain:
         
         # ------------------------------------------
 
-        # MIST FORCED MOVEMENT
+        # MIST SUGGESTED MOVEMENT
 
-        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
-
-        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
+        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 4:
             if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
             actions.append(goToAroundAction)
         
         # ------------------------------------------
-
+        
+        # Go to closest enemy
         closestEnemy = None
         closestEnemyDistance = INFINITY
 
@@ -111,7 +128,13 @@ class Brain:
         actions.append(spinAction)
         
         # ------------------------------------------
-        
+
+
+
+        # ==========================================
+
+
+
         actionIndexPerformed = 0
         
         for action in actions:
