@@ -44,8 +44,8 @@ class Brain:
 
         # ATTACKING
 
-        if self.memory.hasOponentInFront():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in front")
+        if self.memory.hasOponentInRange():
+            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
             attackAction = AttackAction()
             actions.append(attackAction)
 

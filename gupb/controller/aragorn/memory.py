@@ -53,11 +53,28 @@ class Memory:
 
         self.health = knowledge.visible_tiles[self.position].character.health
 
+    def getCurrentWeapon(self):
+        return self.map.terrain[self.position].character.weapon
+
     def hasOponentInFront(self):
         frontCell = coordinates.add_coords(self.position, self.facing.value)
         
         if frontCell in self.map.terrain and self.map.terrain[frontCell].character is not None:
             return True
+        
+        return False
+    
+    def hasOponentInRange(self):
+        currentWeapon = self.getCurrentWeapon()
+        rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
+
+        for cellCoords in rangeCells:
+            if cellCoords == self.position:
+                # do not attack yourself
+                continue
+
+            if cellCoords in self.map.terrain and self.map.terrain[cellCoords].character is not None:
+                return True
         
         return False
 
@@ -101,7 +118,7 @@ class Memory:
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
-        current_weapon = self.map.terrain[self.position].character.weapon.name
+        current_weapon = self.getCurrentWeapon().name
    
         for coords in self.map.terrain:
             # if self.map.terrain[coords].loot is not None:
