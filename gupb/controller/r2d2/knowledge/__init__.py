@@ -187,7 +187,7 @@ def decide_whether_attack(knowledge: R2D2Knowledge):
     in_enemies_cut_range = knowledge.champion_knowledge.position in enemies_cut_ranges
     
     all_weaker = all([enemy.health <= my_description.health for _, enemy in enemies_in_range])
-    return all_weaker or (enemies_in_range and not in_enemies_cut_range)
+    return all_weaker or (enemies_in_range and not in_enemies_cut_range) or knowledge.current_weapon == "bow_unloaded"
 
 def get_all_enemies(knowledge: R2D2Knowledge) -> list[tuple[Coords, ChampionDescription]]:
     """

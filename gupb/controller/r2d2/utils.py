@@ -34,13 +34,13 @@ weapon_translate = {
 
 items_ranking = {
     'potion': 0, # 'potion' is not a weapon, but it is the most important item
-    'axe': 1,
-    'sword': 2,
-    'amulet': 3,
-    'knife': 4,
-    'bow': 5,
-    'bow_loaded': 5,
-    'bow_unloaded': 5
+    'bow': 1,
+    'bow_loaded': 1,
+    'bow_unloaded': 1,
+    'axe': 2,
+    'sword': 3,
+    'amulet': 4,
+    'knife': 5,
 }
 
 update_facing_right = {
