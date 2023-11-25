@@ -1,4 +1,5 @@
 import random
+import traceback
 
 from typing import Optional, List
 
@@ -41,22 +42,24 @@ class Roger(controller.Controller):
         return hash(self._id)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.repair_knowledge(knowledge)
-        self.update_state(knowledge)
-        match self.current_state:
-            case States.RANDOM_WALK:
-                return self.random_walk()
-            case States.HEAD_TO_WEAPON:
-                return self.head_to_weapon([])
-            case States.HEAD_TO_MENHIR:
-                return self.head_to_menhir([])
-            case States.FINAL_DEFENCE:
-                return self.final_defence()
-            case States.HEAD_TO_CENTER:
-                return self.head_to_center([])
-            case States.HEAD_TO_POTION:
-                return self.head_to_potion([])
-
+        try:
+            self.repair_knowledge(knowledge)
+            self.update_state(knowledge)
+            match self.current_state:
+                case States.RANDOM_WALK:
+                    return self.random_walk()
+                case States.HEAD_TO_WEAPON:
+                    return self.head_to_weapon([])
+                case States.HEAD_TO_MENHIR:
+                    return self.head_to_menhir([])
+                case States.FINAL_DEFENCE:
+                    return self.final_defence()
+                case States.HEAD_TO_CENTER:
+                    return self.head_to_center([])
+                case States.HEAD_TO_POTION:
+                    return self.head_to_potion([])
+        except Exception as e:
+            traceback.print_exception(e)
     def repair_knowledge(self, knowledge: characters.ChampionKnowledge):
         new_visible_tiles = {}
         for coords, item in knowledge.visible_tiles.items():
@@ -75,6 +78,15 @@ class Roger(controller.Controller):
             distance_squared = (coords.x - self.current_position.x) ** 2 + (coords.y - self.current_position.y) ** 2
             if distance_squared < 64:
                 return self.head_to_finish()
+        if self.arena.in_cut_range:
+            safe_tiles = self.arena.get_safe_tiles()
+            if safe_tiles:
+                path = self.arena.get_path(safe_tiles[0])
+                if path:
+                    actions = self.arena.map_path_to_action_list(self.current_position, path, True)
+                    self.actions = actions
+                    self.actions_iterator = 0
+                    return self.explore_map()
         if self.arena.potions_coords:
             path = self.arena.get_path(self.arena.get_nearest_potion_coords())
             if path:
@@ -172,9 +184,25 @@ class Roger(controller.Controller):
             cut_positions = get_weapon_cut_positions(self.arena.seen_tiles, self.arena.terrain, self.current_position, self.current_weapon().name)
             for cut_position in cut_positions:
                 if self.arena.seen_tiles.get(cut_position):
-                    if self.arena.seen_tiles[cut_position][1] == self.epoch and self.arena.seen_tiles[cut_position][0].character:
+                    potential_enemy = self.arena.seen_tiles[cut_position][0].character
+                    if self.arena.seen_tiles[cut_position][1] == self.epoch and potential_enemy:
+                        if not self.arena.in_cut_range:
+                            self.actions_iterator -= 1
+                            return characters.Action.ATTACK
+                        else:
+                            if self.arena.subtract_enemy_live(potential_enemy) < 0:
+                                safe_tiles = self.arena.get_safe_tiles()
+                                if safe_tiles:
+                                    path = self.arena.get_path(safe_tiles[0])
+                                    if path:
+                                        actions = self.arena.map_path_to_action_list(self.current_position, path, True)
+                                        self.actions = actions
+                                        self.actions_iterator = 1
+                                        return actions[0]
+
                         self.actions_iterator -= 1
                         return characters.Action.ATTACK
+
         return action
 
     def set_potential_duel_decision(self):
@@ -216,6 +244,16 @@ class Roger(controller.Controller):
                 self.actions = None
                 self.actions_iterator = 0
                 return self.head_to_finish()
+        if self.arena.in_cut_range:
+            safe_tiles = self.arena.get_safe_tiles()
+            if safe_tiles:
+                path = self.arena.get_path(safe_tiles[0])
+                if path:
+                    actions = self.arena.map_path_to_action_list(self.current_position, path, True)
+                    self.actions = actions
+                    self.actions_iterator = 0
+                    self.current_state=States.RANDOM_WALK
+                    return self.explore_map()
         if self.arena.potions_coords:
             path = self.arena.get_path(self.arena.get_nearest_potion_coords())
             if path:
