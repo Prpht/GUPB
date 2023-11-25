@@ -2,14 +2,18 @@ import os
 
 from typing import Dict, Optional, List, Tuple, Callable
 from math import inf
+from pathfinding.core.grid import Grid
+from pathfinding.core.node import GridNode
+from pathfinding.finder.a_star import AStarFinder
 
 from gupb.controller.roger.constans_and_types import SeenWeapon, EpochNr, T, SeenEnemy
 from gupb.controller.roger.utils import get_distance
 from gupb.controller.roger.weapon_manager import get_weapon_cut_positions
-from gupb.model import coordinates, tiles
+from gupb.model import coordinates, tiles, characters
 from gupb.model.arenas import Terrain, TILE_ENCODING, WEAPON_ENCODING
-from gupb.model.characters import ChampionDescription
+from gupb.model.characters import ChampionDescription, Facing, Action
 from gupb.model.coordinates import Coords
+from gupb.model.tiles import Land, Menhir
 
 
 class MapManager:
@@ -27,6 +31,7 @@ class MapManager:
         self.epoch: EpochNr = 0
         self.in_cut_range = False
         self.current_cut_range_tiles: List[coordinates.Coords] = []
+        self.grid: Optional[Grid] = None
 
     def reset(self, arena_name: str):
         self.seen_tiles = {}
@@ -148,17 +153,164 @@ class MapManager:
                 nearest_coords = coords
         return nearest_coords, items[nearest_coords]
 
-    def get_tiles_around(self) -> List[Coords]:
+    def get_tiles_around(self, position=None, back=False) -> List[Coords]:
+        if position is None:
+            position = self.current_position
         tiles = [
-            self.current_position + Coords(0, 1),
-            self.current_position + Coords(0, -1),
-            self.current_position + Coords(1, 0),
-            self.current_position + Coords(-1, 0)
+            position + Coords(0, 1),
+            position + Coords(0, -1),
+            position + Coords(1, 0),
+            position + Coords(-1, 0)
         ]
-        back = self.current_position - self.seen_tiles[self.current_position][0].character.facing.value
-        for i, coord in enumerate(tiles):
-            if coord == back:
-                del tiles[i]
-                break
+        if not back:
+            try:
+                back_coords = position - self.seen_tiles[position][0].character.facing.value
+            except KeyError:
+                return tiles
+            for i, coord in enumerate(tiles):
+                if coord == back_coords:
+                    del tiles[i]
+                    break
         return tiles
+
+    def subtract_enemy_live(self, enemy: ChampionDescription):
+        my = self.seen_tiles[self.current_position][0].character
+        return my.health - enemy.health
+
+    def extract_walkable_tiles(self):
+        items = self.terrain.items()
+        try:
+            return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), items))
+        except Exception as e:
+            print(e)
+
+    def extract_walkable_coords(self, coords: List[Coords]) -> List[Coords]:
+        tiles = self.terrain
+        walkable_coords = []
+        for coord in coords:
+            tile = tiles[coord]
+            if isinstance(tile, Land) or isinstance(tile, Menhir):
+                seen_tile = self.seen_tiles.get(coord)
+                if seen_tile:
+                    if seen_tile[0].character is None:
+                        walkable_coords.append(coord)
+        return walkable_coords
+
+    def build_grid(self):
+        walkable_tiles_list = self.extract_walkable_tiles()
+        walkable_tiles_matrix = [[0 for y in range(self.arena_size[1])] for x in range(self.arena_size[0])]
+
+        for tile in walkable_tiles_list:
+            x, y = tile[0]
+            walkable_tiles_matrix[y][x] = 1
+
+        self.grid = Grid(self.arena_size[0], self.arena_size[1], walkable_tiles_matrix)
+
+    def map_path_to_action_list(self, current_position: Coords, path: List[GridNode], fast_mode: bool = False) -> List[characters.Action]:
+        if fast_mode:
+            return self.map_path_to_fast_action_list(current_position, path)
+        initial_facing = self.seen_tiles[current_position][0].character.facing
+        facings: List[characters.Facing] = list(
+            map(lambda a: characters.Facing(Coords(a[1].x - a[0].x, a[1].y - a[0].y)), list(zip(path[:-1], path[1:]))))
+        actions: List[characters.Action] = []
+        for a, b in zip([initial_facing, *facings[:-1]], facings):
+            actions.extend(self.map_facings_to_actions(a, b, False))
+        return actions
+
+    def map_path_to_fast_action_list(self, current_position: Coords, path: List[GridNode]) -> List[characters.Action]:
+        initial_facing = self.seen_tiles[current_position][0].character.facing
+        facings: List[characters.Facing] = list(
+            map(lambda a: characters.Facing(Coords(a[1].x - a[0].x, a[1].y - a[0].y)), list(zip(path[:-1], path[1:]))))
+        actions: List[characters.Action] = []
+        for a, b in zip([initial_facing for _ in range(len(facings))], facings):
+            actions.extend(self.map_facings_to_actions(a, b, True))
+        return actions
+
+    def map_facings_to_actions(self, f1: characters.Facing, f2: characters.Facing, fast_mode: bool) -> List[characters.Action]:
+        if fast_mode:
+            return self.map_facings_to_fast_actions(f1, f2)
+        else:
+            return self.map_facings_to_slow_actions(f1, f2)
+
+    def map_facings_to_slow_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
+        if f1 == f2:
+            return [characters.Action.STEP_FORWARD]
+        elif f1.turn_left() == f2:
+            return [characters.Action.TURN_LEFT, characters.Action.STEP_FORWARD]
+        elif f1.turn_right() == f2:
+            return [characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
+        else:
+            return [characters.Action.TURN_RIGHT, characters.Action.TURN_RIGHT, characters.Action.STEP_FORWARD]
+
+    def map_facings_to_fast_actions(self, f1: characters.Facing, f2: characters.Facing) -> List[characters.Action]:
+        if f1 == f2:
+            return [characters.Action.STEP_FORWARD]
+        elif f1.turn_left() == f2:
+            return [characters.Action.STEP_LEFT]
+        elif f1.turn_right() == f2:
+            return [characters.Action.STEP_RIGHT]
+        else:
+            return [characters.Action.STEP_BACKWARD]
+
+    def get_path(self, dest: Coords) -> List[GridNode]:
+        self.build_grid()
+        x, y = self.current_position
+        x_dest, y_dest = dest
+        finder = AStarFinder()
+        path, _ = finder.find_path(self.grid.node(x, y), self.grid.node(x_dest, y_dest), self.grid)
+        return path
+
+    def get_distance_to_enemy(self, enemy_coords: Coords):
+        path = self.get_path(enemy_coords)
+        act_list = self.map_path_to_fast_action_list(self.current_position, path)
+        return len(act_list)
+
+    def get_safe_tiles(self) -> List[Coords]:
+        coords_around = self.get_tiles_around()
+        coords_available = self.extract_walkable_coords(coords_around)
+        coords_available.append(self.current_position)
+        tiles_available_set = set(coords_available)
+        unsafe_tiles = []
+        for coords, seen_enemy in self.enemies_coords.items():
+            if seen_enemy.seen_epoch_nr >= self.epoch-2:
+                cut_tiles = get_weapon_cut_positions(self.seen_tiles, self.terrain, coords, seen_enemy.enemy.weapon.name)
+                unsafe_tiles.extend(cut_tiles)
+        unsafe_tiles_set = set(unsafe_tiles)
+        safe_coords = tiles_available_set.difference(unsafe_tiles_set)
+        safe_coords = list(safe_coords)
+        return safe_coords
+
+    # TODO test get_coords_to_attack_in_next_round
+    def get_coords_to_attack_in_next_round(self, position: Coords, champion_desc: ChampionDescription = None) -> Dict:
+        if champion_desc is None:
+            champion_desc = self.seen_tiles[self.current_position][0].character
+        coords_available = self.get_possible_character_coords_in_next_round(position)
+        new_coords_cut_range = {}
+        for new_position in coords_available:
+            if new_position in self.seen_tiles and self.seen_tiles[new_position][0].loot is not None:
+                my_weapon_name = self.seen_tiles[new_position][0].loot.name
+            else:
+                my_weapon_name = champion_desc.weapon.name
+            my_facing = champion_desc.facing.value
+            cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, new_position, my_weapon_name, my_facing)
+            if new_position == position:
+                new_coords_cut_range[new_position] = {Action.TURN_LEFT: [],
+                                                      Action.TURN_RIGHT: [],
+                                                      Action.STEP_FORWARD: cut_positions}
+            else:
+                new_coords_cut_range[new_position] = cut_positions
+        for turn, action in ((Facing.turn_left, Action.TURN_LEFT), (Facing.turn_right, Action.TURN_RIGHT)):
+            my_weapon_name = champion_desc.weapon.name
+            my_facing = champion_desc.facing
+            my_new_facing = turn(my_facing).value
+            cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, position, my_weapon_name, my_new_facing)
+            new_coords_cut_range[position][action] = cut_positions
+        return new_coords_cut_range
+
+    def get_possible_character_coords_in_next_round(self, position: Coords, back=True):
+        coords_around = self.get_tiles_around(position=position, back=back)
+        coords_available = self.extract_walkable_coords(coords_around)
+        coords_available.append(position)
+        return coords_available
+
 

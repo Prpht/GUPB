@@ -2,11 +2,17 @@ from typing import List, Optional, Tuple, Dict
 
 from gupb.model import tiles, coordinates
 from gupb.model.arenas import Terrain
+from gupb.model.characters import Facing
 from gupb.model.coordinates import Coords
 
 
-def get_weapon_cut_positions(seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]], terrain: Optional[Terrain], character_position: Coords, name: str) -> List[Coords]:
-    initial_facing = seen_tiles[character_position][0].character.facing
+def get_weapon_cut_positions(seen_tiles: Dict[coordinates.Coords, Tuple[tiles.TileDescription, int]],
+                             terrain: Optional[Terrain],
+                             character_position: Coords,
+                             name: str,
+                             initial_facing: Optional[Facing] = None) -> List[Coords]:
+    if initial_facing is None:
+        initial_facing = seen_tiles[character_position][0].character.facing
     if name == 'knife':
         return get_line_cut_positions(terrain, initial_facing, character_position, 1)
     elif name == 'sword':
