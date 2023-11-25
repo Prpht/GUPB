@@ -281,7 +281,9 @@ class MapManager:
         return safe_coords
 
     # TODO test get_coords_to_attack_in_next_round
-    def get_coords_to_attack_in_next_round(self, position: Coords, champion_desc: ChampionDescription = None) -> Dict:
+    def get_coords_to_attack_in_next_round(self, position: Coords = None, champion_desc: ChampionDescription = None) -> Dict:
+        if position is None:
+            position = self.current_position
         if champion_desc is None:
             champion_desc = self.seen_tiles[self.current_position][0].character
         coords_available = self.get_possible_character_coords_in_next_round(position)
@@ -291,7 +293,7 @@ class MapManager:
                 my_weapon_name = self.seen_tiles[new_position][0].loot.name
             else:
                 my_weapon_name = champion_desc.weapon.name
-            my_facing = champion_desc.facing.value
+            my_facing = champion_desc.facing
             cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, new_position, my_weapon_name, my_facing)
             if new_position == position:
                 new_coords_cut_range[new_position] = {Action.TURN_LEFT: [],
@@ -299,15 +301,20 @@ class MapManager:
                                                       Action.STEP_FORWARD: cut_positions}
             else:
                 new_coords_cut_range[new_position] = cut_positions
-        for turn, action in ((Facing.turn_left, Action.TURN_LEFT), (Facing.turn_right, Action.TURN_RIGHT)):
+        for action in (Action.TURN_LEFT, Action.TURN_RIGHT):
             my_weapon_name = champion_desc.weapon.name
             my_facing = champion_desc.facing
-            my_new_facing = turn(my_facing).value
+            if action == Action.TURN_RIGHT:
+                my_new_facing = my_facing.turn_right()
+            else:
+                my_new_facing = my_facing.turn_left()
             cut_positions = get_weapon_cut_positions(self.seen_tiles, self.terrain, position, my_weapon_name, my_new_facing)
             new_coords_cut_range[position][action] = cut_positions
         return new_coords_cut_range
 
-    def get_possible_character_coords_in_next_round(self, position: Coords, back=True):
+    def get_possible_character_coords_in_next_round(self, position: Coords = None, back=True):
+        if position is None:
+            position = self.current_position
         coords_around = self.get_tiles_around(position=position, back=back)
         coords_available = self.extract_walkable_coords(coords_around)
         coords_available.append(position)
