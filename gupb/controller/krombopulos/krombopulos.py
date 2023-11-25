@@ -5,7 +5,7 @@ from gupb.model import arenas, characters
 # from gupb.controller.krombopulos.trainer import Trainer
 
 from .knowledge_sources import KnowledgeSources
-from .meta_strategies import MetaStrategy, RandomMetaStrat, ExploreHideRunMetaStrat
+from .meta_strategies import MetaStrategy, ExploreHideRunMetaStrat
 
 
 class KrombopulosMichaelController(controller.Controller):
@@ -34,11 +34,11 @@ class KrombopulosMichaelController(controller.Controller):
         # praise based on micro strategy chosen by meta strategy
         # can easily be changed to meta strategy appraisal
         self.knowledge_sources.praise(score, self.meta_strategy)
+        self.meta_strategy = self._get_next_meta_strategy()(self.knowledge_sources)
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         """What happens before the beginning of a new game."""
         self.knowledge_sources.reset(arena_description)
-        self.meta_strategy = self._get_next_meta_strategy()(self.knowledge_sources)
         self.game_no = game_no
     
     def _get_next_meta_strategy(self) -> MetaStrategy:

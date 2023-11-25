@@ -10,7 +10,6 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
-from .meta_strategies.meta_strategy import MetaStrategy
 
 
 
@@ -208,7 +207,7 @@ class KnowledgeSources(KnowledgeSource):
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge(own_name)
-        self.metastrat_ratings: Dict[MetaStrategy, int] = {strat: 0 for strat in MetaStrategy.__subclasses__}
+        self.metastrat_ratings: Dict[str, int] = defaultdict(int)
 
 
     def find_next_move_on_path(self, start: Coords, end: Coords) -> Coords | None:
@@ -261,7 +260,8 @@ class KnowledgeSources(KnowledgeSource):
             ks.reset(arena_description)
 
 
-    def praise(self, score: int, meta_strategy: MetaStrategy) -> None:
+    def praise(self, score: int, meta_strategy) -> None:
+        # meta_strategy should be a MetaStrategy object. Not imported due to circular import
         self.metastrat_ratings[meta_strategy] += score
         meta_strategy.praise(score)
 
