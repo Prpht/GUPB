@@ -40,10 +40,14 @@ class Weapon(ABC):
     def droppable(cls) -> bool:
         return True
 
-    @staticmethod
-    def cut_transparent(arena: arenas.Arena, position: coordinates.Coords) -> None:
+    @classmethod
+    def cut_transparent(cls, arena: arenas.Arena, position: coordinates.Coords) -> None:
         if position in arena.terrain and arena.terrain[position].terrain_transparent():
-            arena.register_effect(effects.WeaponCut(), position)
+            arena.register_effect(cls.cut_effect(), position)
+
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut()
 
 
 class LineWeapon(Weapon, ABC):
@@ -118,6 +122,10 @@ class Bow(LineWeapon):
     @staticmethod
     def reach() -> int:
         return 50
+
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut(3)
 
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         if self.ready:
