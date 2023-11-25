@@ -16,7 +16,7 @@ CONFIGURATION = {
         random.RandomController("Darius"),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': keyboard_controller,
     'runs_no': 1,
     'profiling_metrics': [],
