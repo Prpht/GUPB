@@ -82,6 +82,7 @@ class Champion:
 
     def act(self) -> None:
         if self.alive:
+            verbose_logger.debug(f"Champion {self.verbose_name()} starts acting.")
             self.store_previous_state()
             action = self.pick_action()
             verbose_logger.debug(f"Champion {self.verbose_name()} picked action {action}.")
