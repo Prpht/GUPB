@@ -1,10 +1,8 @@
 import heapq
-from importlib.util import set_loader
 import math
 from re import S
 import traceback
 import random
-from turtle import back
 from typing import Dict
 from gupb import controller
 from gupb.model import arenas, effects, tiles
@@ -15,16 +13,8 @@ from gupb.model.coordinates import Coords
 from gupb.model.weapons import Knife, Axe, Bow, Sword, Amulet
 
 """
-TODO: inteligentniejsze atakowanie, jesli ma mniej zycia niz przeciwnik to powinien uciekac
-TODO: sprawdza przeciwnikow w szerszym obszarze i jesli widzi jakeigo w poblizu to ucieka w zaleznosci od zycia
-TODO: uciekanie przed mgłą
+NAJNOWSZA KONFIGURACJA Z UCIEKANIEM
 """
-
-"""
-KONFIGURACJA KTORA WYSLALYSMY NA PROJEKTOWE 3
-"""
-
-
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
@@ -35,12 +25,7 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_RIGHT,
 ]
 
-FACING_VALUES = [
-    characters.Facing.LEFT,
-    characters.Facing.RIGHT,
-    characters.Facing.UP,
-    characters.Facing.DOWN,
-]
+
 
 TerrainDescription = Dict[Coords, tiles.TileDescription]
 
@@ -52,6 +37,7 @@ class CynamonkaController(controller.Controller):
         self.weapons_positions = {}
         self.elixir_positions = {}
         self.mist_positions = {}
+        self.enemies_positions = {}
         self.position = None
         self.next_forward_position = None # position of player if it goes forward
         self.facing = None
@@ -60,9 +46,10 @@ class CynamonkaController(controller.Controller):
         self.discovered_arena: TerrainDescription = {}
         self.move_count = 0
         self.target = None
-        self.walkable_area = set()
+        self.walkable_area = []
         self.runaway_target = None
         self.times_in_row_amulet = 0
+        
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, CynamonkaController):
@@ -74,32 +61,45 @@ class CynamonkaController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         try:
+            
             self.move_count+=1
             self.update_discovered_arena(knowledge.visible_tiles)
             self.update_walkable_area()
             self.position = knowledge.position
-            #print(f"walkable area: {self.walkable_area}")
-            #print(f"position: {self.position}")
             self.facing = knowledge.visible_tiles[self.position].character.facing
             self.next_forward_position = self.position + self.facing.value
             self.set_new_weapon()
-            # print("Round: " + str(self.move_count))
-            # first three ifs are the most important actions, player do it even when the map shrinks
-            #if see elixir take it 
 
             if self.can_collect_elixir(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):
                 self.times_in_row_amulet = 0
                 return POSSIBLE_ACTIONS[2] # go forward
-            # if can attack
-            if self.should_run_away():
-                return self.run_away_from_enemies()
-            elif self.can_attack():
+   
+            if self.can_collect_elixir(self.position + self.facing.turn_right().value) and not self.is_mist_at_position(self.position + self.facing.turn_right().value):
+                self.times_in_row_amulet = 0
+                return POSSIBLE_ACTIONS[6]  # Right
+            
+            if self.can_collect_elixir(self.position + self.facing.turn_left().value) and not self.is_mist_at_position(self.position + self.facing.turn_left().value):
+                self.times_in_row_amulet = 0
+                return POSSIBLE_ACTIONS[5]  # Left
+
+            # if self.should_run_away():
+            #     return self.run_away_from_enemies()
+            if self.can_attack():
                 # print("inside can attack")
                 return POSSIBLE_ACTIONS[3] # attack
-            #if can take a weapon
-            if self.can_collect_weapon(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):  
+
+            if self.can_collect_weapon(self.next_forward_position) and not self.is_mist_at_position(self.next_forward_position):
                 self.times_in_row_amulet = 0
-                return POSSIBLE_ACTIONS[2] # go forward
+                return POSSIBLE_ACTIONS[2]  # Forward
+    
+            if self.can_collect_weapon(self.position + self.facing.turn_right().value) and not self.is_mist_at_position(self.position + self.facing.turn_right().value):
+                self.times_in_row_amulet = 0
+                return POSSIBLE_ACTIONS[6]  # Right
+    
+            if self.can_collect_weapon(self.position + self.facing.turn_left().value) and not self.is_mist_at_position(self.position + self.facing.turn_left().value):
+                self.times_in_row_amulet = 0
+                return POSSIBLE_ACTIONS[5]  # Left
+    
             
             #if there is mist, player acts differently - main goal is to run
             if self.is_mist:
@@ -111,8 +111,7 @@ class CynamonkaController(controller.Controller):
                 else:
                     # here should be runaway from mist function
                     self.times_in_row_amulet = 0
-                    #return self.go_to_center()
-                    return self.go_to_center()
+                    return self.runaway_from_mist()
             # player do not see mist so it is not its priority to run away
             else:
                 # TODO: mozna tez zaimplementowac algorytm zeby szedl w kierunku wroga jesli wrog ma mniej zycia i jest blisko
@@ -127,12 +126,13 @@ class CynamonkaController(controller.Controller):
                     return self.go_in_menhir_direction()
                 else:
                     self.times_in_row_amulet = 0
-                    return self.go_to_center()
+                    return self.go_randomly()
         except Exception as e:
             # Handle exceptions or errors here
             #traceback.print_exc()
             #print(f"An error occurred: {e}")
             return self.go_randomly()
+
 
     # returns path if weapon or elixir in the neighbourhood, if its far away return None
     def is_weapon_in_the_neighbourhood(self):
@@ -143,7 +143,7 @@ class CynamonkaController(controller.Controller):
                 paths.append(path)
         shortest_path = CynamonkaController.find_shortest_path_from_list(paths)
         if shortest_path:
-            if len(shortest_path) <= 7 and (self.discovered_arena[shortest_path[-1]].consumable or self.discovered_arena[shortest_path[-1]].loot):
+            if len(shortest_path) <= 7 and self.discovered_arena[shortest_path[-1]].loot:
                 self.target = shortest_path[-1]
                 return True
         return False
@@ -155,18 +155,56 @@ class CynamonkaController(controller.Controller):
                 paths.append(self.find_nearest_path(self.walkable_area, self.position, coords))
         shortest_path = CynamonkaController.find_shortest_path_from_list(paths)
         if shortest_path:
-            if len(shortest_path) <= 7 and (self.discovered_arena[shortest_path[-1]].consumable or self.discovered_arena[shortest_path[-1]].loot):
+            if len(shortest_path) <= 7 and self.discovered_arena[shortest_path[-1]].consumable:
                 self.target = shortest_path[-1]
                 return True
         return False
 
     def update_walkable_area(self):
-        for coords in self.discovered_arena.keys():
-            if self.is_walkable(coords):
+        self.walkable_area = []
+        for coords, tile in self.arena.terrain.items():
+            if tile.passable:
                 if isinstance(coords, Coords):
                     coords = (coords[0], coords[1])
-                self.walkable_area.add(coords)
+                self.walkable_area.append(coords)
+
+    def find_center_of_map(self):
+        # Calculate the average x and y coordinates
+        avg_x = sum(x for x, _ in self.walkable_area) / len(self.walkable_area)
+        avg_y = sum(y for _, y in self.walkable_area) / len(self.walkable_area)
+
+        # Calculate distances from each point to the calculated center
+        distances = [math.sqrt((x - avg_x) ** 2 + (y - avg_y) ** 2) for x, y in self.walkable_area]
+
+        # Find the index of the point closest to the calculated center
+        closest_point_index = distances.index(min(distances))
+
+        closest_point = self.walkable_area[closest_point_index]
+        return closest_point
     
+    def run_away_from_enemies(self):
+        # print("jestem w runaway enemies")
+        escape_range = 4  # Zakres, w którym bot sprawdzi obecność przeciwników
+        escape_area = self.get_escape_area(escape_range)
+
+        for coords, description in self.discovered_arena.items():
+            if description.character and description.character.controller_name != "CynamonkaController" and coords in escape_area:
+                # print("zdrowie przeciwnika: " + str(description.character.health) + " moje zdrowie : " + str(self.discovered_arena[self.position].character.health))
+                if description.character.health > self.discovered_arena[self.position].character.health:
+                    enemy_direction = description.character.facing.value
+                    # Uciekaj od przeciwnika
+                    escape_position = coordinates.Coords(self.position[0] + enemy_direction[0], self.position[1] + enemy_direction[1])
+                    if escape_position in self.walkable_area:
+                        # print("zwracam uciekanie do : " + str(escape_position))
+                        return self.go_in_the_target_direction(escape_position)
+        return None
+
+    def go_to_the_center(self):
+        center = self.find_center_of_map()
+        #print("Going to center")
+        return self.go_in_the_target_direction(center)
+    
+
     @staticmethod
     def find_shortest_path_from_list(paths):
         not_empty_paths = [path for path in paths if path is not None]  # Fixed the list comprehension
@@ -176,27 +214,24 @@ class CynamonkaController(controller.Controller):
         return shortest_path
 
     def go_in_the_target_direction(self, target_point):
-        # Znajdź optymalną trasę do celu
+                # Znajdź optymalną trasę do celu
         nearest_path_to_target = self.find_nearest_path(self.walkable_area, self.position, target_point)
         
-        if nearest_path_to_target is not None:
-            # print("ide do celu")
+        if nearest_path_to_target is not None and len(nearest_path_to_target) > 0:
             # Pobierz kierunek, w którym znajduje się kolejna pozycja na trasie
             next_position_direction = self.calculate_direction(self.position, nearest_path_to_target[0])
+
             # Sprawdź, czy jesteśmy zwróceni w tym samym kierunku co kolejna pozycja
             if self.facing.value == next_position_direction:
-            # Jeśli tak, idź prosto
-                return POSSIBLE_ACTIONS[2]  # Step forward
+                # Jeśli tak, idź prosto
+                return POSSIBLE_ACTIONS[2]
             else:
-                # Sprawdź, czy musimy obrócić się o 180 stopni
+                # W przeciwnym razie, sprawdź, czy musimy obrócić się o 180 stopni
                 if self.is_opposite_direction(self.facing.value, next_position_direction):
-                    return POSSIBLE_ACTIONS[4]  # Step backward
+                    return POSSIBLE_ACTIONS[1] #po prostu wtedy zawsze w prawo
                 else:
                     # W przeciwnym razie, obróć się w kierunku kolejnej pozycji na trasie
-                    if self.is_position_on_left(nearest_path_to_target[0]):
-                        return POSSIBLE_ACTIONS[5]  # Turn left
-                    else:
-                        return POSSIBLE_ACTIONS[6]  # Turn right
+                    return self.turn_towards_direction(next_position_direction)
         # Jeśli nie udało się znaleźć trasy, wykonaj losowy ruch
         return self.go_randomly()
 
@@ -218,6 +253,16 @@ class CynamonkaController(controller.Controller):
         else:
             return False  # Nieznany kierunek
 
+    def get_escape_area(self, escape_range):
+        return {(self.position[0] + dx, self.position[1] + dy) for dx in range(-escape_range, escape_range + 1) for dy in range(-escape_range, escape_range + 1) if (self.position[0] 
+        + dx, self.position[1] + dy) in self.discovered_arena}
+
+        #return escape_area
+
+    def should_run_away(self):
+        escape_action = self.run_away_from_enemies()
+        return escape_action is not None
+
     def is_position_on_right(self, target_position):
         # Sprawdź, czy target_position jest po "prawej" stronie od aktualnej pozycji
         return not self.is_position_on_left(target_position)
@@ -225,6 +270,7 @@ class CynamonkaController(controller.Controller):
     def is_opposite_direction(self, direction1, direction2):
         # Sprawdź, czy dwie koordynaty są przeciwne sobie
         return  direction1[0] == -direction2[0] and direction1[1] == -direction2[1]
+
 
     def turn_towards_direction(self, target_direction):
         # Obróć się w kierunku podanego kierunku
@@ -255,7 +301,7 @@ class CynamonkaController(controller.Controller):
         path_from_menhir = self.find_nearest_path(self.walkable_area, self.next_forward_position, self.menhir_position)
         if path_from_menhir:
             distance_from_menhir = len(path_from_menhir)
-            if distance_from_menhir > 2:
+            if distance_from_menhir > 3:
                 return self.go_in_the_target_direction(self.menhir_position)            
             else: 
                 return self.go_randomly()
@@ -273,7 +319,9 @@ class CynamonkaController(controller.Controller):
             return POSSIBLE_ACTIONS[6]
         else:
             return random.choice(POSSIBLE_ACTIONS[:2])
-        
+
+
+
     # astar funkcja do znalezienia trasy
     def find_nearest_path(self, grid, start, goal):
         # Inicjalizuj listę odwiedzonych pozycji
@@ -302,6 +350,8 @@ class CynamonkaController(controller.Controller):
                     new_cost = len(path) + 1 + math.dist(new_position, goal)
                     heapq.heappush(priority_queue, (new_cost, new_position, path + [new_position]))
         return None  # Nie znaleziono ścieżki do celu
+
+
     
     def set_new_weapon(self):
         new_weapon = self.discovered_arena[self.position].character.weapon.name
@@ -323,32 +373,35 @@ class CynamonkaController(controller.Controller):
 
 
     def runaway_from_mist(self):
+        # główne załozenie: jesli zidentyfikuje mgle na mapie kieruje sie w strone najdalszego odkrytego do tej pory punktu, do ktorego istenieje sciezka
         # Jeśli brak obszarów mgły, zwróć losową akcję
         if not self.mist_positions:
             return self.go_randomly()
+        
+        if self.runaway_target is not None and self.runaway_target not in self.walkable_area:
 
-        farthest_distance = 0
-        farthest_position = None
+            max_distance = 0
+            best_position = None
 
-        for coords in self.discovered_arena.items():
-                # Oblicz odległość między bieżącym położeniem bota a położeniem przeciwnika
-                distance = math.dist(self.position, coords)
+            for position in self.discovered_arena:
+                if position not in self.mist_positions and position in self.walkable_area:
+                    # Oblicz odległość między polem a najbliższym obszarem mgły
+                    min_distance = min(math.dist(position, mist) for mist in self.mist_positions)
 
-                if distance > farthest_distance:
-                    farthest_distance = distance
-                    temp_farthest_position = coords
-                    if  self.find_nearest_path(self.walkable_area, self.position, temp_farthest_position) and temp_farthest_position not in self.mist_positions:
-                        farthest_position = coords
+                    if min_distance > max_distance:
+                        max_distance = min_distance
+                        best_position = position
 
-        if farthest_position is not None: # and self.find_nearest_path(self.walkable_area, self.position, farthest_position) and farthest_position not in self.mist_positions:
-            # Znaleziono pozycję, więc uciekaj w jej kierunku
-            # direction = coordinates.Coords(farthest_position[0] - self.position[0], farthest_position[1] - self.position[1])
-            #print('uciekam przed mggla: ' + str(farthest_position))
-
-            return self.go_in_the_target_direction(farthest_position)
-
-        # Brak dostępnych pól, które nie są w obszarze mgły, zwróć losową akcję
-        return self.go_randomly()
+            if best_position is not None and self.find_nearest_path(self.walkable_area, self.position, best_position):
+                # Znaleziono najlepsze pole, więc uciekaj w jego kierunku
+                direction = coordinates.Coords(best_position[0] - self.position[0], best_position[1] - self.position[1])
+                self.runaway_target = best_position
+                return self.go_in_the_target_direction(self.runaway_target)
+            else:
+                # Brak dostępnych pól, które nie są w obszarze mgły, zwróć losową akcję
+                return self.go_randomly()
+        else:
+            return self.go_in_the_target_direction(self.runaway_target)
 
     def get_attackable_area(self):
         attackable_area = []
@@ -382,145 +435,6 @@ class CynamonkaController(controller.Controller):
                 return True
         return False
 
-    def run_away_from_enemies(self):
-        # print("jestem w runaway enemies")
-        escape_range = 4  # Zakres, w którym bot sprawdzi obecność przeciwników
-        escape_area = self.get_escape_area(escape_range)
-
-        for coords, description in self.discovered_arena.items():
-            if description.character and description.character.controller_name != "CynamonkaController" and coords in escape_area:
-                # print("zdrowie przeciwnika: " + str(description.character.health) + " moje zdrowie : " + str(self.discovered_arena[self.position].character.health))
-                if description.character.health > self.discovered_arena[self.position].character.health:
-                    enemy_direction = description.character.facing.value
-                    # Uciekaj od przeciwnika
-                    escape_position = coordinates.Coords(self.position[0] + enemy_direction[0], self.position[1] + enemy_direction[1])
-                    if escape_position in self.walkable_area:
-                        # print("zwracam uciekanie do : " + str(escape_position))
-                        return self.go_in_the_target_direction(escape_position)
-        return None
-
-    # def run_away_from_enemies(self):
-    #     # print("uciekam")
-    #     # Zakres, w którym bot sprawdzi obecność przeciwników
-    #     escape_range = 4
-    #     escape_area = self.get_escape_area(escape_range)
-
-    #     farthest_distance = 0
-    #     farthest_position = None
-
-    #     for coords, description in self.discovered_arena.items():
-    #         if description.character and description.character.controller_name != "CynamonkaController" and coords in escape_area:
-    #             if description.character.health > self.discovered_arena[self.position].character.health:
-
-    #                 # Oblicz odległość między botem a przeciwnikiem
-    #                 distance = math.dist(self.position, coords)
-    #                 print(str(distance))
-
-    #                 if distance > farthest_distance:
-    #                     farthest_distance = distance
-    #                     temp_farthest_position = coords
-    #                     print("temp przeciwnik"+str(temp_farthest_position))
-    #                     if  self.find_nearest_path(self.walkable_area, self.position, temp_farthest_position):
-    #                         farthest_position = coords
-
-    #     if farthest_position is not None:
-    #         print('uciekam przed przeciwnikiem'+ str(farthest_position))
-    #         return self.go_in_the_target_direction(farthest_position)
-
-    #     return None
-    def closest_point(self, points_set, target):
-        closest = None
-        min_distance = float('inf')
-
-        for point in points_set:
-            distance =  abs(target[0] - point[0]) + abs(target[1] - point[1])
-            if distance < min_distance:
-                min_distance = distance
-                closest = point
-
-        return closest
-
-    def go_to_center(self):
-        map_center = (12, 12)  # Center position on a 25x25 map
-        direction = (map_center[0] - self.position[0], map_center[1] - self.position[1])
-        #print(f"self position: {self.position}")
-        if direction == (0, 0):
-            return self.go_randomly()
-        if map_center in self.walkable_area:
-            #print("map center in walkable aren")
-            if self.find_nearest_path(self.walkable_area, self.position, map_center):
-                #print("go in the target direction")
-                return self.go_in_the_target_direction(map_center)
-        # else:
-        #     almost_map_center = self.closest_point(self.walkable_area, map_center)
-        #     #print(f"almost map center in disc area: {almost_map_center}")
-        #     if self.find_nearest_path(self.walkable_area, self.position, almost_map_center):
-        #         #print("go in the target direction")
-        #         return self.go_in_the_target_direction(almost_map_center)
-        #print("go randomlys")
-        #return self.go_randomly()
-        if abs(direction[0]) > abs(direction[1]):
-            if direction[0] > 0:
-                target_position = (self.position[0] + 1, self.position[1])
-                if self.is_walkable(target_position):
-                    if self.facing == FACING_VALUES[1]:
-                        return POSSIBLE_ACTIONS[2]  
-                    elif self.facing == FACING_VALUES[0]:
-                        return POSSIBLE_ACTIONS[4]  
-                    elif self.facing == FACING_VALUES[2]:
-                        return POSSIBLE_ACTIONS[6]
-                    else:
-                        return POSSIBLE_ACTIONS[5]
-            else:
-                target_position = (self.position[0] - 1, self.position[1])
-                if self.is_walkable(target_position):
-                    if self.facing == FACING_VALUES[0]:
-                        return POSSIBLE_ACTIONS[2]
-                    elif self.facing == FACING_VALUES[1]:
-                        return POSSIBLE_ACTIONS[4]  
-                    elif self.facing == FACING_VALUES[2]:
-                        return POSSIBLE_ACTIONS[5]
-                    else:
-                        return POSSIBLE_ACTIONS[6]
-                    
-        if direction[1] > 0:
-            target_position = (self.position[0], self.position[1] + 1)
-            if self.is_walkable(target_position):
-                if self.facing == FACING_VALUES[3]:
-                    return POSSIBLE_ACTIONS[2]
-                elif self.facing == FACING_VALUES[2]:
-                    return POSSIBLE_ACTIONS[4]  
-                elif self.facing == FACING_VALUES[0]:
-                    return POSSIBLE_ACTIONS[5]
-                else:
-                    return POSSIBLE_ACTIONS[6]
-        else:
-            target_position = (self.position[0], self.position[1] - 1)
-            if self.is_walkable(target_position):
-                if self.facing == FACING_VALUES[2]:
-                    return POSSIBLE_ACTIONS[2]
-                elif self.facing == FACING_VALUES[1]:
-                    return POSSIBLE_ACTIONS[5]  
-                elif self.facing == FACING_VALUES[0]:
-                    return POSSIBLE_ACTIONS[6]
-                else:
-                    return POSSIBLE_ACTIONS[4]
-                
-        return self.go_randomly()
-
-
-
-    def get_escape_area(self, escape_range):
-        return {(self.position[0] + dx, self.position[1] + dy) for dx in range(-escape_range, escape_range + 1) for dy in range(-escape_range, escape_range + 1) if (self.position[0] 
-        + dx, self.position[1] + dy) in self.discovered_arena}
-
-        #return escape_area
-
-    def should_run_away(self):
-        escape_action = self.run_away_from_enemies()
-        return escape_action is not None
-
-
     def can_turn_right(self):
         right_position = self.position + self.facing.turn_right().value
         return self.is_walkable(right_position)
@@ -531,18 +445,12 @@ class CynamonkaController(controller.Controller):
 
     # check if it is possible to go to given position, if there is a sea wall or mist the champion cannot go there
     def is_walkable(self, position):
-        #if position in self.walkable_area:
-        if position in self.discovered_arena.keys():
-            return self.discovered_arena[position].type != 'sea' and self.discovered_arena[position].type != 'wall' and not self.is_mist_at_position(position)
-        return False
-    
+        return self.discovered_arena[position].type != 'sea' and self.discovered_arena[position].type != 'wall' and not self.is_mist_at_position(position)
+
+
+
     def can_move_forward(self):
         return self.is_walkable(self.next_forward_position)
-
-    def can_move_backward(self):
-        # Pobierz kierunek, w którym chcemy się poruszyć do tyłu
-        backward_position = self.position + self.facing.opposite().value
-        return self.is_walkable(backward_position)
             
     def update_discovered_arena(self, visible_tiles: Dict[Coords, tiles.TileDescription]):
         for coords, description in visible_tiles.items():
@@ -617,4 +525,4 @@ class CynamonkaController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.PINK
+        return characters.Tabard.LIME
