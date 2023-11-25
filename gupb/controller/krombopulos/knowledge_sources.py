@@ -10,6 +10,7 @@ from gupb.model import characters, arenas, tiles
 from gupb.model.coordinates import Coords, add_coords
 
 from .utils import manhattan_distance
+from .meta_strategies.meta_strategy import MetaStrategy
 
 
 
@@ -207,8 +208,7 @@ class KnowledgeSources(KnowledgeSource):
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge(own_name)
-        # todo: make this work
-        # self.meta_ratings: Dict[MetaStrategy, int] = {meta: 0 for meta in MetaStrategy.__subclasses__}
+        self.metastrat_ratings: Dict[MetaStrategy, int] = {strat: 0 for strat in MetaStrategy.__subclasses__}
 
 
     def find_next_move_on_path(self, start: Coords, end: Coords) -> Coords | None:
@@ -261,10 +261,9 @@ class KnowledgeSources(KnowledgeSource):
             ks.reset(arena_description)
 
 
-    def praise(self, score: int, meta_strat):
-        # todo: make this work
-        # self.meta_ratings[meta] += score
-        ...
+    def praise(self, score: int, meta_strategy: MetaStrategy) -> None:
+        self.metastrat_ratings[meta_strategy] += score
+        meta_strategy.praise(score)
 
 
     def __iter__(self) -> Iterator[KnowledgeSource]:
