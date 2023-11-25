@@ -1,4 +1,4 @@
-from gupb.model import arenas, characters, coordinates, weapons
+from gupb.model import arenas, characters, coordinates, weapons, consumables
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
@@ -97,9 +97,16 @@ class Brain:
 
         for coords in self.memory.map.terrain:
             if (
+                # tile has character
                 self.memory.map.terrain[coords].character is not None
+                # ignore ourselfs
                 and self.memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # ignore our position
                 and self.memory.position != coords
+                # ignore enemies with greater health
+                and self.memory.map.terrain[coords].character.health <= self.memory.health
+                # ignore enemies with health greater than reward of killing (potion restore)
+                and self.memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
             ):
                 distance = utils.coordinatesDistance(self.memory.position, coords)
                 
@@ -117,6 +124,17 @@ class Brain:
         spinAction = SpinAction()
         actions.append(spinAction)
         
+        # ------------------------------------------
+
+        # EXPLORE THE MAP
+
+        exploreToPos = self.memory.getOppositeSectionCenterPos()
+
+        if DEBUG: dbg_ac_msgs.append("Exploring action")
+        exploreAction = GoToAroundAction()
+        exploreAction.setDestination(exploreToPos)
+        actions.append(exploreAction)
+
         # ------------------------------------------
 
 

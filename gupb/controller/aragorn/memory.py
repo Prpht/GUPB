@@ -1,4 +1,4 @@
-import os
+import os, random
 from typing import Dict, NamedTuple, Optional, List
 
 from gupb.model import arenas, tiles, coordinates, weapons, games
@@ -151,8 +151,49 @@ class Memory:
             return True
 
         return False
+    
+    def getCurrentSection(self):
+        sectionsCenters = self.map.getSectionsCenters()
+        distances = []
 
+        for sectionCenter in sectionsCenters:
+            distances.append(
+                utils.coordinatesDistance(self.pos, sectionCenter)
+            )
+        
+        minDistance = 9999
+        minSector = 0
 
+        for i, d in enumerate(distances):
+            if d < minDistance:
+                minDistance = d
+                minSector = i
+        
+        return minSector
+    
+    def getOppositeSection(self):
+        currentSection = self.getCurrentSection()
+
+        if currentSection == 2:
+            return 5
+        if currentSection == 3:
+            return 4
+        if currentSection == 4:
+            return 3
+        if currentSection == 5:
+            return 2
+        
+        return random.randint(0, 5)
+    
+    def getOppositeSectionCenterPos(self):
+        oppositeSection = self.getOppositeSection()
+        sectionsCenters = self.map.getSectionsCenters()
+
+        if oppositeSection not in sectionsCenters:
+            if DEBUG: print("[Memory] getOppositeSectionCenterPos(): oppositeSection is not in sections!")
+            return None
+        
+        return sectionsCenters[oppositeSection]
 
 class Environment:
     def __init__(self, map: 'Map'):
@@ -177,6 +218,8 @@ class Map:
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
 
         self.menhirCalculator = MenhirCalculator(self)
+
+        self.sectionsCenters = None
 
     @staticmethod
     def load(name: str) -> 'Map':
@@ -349,6 +392,62 @@ class Map:
                         dangerousTiles.append(coords)
         
         return dangerousTiles
+    
+    def getSectionsCenters(self):
+        """
+        Divides map to 5 sections and returns their centers
+
+        ul -> up left
+        ur -> up right
+        dl -> down left
+        dr -> dorn right
+
+        .-----------------.
+        |        |        |
+        |  2   __|__   3  |
+        |     |     |     |
+        |-----|  1  |-----|
+        |     |__ __|     |
+        |  4     |     5  |      
+        |        |        |
+        `-----------------`
+        """
+
+        if self.sectionsCenters is not None:
+            return self.sectionsCenters
+        
+        center = coordinates.Coords(self.size[0] / 2, self.size[1] / 2)
+
+        ul_corner = coordinates.Coords(0, 0)
+        ur_corner = coordinates.Coords(self.size[0], 0)
+        dl_corner = coordinates.Coords(0, self.size[1])
+        dr_corner = coordinates.Coords(self.size[0], self.size[1])
+
+        ul_distance = coordinates.sub_coords(ul_corner, center)
+        ur_distance = coordinates.sub_coords(ur_corner, center)
+        dl_distance = coordinates.sub_coords(dl_corner, center)
+        dr_distance = coordinates.sub_coords(dr_corner, center)
+
+        ul_distance = coordinates.mul_coords(ul_distance, 2/3)
+        ur_distance = coordinates.mul_coords(ur_distance, 2/3)
+        dl_distance = coordinates.mul_coords(dl_distance, 2/3)
+        dr_distance = coordinates.mul_coords(dr_distance, 2/3)
+
+        ul_center = coordinates.add_coords(center, ul_distance)
+        ur_center = coordinates.add_coords(center, ur_distance)
+        dl_center = coordinates.add_coords(center, dl_distance)
+        dr_center = coordinates.add_coords(center, dr_distance)
+
+        self.sectionsCenters = [
+            center,
+            ul_center,
+            ur_center,
+            dl_center,
+            dr_center
+        ]
+
+        return self.sectionsCenters
+
 
 class MenhirCalculator:
     def __init__(self, map :Map) -> None:
