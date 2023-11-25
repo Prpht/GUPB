@@ -119,21 +119,22 @@ class Brain:
             goToAttackAction = GoToAroundAction()
             goToAttackAction.setDestination(closestEnemy)
             actions.append(goToAttackAction)
-
-        if DEBUG: dbg_ac_msgs.append("No action found, spinning")
-        spinAction = SpinAction()
-        actions.append(spinAction)
         
         # ------------------------------------------
 
         # EXPLORE THE MAP
 
-        exploreToPos = self.memory.getOppositeSectionCenterPos()
-
         if DEBUG: dbg_ac_msgs.append("Exploring action")
-        exploreAction = GoToAroundAction()
-        exploreAction.setDestination(exploreToPos)
+        exploreAction = ExploreAction()
         actions.append(exploreAction)
+
+        # ------------------------------------------
+
+        # NOTHING TO DO - JUST SPIN
+
+        if DEBUG: dbg_ac_msgs.append("No action found, spinning")
+        spinAction = SpinAction()
+        actions.append(spinAction)
 
         # ------------------------------------------
 
@@ -152,6 +153,9 @@ class Brain:
                 if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
                 self.onDecisionReturning(ret)
                 return ret
+            
+            if ret is None:
+                if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
             
             actionIndexPerformed += 1
         

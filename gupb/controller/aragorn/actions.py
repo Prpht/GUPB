@@ -8,6 +8,7 @@ from gupb.model import characters
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.constants import DEBUG, INFINITY
 from gupb.controller.aragorn import pathfinding
+from gupb.controller.aragorn import utils
 
 
 
@@ -95,7 +96,7 @@ class GoToAroundAction(GoToAction):
         actionToPerform = super().perform(memory)
         
         limit = 25
-        destinationsGenerator = self.__aroundTileGenerator(self.destination)
+        destinationsGenerator = utils.aroundTileGenerator(self.destination)
 
         while actionToPerform is None and limit > 0:
             limit -= 1
@@ -109,12 +110,44 @@ class GoToAroundAction(GoToAction):
         
         return actionToPerform
 
-    def __aroundTileGenerator(self, aroundDestination :Coords):
-        if not isinstance(aroundDestination, Coords):
-            return None
+class ExploreAction(GoToAroundAction):
+    MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED = 4
+
+    def perform(self, memory: Memory) -> Action:
+        currentSection = memory.getCurrentSection()
+
+        if not any(memory.is_section_explored):
+            for _ in range(currentSection - len(memory.is_section_explored) + 1):
+                memory.is_section_explored.append(False)
+            memory.is_section_explored[currentSection] = True
+
+        if currentSection < len(memory.is_section_explored) and memory.is_section_explored[currentSection]:
+            exploreToSection = memory.getOppositeSection()
+        else:
+            exploreToSection = currentSection
+
+        if exploreToSection < len(memory.is_section_explored) and memory.is_section_explored[exploreToSection]:
+            exploreToSection = memory.getRandomSection()
         
-        for r in range(7):
-            for x in range(-r, r + 1):
-                for y in range(-r, r + 1):
-                    if (x - aroundDestination.x) ** 2 + (y - aroundDestination.y) ** 2 == r ** 2:
-                        yield Coords(x, y)
+        if exploreToSection < len(memory.is_section_explored) and memory.is_section_explored[exploreToSection]:
+            for section, isSectionExplored in enumerate(memory.is_section_explored):
+                if not isSectionExplored:
+                    exploreToSection = section
+                    break
+
+        exploreToPos = memory.getSectionCenterPos(exploreToSection)
+
+        if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
+            memory.is_section_explored[exploreToSection] = True
+            return self.perform(memory)
+
+        self.setDestination(exploreToPos)
+
+        res = super().perform(memory)
+
+        if res is None:
+            if DEBUG: print("[ARAGORN|EXPLORE] Cannot reach section", exploreToSection, "at", exploreToPos, ", marking it as explored")
+            memory.is_section_explored[exploreToSection] = True
+            return self.perform(memory)
+        
+        return res

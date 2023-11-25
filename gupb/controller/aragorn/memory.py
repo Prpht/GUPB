@@ -24,6 +24,8 @@ class Memory:
         self.environment: Environment = None
 
         self.health: int = 0
+
+        self.is_section_explored = [False, False, False, False, False]
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
@@ -152,13 +154,13 @@ class Memory:
 
         return False
     
-    def getCurrentSection(self):
+    def getCurrentSection(self) -> int:
         sectionsCenters = self.map.getSectionsCenters()
         distances = []
 
         for sectionCenter in sectionsCenters:
             distances.append(
-                utils.coordinatesDistance(self.pos, sectionCenter)
+                utils.coordinatesDistance(self.position, sectionCenter)
             )
         
         minDistance = 9999
@@ -174,26 +176,28 @@ class Memory:
     def getOppositeSection(self):
         currentSection = self.getCurrentSection()
 
-        if currentSection == 2:
-            return 5
-        if currentSection == 3:
+        if currentSection == 1:
             return 4
-        if currentSection == 4:
+        if currentSection == 2:
             return 3
-        if currentSection == 5:
+        if currentSection == 3:
             return 2
+        if currentSection == 4:
+            return 1
         
-        return random.randint(0, 5)
+        return random.randint(1, 4)
     
-    def getOppositeSectionCenterPos(self):
-        oppositeSection = self.getOppositeSection()
+    def getSectionCenterPos(self, section):
         sectionsCenters = self.map.getSectionsCenters()
 
-        if oppositeSection not in sectionsCenters:
-            if DEBUG: print("[Memory] getOppositeSectionCenterPos(): oppositeSection is not in sections!")
+        if section >= len(sectionsCenters):
+            if DEBUG: print("[Memory] getSectionCenterPos(): oppositeSection is not in sections! Section is:", section)
             return None
         
-        return sectionsCenters[oppositeSection]
+        return sectionsCenters[section]
+    
+    def getRandomSection(self):
+        return random.randint(0, 4)
 
 class Environment:
     def __init__(self, map: 'Map'):
@@ -404,40 +408,60 @@ class Map:
 
         .-----------------.
         |        |        |
-        |  2   __|__   3  |
+        |  1   __|__   2  |
         |     |     |     |
-        |-----|  1  |-----|
+        |-----|  0  |-----|
         |     |__ __|     |
-        |  4     |     5  |      
+        |  3     |     4  |      
         |        |        |
         `-----------------`
         """
 
+        # cache
         if self.sectionsCenters is not None:
             return self.sectionsCenters
         
+        # get map's center
         center = coordinates.Coords(self.size[0] / 2, self.size[1] / 2)
+        center = coordinates.Coords(round(center.x), round(center.y))
 
+        # define map corners
         ul_corner = coordinates.Coords(0, 0)
         ur_corner = coordinates.Coords(self.size[0], 0)
         dl_corner = coordinates.Coords(0, self.size[1])
         dr_corner = coordinates.Coords(self.size[0], self.size[1])
 
+        # calculate distance from center to corners
         ul_distance = coordinates.sub_coords(ul_corner, center)
         ur_distance = coordinates.sub_coords(ur_corner, center)
         dl_distance = coordinates.sub_coords(dl_corner, center)
         dr_distance = coordinates.sub_coords(dr_corner, center)
 
+        # get 2/3 of distance
         ul_distance = coordinates.mul_coords(ul_distance, 2/3)
         ur_distance = coordinates.mul_coords(ur_distance, 2/3)
         dl_distance = coordinates.mul_coords(dl_distance, 2/3)
         dr_distance = coordinates.mul_coords(dr_distance, 2/3)
+        
+        # round distance to ensure that section's center coords are integers
+        ul_distance = coordinates.Coords(round(ul_distance.x), round(ul_distance.y))
+        ur_distance = coordinates.Coords(round(ur_distance.x), round(ur_distance.y))
+        dl_distance = coordinates.Coords(round(dl_distance.x), round(dl_distance.y))
+        dr_distance = coordinates.Coords(round(dr_distance.x), round(dr_distance.y))
 
+        # add distance to center to get section's center coords
         ul_center = coordinates.add_coords(center, ul_distance)
         ur_center = coordinates.add_coords(center, ur_distance)
         dl_center = coordinates.add_coords(center, dl_distance)
         dr_center = coordinates.add_coords(center, dr_distance)
 
+        # find closest land tile to section's center
+        ul_center = utils.closestTileFromWithCondition(ul_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, ul_center)
+        ur_center = utils.closestTileFromWithCondition(ur_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, ur_center)
+        dl_center = utils.closestTileFromWithCondition(dl_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, dl_center)
+        dr_center = utils.closestTileFromWithCondition(dr_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, dr_center)
+        
+        # return section's centers
         self.sectionsCenters = [
             center,
             ul_center,
