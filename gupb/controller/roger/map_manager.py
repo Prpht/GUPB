@@ -181,8 +181,8 @@ class MapManager:
         items = self.terrain.items()
         try:
             return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), items))
-        except Exception as e:
-            print(e)
+        except Exception:
+            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', items))
 
     def extract_walkable_coords(self, coords: List[Coords]) -> List[Coords]:
         tiles = self.terrain

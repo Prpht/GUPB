@@ -42,24 +42,22 @@ class Roger(controller.Controller):
         return hash(self._id)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        try:
-            self.repair_knowledge(knowledge)
-            self.update_state(knowledge)
-            match self.current_state:
-                case States.RANDOM_WALK:
-                    return self.random_walk()
-                case States.HEAD_TO_WEAPON:
-                    return self.head_to_weapon([])
-                case States.HEAD_TO_MENHIR:
-                    return self.head_to_menhir([])
-                case States.FINAL_DEFENCE:
-                    return self.final_defence()
-                case States.HEAD_TO_CENTER:
-                    return self.head_to_center([])
-                case States.HEAD_TO_POTION:
-                    return self.head_to_potion([])
-        except Exception as e:
-            traceback.print_exception(e)
+        self.repair_knowledge(knowledge)
+        self.update_state(knowledge)
+        match self.current_state:
+            case States.RANDOM_WALK:
+                return self.random_walk()
+            case States.HEAD_TO_WEAPON:
+                return self.head_to_weapon([])
+            case States.HEAD_TO_MENHIR:
+                return self.head_to_menhir([])
+            case States.FINAL_DEFENCE:
+                return self.final_defence()
+            case States.HEAD_TO_CENTER:
+                return self.head_to_center([])
+            case States.HEAD_TO_POTION:
+                return self.head_to_potion([])
+
     def repair_knowledge(self, knowledge: characters.ChampionKnowledge):
         new_visible_tiles = {}
         for coords, item in knowledge.visible_tiles.items():
@@ -196,8 +194,12 @@ class Roger(controller.Controller):
                                     path = self.arena.get_path(safe_tiles[0])
                                     if path:
                                         actions = self.arena.map_path_to_action_list(self.current_position, path, True)
-                                        self.actions = actions
-                                        self.actions_iterator = 1
+                                        if len(actions) == 1:
+                                            self.actions = None
+                                            self.actions_iterator = 0
+                                        else:
+                                            self.actions = actions
+                                            self.actions_iterator = 1
                                         return actions[0]
 
                         self.actions_iterator -= 1
