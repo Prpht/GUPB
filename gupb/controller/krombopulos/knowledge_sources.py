@@ -71,6 +71,8 @@ class MapKnowledge(KnowledgeSource):
         if self.epoch % 10 == 0:
             # update presumed map size
             self._update_map_center()
+        if not any([data.get('type') == 'menhir' for _, data in self.graph.nodes(data=True)]):
+            self.menhir_pos = self.get_approx_menhir_pos()
 
 
     def reset(self, arena_description: arenas.ArenaDescription):
