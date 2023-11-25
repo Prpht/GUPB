@@ -29,7 +29,7 @@ class RouteMicroStrat(MicroStrategy):
         # if we do not know where the menhir is, move to the map center
         except TypeError:
             next_pos = self.knowledge_sources.find_next_move_on_path(self.knowledge_sources.players.own_player_pos,
-                                                                     self.knowledge_sources.map.map_center)                                        
+                                                                     self.knowledge_sources.map.map_center) 
 
         chosen_action = characters.Action.DO_NOTHING
 

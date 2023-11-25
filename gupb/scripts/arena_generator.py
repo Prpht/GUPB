@@ -1,6 +1,9 @@
+from itertools import repeat
+import random
+from typing import Iterator
+
 import networkx as nx
 import perlin_noise
-import random
 import scipy.stats as scp_stats
 from tqdm import tqdm
 
@@ -8,11 +11,13 @@ ArenaDefinition = list[list[str]]
 
 DEFAULT_WIDTH = 24
 DEFAULT_HEIGHT = 24
+MIN_SIZE = 20
+MAX_SIZE = 40
 PERLIN_NOISE_OCTAVES = 4
-REQUIRED_AREA = 250
+REQUIRED_AREA_COEFFICIENT = 0.4
 WEAPONS_PER_BUILDING = 2
-BUILDINGS_PER_ARENA = 8
-MAX_BUILDING_SIZE = 7
+BUILDINGS_PER_ARENA = 10
+MAX_BUILDING_SIZE = 10
 
 WEAPONS = ['S', 'A', 'B', 'M']
 
@@ -130,11 +135,12 @@ def remove_disconnected_islands(arena: ArenaDefinition) -> int:
 
 
 def generate_arena(width: int, height: int) -> ArenaDefinition:
+    required_area = int(width * height * REQUIRED_AREA_COEFFICIENT)
     while True:
         arena = perlin_landscape_arena(width, height)
         add_buildings(arena)
         playable_area = remove_disconnected_islands(arena)
-        if playable_area > REQUIRED_AREA:
+        if playable_area > required_area:
             break
     return arena
 
@@ -160,12 +166,21 @@ def save_arena(arena: ArenaDefinition, file_name: str) -> None:
     remove_last_new_line()
 
 
-def generate_arenas(how_many: int) -> list[str]:
+def generate_arenas(
+        how_many: int,
+        size_generator: Iterator[tuple[int, int]] = repeat((DEFAULT_WIDTH, DEFAULT_HEIGHT))
+) -> list[str]:
     arena_names = [f"generated_{i}" for i in range(how_many)]
     for name in tqdm(arena_names, desc="Generating arenas"):
-        arena = generate_arena(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        arena = generate_arena(*next(size_generator))
         save_arena(arena, name)
     return arena_names
+
+
+def random_size_generator() -> Iterator[tuple[int, int]]:
+    while True:
+        size = random.randint(MIN_SIZE, MAX_SIZE)
+        yield size, size
 
 
 def main() -> None:

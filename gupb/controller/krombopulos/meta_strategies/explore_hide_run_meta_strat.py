@@ -50,7 +50,6 @@ class ExploreHideRunMetaStrat(MetaStrategy):
             for mode in self.microstrat_ratings:
                 self.microstrat_ratings[mode] += score
 
-
     def _switch_mode(self):
         if self.mode == 'route':
             self.mode = 'explore'

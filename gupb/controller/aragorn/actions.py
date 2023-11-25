@@ -104,7 +104,7 @@ class GoToAction(Action):
             return characters.Action.TURN_RIGHT
     
     def find_path(self, memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> (Optional[List[Coords]], int):
-        def get_h_cost(h_start: Coords, h_end: Coords, h_facing: characters.Facing) -> int:
+        def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing) -> int:
             distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
             direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
                                        1 if h_end.y - h_start.y > 0 else -1 if h_end.y - h_start.y < 0 else 0)
@@ -118,8 +118,18 @@ class GoToAction(Action):
                 turns = 2
             else:
                 turns = 0
+            
+            mistCost = 0
+            
+            if memory.map.terrain[h_end].__class__.__name__.lower() == 'menhir':
+                mistCost = 40
+            
+            dangerousTileCost = 0
 
-            return (turns if turns <= 2 else 2) + distance
+            if h_end in memory.map.getDangerousTiles():
+                dangerousTileCost = 10
+
+            return (turns if turns <= 2 else 2) + distance + mistCost + dangerousTileCost
 
         a_coords = NamedTuple('a_coords', [('coords', Coords),
                                            ('g_cost', int),
@@ -129,7 +139,7 @@ class GoToAction(Action):
         
         open_coords: [a_coords] = []
         closed_coords: {Coords: a_coords} = {}
-        open_coords.append(a_coords(start, 0, get_h_cost(start, end, facing), None, facing))
+        open_coords.append(a_coords(start, 0, get_h_cost(memory, start, end, facing), None, facing))
         
         while len(open_coords) > 0:
             open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost + x.h_cost, x.h_cost), reverse=False))
@@ -165,7 +175,7 @@ class GoToAction(Action):
                                        3 if add_coords(neighbor_direction, current.facing.value) == Coords(0, 0) else 2) \
                                       + current.g_cost
                     
-                    neighbor_h_cost = get_h_cost(neighbor, end, self.get_facing(neighbor_direction))
+                    neighbor_h_cost = get_h_cost(memory, neighbor, end, self.get_facing(neighbor_direction))
 
                     for coords in open_coords:
                         if coords.coords == neighbor:
