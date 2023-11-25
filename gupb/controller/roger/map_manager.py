@@ -53,6 +53,7 @@ class MapManager:
         for coords, tile in tiles.items():
             self.check_menhir(coords, tile)
             self.check_potion(coords, tile)
+            self.check_enemy(coords, tile)
             self.check_weapon(coords, tile)
             self.check_mist(coords, tile)
 
@@ -147,12 +148,17 @@ class MapManager:
                 nearest_coords = coords
         return nearest_coords, items[nearest_coords]
 
-    def get_4_tiles_around(self):
+    def get_tiles_around(self) -> List[Coords]:
         tiles = [
             self.current_position + Coords(0, 1),
             self.current_position + Coords(0, -1),
             self.current_position + Coords(1, 0),
             self.current_position + Coords(-1, 0)
         ]
+        back = self.current_position - self.seen_tiles[self.current_position][0].character.facing.value
+        for i, coord in enumerate(tiles):
+            if coord == back:
+                del tiles[i]
+                break
         return tiles
 

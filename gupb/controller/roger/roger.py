@@ -46,6 +46,7 @@ class Roger(controller.Controller):
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.repair_knowledge(knowledge)
         self.update_state(knowledge)
+        self.get_safe_tiles()
         match self.current_state:
             case States.RANDOM_WALK:
                 return self.random_walk()
@@ -358,13 +359,24 @@ class Roger(controller.Controller):
         self.current_state = States.RANDOM_WALK
         self.arena.reset(arena_description.name)
 
-    def extract_walkable_tiles(self, items=None):
-        if items is None:
-            items = self.arena.terrain.items()
+    def extract_walkable_tiles(self):
+        items = self.arena.terrain.items()
         try:
             return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), items))
-        except AttributeError:
-            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', items))
+        except Exception as e:
+            print(e)
+
+    def extract_walkable_coords(self, coords: List[Coords]) -> List[Coords]:
+        tiles = self.arena.terrain
+        walkable_coords = []
+        for coord in coords:
+            tile = tiles[coord]
+            if isinstance(tile, Land) or isinstance(tile, Menhir):
+                seen_tile = self.arena.seen_tiles.get(coord)
+                if seen_tile:
+                    if seen_tile[0].character is None:
+                        walkable_coords.append(coord)
+        return walkable_coords
 
     def build_grid(self):
         walkable_tiles_list = self.extract_walkable_tiles()
@@ -388,18 +400,19 @@ class Roger(controller.Controller):
         return characters.Tabard.RED
 
     def get_safe_tiles(self) -> List[Coords]:
-        tiles_around = self.arena.get_4_tiles_around()
-        tiles_available = self.extract_walkable_tiles(tiles_around)  #todo uogólnić
-        tiles_available_set = set(tiles_available)
+        coords_around = self.arena.get_tiles_around()
+        coords_available = self.extract_walkable_coords(coords_around)
+        coords_available.append(self.current_position)
+        tiles_available_set = set(coords_available)
         unsafe_tiles = []
         for coords, seen_enemy in self.arena.enemies_coords.items():
-            cut_tiles = get_weapon_cut_positions(self.arena.seen_tiles, self.arena.terrain, coords, seen_enemy.enemy.weapon.name)
-            unsafe_tiles.extend(cut_tiles)
+            if seen_enemy.seen_epoch_nr >= self.epoch-2:
+                cut_tiles = get_weapon_cut_positions(self.arena.seen_tiles, self.arena.terrain, coords, seen_enemy.enemy.weapon.name)
+                unsafe_tiles.extend(cut_tiles)
         unsafe_tiles_set = set(unsafe_tiles)
-        safe_tiles = tiles_available_set.difference(unsafe_tiles_set)
-        safe_tiles = list(safe_tiles)
-        return safe_tiles
-
+        safe_coords = tiles_available_set.difference(unsafe_tiles_set)
+        safe_coords = list(safe_coords)
+        return safe_coords
 
 
 
