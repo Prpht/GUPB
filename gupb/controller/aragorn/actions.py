@@ -133,7 +133,7 @@ class GoToAroundAction(GoToAction):
         
         return actionToPerform
 
-class ExploreAction(Action):
+class AdvExploreAction(Action):
     MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED = 4
 
     def __init__(self) -> None:
@@ -194,6 +194,43 @@ class ExploreAction(Action):
             return self.perform(memory)
         
         if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
+        return res
+    
+class ExploreAction(Action):
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        currentSection = memory.getCurrentSection()
+        
+        if currentSection == 0:
+            gotoVector = Coords(-1, -1)
+        elif currentSection == 1:
+            gotoVector = Coords(1, 0)
+        elif currentSection == 2:
+            gotoVector = Coords(-1, -1)
+        elif currentSection == 3:
+            gotoVector = Coords(1, 0)
+        else:
+            gotoVector = Coords(-1, -1)
+        
+        mul = 3
+        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
+        exploreToPos = add_coords(memory.position, gotoVector)
+
+
+        gotoAroundAction = GoToAroundAction()
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
+
+        if res is not None:
+            return res
+        
+        gotoVector = Coords(random.randint(-1, 1), random.randint(-1, 1))
+        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
+        exploreToPos = add_coords(memory.position, gotoVector)
+
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
+
         return res
 
 class AttackClosestEnemyAction(Action):
