@@ -70,11 +70,14 @@ class Memory:
         
         return False
     
-    def hasOponentInRange(self):
+    def getClosestOponentInRange(self):
+        closestOponentDistance = INFINITY
+        closestOponentInRange = None
+        
         currentWeapon = self.getCurrentWeaponClass()
 
         if currentWeapon is None:
-            return False
+            return None
 
         rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
 
@@ -84,9 +87,13 @@ class Memory:
                 continue
 
             if cellCoords in self.map.terrain and self.map.terrain[cellCoords].character is not None:
-                return True
+                distance = utils.coordinatesDistance(self.position, cellCoords)
+
+                if distance < closestOponentDistance:
+                    closestOponentDistance = distance
+                    closestOponentInRange = self.map.terrain[cellCoords].character
         
-        return False
+        return closestOponentInRange
 
     def hasOponentOnRight(self):
         rightCell = coordinates.add_coords(self.position, self.facing.turn_right().value)

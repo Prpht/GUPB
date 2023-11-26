@@ -38,6 +38,21 @@ class Brain:
         
         # ------------------------------------------
 
+        # ATTACKING
+
+        oponentInRange = self.memory.getClosestOponentInRange()
+
+        if (
+            oponentInRange is not None
+            and oponentInRange.health <= self.memory.health
+            and oponentInRange.health <= consumables.POTION_RESTORED_HP
+        ):
+            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
+        # ------------------------------------------
+
         # DEFENDING FROM ATTACKS
         dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
@@ -47,33 +62,6 @@ class Brain:
             takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
             actions.append(takeToOnesLegsAction)
         
-        # ------------------------------------------
-
-        # ATTACKING
-
-        if self.memory.hasOponentInRange():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
-        if self.memory.hasOponentOnRight():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent on right")
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_RIGHT)
-            actions.append(spinAction)
-
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
-        if self.memory.hasOponentOnLeft():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent on left")
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_LEFT)
-            actions.append(spinAction)
-
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
         # ------------------------------------------
 
         # PICKING STUFF
