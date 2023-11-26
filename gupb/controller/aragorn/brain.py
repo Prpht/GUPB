@@ -59,10 +59,10 @@ class Brain:
             oponentInRange is not None
             and (
                 self.memory.position not in dangerousTilesDict.keys()
-                # or (
-                    # oponentInRange.health <= self.memory.health
+                or (
+                    oponentInRange.health <= self.memory.health
                     # and oponentInRange.health <= consumables.POTION_RESTORED_HP
-                # )
+                )
             )
         ):
             attackAction = AttackAction()

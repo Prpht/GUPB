@@ -471,6 +471,44 @@ class SeeMoreAction(Action):
         
         return maxVisibleCoordsFacing.value
     
+    def getNearbyOpponentPos(self, memory: Memory) -> bool:
+        nearbyOponentDistance = INFINITY
+        nearbyOponentPos = None
+        
+        r = 3
+
+        for x in range(memory.position.x - r, memory.position.x + r + 1):
+            for y in range(memory.position.x - r, memory.position.x + r + 1):
+                coords = Coords(x, y)
+
+                if coords not in memory.map.terrain:
+                    continue
+
+                if memory.map.terrain[coords].character is None or memory.map.terrain[coords].character.controller_name == OUR_BOT_NAME:
+                    continue
+                
+                distance = utils.coordinatesDistance(memory.position, coords)
+
+                if distance < nearbyOponentDistance:
+                    nearbyOponentDistance = distance
+                    nearbyOponentPos = coords
+
+        return nearbyOponentPos
+    
+    def getMostDefensiveDirection(self, memory :Memory, nearbyOpponentPos :Coords) -> Coords:
+        # get vector to closest enemy
+        opponentDirection = sub_coords(nearbyOpponentPos, memory.position)
+
+        # normalize its coords
+        maxC = max(abs(opponentDirection.x), abs(opponentDirection.y))
+        opponentDirection = Coords(opponentDirection.x // maxC, opponentDirection.y // maxC)
+        
+        # if both coords are 1s or -1s, set one of them to 0
+        if opponentDirection.x != 0 and opponentDirection.y != 0:
+            opponentDirection = Coords(opponentDirection.x, 0)
+
+        return opponentDirection
+    
     def lookAtTile(self, memory: Memory, tile: Coords) -> Action:
         if tile == memory.facing.value:
             # seems OK - do other actions
@@ -487,11 +525,15 @@ class SeeMoreAction(Action):
 
     @profile
     def perform(self, memory: Memory) -> Action:
+        nearbyOpponentPos = self.getNearbyOpponentPos(memory)
+
+        if nearbyOpponentPos is not None:
+            defensiveDirection = self.getMostDefensiveDirection(memory, nearbyOpponentPos)
+            return self.lookAtTile(memory, defensiveDirection)
+
         if self.isGoingForward(memory):
             forwardDirection = self.getForwardDirection(memory)
             return self.lookAtTile(memory, forwardDirection)
         
         bestDirection = self.directionWithMostVisibleCoords(memory)
         return self.lookAtTile(memory, bestDirection)
-        
-        
