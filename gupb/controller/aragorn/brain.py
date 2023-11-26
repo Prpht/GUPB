@@ -84,7 +84,7 @@ class Brain:
 
         [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
 
-        if closestWeaponDistance is not None and closestWeaponDistance < 5:
+        if closestWeaponDistance is not None and closestWeaponDistance < 15:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
@@ -95,7 +95,7 @@ class Brain:
 
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
-        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
+        if menhirPos is not None and (self.memory.map.mist_radius < 7 or utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2):
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
             yield goToAroundAction, "Going closer to menhir"

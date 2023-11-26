@@ -138,8 +138,6 @@ class Memory:
         current_weapon = self.getCurrentWeaponName()
    
         for coords in self.map.terrain:
-            # if self.map.terrain[coords].loot is not None:
-            #     print(self.map.terrain[coords].loot)
             if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
                 #TODO: assign correct weights for weapons when the proper usage of each of them is known

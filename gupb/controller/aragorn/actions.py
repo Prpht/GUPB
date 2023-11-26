@@ -133,7 +133,7 @@ class GoToAroundAction(GoToAction):
         
         return actionToPerform
 
-class AdvExploreAction(Action):
+class ExploreAction(Action):
     MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED = 4
 
     def __init__(self) -> None:
@@ -154,6 +154,11 @@ class AdvExploreAction(Action):
         for section in self.plan:
             if not self.is_section_explored[section]:
                 return section
+        
+        for i in range(len(self.is_section_explored)):
+            self.is_section_explored[i] = False
+        
+        return self.plan[0]
 
     @profile
     def perform(self, memory: Memory) -> Action:
@@ -168,7 +173,7 @@ class AdvExploreAction(Action):
             remainingSections = [section for section in range(len(self.is_section_explored)) if section not in [currentSection, oppositeSection]]
             random.shuffle(remainingSections)
 
-            self.plan = [oppositeSection] + remainingSections
+            self.plan = [currentSection, oppositeSection] + remainingSections
 
         exploreToSection = self.__getNextSectionFromPlan()
 
@@ -196,7 +201,7 @@ class AdvExploreAction(Action):
         if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
         return res
     
-class ExploreAction(Action):
+class BasicExploreAction(Action):
     @profile
     def perform(self, memory: Memory) -> Action:
         currentSection = memory.getCurrentSection()
