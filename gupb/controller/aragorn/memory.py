@@ -6,7 +6,7 @@ from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
 
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY, OUR_BOT_NAME
 
 
 
@@ -417,7 +417,7 @@ class Map:
             
             enemyDescription = self.terrain[coords].character
             
-            if enemyDescription is not None:
+            if enemyDescription is not None and enemyDescription.controller_name != OUR_BOT_NAME:
                 weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
 
                 if weapon is None:
