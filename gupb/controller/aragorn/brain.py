@@ -10,6 +10,14 @@ from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
 class Brain:
     def __init__(self):
         self.memory = Memory()
+        self.persistentActions = {}
+
+        self.__initPersistentActions()
+    
+    def __initPersistentActions(self):
+        self.persistentActions = {
+            'explore': ExploreAction(),
+        }
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
@@ -125,7 +133,7 @@ class Brain:
         # EXPLORE THE MAP
 
         if DEBUG: dbg_ac_msgs.append("Exploring action")
-        exploreAction = ExploreAction()
+        exploreAction = self.persistentActions['explore']
         actions.append(exploreAction)
 
         # ------------------------------------------
@@ -165,6 +173,8 @@ class Brain:
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.memory.reset(arena_description)
+
+        self.__initPersistentActions()
     
     def onDecisionReturning(self, action: characters.Action):
         if action in [

@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from random import choice
+import random
 from typing import NamedTuple, Optional, List, Tuple
 
 from gupb.model.coordinates import *
@@ -37,7 +37,7 @@ class SpinAction(Action):
 class RandomAction(Action):
     def perform(self, memory: Memory) -> characters.Action:
         available_actions = [characters.Action.STEP_FORWARD, characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
-        random_action = choice(available_actions)
+        random_action = random.choice(available_actions)
         return random_action
 
 class AttackAction(Action):
@@ -110,44 +110,57 @@ class GoToAroundAction(GoToAction):
         
         return actionToPerform
 
-class ExploreAction(GoToAroundAction):
+class ExploreAction(Action):
     MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED = 4
+
+    def __init__(self) -> None:
+        self.is_section_explored = [False, False, False, False, False]
+        self.firstPerform = True
+        self.plan = [1, 2, 3, 4, 0]
+        self.minDistanceToSectionCenterToMarkItAsExplored = 7
+    
+    def __markSectionAsExplored(self, section: int) -> None:
+        if section < len(self.is_section_explored):
+            self.is_section_explored[section] = True
+        else:
+            for _ in range(section - len(self.is_section_explored) + 1):
+                self.is_section_explored.append(False)
+            self.is_section_explored[section] = True
+    
+    def __getNextSectionFromPlan(self):
+        for section in self.plan:
+            if not self.is_section_explored[section]:
+                return section
 
     def perform(self, memory: Memory) -> Action:
         currentSection = memory.getCurrentSection()
 
-        if not any(memory.is_section_explored):
-            for _ in range(currentSection - len(memory.is_section_explored) + 1):
-                memory.is_section_explored.append(False)
-            memory.is_section_explored[currentSection] = True
+        if self.firstPerform:
+            self.__markSectionAsExplored(currentSection)
+            self.minDistanceToSectionCenterToMarkItAsExplored = (memory.map.size[0] + memory.map.size[1]) / 2 / 5
+            self.firstPerform = False
+            oppositeSection = memory.getOppositeSection()
 
-        if currentSection < len(memory.is_section_explored) and memory.is_section_explored[currentSection]:
-            exploreToSection = memory.getOppositeSection()
-        else:
-            exploreToSection = currentSection
+            remainingSections = [section for section in range(len(self.is_section_explored)) if section not in [currentSection, oppositeSection]]
+            random.shuffle(remainingSections)
 
-        if exploreToSection < len(memory.is_section_explored) and memory.is_section_explored[exploreToSection]:
-            exploreToSection = memory.getRandomSection()
-        
-        if exploreToSection < len(memory.is_section_explored) and memory.is_section_explored[exploreToSection]:
-            for section, isSectionExplored in enumerate(memory.is_section_explored):
-                if not isSectionExplored:
-                    exploreToSection = section
-                    break
+            self.plan = [oppositeSection] + remainingSections
 
+        exploreToSection = self.__getNextSectionFromPlan()
         exploreToPos = memory.getSectionCenterPos(exploreToSection)
 
         if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
-            memory.is_section_explored[exploreToSection] = True
+            self.__markSectionAsExplored(exploreToSection)
             return self.perform(memory)
 
-        self.setDestination(exploreToPos)
-
-        res = super().perform(memory)
+        gotoAroundAction = GoToAroundAction()
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
 
         if res is None:
             if DEBUG: print("[ARAGORN|EXPLORE] Cannot reach section", exploreToSection, "at", exploreToPos, ", marking it as explored")
-            memory.is_section_explored[exploreToSection] = True
+            self.__markSectionAsExplored(exploreToSection)
             return self.perform(memory)
         
+        if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
         return res

@@ -24,8 +24,6 @@ class Memory:
         self.environment: Environment = None
 
         self.health: int = 0
-
-        self.is_section_explored = [False, False, False, False, False]
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
