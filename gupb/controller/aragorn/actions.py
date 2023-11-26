@@ -360,15 +360,15 @@ class TakeToOnesLegsAction(Action):
             if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Danger source pos is None")
             return None
         
-        runAwayAction = self.runAway(memory)
-
-        if runAwayAction is not None:
-            return runAwayAction
-        
         runToAnySafeTileAction = self.runToAnySafeTile(memory)
 
         if runToAnySafeTileAction is not None:
             return runToAnySafeTileAction
+        
+        runAwayAction = self.runAway(memory)
+
+        if runAwayAction is not None:
+            return runAwayAction
         
         return None
     
