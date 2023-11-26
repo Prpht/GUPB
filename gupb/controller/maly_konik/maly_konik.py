@@ -70,13 +70,18 @@ class MalyKonik(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__update_myself(knowledge)
-        self.map.read_information(knowledge)
+        self.map.read_information(knowledge, self.weapon_name)
 
         self.strategy.set_position_and_orientation(self.position, self.orientation)
         self.strategy.set_weapon(self.weapon_name)
 
         try:
-            next_move = self.strategy.best_choice(knowledge)
+            self.strategy.check_my_status(knowledge)
+
+            if not self.strategy.future_moves:
+                self.strategy.plan_my_moves()
+
+            next_move = self.strategy.move(knowledge)
         except Exception as e:
             # traceback.print_exc()
             # print(e)
