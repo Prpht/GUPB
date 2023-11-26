@@ -502,6 +502,9 @@ class MenhirCalculator:
         if len(mistCoordinates) == 0:
             return None, None
         
+        if not self.recentlyChanged:
+            return self.lastResult
+        
         bestMenhirPos = None
         bestMistAmount = 0
 
@@ -547,4 +550,5 @@ class MenhirCalculator:
                     bestMistAmount = mistFound/mistMax
         
         self.recentlyChanged = False
-        return bestMenhirPos, bestMistAmount
+        self.lastResult = (bestMenhirPos, bestMistAmount)
+        return self.lastResult
