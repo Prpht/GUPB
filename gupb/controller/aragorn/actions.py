@@ -147,7 +147,14 @@ class ExploreAction(Action):
             self.plan = [oppositeSection] + remainingSections
 
         exploreToSection = self.__getNextSectionFromPlan()
+
+        if exploreToSection is None:
+            return None
+        
         exploreToPos = memory.getSectionCenterPos(exploreToSection)
+
+        if exploreToPos is None:
+            return None
 
         if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
             self.__markSectionAsExplored(exploreToSection)

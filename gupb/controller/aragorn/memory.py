@@ -188,7 +188,7 @@ class Memory:
     def getSectionCenterPos(self, section):
         sectionsCenters = self.map.getSectionsCenters()
 
-        if section >= len(sectionsCenters):
+        if section is None or section >= len(sectionsCenters):
             if DEBUG: print("[Memory] getSectionCenterPos(): oppositeSection is not in sections! Section is:", section)
             return None
         
