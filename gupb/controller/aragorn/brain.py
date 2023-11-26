@@ -5,7 +5,7 @@ from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
 
-
+import time
 
 class Brain:
     def __init__(self):
@@ -13,6 +13,7 @@ class Brain:
         self.persistentActions = {}
 
         self.__initPersistentActions()
+        self.wholeTime = 0
     
     def __initPersistentActions(self):
         self.persistentActions = {
@@ -20,6 +21,7 @@ class Brain:
         }
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        startTime = time.time()
         self.memory.update(knowledge)
 
         actions = []
@@ -145,6 +147,9 @@ class Brain:
             if ret is not None and ret is not characters.Action.DO_NOTHING:
                 if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
                 self.onDecisionReturning(ret)
+                
+                endTime = time.time()
+                self.wholeTime += endTime - startTime
                 return ret
             
             if ret is None:
@@ -154,6 +159,9 @@ class Brain:
         
         if DEBUG: print("[ARAGORN|BRAIN] None of actions returned anything, spinning")
         self.onDecisionReturning(characters.Action.TURN_RIGHT)
+        
+        endTime = time.time()
+        self.wholeTime += endTime - startTime
         return characters.Action.TURN_RIGHT
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
