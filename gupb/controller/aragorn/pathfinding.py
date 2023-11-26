@@ -10,6 +10,7 @@ from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME, USE
 cache = {}
 
 def invalidate_PF_cache():
+    global cache
     cache = {}
 
 def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords, useAllMovements :bool = False) -> characters.Action:
@@ -38,6 +39,8 @@ def get_facing(f_coords: Coords) -> characters.Facing:
         return characters.Facing.RIGHT
 
 def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> (Optional[List[Coords]], int):
+    global cache
+    
     if USE_PF_CACHE:
         cacheKey = (memory.map.terrain, start, end, facing, useAllMovements)
         
