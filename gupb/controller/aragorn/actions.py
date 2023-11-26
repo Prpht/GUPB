@@ -229,7 +229,16 @@ class AttackClosestEnemyAction(Action):
         if closestEnemy is None:
             return None
         
+        # CLOSEST ENEMY IS TOO FAR
+        # just approach him
+        if closestEnemyDistance > 3:
+            goToAttackAction = GoToAction()
+            goToAttackAction.setDestination(closestEnemy)
+            return goToAttackAction.perform(memory)
+
+        # IF CLOSEST ENEMY IS NEARBY
         # GET CLOSEST FIELD YOU CAN ATTACK FROM
+        # BY CALCULATING DETAILED PATHS COSTS
         currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
 
         if currentWeapon is None:
