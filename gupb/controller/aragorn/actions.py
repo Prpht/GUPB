@@ -388,7 +388,7 @@ class TakeToOnesLegsAction(Action):
         return res
 
     def runToAnySafeTile(self, memory: Memory) -> Action:
-        dangerousTiles = memory.map.getDangerousTiles()
+        dangerousTiles = memory.map.getDangerousTiles(memory.tick)
         
         possibleTiles = [
             memory.position,

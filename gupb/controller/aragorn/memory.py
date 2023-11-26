@@ -4,6 +4,7 @@ from typing import Dict, NamedTuple, Optional, List
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
+from gupb.model.profiling import profile
 
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY, OUR_BOT_NAME
@@ -228,6 +229,8 @@ class Map:
 
         self.sectionsCenters = None
         self.centerPos = coordinates.Coords(round(self.size[0] / 2), round(self.size[1] / 2))
+        self.__dangerousTiles_cache_data = None
+        self.__dangerousTiles_cache_tick = 0
 
     @staticmethod
     def load(name: str) -> 'Map':
@@ -377,10 +380,15 @@ class Map:
         
         return closestCoords
     
-    def getDangerousTiles(self):
+    @profile
+    def getDangerousTiles(self, currentTick :int = None):
         """
         Returns list of tiles that are in range of enemy weapon
         """
+
+        # cache
+        if currentTick is not None and self.__dangerousTiles_cache_data is not None and self.__dangerousTiles_cache_tick == currentTick:
+            return self.__dangerousTiles_cache_data
 
         dangerousTiles = []
 
@@ -398,6 +406,11 @@ class Map:
                 for position in positions:
                     if position not in dangerousTiles:
                         dangerousTiles.append(position)
+        
+        # cache
+        if currentTick is not None:
+            self.__dangerousTiles_cache_data = dangerousTiles
+            self.__dangerousTiles_cache_tick = currentTick
         
         return dangerousTiles
 
