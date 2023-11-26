@@ -1,9 +1,12 @@
+import random
+import traceback
+
 from gupb import controller
 from gupb.model import characters, arenas, weapons
 from gupb.model import coordinates as cord
 from .mapa import Mapa
 from .strategie import FirstStrategy
-from .utils import CHAMPION_STARTING_HP
+from .utils import CHAMPION_STARTING_HP, ACTIONS
 from typing import Optional
 
 
@@ -19,7 +22,8 @@ class MalyKonik(controller.Controller):
         self.strategy: FirstStrategy = FirstStrategy(self.map,
                                                      self.weapon_name,
                                                      self.position,
-                                                     self.orientation)
+                                                     self.orientation,
+                                                     self.health)
 
     def __hash__(self) -> int:
         return hash(self.nick)
@@ -66,31 +70,42 @@ class MalyKonik(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.__update_myself(knowledge)
-
-        self.map.read_information(knowledge)
+        self.map.read_information(knowledge, self.weapon_name)
 
         self.strategy.set_position_and_orientation(self.position, self.orientation)
         self.strategy.set_weapon(self.weapon_name)
 
-        next_move = self.strategy.best_choice(knowledge)
+        try:
+            self.strategy.check_my_status(knowledge)
 
-        # self.map.reset_enemies()
+            if not self.strategy.future_moves:
+                self.strategy.plan_my_moves()
+
+            next_move = self.strategy.move(knowledge)
+        except Exception as e:
+            # traceback.print_exc()
+            # print(e)
+            # print(self.position)
+            # print(self.strategy.future_moves)
+            next_move = random.choices(ACTIONS, weights=(0, 1, 1, 4, 0, 2))[0]
+            self.strategy.reset_moves()
+
+        self.map.reset_enemies()
 
         return next_move
-
-        #  Z naładowanym łukiem można chodzić, więc jeżeli tylko go mamy to go ładujmy
-        # if isinstance(self.weapon, weapons.Bow) and not self.weapon.ready:
-        #     return characters.Action.ATTACK
 
     def praise(self, score: int) -> None:
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.map.reset_map(arena_description)
+
         self.strategy = FirstStrategy(self.map,
                                       self.weapon_name,
                                       self.position,
-                                      self.orientation)
+                                      self.orientation,
+                                      CHAMPION_STARTING_HP)
+        #self.strategy.future_moves = []
 
     @property
     def name(self) -> str:

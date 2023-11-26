@@ -3,6 +3,7 @@ from gupb.model import arenas, coordinates, weapons
 from gupb.model import characters
 
 from gupb.controller.aragorn.brain import Brain
+from gupb.controller.aragorn.constants import OUR_BOT_NAME
 
 
 class AragornController(controller.Controller):
@@ -21,7 +22,7 @@ class AragornController(controller.Controller):
     
     @property
     def name(self) -> str:
-        return 'Aragorn'
+        return OUR_BOT_NAME
 
     @property
     def preferred_tabard(self) -> characters.Tabard:

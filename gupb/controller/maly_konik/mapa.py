@@ -1,32 +1,42 @@
 from typing import Dict, Optional, List
 
 import numpy as np
+import math
 
 from gupb.model import coordinates as cord
 from gupb.model import characters
 from gupb.model.arenas import ArenaDescription, Arena
+from .utils import WORST_WEAPONS
 
 
 class Mapa:
     def __init__(self) -> None:
         self.position: Optional[cord.Coords] = None
-        self.weapons_position: Dict = {}
         self.menhir_position: Optional[cord.Coords] = None
         self.mist_position: List[cord.Coords] = []
         self.potion_position: Optional[cord.Coords] = None
+        self.weapon_position: Optional[cord.Coords] = None
+        self.weapon_name = None
         self.not_explored_terrain: Dict[cord.Coords] = {}
-        # self.enemies: List[cord.Coords] = []
+
+        self._enemies: List[cord.Coords] = []
+        self.closest_enemy_cord = None
+        self.enemy = None
+
         self.arena: Optional[Arena] = None
         self.grid_matrix: List[cord.Coords] = []
 
     def reset_map(self, arena_description: ArenaDescription) -> None:
         self.position = None
-        self.weapons_position = {}
+        self.weapon_position = None
+        self.weapon_name = None
         self.menhir_position = None
         self.mist_position = []
         self.potion_position = None
         self.not_explored_terrain = {}
-        # self.enemies = []
+        self._enemies = []
+        self.closest_enemy_cord = None
+        self.enemy = None
         self.arena = Arena.load(arena_description.name)
         self.grid_matrix = np.ones((self.arena.size[0], self.arena.size[1]))
 
@@ -37,15 +47,19 @@ class Mapa:
                 self.grid_matrix[cords.y, cords.x] = 1
                 self.not_explored_terrain[cords] = 'NotExplored'
 
-    def read_information(self, knowledge: characters.ChampionKnowledge) -> None:
+    def read_information(self, knowledge: characters.ChampionKnowledge, weapon_name) -> None:
         self.position = knowledge.position
 
         for coord, tile in knowledge.visible_tiles.items():
             # Widzimy broń
-            if tile.loot:
-                self.weapons_position[coord] = tile.loot.name
-            elif coord in self.weapons_position:
-                self.weapons_position.pop(coord)
+            if tile.loot and self.weapon_position is None:
+                if WORST_WEAPONS[tile.loot.name] < WORST_WEAPONS[weapon_name]:
+                    self.weapon_position = coord
+                    self.weapon_name = tile.loot.name
+            # Sprawdzamy czy nikt nie ukradł
+            elif not tile.loot and self.weapon_position == coord:
+                self.weapon_position = None
+                self.weapon_name = None
 
             # Widzimy menhir
             if tile.type == 'menhir':
@@ -54,8 +68,9 @@ class Mapa:
             # Widzimy mgle
             for effect in tile.effects:
                 if effect.type == 'mist':
-                    self.mist_position.append(coord)
-                    break
+                    if math.sqrt((coord[0] - self.position[0]) ** 2 + (coord[1] - self.position[1]) ** 2) < 4:
+                        self.mist_position.append(coord)
+                        break
 
             # Widzimy miksture
             if tile.consumable and self.potion_position is None:
@@ -69,8 +84,20 @@ class Mapa:
                 self.not_explored_terrain.pop(coord)
 
             # Widzimy wroga
-            # if tile.character and coord != self.position:
-            #     self.enemies.append(coord)
+            if tile.character and coord != self.position:
+                self._enemies.append(coord)
 
-    # def reset_enemies(self) -> None:
-    #     self.enemies = []
+        if self._enemies:
+            self.closest_enemy_cord = min(self._enemies, key=lambda pos:
+                                          math.sqrt(
+                                              (pos[0] - self.position[0]) ** 2 + (pos[1] - self.position[1]) ** 2
+                                          ))
+
+            for coord, tile in knowledge.visible_tiles.items():
+                if coord[0] == self.closest_enemy_cord[0] and coord[1] == self.closest_enemy_cord[1]:
+                    self.enemy = tile.character
+
+    def reset_enemies(self) -> None:
+        self._enemies = []
+        self.enemy = None
+        self.closest_enemy_cord = None

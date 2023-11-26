@@ -1,4 +1,4 @@
-import os
+import os, random
 from typing import Dict, NamedTuple, Optional, List
 
 from gupb.model import arenas, tiles, coordinates, weapons, games
@@ -6,7 +6,7 @@ from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
 
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY, OUR_BOT_NAME
 
 
 
@@ -33,7 +33,8 @@ class Memory:
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
 
-        self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
+        # self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
+        self.map = Map.load(arena_description.name)
         self.environment = Environment(self.map)
 
         self.health: int = 0
@@ -52,6 +53,15 @@ class Memory:
 
         self.health = knowledge.visible_tiles[self.position].character.health
 
+    def getCurrentWeaponDescription(self):
+        return self.map.terrain[self.position].character.weapon
+    
+    def getCurrentWeaponName(self):
+        return self.getCurrentWeaponDescription().name
+
+    def getCurrentWeaponClass(self):
+        return Map.weaponDescriptionConverter(self.getCurrentWeaponDescription())
+
     def hasOponentInFront(self):
         frontCell = coordinates.add_coords(self.position, self.facing.value)
         
@@ -59,6 +69,31 @@ class Memory:
             return True
         
         return False
+    
+    def getClosestOponentInRange(self):
+        closestOponentDistance = INFINITY
+        closestOponentInRange = None
+        
+        currentWeapon = self.getCurrentWeaponClass()
+
+        if currentWeapon is None:
+            return None
+
+        rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
+
+        for cellCoords in rangeCells:
+            if cellCoords == self.position:
+                # do not attack yourself
+                continue
+
+            if cellCoords in self.map.terrain and self.map.terrain[cellCoords].character is not None:
+                distance = utils.coordinatesDistance(self.position, cellCoords)
+
+                if distance < closestOponentDistance:
+                    closestOponentDistance = distance
+                    closestOponentInRange = self.map.terrain[cellCoords].character
+        
+        return closestOponentInRange
 
     def hasOponentOnRight(self):
         rightCell = coordinates.add_coords(self.position, self.facing.turn_right().value)
@@ -100,9 +135,15 @@ class Memory:
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
-
+        current_weapon = self.getCurrentWeaponName()
+   
         for coords in self.map.terrain:
-            if self.map.terrain[coords].loot == weapons.Weapon:
+            if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
+                possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
+                #TODO: assign correct weights for weapons when the proper usage of each of them is known
+                if WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
+                    continue
+
                 distance = utils.coordinatesDistance(self.position, coords)
 
                 if distance < minDistance:
@@ -115,8 +156,51 @@ class Memory:
             return True
 
         return False
+    
+    def getCurrentSection(self) -> int:
+        sectionsCenters = self.map.getSectionsCenters()
+        distances = []
 
+        for sectionCenter in sectionsCenters:
+            distances.append(
+                utils.coordinatesDistance(self.position, sectionCenter)
+            )
+        
+        minDistance = 9999
+        minSector = 0
 
+        for i, d in enumerate(distances):
+            if d < minDistance:
+                minDistance = d
+                minSector = i
+        
+        return minSector
+    
+    def getOppositeSection(self):
+        currentSection = self.getCurrentSection()
+
+        if currentSection == 1:
+            return 4
+        if currentSection == 2:
+            return 3
+        if currentSection == 3:
+            return 2
+        if currentSection == 4:
+            return 1
+        
+        return random.randint(1, 4)
+    
+    def getSectionCenterPos(self, section):
+        sectionsCenters = self.map.getSectionsCenters()
+
+        if section is None or section >= len(sectionsCenters):
+            if DEBUG: print("[Memory] getSectionCenterPos(): oppositeSection is not in sections! Section is:", section)
+            return None
+        
+        return sectionsCenters[section]
+    
+    def getRandomSection(self):
+        return random.randint(0, 4)
 
 class Environment:
     def __init__(self, map: 'Map'):
@@ -142,6 +226,9 @@ class Map:
 
         self.menhirCalculator = MenhirCalculator(self)
 
+        self.sectionsCenters = None
+        self.centerPos = coordinates.Coords(round(self.size[0] / 2), round(self.size[1] / 2))
+
     @staticmethod
     def load(name: str) -> 'Map':
         terrain = dict()
@@ -158,7 +245,7 @@ class Map:
                             terrain[position] = arenas.TILE_ENCODING[character]()
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
-                            terrain[position].loot = arenas.WEAPON_ENCODING[character]()
+                            terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
         return Map(name, terrain)
     
     @staticmethod
@@ -211,7 +298,7 @@ class Map:
                 self.terrain[coords] = newType()
             
             self.terrain[coords].tick = currentTick
-            self.terrain[coords].loot = self.weaponDescriptionConverter(visible_tile_description.loot)
+            self.terrain[coords].loot = Map.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
             
@@ -221,7 +308,8 @@ class Map:
             if effects.Mist in tileEffects:
                 self.menhirCalculator.addMist(coords)
     
-    def weaponDescriptionConverter(self, weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
+    @staticmethod
+    def weaponDescriptionConverter(weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
         if weaponDescription is None or not isinstance(weaponDescription, weapons.WeaponDescription):
             return None
         
@@ -231,7 +319,7 @@ class Map:
             return weapons.Sword
         elif weaponDescription.name == 'axe':
             return weapons.Axe
-        elif weaponDescription.name == 'bow':
+        elif weaponDescription.name in ['bow' 'bow_loaded' 'bow_unloaded']:
             return weapons.Bow
         elif weaponDescription.name == 'amulet':
             return weapons.Amulet
@@ -288,6 +376,134 @@ class Map:
                     closestDistance = distance
         
         return closestCoords
+    
+    def getDangerousTiles(self):
+        """
+        Returns list of tiles that are in range of enemy weapon
+        """
+
+        dangerousTiles = []
+
+        for coords in self.terrain:
+            enemyDescription = self.terrain[coords].character
+            
+            if enemyDescription is not None:
+                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
+
+                if weapon is None:
+                    continue
+
+                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
+
+                for position in positions:
+                    if position not in dangerousTiles:
+                        dangerousTiles.append(position)
+        
+        return dangerousTiles
+
+    def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
+        """
+        Returns a dict. Keys are coords with danger, values are their sources
+        """
+
+        dangerousTiles = {}
+
+        for coords in self.terrain:
+            if currentTick is not None and maxTicksBehind is not None and hasattr(self.terrain[coords], 'tick'):
+                if self.terrain[coords].tick < currentTick - maxTicksBehind:
+                    continue
+            
+            enemyDescription = self.terrain[coords].character
+            
+            if enemyDescription is not None and enemyDescription.controller_name != OUR_BOT_NAME:
+                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
+
+                if weapon is None:
+                    continue
+
+                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
+
+                for position in positions:
+                    if position not in dangerousTiles:
+                        dangerousTiles[position] = coords
+        
+        return dangerousTiles
+    
+    def getSectionsCenters(self):
+        """
+        Divides map to 5 sections and returns their centers
+
+        ul -> up left
+        ur -> up right
+        dl -> down left
+        dr -> dorn right
+
+        .-----------------.
+        |        |        |
+        |  1   __|__   2  |
+        |     |     |     |
+        |-----|  0  |-----|
+        |     |__ __|     |
+        |  3     |     4  |      
+        |        |        |
+        `-----------------`
+        """
+
+        # cache
+        if self.sectionsCenters is not None:
+            return self.sectionsCenters
+        
+        # get map's center
+        center = coordinates.Coords(self.size[0] / 2, self.size[1] / 2)
+        center = coordinates.Coords(round(center.x), round(center.y))
+
+        # define map corners
+        ul_corner = coordinates.Coords(0, 0)
+        ur_corner = coordinates.Coords(self.size[0], 0)
+        dl_corner = coordinates.Coords(0, self.size[1])
+        dr_corner = coordinates.Coords(self.size[0], self.size[1])
+
+        # calculate distance from center to corners
+        ul_distance = coordinates.sub_coords(ul_corner, center)
+        ur_distance = coordinates.sub_coords(ur_corner, center)
+        dl_distance = coordinates.sub_coords(dl_corner, center)
+        dr_distance = coordinates.sub_coords(dr_corner, center)
+
+        # get 2/3 of distance
+        ul_distance = coordinates.mul_coords(ul_distance, 2/3)
+        ur_distance = coordinates.mul_coords(ur_distance, 2/3)
+        dl_distance = coordinates.mul_coords(dl_distance, 2/3)
+        dr_distance = coordinates.mul_coords(dr_distance, 2/3)
+        
+        # round distance to ensure that section's center coords are integers
+        ul_distance = coordinates.Coords(round(ul_distance.x), round(ul_distance.y))
+        ur_distance = coordinates.Coords(round(ur_distance.x), round(ur_distance.y))
+        dl_distance = coordinates.Coords(round(dl_distance.x), round(dl_distance.y))
+        dr_distance = coordinates.Coords(round(dr_distance.x), round(dr_distance.y))
+
+        # add distance to center to get section's center coords
+        ul_center = coordinates.add_coords(center, ul_distance)
+        ur_center = coordinates.add_coords(center, ur_distance)
+        dl_center = coordinates.add_coords(center, dl_distance)
+        dr_center = coordinates.add_coords(center, dr_distance)
+
+        # find closest land tile to section's center
+        ul_center = utils.closestTileFromWithCondition(ul_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, ul_center)
+        ur_center = utils.closestTileFromWithCondition(ur_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, ur_center)
+        dl_center = utils.closestTileFromWithCondition(dl_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, dl_center)
+        dr_center = utils.closestTileFromWithCondition(dr_center, lambda coords: self.terrain[coords].__class__.__name__.lower() == 'land', 30, dr_center)
+        
+        # return section's centers
+        self.sectionsCenters = [
+            center,
+            ul_center,
+            ur_center,
+            dl_center,
+            dr_center
+        ]
+
+        return self.sectionsCenters
+
 
 class MenhirCalculator:
     def __init__(self, map :Map) -> None:
@@ -295,6 +511,7 @@ class MenhirCalculator:
 
         self.menhirPos = None
         self.mistCoordinates = []
+        self.recentlyChanged = True
 
     def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
         if not isinstance(menhirPos, coordinates.Coords):
@@ -303,6 +520,7 @@ class MenhirCalculator:
     
     def addMist(self, mistPos: coordinates.Coords) -> None:
         if mistPos not in self.mistCoordinates:
+            self.recentlyChanged = True
             self.mistCoordinates.append(mistPos)
     
     def isMenhirPosFound(self) -> bool:
@@ -317,6 +535,9 @@ class MenhirCalculator:
         mistCoordinates = self.mistCoordinates
         if len(mistCoordinates) == 0:
             return None, None
+        
+        if not self.recentlyChanged:
+            return self.lastResult
         
         bestMenhirPos = None
         bestMistAmount = 0
@@ -362,4 +583,6 @@ class MenhirCalculator:
                     bestMenhirPos = try_menhir
                     bestMistAmount = mistFound/mistMax
         
-        return bestMenhirPos, bestMistAmount
+        self.recentlyChanged = False
+        self.lastResult = (bestMenhirPos, bestMistAmount)
+        return self.lastResult
