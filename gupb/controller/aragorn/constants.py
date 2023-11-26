@@ -6,6 +6,6 @@ WEAPON_HIERARCHY = {
     "sword" : 4,
     "bow_loaded" : 1,
     "bow_unloaded" : 1,
-    "amulet" : 3,
+    "amulet" : 5,
     "knife" : 2
 }
