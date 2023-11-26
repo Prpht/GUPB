@@ -380,44 +380,16 @@ class Map:
         
         return closestCoords
     
-    @profile
-    def getDangerousTiles(self, currentTick :int = None):
+    def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
         """
-        Returns list of tiles that are in range of enemy weapon
+        Returns a dict. Keys are coords with danger, values are their sources
         """
 
         # cache
         if currentTick is not None and self.__dangerousTiles_cache_data is not None and self.__dangerousTiles_cache_tick == currentTick:
             return self.__dangerousTiles_cache_data
 
-        dangerousTiles = []
 
-        for coords in self.terrain:
-            enemyDescription = self.terrain[coords].character
-            
-            if enemyDescription is not None:
-                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
-
-                if weapon is None:
-                    continue
-
-                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
-
-                for position in positions:
-                    if position not in dangerousTiles:
-                        dangerousTiles.append(position)
-        
-        # cache
-        if currentTick is not None:
-            self.__dangerousTiles_cache_data = dangerousTiles
-            self.__dangerousTiles_cache_tick = currentTick
-        
-        return dangerousTiles
-
-    def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
-        """
-        Returns a dict. Keys are coords with danger, values are their sources
-        """
 
         dangerousTiles = {}
 
@@ -439,6 +411,11 @@ class Map:
                 for position in positions:
                     if position not in dangerousTiles:
                         dangerousTiles[position] = coords
+        
+        # cache
+        if currentTick is not None:
+            self.__dangerousTiles_cache_data = dangerousTiles
+            self.__dangerousTiles_cache_tick = currentTick
         
         return dangerousTiles
     

@@ -95,7 +95,7 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         
         dangerousTileCost = 0
 
-        if h_end in memory.map.getDangerousTiles(memory.tick):
+        if h_end in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
             dangerousTileCost = 10
 
         return (turns if turns <= 2 else 2) + distance + mistCost + dangerousTileCost
