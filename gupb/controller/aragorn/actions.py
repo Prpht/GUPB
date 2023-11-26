@@ -224,6 +224,9 @@ class AttackClosestEnemyAction(Action):
         
         # GET CLOSEST FIELD YOU CAN ATTACK FROM
         currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
+
+        if currentWeapon is None:
+            return None
         
         positionsToAttackFrom = {}
         minNormalDistance = INFINITY
