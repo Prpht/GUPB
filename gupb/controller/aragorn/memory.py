@@ -1,5 +1,6 @@
 import os, random
 from typing import Dict, NamedTuple, Optional, List
+import bresenham
 
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
@@ -18,41 +19,61 @@ class Memory:
 
         self.idleTime = 0
         self.position: coordinates.Coords = None
+        self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
+        self.numberOfVisibleTiles: int = 0
         
         self.map: Map = None
         self.environment: Environment = None
 
         self.health: int = 0
+        
+        # create last actions variable that
+        # is a list of last 5 actions
+        # with rotation actions removed
+        self.lastActions: list = []
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
 
         self.idleTime = 0
         self.position: coordinates.Coords = None
+        self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
+        self.numberOfVisibleTiles: int = 0
 
         # self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
         self.map = Map.load(arena_description.name)
         self.environment = Environment(self.map)
 
         self.health: int = 0
+        
+        self.lastActions: list = []
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.tick += 1
 
+        self.lastPosition = self.position
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
         self.map.parseVisibleTiles(knowledge.visible_tiles, self.tick)
+        self.numberOfVisibleTiles = len(knowledge.visible_tiles)
         
         self.idleTime += 1
         self.environment.environment_action(self.no_of_champions_alive)
 
         self.health = knowledge.visible_tiles[self.position].character.health
+
+    def addLastAction(self, action):
+        self.lastActions.append(action)
+        self.lastActions = self.lastActions[-5:]
+    
+    def getLastActions(self):
+        return self.lastActions
 
     def getCurrentWeaponDescription(self):
         return self.map.terrain[self.position].character.weapon
@@ -268,6 +289,51 @@ class Map:
                     terrain[position] = tiles.Land()
         
         return Map(name, terrain)
+    
+    @profile
+    def visible_coords(self, characterFacing :characters.Facing, characterPosition :coordinates.Coords, characterWeapon :weapons.Weapon = None) -> set[coordinates.Coords]:
+        def estimate_border_point() -> tuple[coordinates.Coords, int]:
+            if characterFacing == characters.Facing.UP:
+                return coordinates.Coords(characterPosition.x, 0), characterPosition[1]
+            elif characterFacing == characters.Facing.RIGHT:
+                return coordinates.Coords(self.size[0] - 1, characterPosition.y), self.size[0] - characterPosition[0]
+            elif characterFacing == characters.Facing.DOWN:
+                return coordinates.Coords(characterPosition.x, self.size[1] - 1), self.size[1] - characterPosition.y
+            elif characterFacing == characters.Facing.LEFT:
+                return coordinates.Coords(0, characterPosition.y), characterPosition[0]
+
+        def champion_left_and_right() -> list[coordinates.Coords]:
+            if characterFacing == characters.Facing.UP or characterFacing == characters.Facing.DOWN:
+                return [
+                    coordinates.Coords(characterPosition.x + 1, characterPosition.y),
+                    coordinates.Coords(characterPosition.x - 1, characterPosition.y),
+                ]
+            elif characterFacing == characters.Facing.LEFT or characterFacing == characters.Facing.RIGHT:
+                return [
+                    coordinates.Coords(characterPosition.x, characterPosition.y + 1),
+                    coordinates.Coords(characterPosition.x, characterPosition.y - 1),
+                ]
+
+        border, distance = estimate_border_point()
+        left = characterFacing.turn_left().value
+        targets = [border + coordinates.Coords(i * left.x, i * left.y) for i in range(-distance, distance + 1)]
+        visible = set()
+        visible.add(characterPosition)
+        for coords in targets:
+            ray = bresenham.bresenham(characterPosition.x, characterPosition.y, coords[0], coords[1])
+            next(ray)
+            for ray_coords in ray:
+                if ray_coords not in self.terrain:
+                    break
+                visible.add(ray_coords)
+                if not self.terrain[ray_coords].transparent:
+                    break
+        if characterWeapon is not None:
+            for coords in characterWeapon.prescience(characterPosition, characterFacing):
+                if coords in self.terrain:
+                    visible.add(coords)
+        visible.update(champion_left_and_right())
+        return visible
     
     @profile
     def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], currentTick :int) -> None:

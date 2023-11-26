@@ -434,3 +434,64 @@ class TakeToOnesLegsAction(Action):
         goToAction = GoToAction()
         goToAction.setDestination(maxSafeTile)
         return goToAction.perform(memory)
+
+class SeeMoreAction(Action):
+    def isGoingForward(self, memory: Memory) -> bool:
+        last2Actions = memory.getLastActions()[-2:]
+        
+        if len(last2Actions) < 2:
+            return False
+        
+        return (
+            last2Actions[0] == characters.Action.STEP_FORWARD
+            and last2Actions[1] == characters.Action.STEP_FORWARD
+        )
+    
+    def getForwardDirection(self, memory: Memory) -> Coords:
+        return sub_coords(memory.position, memory.lastPosition)
+    
+    def directionWithMostVisibleCoords(self, memory: Memory) -> Coords:
+        amountOfVisibleCoords = {
+            characters.Facing.UP: 0,
+            characters.Facing.RIGHT: 0,
+            characters.Facing.DOWN: 0,
+            characters.Facing.LEFT: 0,
+        }
+
+        for facing in amountOfVisibleCoords:
+            amountOfVisibleCoords[facing] = len(memory.map.visible_coords(facing, memory.position, memory.getCurrentWeaponClass()))
+        
+        maxVisibleCoords = -INFINITY
+        maxVisibleCoordsFacing = None
+
+        for facing in amountOfVisibleCoords:
+            if amountOfVisibleCoords[facing] > maxVisibleCoords:
+                maxVisibleCoords = amountOfVisibleCoords[facing]
+                maxVisibleCoordsFacing = facing
+        
+        return maxVisibleCoordsFacing.value
+    
+    def lookAtTile(self, memory: Memory, tile: Coords) -> Action:
+        if tile == memory.facing.value:
+            # seems OK - do other actions
+            return None
+        
+        if tile == memory.facing.turn_left().value:
+            return characters.Action.TURN_LEFT
+        
+        if tile == memory.facing.turn_right().value:
+            return characters.Action.TURN_RIGHT
+        
+        if tile == memory.facing.turn_left().turn_left().value:
+            return characters.Action.TURN_RIGHT
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        if self.isGoingForward(memory):
+            forwardDirection = self.getForwardDirection(memory)
+            return self.lookAtTile(memory, forwardDirection)
+        
+        bestDirection = self.directionWithMostVisibleCoords(memory)
+        return self.lookAtTile(memory, bestDirection)
+        
+        

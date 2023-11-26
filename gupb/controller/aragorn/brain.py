@@ -59,10 +59,10 @@ class Brain:
             oponentInRange is not None
             and (
                 self.memory.position not in dangerousTilesDict.keys()
-                or (
-                    oponentInRange.health <= self.memory.health
+                # or (
+                    # oponentInRange.health <= self.memory.health
                     # and oponentInRange.health <= consumables.POTION_RESTORED_HP
-                )
+                # )
             )
         ):
             attackAction = AttackAction()
@@ -105,6 +105,13 @@ class Brain:
         attackClosestEnemyAction = AttackClosestEnemyAction()
         yield attackClosestEnemyAction, "Going closer to enemy"
         
+        # ------------------------------------------
+
+        # ROTATE TO SEE MORE
+
+        seeMoreAction = SeeMoreAction()
+        yield seeMoreAction, "Rotating to see more"
+
         # ------------------------------------------
 
         # EXPLORE THE MAP
@@ -160,3 +167,5 @@ class Brain:
             characters.Action.STEP_FORWARD,
         ]:
             self.memory.resetIdle()
+        
+        self.memory.addLastAction(action)
