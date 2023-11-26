@@ -26,6 +26,10 @@ class Brain:
         if DEBUG: dbg_ac_msgs = []
 
         # ------------------------------------------
+        
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
+
+        # ------------------------------------------
 
         # PREVENT IDLE PENALTY
 
@@ -38,35 +42,8 @@ class Brain:
         
         # ------------------------------------------
 
-        # ATTACKING
+        # PICKING UP POTION
 
-        oponentInRange = self.memory.getClosestOponentInRange()
-
-        if (
-            oponentInRange is not None
-            and oponentInRange.health <= self.memory.health
-            and oponentInRange.health <= consumables.POTION_RESTORED_HP
-        ):
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
-        # ------------------------------------------
-
-        # DEFENDING FROM ATTACKS
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
-
-        if self.memory.position in dangerousTilesDict:
-            if DEBUG: dbg_ac_msgs.append("Defending from attack")
-            takeToOnesLegsAction = TakeToOnesLegsAction()
-            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
-            actions.append(takeToOnesLegsAction)
-        
-        # ------------------------------------------
-
-        # PICKING STUFF
-        
-        # potion
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
 
         if closestPotionDistance is not None and closestPotionDistance < 5:
@@ -75,9 +52,42 @@ class Brain:
             goToPotionAction.setDestination(closestPotionCoords)
             actions.append(goToPotionAction)
 
-        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
+        # ------------------------------------------
         
-        # weapon
+        # ATTACKING
+
+        oponentInRange = self.memory.getClosestOponentInRange()
+
+        if (
+            oponentInRange is not None
+            and (
+                self.memory.position not in dangerousTilesDict.keys()
+                or (
+                    oponentInRange.health <= self.memory.health
+                    # and oponentInRange.health <= consumables.POTION_RESTORED_HP
+                )
+            )
+        ):
+            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
+            attackAction = AttackAction()
+            actions.append(attackAction)
+
+        # ------------------------------------------
+
+        # DEFENDING FROM ATTACKS
+
+        if self.memory.position in dangerousTilesDict:
+            if DEBUG: dbg_ac_msgs.append("Defending from attack")
+            takeToOnesLegsAction = TakeToOnesLegsAction()
+            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
+            actions.append(takeToOnesLegsAction)
+        
+        # ------------------------------------------
+        
+        # PICKING UP WEAPON
+
+        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
+
         if closestWeaponDistance is not None and closestWeaponDistance < 5:
             if DEBUG: dbg_ac_msgs.append("Picking nearby weapon")
             goToWeaponAction = GoToAction()

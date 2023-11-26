@@ -195,15 +195,15 @@ class AttackClosestEnemyAction(Action):
                 # tile has character
                 memory.map.terrain[coords].character is not None
                 # ignore if data is outdated
-                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick < memory.tick - self.OUTDATED_DATA_TICKS)
+                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
                 and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
                 and memory.position != coords
                 # ignore enemies with greater health
-                and memory.map.terrain[coords].character.health <= memory.health
+                # and memory.map.terrain[coords].character.health <= memory.health
                 # ignore enemies with health greater than reward of killing (potion restore)
-                and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
+                # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
             ):
                 distance = utils.coordinatesDistance(memory.position, coords)
                 
@@ -289,7 +289,12 @@ class TakeToOnesLegsAction(Action):
         if runAwayAction is not None:
             return runAwayAction
         
-        return self.runToAnySafeTile(memory)
+        runToAnySafeTileAction = self.runToAnySafeTile(memory)
+
+        if runToAnySafeTileAction is not None:
+            return runToAnySafeTileAction
+        
+        return None
     
     def runAway(self, memory: Memory) -> Action:
         # get vector from danger source to our position
