@@ -141,6 +141,7 @@ class ExploreAction(Action):
         self.firstPerform = True
         self.plan = [1, 2, 3, 4, 0]
         self.minDistanceToSectionCenterToMarkItAsExplored = 7
+        self.regeneratePlanTimes = 0
     
     def __markSectionAsExplored(self, section: int) -> None:
         if section < len(self.is_section_explored):
@@ -155,6 +156,11 @@ class ExploreAction(Action):
             if not self.is_section_explored[section]:
                 return section
         
+        self.regeneratePlanTimes += 1
+
+        if self.regeneratePlanTimes > 5:
+            return None
+
         for i in range(len(self.is_section_explored)):
             self.is_section_explored[i] = False
         
