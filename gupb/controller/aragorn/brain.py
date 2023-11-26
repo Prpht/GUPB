@@ -20,12 +20,8 @@ class Brain:
             'explore': ExploreAction(),
         }
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        startTime = time.time()
+    def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
-
-        actions = []
-        if DEBUG: dbg_ac_msgs = []
 
         # ------------------------------------------
         
@@ -37,10 +33,9 @@ class Brain:
 
         if self.memory.willGetIdlePenalty():
             # TODO: allow to decide action, afterwards, if pos will no change - force spin
-            if DEBUG: dbg_ac_msgs.append("Spinning to prevent idle penalty")
             spinAction = SpinAction()
             spinAction.setSpin(characters.Action.TURN_LEFT)
-            actions.append(spinAction)
+            yield spinAction, "Spinning to prevent idle penalty"
         
         # ------------------------------------------
 
@@ -49,10 +44,9 @@ class Brain:
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
 
         if closestPotionDistance is not None and closestPotionDistance < 5:
-            if DEBUG: dbg_ac_msgs.append("Picking nearby potion")
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
-            actions.append(goToPotionAction)
+            yield goToPotionAction, "Picking nearby potion"
 
         # ------------------------------------------
         
@@ -70,19 +64,17 @@ class Brain:
                 )
             )
         ):
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in range")
             attackAction = AttackAction()
-            actions.append(attackAction)
+            yield attackAction, "Attacking, since got oponent in range"
 
         # ------------------------------------------
 
         # DEFENDING FROM ATTACKS
 
         if self.memory.position in dangerousTilesDict:
-            if DEBUG: dbg_ac_msgs.append("Defending from attack")
             takeToOnesLegsAction = TakeToOnesLegsAction()
             takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
-            actions.append(takeToOnesLegsAction)
+            yield takeToOnesLegsAction, "Defending from attack"
         
         # ------------------------------------------
         
@@ -91,10 +83,9 @@ class Brain:
         [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
 
         if closestWeaponDistance is not None and closestWeaponDistance < 5:
-            if DEBUG: dbg_ac_msgs.append("Picking nearby weapon")
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
-            actions.append(goToWeaponAction)
+            yield goToWeaponAction, "Picking nearby weapon"
         
         # ------------------------------------------
 
@@ -103,49 +94,43 @@ class Brain:
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
         if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
-            if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
-            actions.append(goToAroundAction)
+            yield goToAroundAction, "Going closer to menhir"
         
         # ------------------------------------------
         
         # Go to closest enemy
-        if DEBUG: dbg_ac_msgs.append("Going closer to enemy")
         attackClosestEnemyAction = AttackClosestEnemyAction()
-        actions.append(attackClosestEnemyAction)
+        yield attackClosestEnemyAction, "Going closer to enemy"
         
         # ------------------------------------------
 
         # EXPLORE THE MAP
 
-        if DEBUG: dbg_ac_msgs.append("Exploring action")
         exploreAction = self.persistentActions['explore']
-        actions.append(exploreAction)
+        yield exploreAction, "Exploring action"
 
         # ------------------------------------------
 
         # NOTHING TO DO - JUST SPIN
 
-        if DEBUG: dbg_ac_msgs.append("No action found, spinning")
         spinAction = SpinAction()
-        actions.append(spinAction)
-
-        # ------------------------------------------
-
-
+        yield spinAction, "No action found, spinning"
 
         # ==========================================
 
 
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        startTime = time.time()
 
         actionIndexPerformed = 0
-        
-        for action in actions:
+
+        for action, dbg_ac_msg in self.prepareActions(knowledge):
             ret = action.perform(self.memory)
             
             if ret is not None and ret is not characters.Action.DO_NOTHING:
-                if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
+                if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msg)
                 self.onDecisionReturning(ret)
                 
                 endTime = time.time()
@@ -153,7 +138,7 @@ class Brain:
                 return ret
             
             if ret is None:
-                if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
+                if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msg)
             
             actionIndexPerformed += 1
         
