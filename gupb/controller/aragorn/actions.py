@@ -194,6 +194,13 @@ class ExploreAction(Action):
         if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
             self.__markSectionAsExplored(exploreToSection)
             return self.perform(memory)
+        
+        # if center outside of safe mehhir ring, mark it as explored
+        [menhirPos, prob] = memory.map.menhirCalculator.approximateMenhirPos(memory.tick)
+
+        if menhirPos is not None and utils.coordinatesDistance(exploreToPos, menhirPos) > memory.map.mist_radius / 2:
+            self.__markSectionAsExplored(exploreToSection)
+            return self.perform(memory)
 
         gotoAroundAction = GoToAroundAction()
         gotoAroundAction.setDestination(exploreToPos)

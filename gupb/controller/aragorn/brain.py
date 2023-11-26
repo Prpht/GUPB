@@ -137,8 +137,8 @@ class Brain:
                 
                 return ret
             
-            if ret is None:
-                if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msg)
+            # if ret is None:
+            #     if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msg)
             
             actionIndexPerformed += 1
         
