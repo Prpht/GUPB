@@ -41,5 +41,5 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': False,
-    'runs_no': 1,
+    'runs_no': 3,
 }
