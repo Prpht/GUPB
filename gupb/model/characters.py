@@ -4,7 +4,6 @@ from enum import Enum
 from functools import partial
 import logging
 import random
-import traceback
 from typing import NamedTuple, Optional, Dict
 
 from gupb import controller
@@ -119,8 +118,7 @@ class Champion:
                     return Action.DO_NOTHING
                 return action
             except Exception as e:
-                verbose_logger.warning(f"Controller {self.verbose_name()} throw an unexpected exception: {repr(e)}. {e.__traceback__}")
-                print(traceback.format_exc())
+                verbose_logger.warning(f"Controller {self.verbose_name()} throw an unexpected exception: {repr(e)}.")
                 controller.ControllerExceptionReport(self.verbose_name(), repr(e)).log(logging.WARN)
                 return Action.DO_NOTHING
         else:
