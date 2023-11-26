@@ -392,7 +392,31 @@ class Map:
 
                 for position in positions:
                     if position not in dangerousTiles:
-                        dangerousTiles.append(coords)
+                        dangerousTiles.append(position)
+        
+        return dangerousTiles
+
+    def getDangerousTilesWithDangerSourcePos(self):
+        """
+        Returns a dict. Keys are coords with danger, values are their sources
+        """
+
+        dangerousTiles = {}
+
+        for coords in self.terrain:
+            enemyDescription = self.terrain[coords].character
+            
+            if enemyDescription is not None:
+                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
+
+                if weapon is None:
+                    continue
+
+                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
+
+                for position in positions:
+                    if position not in dangerousTiles:
+                        dangerousTiles[position] = coords
         
         return dangerousTiles
     

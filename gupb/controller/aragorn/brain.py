@@ -38,6 +38,17 @@ class Brain:
         
         # ------------------------------------------
 
+        # DEFENDING FROM ATTACKS
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos()
+
+        if self.memory.position in dangerousTilesDict:
+            if DEBUG: dbg_ac_msgs.append("Defending from attack")
+            takeToOnesLegsAction = TakeToOnesLegsAction()
+            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
+            actions.append(takeToOnesLegsAction)
+        
+        # ------------------------------------------
+
         # ATTACKING
 
         if self.memory.hasOponentInRange():

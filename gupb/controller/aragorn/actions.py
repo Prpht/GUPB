@@ -52,6 +52,7 @@ class GoToAction(Action):
         super().__init__()
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
+        self.useAllMovements: bool = False
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -67,6 +68,12 @@ class GoToAction(Action):
             if DEBUG:
                 print("Trying to set destination facing to non Facing object (" + str(dstFacing) + " of type " + str(type(dstFacing)) + ")")
 
+    def setUseAllMovements(self, useAllMovements: bool) -> None:
+        if isinstance(useAllMovements, bool):
+            self.useAllMovements = useAllMovements
+        else:
+            if DEBUG: print("Trying to set use all movements to non bool object (" + str(useAllMovements) + " of type " + str(type(useAllMovements)) + ")")
+    
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
             return None
@@ -79,7 +86,7 @@ class GoToAction(Action):
                 return characters.Action.TURN_RIGHT
             return None
         
-        [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing = memory.facing)
+        [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
 
         if path is None or len(path) <= 1:
             return None
@@ -215,7 +222,7 @@ class AttackClosestEnemyAction(Action):
             characters.Facing.LEFT,
             characters.Facing.RIGHT,
         ]:
-            for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy.pos, facing.turn_left().turn_left()):
+            for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy, facing.turn_left().turn_left()):
                 tmpDistance = utils.coordinatesDistance(memory.position, pos)
                 
                 if tmpDistance < minNormalDistance:
@@ -235,7 +242,7 @@ class AttackClosestEnemyAction(Action):
                 # - leave them as INFINITY
                 continue
 
-            positionsToAttackFrom[(pos, facing)] = utils.get_path_cost(memory, memory.pos, pos, facing)
+            positionsToAttackFrom[(pos, facing)] = pathfinding.get_path_cost(memory, memory.position, pos, facing)
         
         minCost = INFINITY
         minCostPos = None
@@ -255,4 +262,34 @@ class AttackClosestEnemyAction(Action):
         goToAttackAction = GoToAction()
         goToAttackAction.setDestination(minCostPos)
         goToAttackAction.setDestinationFacing(minCostFacing)
-        return goToAttackAction.perform()
+        return goToAttackAction.perform(memory)
+
+class TakeToOnesLegsAction(Action):
+    def __init__(self):
+        self.dangerSourcePos = None
+    
+    def setDangerSourcePos(self, dangerSourcePos: Coords) -> None:
+        if not isinstance(dangerSourcePos, Coords):
+            if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Trying to set danger source pos to non Coords object (" + str(dangerSourcePos) + " of type " + str(type(dangerSourcePos)) + ")")
+            return
+
+        self.dangerSourcePos = dangerSourcePos
+    
+    def perform(self, memory: Memory) -> Action:
+        if self.dangerSourcePos is None:
+            if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Danger source pos is None")
+            return None
+        
+        # get vector from danger source to our position
+        moveTowardsVector = sub_coords(memory.position, self.dangerSourcePos)
+        # multiply it * 4
+        moveTowardsVector = add_coords(moveTowardsVector, moveTowardsVector)
+        moveTowardsVector = add_coords(moveTowardsVector, moveTowardsVector) 
+        # add it to our position
+        moveTowardsPos = add_coords(memory.position, moveTowardsVector)
+
+        # go to that position
+        goToAroundAction = GoToAroundAction()
+        goToAroundAction.setDestination(moveTowardsPos)
+        goToAroundAction.setUseAllMovements(True)
+        return goToAroundAction.perform(memory)

@@ -9,7 +9,7 @@ from gupb.controller.aragorn.constants import DEBUG, INFINITY
 
 
 
-def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords) -> characters.Action:
+def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords, useAllMovements :bool = False) -> characters.Action:
     direction = sub_coords(destination, source)
 
     if direction == sourceFacing.value:
@@ -19,7 +19,10 @@ def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, 
     elif direction == sourceFacing.turn_right().value:
         return characters.Action.STEP_RIGHT
     else:
-        return characters.Action.TURN_RIGHT
+        if not useAllMovements:
+            return characters.Action.TURN_RIGHT
+        else:
+            return characters.Action.STEP_BACKWARD
     
 def get_facing(f_coords: Coords) -> characters.Facing:
     if f_coords == Coords(0, 1):
@@ -31,21 +34,24 @@ def get_facing(f_coords: Coords) -> characters.Facing:
     elif f_coords == Coords(-1, 0):
         return characters.Facing.RIGHT
 
-def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> (Optional[List[Coords]], int):
-    def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing) -> int:
+def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> (Optional[List[Coords]], int):
+    def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing, useAllMovements :bool = False) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
         direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
                                     1 if h_end.y - h_start.y > 0 else -1 if h_end.y - h_start.y < 0 else 0)
         
-        turnDiffX = abs(h_facing.value.x - direction.x)
-        turnDiffY = abs(h_facing.value.y - direction.y)
-
-        if turnDiffX == 1 and turnDiffY == 1:
-            turns = 1
-        elif turnDiffX == 2 or turnDiffY == 2:
-            turns = 2
-        else:
+        if useAllMovements:
             turns = 0
+        else:
+            turnDiffX = abs(h_facing.value.x - direction.x)
+            turnDiffY = abs(h_facing.value.y - direction.y)
+
+            if turnDiffX == 1 and turnDiffY == 1:
+                turns = 1
+            elif turnDiffX == 2 or turnDiffY == 2:
+                turns = 2
+            else:
+                turns = 0
         
         mistCost = 0
         
@@ -67,7 +73,7 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
     
     open_coords: [a_coords] = []
     closed_coords: {Coords: a_coords} = {}
-    open_coords.append(a_coords(start, 0, get_h_cost(memory, start, end, facing), None, facing))
+    open_coords.append(a_coords(start, 0, get_h_cost(memory, start, end, facing, useAllMovements), None, facing))
     
     while len(open_coords) > 0:
         open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost + x.h_cost, x.h_cost), reverse=False))
@@ -103,7 +109,7 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                                     3 if add_coords(neighbor_direction, current.facing.value) == Coords(0, 0) else 2) \
                                     + current.g_cost
                 
-                neighbor_h_cost = get_h_cost(memory, neighbor, end, get_facing(neighbor_direction))
+                neighbor_h_cost = get_h_cost(memory, neighbor, end, get_facing(neighbor_direction), useAllMovements)
 
                 for coords in open_coords:
                     if coords.coords == neighbor:
