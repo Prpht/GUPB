@@ -100,33 +100,9 @@ class Brain:
         # ------------------------------------------
         
         # Go to closest enemy
-        closestEnemy = None
-        closestEnemyDistance = INFINITY
-
-        for coords in self.memory.map.terrain:
-            if (
-                # tile has character
-                self.memory.map.terrain[coords].character is not None
-                # ignore ourselfs
-                and self.memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
-                # ignore our position
-                and self.memory.position != coords
-                # ignore enemies with greater health
-                and self.memory.map.terrain[coords].character.health <= self.memory.health
-                # ignore enemies with health greater than reward of killing (potion restore)
-                and self.memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
-            ):
-                distance = utils.coordinatesDistance(self.memory.position, coords)
-                
-                if distance < closestEnemyDistance:
-                    closestEnemy = coords
-                    closestEnemyDistance = distance
-        
-        if closestEnemy is not None:
-            if DEBUG: dbg_ac_msgs.append("Going closer to enemy")
-            goToAttackAction = GoToAroundAction()
-            goToAttackAction.setDestination(closestEnemy)
-            actions.append(goToAttackAction)
+        if DEBUG: dbg_ac_msgs.append("Going closer to enemy")
+        attackClosestEnemyAction = AttackClosestEnemyAction()
+        actions.append(attackClosestEnemyAction)
         
         # ------------------------------------------
 

@@ -222,6 +222,7 @@ class Map:
         self.menhirCalculator = MenhirCalculator(self)
 
         self.sectionsCenters = None
+        self.centerPos = coordinates.Coords(round(self.size[0] / 2), round(self.size[1] / 2))
 
     @staticmethod
     def load(name: str) -> 'Map':

@@ -15,7 +15,9 @@ def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, 
     if direction == sourceFacing.value:
         return characters.Action.STEP_FORWARD
     elif direction == sourceFacing.turn_left().value:
-        return characters.Action.TURN_LEFT
+        return characters.Action.STEP_LEFT
+    elif direction == sourceFacing.turn_right().value:
+        return characters.Action.STEP_RIGHT
     else:
         return characters.Action.TURN_RIGHT
     
@@ -115,3 +117,6 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
     
     trace: Optional[List[Coords]] = None
     return trace, INFINITY
+
+def get_path_cost(memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> int:
+    return find_path(memory, start, end, facing)[1]

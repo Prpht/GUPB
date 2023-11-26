@@ -1,12 +1,15 @@
 from abc import abstractmethod
 import random
 from typing import NamedTuple, Optional, List, Tuple
+from collections import defaultdict
 
 from gupb.model.coordinates import *
 from gupb.model import characters
+from gupb.model import consumables
+from gupb.model import weapons
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
 from gupb.controller.aragorn import pathfinding
 from gupb.controller.aragorn import utils
 
@@ -171,3 +174,85 @@ class ExploreAction(Action):
         
         if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
         return res
+
+class AttackClosestEnemyAction(Action):
+    def perform(self, memory: Memory) -> Action:
+        # GET CLOSEST ENEMY
+        closestEnemy = None
+        closestEnemyDistance = INFINITY
+
+        for coords in memory.map.terrain:
+            if (
+                # tile has character
+                memory.map.terrain[coords].character is not None
+                # ignore ourselfs
+                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # ignore our position
+                and memory.position != coords
+                # ignore enemies with greater health
+                and memory.map.terrain[coords].character.health <= memory.health
+                # ignore enemies with health greater than reward of killing (potion restore)
+                and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
+            ):
+                distance = utils.coordinatesDistance(memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
+        
+        if closestEnemy is None:
+            return None
+        
+        # GET CLOSEST FIELD YOU CAN ATTACK FROM
+        currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
+        
+        positionsToAttackFrom = {}
+        minNormalDistance = INFINITY
+
+        for facing in [
+            characters.Facing.UP,
+            characters.Facing.DOWN,
+            characters.Facing.LEFT,
+            characters.Facing.RIGHT,
+        ]:
+            for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy.pos, facing.turn_left().turn_left()):
+                tmpDistance = utils.coordinatesDistance(memory.position, pos)
+                
+                if tmpDistance < minNormalDistance:
+                    minNormalDistance = tmpDistance
+                
+                if tmpDistance > minNormalDistance + 1:
+                    # do not add positions that are too far
+                    continue
+
+                positionsToAttackFrom[(pos, facing)] = INFINITY
+        
+        for (pos, facing) in positionsToAttackFrom:
+            tmpDistance = utils.coordinatesDistance(memory.position, pos)
+            
+            if tmpDistance > minNormalDistance + 1:
+                # do not add positions that are too far
+                # - leave them as INFINITY
+                continue
+
+            positionsToAttackFrom[(pos, facing)] = utils.get_path_cost(memory, memory.pos, pos, facing)
+        
+        minCost = INFINITY
+        minCostPos = None
+        minCostFacing = None
+
+        for (pos, facing) in positionsToAttackFrom:
+            if positionsToAttackFrom[(pos, facing)] < minCost:
+                minCost = positionsToAttackFrom[(pos, facing)]
+                minCostPos = pos
+                minCostFacing = facing
+        
+        if minCostPos is None:
+            return None
+        
+        # GO TO CLOSEST FIELD YOU CAN ATTACK FROM
+
+        goToAttackAction = GoToAction()
+        goToAttackAction.setDestination(minCostPos)
+        goToAttackAction.setDestinationFacing(minCostFacing)
+        return goToAttackAction.perform()
