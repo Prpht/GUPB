@@ -3,7 +3,6 @@ import random
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
-from gupb.model.coordinates import Coords
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.explore import Explore
 from gupb.controller.ancymon.strategies.hunter import Hunter
@@ -43,9 +42,9 @@ class AncymonController(controller.Controller):
         self.path_finder.update_paths(self.environment.position)
         self.alternative_path_finder.update_paths(self.environment.position)
         self.i += 1
-        # print(self.i, end=' ')
 
         hunter_decision, item_finder_decision, explorer_decision = None, None, None
+        took_damage = self.environment.took_damage()
 
         try:
             hunter_decision = self.hunter.decide(self.path_finder)
@@ -73,29 +72,51 @@ class AncymonController(controller.Controller):
             # print(f"An exception occurred in Explorer strategy: {e}")
             pass
 
+        if took_damage:
+            self.environment.flee_moves = 3
+        try:
+            if self.environment.flee_moves > 0:
+                self.environment.flee_moves -= 1
+                self.item_finder.next_move = self.path_finder.next_action(self.item_finder.path, True)
+                self.explorer.next_move = self.path_finder.next_action(self.explorer.path, True)
+        except Exception as e:
+            # print(f"An exception occurred in Flee Startegy: {e}")
+            pass
+
         if hunter_decision != HUNTER_DECISION.NO_ENEMY and item_finder_decision != ITEM_FINDER_DECISION.NO_ITEMS:
             if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_POTION:
                 if hunter_decision == HUNTER_DECISION.CHASE:
-                    if len(self.hunter.path) >= len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health: #Dodać ograniczenie globalne
-                        if len(self.item_finder.path) <= self.environment.enemies_left + 3:
+                    if len(self.hunter.path) >= len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health:
+                        if len(self.item_finder.path) <= self.environment.enemies_left + 4:
                             # print('Go for potion instead of chasing')
                             return self.item_finder.next_move
+            if item_finder_decision == ITEM_FINDER_DECISION.GO_FOR_LOOT:
+                if hunter_decision == HUNTER_DECISION.CHASE:
+                    if len(self.hunter.path) >= len(self.item_finder.path) or self.environment.champion.health <= self.hunter.next_target.health:
+                        if len(self.item_finder.path) <= self.environment.enemies_left + 3:
+                            if self.environment.weapon.name == 'knife' or self.environment.weapon.name.find('bow') >= 0:
+                                # print('Go for weapon instead of chasing')
+                                return self.item_finder.next_move
 
 
         if hunter_decision != HUNTER_DECISION.NO_ENEMY:
-            if hunter_decision == HUNTER_DECISION.LONG_RANGE_ATTACK:
-                if self.environment.old_health == self.environment.champion.health:
-                    # print('Long range attack')
-                    return self.hunter.next_move
             if hunter_decision == HUNTER_DECISION.ATTACK:
                 if self.environment.champion.health >= self.hunter.next_target.health:
                     # print('Classic Attack')
                     return self.hunter.next_move
+                if self.hunter.next_target.weapon.name.find('bow') >= 0:
+                    if self.environment.champion.health * 3 >= self.hunter.next_target.health * 2:
+                        # print('Attack BowMan')
+                        return self.hunter.next_move
             if hunter_decision == HUNTER_DECISION.CHASE:
                 if (self.environment.champion.health >= self.hunter.next_target.health
                         and self.hunter.path is not None and len(self.hunter.path) <= 4):
                     # print('Classic chase')
                     return self.hunter.next_move
+                if self.hunter.next_target.weapon.name.find('bow') >= 0:
+                    if self.environment.champion.health * 3 >= self.hunter.next_target.health * 2:
+                        # print('Chase BowMan')
+                        return self.hunter.next_move
 
         if item_finder_decision is not ITEM_FINDER_DECISION.NO_ITEMS:
             if item_finder_decision == ITEM_FINDER_DECISION.ENEMY_ON_NEXT_MOVE:

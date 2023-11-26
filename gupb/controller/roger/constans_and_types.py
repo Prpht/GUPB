@@ -6,12 +6,12 @@ from gupb.model.characters import ChampionDescription
 
 
 class WeaponValue(Enum):
-    AMULET          = 0
     KNIFE           = 1
-    AXE             = 3
-    SWORD           = 5
-    BOW_UNLOADED    = 6
-    BOW_LOADED      = 7
+    BOW_UNLOADED    = 2
+    BOW_LOADED      = 3
+    AMULET          = 4
+    AXE             = 5
+    SWORD           = 6
 
 
 class States(Enum):

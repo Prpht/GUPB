@@ -84,3 +84,15 @@ def is_facing(my_position: coordinates.Coords, other_position: coordinates.Coord
         return True
     else:
         return False
+
+
+def closest_opposite(fields: list, position: coordinates.Coords, destination: coordinates.Coords) -> list:
+    dx, dy = position.x - destination.x, position.y - destination.y
+    new_position = np.array([[position.x + dx, position.y + dy]])
+
+    fields_copy = fields.copy()
+    fields_copy.remove([position.x, position.y])
+    fields_copy = np.array(fields_copy)
+    closest = np.argmin(np.abs(fields_copy - new_position).sum(axis=1))
+
+    return fields_copy[closest].tolist()
