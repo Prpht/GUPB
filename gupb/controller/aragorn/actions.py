@@ -108,8 +108,12 @@ class GoToAroundAction(GoToAction):
     def perform(self, memory: Memory) -> Action:
         if memory.position == self.destination:    
             return None
+        
+        if self.destination in memory.map.terrain and memory.map.terrain[self.destination].terrain_passable():
+            actionToPerform = super().perform(memory)
+        else:
+            actionToPerform = None
 
-        actionToPerform = super().perform(memory)
         
         limit = 25
         destinationsGenerator = utils.aroundTileGenerator(self.destination)
@@ -122,7 +126,10 @@ class GoToAroundAction(GoToAction):
             except StopIteration:
                 pass
 
-            actionToPerform = super().perform(memory)
+            if self.destination in memory.map.terrain and memory.map.terrain[self.destination].terrain_passable():
+                actionToPerform = super().perform(memory)
+            else:
+                actionToPerform = None
         
         return actionToPerform
 
