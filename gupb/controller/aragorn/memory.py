@@ -396,7 +396,7 @@ class Map:
         
         return dangerousTiles
 
-    def getDangerousTilesWithDangerSourcePos(self):
+    def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
         """
         Returns a dict. Keys are coords with danger, values are their sources
         """
@@ -404,6 +404,10 @@ class Map:
         dangerousTiles = {}
 
         for coords in self.terrain:
+            if currentTick is not None and maxTicksBehind is not None and hasattr(self.terrain[coords], 'tick'):
+                if self.terrain[coords].tick < currentTick - maxTicksBehind:
+                    continue
+            
             enemyDescription = self.terrain[coords].character
             
             if enemyDescription is not None:

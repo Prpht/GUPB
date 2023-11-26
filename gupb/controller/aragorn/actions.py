@@ -183,6 +183,8 @@ class ExploreAction(Action):
         return res
 
 class AttackClosestEnemyAction(Action):
+    OUTDATED_DATA_TICKS = 16
+
     def perform(self, memory: Memory) -> Action:
         # GET CLOSEST ENEMY
         closestEnemy = None
@@ -192,6 +194,8 @@ class AttackClosestEnemyAction(Action):
             if (
                 # tile has character
                 memory.map.terrain[coords].character is not None
+                # ignore if data is outdated
+                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick < memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
                 and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
