@@ -7,6 +7,7 @@ from gupb.model.coordinates import *
 from gupb.model import characters
 from gupb.model import consumables
 from gupb.model import weapons
+from gupb.model.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
@@ -25,6 +26,7 @@ class SpinAction(Action):
         super().__init__()
         self.spin = characters.Action.TURN_RIGHT
     
+    @profile
     def perform(self, memory :Memory) -> characters.Action:
         return self.spin
     
@@ -38,12 +40,14 @@ class SpinAction(Action):
         self.spin = spin
 
 class RandomAction(Action):
+    @profile
     def perform(self, memory: Memory) -> characters.Action:
         available_actions = [characters.Action.STEP_FORWARD, characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
         random_action = random.choice(available_actions)
         return random_action
 
 class AttackAction(Action):
+    @profile
     def perform(self, memory: Memory) -> Action:
         return characters.Action.ATTACK
 
@@ -74,6 +78,7 @@ class GoToAction(Action):
         else:
             if DEBUG: print("Trying to set use all movements to non bool object (" + str(useAllMovements) + " of type " + str(type(useAllMovements)) + ")")
     
+    @profile
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
             return None
@@ -99,6 +104,7 @@ class GoToAction(Action):
         return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination)
     
 class GoToAroundAction(GoToAction):
+    @profile
     def perform(self, memory: Memory) -> Action:
         if memory.position == self.destination:    
             return None
@@ -142,6 +148,7 @@ class ExploreAction(Action):
             if not self.is_section_explored[section]:
                 return section
 
+    @profile
     def perform(self, memory: Memory) -> Action:
         currentSection = memory.getCurrentSection()
 
@@ -185,6 +192,7 @@ class ExploreAction(Action):
 class AttackClosestEnemyAction(Action):
     OUTDATED_DATA_TICKS = 16
 
+    @profile
     def perform(self, memory: Memory) -> Action:
         # GET CLOSEST ENEMY
         closestEnemy = None
@@ -279,6 +287,7 @@ class TakeToOnesLegsAction(Action):
 
         self.dangerSourcePos = dangerSourcePos
     
+    @profile
     def perform(self, memory: Memory) -> Action:
         if self.dangerSourcePos is None:
             if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Danger source pos is None")

@@ -5,9 +5,12 @@ from gupb.model import characters
 from gupb.model import effects
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME, USE_PF_CACHE
 
+cache = {}
 
+def invalidate_PF_cache():
+    cache = {}
 
 def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords, useAllMovements :bool = False) -> characters.Action:
     direction = sub_coords(destination, source)
@@ -35,6 +38,12 @@ def get_facing(f_coords: Coords) -> characters.Facing:
         return characters.Facing.RIGHT
 
 def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> (Optional[List[Coords]], int):
+    if USE_PF_CACHE:
+        cacheKey = (memory.map.terrain, start, end, facing, useAllMovements)
+        
+        if cacheKey in cache:
+            return cache[cacheKey]
+
     def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing, useAllMovements :bool = False) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
         direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
@@ -88,6 +97,9 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                 current_parent = closed_coords[current_parent.parent]
                 trace.insert(0, current_parent.coords)
 
+            if USE_PF_CACHE:
+                cache[cacheKey] = (trace, int(current.h_cost + current.g_cost))
+            
             return trace, int(current.h_cost + current.g_cost)
 
         neighbors: [Coords] = [add_coords(current.coords, (Coords(0, 1))),
@@ -123,6 +135,10 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                                             get_facing(neighbor_direction)))
     
     trace: Optional[List[Coords]] = None
+    
+    if USE_PF_CACHE:
+        cache[cacheKey] = (trace, INFINITY)
+    
     return trace, INFINITY
 
 def get_path_cost(memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> int:

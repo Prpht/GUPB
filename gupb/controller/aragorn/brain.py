@@ -4,6 +4,7 @@ from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.model.profiling import profile
 
 import time
 
@@ -20,6 +21,7 @@ class Brain:
             'explore': ExploreAction(),
         }
 
+    @profile
     def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
 
@@ -151,6 +153,7 @@ class Brain:
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.memory.reset(arena_description)
+        pathfinding.invalidate_PF_cache()
 
         self.__initPersistentActions()
     
