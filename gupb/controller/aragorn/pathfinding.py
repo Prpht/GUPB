@@ -1,5 +1,6 @@
 from typing import NamedTuple, Optional, List, Tuple
 
+from gupb.model.profiling import profile
 from gupb.model.coordinates import *
 from gupb.model import characters
 from gupb.model import effects
@@ -12,6 +13,9 @@ cache = {}
 def invalidate_PF_cache():
     global cache
     cache = {}
+
+def makeHashable(dict: {Coords: Coords}) -> [Coords]:
+    return frozenset(dict.items())
 
 def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords, useAllMovements :bool = False) -> characters.Action:
     direction = sub_coords(destination, source)
@@ -38,14 +42,32 @@ def get_facing(f_coords: Coords) -> characters.Facing:
     elif f_coords == Coords(-1, 0):
         return characters.Facing.RIGHT
 
+@profile
 def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> (Optional[List[Coords]], int):
     global cache
-    
+
     if USE_PF_CACHE:
-        cacheKey = (memory.map.terrain, start, end, facing, useAllMovements)
+        cacheKey = (start, end, facing, useAllMovements)
         
         if cacheKey in cache:
             return cache[cacheKey]
+    
+    considerFrom = Coords(
+        min(start.x, end.x) - 5,
+        min(start.y, end.y) - 5,
+    )
+    considerTo = Coords(
+        max(start.x, end.x) + 5,
+        max(start.y, end.y) + 5,
+    )
+
+    if considerTo.x - considerFrom.x < 10:
+        considerTo.x -= 10
+        considerFrom.x += 10
+    
+    if considerTo.y - considerFrom.y < 10:
+        considerTo.y -= 10
+        considerFrom.y += 10
 
     def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing, useAllMovements :bool = False) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
@@ -112,6 +134,9 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
 
         for neighbor in neighbors:
             if not neighbor in memory.map.terrain:
+                continue
+
+            if neighbor.x < considerFrom.x or neighbor.x > considerTo.x or neighbor.y < considerFrom.y or neighbor.y > considerTo.y:
                 continue
 
             if (
