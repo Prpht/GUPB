@@ -119,6 +119,7 @@ class Memory:
     def willGetIdlePenalty(self):
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
     
+    @profile
     def getDistanceToClosestPotion(self):
         minDistance = INFINITY
         minCoords = None
@@ -133,6 +134,7 @@ class Memory:
         
         return [minDistance, minCoords]
 
+    @profile
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
@@ -232,6 +234,8 @@ class Map:
         self.__dangerousTiles_cache_data = None
         self.__dangerousTiles_cache_tick = 0
 
+        if DEBUG: print("[ARAGORN|MEMORY] loaded map " + self.name + " with size " + str(self.size))
+
     @staticmethod
     def load(name: str) -> 'Map':
         terrain = dict()
@@ -265,6 +269,7 @@ class Map:
         
         return Map(name, terrain)
     
+    @profile
     def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], currentTick :int) -> None:
         for coords in visibleTiles:
             visible_tile_description = visibleTiles[coords]
@@ -309,7 +314,7 @@ class Map:
             self.terrain[coords].effects = tileEffects
 
             if effects.Mist in tileEffects:
-                self.menhirCalculator.addMist(coords)
+                self.menhirCalculator.addMist(coords, tick=currentTick)
     
     @staticmethod
     def weaponDescriptionConverter(weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
@@ -380,6 +385,7 @@ class Map:
         
         return closestCoords
     
+    @profile
     def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
         """
         Returns a dict. Keys are coords with danger, values are their sources
@@ -501,22 +507,24 @@ class MenhirCalculator:
 
         self.menhirPos = None
         self.mistCoordinates = []
-        self.recentlyChanged = True
+        self.lastChangeTick = -INFINITY
+        self.lastResult = None
 
     def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
         if not isinstance(menhirPos, coordinates.Coords):
             print("[MenhirCalculator] Trying to set menhir pos to non Coords object (" + str(menhirPos) + " of type " + str(type(menhirPos)) + ")")
         self.menhirPos = menhirPos
     
-    def addMist(self, mistPos: coordinates.Coords) -> None:
+    def addMist(self, mistPos: coordinates.Coords, tick :int) -> None:
         if mistPos not in self.mistCoordinates:
-            self.recentlyChanged = True
+            self.lastChangeTick = tick
             self.mistCoordinates.append(mistPos)
     
     def isMenhirPosFound(self) -> bool:
         return self.menhirPos is not None
     
-    def approximateMenhirPos(self, tick :int = None) -> coordinates.Coords:
+    @profile
+    def approximateMenhirPos(self, tick :int) -> coordinates.Coords:
         mistRadius = self.map.mist_radius
 
         if self.menhirPos is not None:
@@ -526,7 +534,7 @@ class MenhirCalculator:
         if len(mistCoordinates) == 0:
             return None, None
         
-        if not self.recentlyChanged:
+        if self.lastChangeTick >= tick - 13 and self.lastResult is not None:
             return self.lastResult
         
         bestMenhirPos = None
@@ -543,7 +551,7 @@ class MenhirCalculator:
                 mistMax = 0
 
                 for coords in self.map.terrain:
-                    if tick is not None and hasattr(self.map.terrain[coords], 'tick'):
+                    if hasattr(self.map.terrain[coords], 'tick'):
                         if self.map.terrain[coords].tick < tick - 16:
                             continue
                     
@@ -573,6 +581,6 @@ class MenhirCalculator:
                     bestMenhirPos = try_menhir
                     bestMistAmount = mistFound/mistMax
         
-        self.recentlyChanged = False
+        self.lastChangeTick = tick
         self.lastResult = (bestMenhirPos, bestMistAmount)
         return self.lastResult

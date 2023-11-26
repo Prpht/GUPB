@@ -69,7 +69,6 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         considerTo.y -= 10
         considerFrom.y += 10
 
-    @profile
     def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing, useAllMovements :bool = False) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
         direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,

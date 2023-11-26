@@ -21,7 +21,6 @@ class Brain:
             'explore': ExploreAction(),
         }
 
-    @profile
     def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
 
@@ -122,21 +121,20 @@ class Brain:
 
         # ==========================================
 
-
+    @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        startTime = time.time()
-
         actionIndexPerformed = 0
 
         for action, dbg_ac_msg in self.prepareActions(knowledge):
+            startTime = time.time()
             ret = action.perform(self.memory)
+            endTime = time.time()
+            self.wholeTime += endTime - startTime
             
             if ret is not None and ret is not characters.Action.DO_NOTHING:
                 if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msg)
                 self.onDecisionReturning(ret)
                 
-                endTime = time.time()
-                self.wholeTime += endTime - startTime
                 return ret
             
             if ret is None:
@@ -147,8 +145,6 @@ class Brain:
         if DEBUG: print("[ARAGORN|BRAIN] None of actions returned anything, spinning")
         self.onDecisionReturning(characters.Action.TURN_RIGHT)
         
-        endTime = time.time()
-        self.wholeTime += endTime - startTime
         return characters.Action.TURN_RIGHT
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
