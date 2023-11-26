@@ -5,7 +5,7 @@ from gupb.model import characters
 from gupb.model import effects
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
 
 
 
@@ -100,8 +100,9 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                 continue
 
             if (
-                    neighbor in memory.map.terrain.keys()\
-                    and memory.map.terrain[neighbor].terrain_passable()\
+                    neighbor in memory.map.terrain.keys()
+                    and memory.map.terrain[neighbor].terrain_passable()
+                    and (memory.map.terrain[neighbor].character is None or memory.map.terrain[neighbor].character.controller_name == OUR_BOT_NAME) # check if enemy is not in the way
                     and neighbor not in closed_coords.keys()
             ):
                 neighbor_direction: Coords = Coords(neighbor.x - current.coords.x, neighbor.y - current.coords.y)

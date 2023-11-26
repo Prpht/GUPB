@@ -39,7 +39,7 @@ class Brain:
         # ------------------------------------------
 
         # DEFENDING FROM ATTACKS
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 3)
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
         if self.memory.position in dangerousTilesDict:
             if DEBUG: dbg_ac_msgs.append("Defending from attack")

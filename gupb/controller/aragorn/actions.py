@@ -284,11 +284,18 @@ class TakeToOnesLegsAction(Action):
             if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Danger source pos is None")
             return None
         
+        runAwayAction = self.runAway(memory)
+
+        if runAwayAction is not None:
+            return runAwayAction
+        
+        return self.runToAnySafeTile(memory)
+    
+    def runAway(self, memory: Memory) -> Action:
         # get vector from danger source to our position
         moveTowardsVector = sub_coords(memory.position, self.dangerSourcePos)
         # multiply it * 4
         moveTowardsVector = add_coords(moveTowardsVector, moveTowardsVector)
-        moveTowardsVector = add_coords(moveTowardsVector, moveTowardsVector) 
         # add it to our position
         moveTowardsPos = add_coords(memory.position, moveTowardsVector)
 
@@ -296,4 +303,46 @@ class TakeToOnesLegsAction(Action):
         goToAroundAction = GoToAroundAction()
         goToAroundAction.setDestination(moveTowardsPos)
         goToAroundAction.setUseAllMovements(True)
-        return goToAroundAction.perform(memory)
+        res = goToAroundAction.perform(memory)
+        return res
+
+    def runToAnySafeTile(self, memory: Memory) -> Action:
+        dangerousTiles = memory.map.getDangerousTiles()
+        
+        possibleTiles = [
+            memory.position,
+            add_coords(memory.position, Coords(1, 0)),
+            add_coords(memory.position, Coords(-1, 0)),
+            add_coords(memory.position, Coords(0, 1)),
+            add_coords(memory.position, Coords(0, -1)),
+        ]
+        safeTiles = {}
+
+        for coords in possibleTiles:
+            if coords not in memory.map.terrain:
+                continue
+            
+            if not memory.map.terrain[coords].terrain_passable():
+                continue
+            
+            if coords in dangerousTiles:
+                continue
+            
+            safeTiles[coords] = utils.coordinatesDistance(coords, self.dangerSourcePos)
+
+        # get coords from safeTiles key with maximum value
+        maxSafeTile = None
+        maxSafeTileValue = -INFINITY
+
+        for coords in safeTiles:
+            if safeTiles[coords] > maxSafeTileValue:
+                maxSafeTileValue = safeTiles[coords]
+                maxSafeTile = coords
+            
+        # IF THERES NEARBY SAFE TILE, GO TO IT
+        if maxSafeTile is None:
+            return None
+        
+        goToAction = GoToAction()
+        goToAction.setDestination(maxSafeTile)
+        return goToAction.perform(memory)
