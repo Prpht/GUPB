@@ -8,7 +8,6 @@ from gupb.controller.aragorn.constants import OUR_BOT_NAME
 
 class AragornController(controller.Controller):
     def __init__(self, first_name :str):
-        print("TEST")
         self.first_name = first_name
         self.brain = Brain()
     
