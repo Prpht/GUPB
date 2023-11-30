@@ -6,8 +6,7 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
 from gupb.controller import Controller
-from gupb.controller.forrest_gump.utils import init_grid, next_pos_to_action, is_facing
-from gupb.controller.forrest_gump.egreedy import EGreedy
+from gupb.controller.forrest_gump.utils import init_grid, next_pos_to_action, is_facing, closest_opposite
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
@@ -28,11 +27,11 @@ WEAPONS = {
 WEAPONS_VALUE = {
     'knife': 1,
     'sword': 2,
-    'axe': 4,
-    'amulet': 5,
-    'bow': 3,
-    'bow_loaded': 3,
-    'bow_unloaded': 3
+    'axe': 3,
+    'bow': 4,
+    'bow_loaded': 4,
+    'bow_unloaded': 4,
+    'amulet': 5
 }
 
 
@@ -40,21 +39,13 @@ class ForrestGumpController(Controller):
     def __init__(self, first_name: str) -> None:
         self.first_name = first_name
 
-        self.attack_distance_agent = EGreedy(n_arms=5, epsilon=0.03, optimistic_start=200., offset=1)
-        self.attack_health_agent = EGreedy(n_arms=5, epsilon=0.03, optimistic_start=200., offset=0)
-        self.defend_distance_agent = EGreedy(n_arms=5, epsilon=0.03, optimistic_start=200., offset=4)
-        self.go_to_menhir_if_alive_agent = EGreedy(n_arms=7, epsilon=0.03, optimistic_start=200., offset=1)
-        self.hide_distance_agent = EGreedy(n_arms=6, epsilon=0.03, optimistic_start=200., offset=2)
-        self.pickup_distance_agent = EGreedy(n_arms=8, epsilon=0.03, optimistic_start=200., offset=1)
-        self.potion_distance_agent = EGreedy(n_arms=7, epsilon=0.03, optimistic_start=200., offset=1)
-
-        self.attack_distance = self.attack_distance_agent(0.)
-        self.attack_health = self.attack_health_agent(0.)
-        self.defend_distance = self.defend_distance_agent(0.)
-        self.go_to_menhir_if_alive = self.go_to_menhir_if_alive_agent(0.)
-        self.hide_distance = self.hide_distance_agent(0.)
-        self.pickup_distance = self.pickup_distance_agent(0.)
-        self.potion_distance = self.potion_distance_agent(0.)
+        self.attack_distance = 3
+        self.attack_health = 2
+        self.defend_distance = 5
+        self.go_to_menhir_if_alive = 1
+        self.hide_distance = 5
+        self.pickup_distance = 5
+        self.potion_distance = 5
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ForrestGumpController):
@@ -64,17 +55,13 @@ class ForrestGumpController(Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def find_nearest_field(self, position: coordinates.Coords) -> tuple:
-        position = np.array([position.x, position.y])
-        return self.fields_copy[np.argmin(np.abs(self.fields_copy - position).sum(axis=1))]
-
     def find_nearest_field_from_list(self, position: coordinates.Coords, fields: np.ndarray, knowledge: characters.ChampionKnowledge) -> coordinates.Coords:
         position = np.array([position.x, position.y])
 
         for new_x, new_y in fields[np.argsort(np.abs(fields - position).sum(axis=1))]:
             coords = coordinates.Coords(new_x, new_y)
 
-            if [new_x, new_y] in self.fields_copy and (coords not in knowledge.visible_tiles or not knowledge.visible_tiles[coords].character):
+            if [new_x, new_y] in self.fields and (coords not in knowledge.visible_tiles or not knowledge.visible_tiles[coords].character):
                 return coordinates.Coords(new_x, new_y)
 
         return coordinates.Coords(*position)
@@ -84,7 +71,7 @@ class ForrestGumpController(Controller):
         grid = Grid(matrix=self.matrix)
 
         start = grid.node(position.x, position.y)
-        finish = grid.node(*self.find_nearest_field(destination))
+        finish = grid.node(destination.x, destination.y)
 
         return finder.find_path(start, finish, grid)[0]
 
@@ -99,10 +86,6 @@ class ForrestGumpController(Controller):
                 WEAPONS_VALUE[weapon] < WEAPONS_VALUE[tile.loot.name])
 
     def go_to_destination(self, position: coordinates.Coords, facing: characters.Facing) -> characters.Action:
-        while coordinates.Coords(*self.find_nearest_field(self.destination_coords)) == position:
-            x, y = choice(self.fields)
-            self.set_destination(coordinates.Coords(x, y), 10, self.fast)
-
         path = self.find_path(position, self.destination_coords)
         next_pos = path[1] if len(path) > 1 else path[0]
         self.destination_age -= 1
@@ -110,11 +93,6 @@ class ForrestGumpController(Controller):
 
     def cut_positions(self, position: coordinates.Coords, facing: characters.Facing, weapon: str) -> list:
         return WEAPONS[weapon].cut_positions(self.arena.terrain, position, facing)
-
-    @staticmethod
-    def opposite_direction(position: coordinates.Coords, destination: coordinates.Coords) -> coordinates.Coords:
-        dx, dy = position.x - destination.x, position.y - destination.y
-        return coordinates.Coords(position.x + dx, position.y + dy)
 
     def set_destination(self, destination: coordinates.Coords, max_age: int, fast: bool) -> None:
         if self.override:
@@ -154,10 +132,15 @@ class ForrestGumpController(Controller):
                 continue
 
             if tile.character:
+                cut_positions = self.cut_positions(position, facing, weapon)
+
+                if 'bow' in weapon and self.distance(position, coords) >= 3 and coords in cut_positions:
+                    return characters.Action.ATTACK
+
                 if (health + self.attack_health >= tile.character.health and
                         ('bow' not in weapon or 'bow' in weapon and (self.distance(position, coords) >= 4 or
-                         2 * health + self.attack_health >= tile.character.health))):
-                    if coords in self.cut_positions(position, facing, weapon):
+                         health + 2 * self.attack_health >= tile.character.health))):
+                    if coords in cut_positions:
                         return characters.Action.ATTACK
                     elif self.distance(position, coords) <= self.attack_distance:
                         if weapon == 'amulet':
@@ -165,26 +148,25 @@ class ForrestGumpController(Controller):
                             self.set_destination(self.find_nearest_field_from_list(position, possible_pos, knowledge), 10, True)
                         else:
                             self.set_destination(coords, 10, True)
-                elif self.distance(position, coords) <= self.hide_distance and is_facing(position, coords, tile.character.facing):
-                    if tile.character.weapon.name == 'amulet':
-                        possible_pos = np.array([
-                            [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2],
-                            [2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2],
-                        ]) + np.array([x, y])
-                        self.set_destination(self.find_nearest_field_from_list(position, possible_pos, knowledge), 10, True)
-                    elif (position.x == x and
-                            (position.y > y and tile.character.facing == characters.Facing.DOWN or
-                             position.y < y and tile.character.facing == characters.Facing.UP)):
-                        possible_pos = np.array([[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 0], [1, 1]]) + np.array([position.x, position.y])
-                        self.set_destination(self.find_nearest_field_from_list(position, possible_pos, knowledge), 10, True)
-                    elif (position.y == y and
-                            (position.x > x and tile.character.facing == characters.Facing.RIGHT or
-                             position.x < x and tile.character.facing == characters.Facing.LEFT)):
-                        possible_pos = np.array([[-1, -1], [0, -1], [1, -1], [-1, 1], [0, 1], [1, 1]]) + np.array([position.x, position.y])
-                        self.set_destination(self.find_nearest_field_from_list(position, possible_pos, knowledge), 10, True)
+                elif coords in cut_positions and not is_facing(position, coords, tile.character.facing):
+                    return characters.Action.ATTACK
+                elif self.distance(position, coords) <= self.hide_distance:
+                    cut_positions = WEAPONS[tile.character.weapon.name].cut_positions(self.arena.terrain, coords, tile.character.facing)
+
+                    if position in cut_positions:
+                        safe_positions = self.fields.copy()
+
+                        for pos in cut_positions:
+                            if pos in safe_positions:
+                                safe_positions.remove([pos.x, pos.y])
+
+                        safe_positions = [coordinates.Coords(pos[0], pos[1]) for pos in safe_positions]
+                        new_coords = min([(self.distance(position, pos), pos) for pos in safe_positions])[1]
                     else:
-                        new_coords = self.opposite_direction(position, coords)
-                        self.set_destination(new_coords, 10, True)
+                        new_coords = closest_opposite(self.fields, position, coords)
+                        new_coords = coordinates.Coords(new_coords[0], new_coords[1])
+
+                    self.set_destination(new_coords, 10, True)
 
             if self.grab_potion(position, coords, tile):
                 self.set_destination(coords, 10, True)
@@ -194,13 +176,7 @@ class ForrestGumpController(Controller):
 
             if not self.final_coords:
                 if tile.type == 'menhir':
-                    self.fields = self.fields_copy
                     self.final_coords = coords
-                else:
-                    try:
-                        self.fields.remove([x, y])
-                    except ValueError:
-                        pass
 
             if (any(effect.type == 'mist' for effect in tile.effects) and
                     (dist := self.distance(position, coords)) < nearest_mist_distance):
@@ -213,27 +189,21 @@ class ForrestGumpController(Controller):
             if self.final_coords:
                 if position == self.final_coords:
                     return characters.Action.TURN_LEFT
-                self.set_destination(self.final_coords, 10, True)
+                self.set_destination(self.final_coords, 10, False)
             else:
-                new_pos = self.opposite_direction(position, nearest_mist_coords)
-                self.set_destination(new_pos, 10, True)
+                new_pos = closest_opposite(self.fields, position, nearest_mist_coords)
+                new_pos = coordinates.Coords(new_pos[0], new_pos[1])
+                self.set_destination(new_pos, 10, False)
 
         return self.go_to_destination(position, facing)
 
     def praise(self, score: int) -> None:
-        self.attack_distance = self.attack_distance_agent(score)
-        self.attack_health = self.attack_health_agent(score)
-        self.defend_distance = self.defend_distance_agent(score)
-        self.go_to_menhir_if_alive = self.go_to_menhir_if_alive_agent(score)
-        self.hide_distance = self.hide_distance_agent(score)
-        self.pickup_distance = self.pickup_distance_agent(score)
-        self.potion_distance = self.potion_distance_agent(score)
+        pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.arena = arenas.Arena.load(arena_description.name)
         self.matrix = init_grid(arena_description)
         self.fields = np.argwhere(self.matrix.T == 1).tolist()
-        self.fields_copy = self.fields.copy()
 
         self.fast = False
         self.final_coords = None

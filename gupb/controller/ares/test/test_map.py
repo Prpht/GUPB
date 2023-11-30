@@ -3,7 +3,7 @@ sys.path.append('.')
 
 import unittest
 
-from ares_controller import Map
+from gupb.controller.ares.ares_controller import Map
 from gupb.model.characters import ChampionKnowledge, Action
 from gupb.model import arenas
 from gupb.model import effects
