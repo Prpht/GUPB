@@ -92,6 +92,7 @@ class Brain:
         if menhirPos is not None and (self.memory.map.mist_radius < 7 or utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2):
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
+            goToAroundAction.setAllowDangerous(True)
             yield goToAroundAction, "Going closer to menhir"
 
         # ------------------------------------------

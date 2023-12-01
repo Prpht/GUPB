@@ -57,6 +57,7 @@ class GoToAction(Action):
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
         self.useAllMovements: bool = False
+        self.allowDangerous: bool = False
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -78,6 +79,12 @@ class GoToAction(Action):
         else:
             if DEBUG: print("Trying to set use all movements to non bool object (" + str(useAllMovements) + " of type " + str(type(useAllMovements)) + ")")
     
+    def setAllowDangerous(self, allowDangerous: bool) -> None:
+        if isinstance(allowDangerous, bool):
+            self.allowDangerous = allowDangerous
+        else:
+            if DEBUG: print("Trying to set allow dangerous to non bool object (" + str(allowDangerous) + " of type " + str(type(allowDangerous)) + ")")
+
     @profile
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
@@ -96,7 +103,7 @@ class GoToAction(Action):
         if path is None or len(path) <= 1:
             return None
         
-        if cost > 40:
+        if not self.allowDangerous and cost > 40:
             return None
 
         nextCoord = path[1]
@@ -207,6 +214,7 @@ class ExploreAction(Action):
 
         gotoAroundAction = GoToAroundAction()
         gotoAroundAction.setDestination(exploreToPos)
+        gotoAroundAction.setAllowDangerous(True)
         res = gotoAroundAction.perform(memory)
 
         if res is None:
