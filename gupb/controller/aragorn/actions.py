@@ -407,7 +407,40 @@ class TakeToOnesLegsAction(Action):
         goToAroundAction.setUseAllMovements(True)
         res = goToAroundAction.perform(memory)
         return res
+    
+    def howManySafeTilesAround(self, coords: Coords, memory: Memory, dangerousTiles) -> int:
+        possibleTiles = [
+            add_coords(coords, Coords(1, 0)),
+            add_coords(coords, Coords(-1, 0)),
+            add_coords(coords, Coords(0, 1)),
+            add_coords(coords, Coords(0, -1)),
+        ]
+        safeTiles = 0
 
+        for coords in possibleTiles:
+            if self.isTileGood(coords, memory, dangerousTiles):
+                safeTiles += 1
+        
+        return safeTiles
+
+    def isTileGood(self, coords: Coords, memory: Memory, dangerousTiles) -> bool:
+        if coords not in memory.map.terrain:
+            return False
+        
+        if not memory.map.terrain[coords].terrain_passable():
+            return False
+        
+        if coords in dangerousTiles:
+            return False
+        
+        if coords == memory.position:
+            return False
+        
+        if memory.map.terrain[coords].character is not None and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME:
+            return False
+
+        return True
+    
     def runToAnySafeTile(self, memory: Memory) -> Action:
         dangerousTiles = list(memory.map.getDangerousTilesWithDangerSourcePos(memory.tick).keys())
         
@@ -420,16 +453,10 @@ class TakeToOnesLegsAction(Action):
         safeTiles = {}
 
         for coords in possibleTiles:
-            if coords not in memory.map.terrain:
+            if not self.isTileGood(coords, memory, dangerousTiles):
                 continue
             
-            if not memory.map.terrain[coords].terrain_passable():
-                continue
-            
-            if coords in dangerousTiles:
-                continue
-            
-            safeTiles[coords] = utils.coordinatesDistance(coords, self.dangerSourcePos)
+            safeTiles[coords] = self.howManySafeTilesAround(coords, memory, dangerousTiles)
 
         # get coords from safeTiles key with maximum value
         maxSafeTile = None
