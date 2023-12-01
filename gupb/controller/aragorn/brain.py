@@ -40,6 +40,15 @@ class Brain:
         
         # ------------------------------------------
 
+        # DEFENDING FROM ATTACKS
+
+        if self.memory.position in dangerousTilesDict:
+            takeToOnesLegsAction = TakeToOnesLegsAction()
+            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
+            yield takeToOnesLegsAction, "Defending from attack"
+        
+        # ------------------------------------------
+
         # PICKING UP POTION
 
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
@@ -71,15 +80,6 @@ class Brain:
         ):
             attackAction = AttackAction()
             yield attackAction, "Attacking, since got oponent in range"
-
-        # ------------------------------------------
-
-        # DEFENDING FROM ATTACKS
-
-        if self.memory.position in dangerousTilesDict:
-            takeToOnesLegsAction = TakeToOnesLegsAction()
-            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
-            yield takeToOnesLegsAction, "Defending from attack"
         
         # ------------------------------------------
 
@@ -109,16 +109,16 @@ class Brain:
         
         # ------------------------------------------
         
-        # Go to closest enemy
-        attackClosestEnemyAction = AttackClosestEnemyAction()
-        yield attackClosestEnemyAction, "Going closer to enemy"
-        
-        # ------------------------------------------
-
         # ROTATE TO SEE MORE
 
         seeMoreAction = SeeMoreAction()
         yield seeMoreAction, "Rotating to see more"
+
+        # ------------------------------------------
+        
+        # Go to closest enemy
+        attackClosestEnemyAction = AttackClosestEnemyAction()
+        yield attackClosestEnemyAction, "Going closer to enemy"
 
         # ------------------------------------------
 

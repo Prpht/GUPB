@@ -95,6 +95,9 @@ class GoToAction(Action):
 
         if path is None or len(path) <= 1:
             return None
+        
+        if cost > 40:
+            return None
 
         nextCoord = path[1]
         
@@ -295,6 +298,7 @@ class AttackClosestEnemyAction(Action):
             if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer")
             goToAttackAction = GoToAction()
             goToAttackAction.setDestination(closestEnemy)
+            goToAttackAction.setUseAllMovements(True)
             ret = goToAttackAction.perform(memory)
             if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer, result:", ret)
             return ret
@@ -357,6 +361,7 @@ class AttackClosestEnemyAction(Action):
         goToAttackAction = GoToAction()
         goToAttackAction.setDestination(minCostPos)
         goToAttackAction.setDestinationFacing(minCostFacing)
+        goToAttackAction.setUseAllMovements(True)
         return goToAttackAction.perform(memory)
 
 class TakeToOnesLegsAction(Action):
@@ -407,7 +412,6 @@ class TakeToOnesLegsAction(Action):
         dangerousTiles = list(memory.map.getDangerousTilesWithDangerSourcePos(memory.tick).keys())
         
         possibleTiles = [
-            memory.position,
             add_coords(memory.position, Coords(1, 0)),
             add_coords(memory.position, Coords(-1, 0)),
             add_coords(memory.position, Coords(0, 1)),
@@ -440,20 +444,31 @@ class TakeToOnesLegsAction(Action):
         if maxSafeTile is None:
             return None
         
-        goToAction = GoToAction()
-        goToAction.setDestination(maxSafeTile)
-        return goToAction.perform(memory)
+        if maxSafeTile == add_coords(memory.position, memory.facing.value):
+            return characters.Action.STEP_FORWARD
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_left().value):
+            return characters.Action.STEP_LEFT
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_right().value):
+            return characters.Action.STEP_RIGHT
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_left().turn_left().value):
+            return characters.Action.STEP_BACKWARD
+        
+        return None
 
 class SeeMoreAction(Action):
-    def isGoingForward(self, memory: Memory) -> bool:
+    def isGoingToSomeDirection(self, memory: Memory) -> bool:
         last2Actions = memory.getLastActions()[-2:]
         
         if len(last2Actions) < 2:
             return False
         
         return (
-            last2Actions[0] == characters.Action.STEP_FORWARD
-            and last2Actions[1] == characters.Action.STEP_FORWARD
+            last2Actions[0] == last2Actions[1]
+            and last2Actions[0] in [
+                characters.Action.STEP_LEFT,
+                characters.Action.STEP_RIGHT,
+                characters.Action.STEP_BACKWARD,
+            ]
         )
     
     def getForwardDirection(self, memory: Memory) -> Coords:
@@ -540,9 +555,11 @@ class SeeMoreAction(Action):
             defensiveDirection = self.getMostDefensiveDirection(memory, nearbyOpponentPos)
             return self.lookAtTile(memory, defensiveDirection)
 
-        if self.isGoingForward(memory):
+        if self.isGoingToSomeDirection(memory):
             forwardDirection = self.getForwardDirection(memory)
             return self.lookAtTile(memory, forwardDirection)
         
-        bestDirection = self.directionWithMostVisibleCoords(memory)
-        return self.lookAtTile(memory, bestDirection)
+        # bestDirection = self.directionWithMostVisibleCoords(memory)
+        # return self.lookAtTile(memory, bestDirection)
+
+        return None
