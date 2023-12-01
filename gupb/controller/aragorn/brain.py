@@ -18,7 +18,7 @@ class Brain:
     
     def __initPersistentActions(self):
         self.persistentActions = {
-            'explore': ExploreAction(),
+            'explore': AdvancedExploreAction(),
         }
 
     def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:

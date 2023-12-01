@@ -224,43 +224,88 @@ class ExploreAction(Action):
         
         if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
         return res
+
+class AdvancedExploreAction(ExploreAction):
+    def __init__(self) -> None:
+        super().__init__()
+        
+        self.visitedCenter = False
+        self.seenAllTiles = False
+
+        self.standableCenter = None
     
-class BasicExploreAction(Action):
+    def __findStandableCenter(self, memory: Memory):
+        center = coordinates.Coords(round(memory.map.size[0] / 2), round(memory.map.size[1] / 2))
+        
+        destinationsGenerator = utils.aroundTileGenerator(center)
+        limit = 25
+
+        while self.standableCenter is None and limit > 0:
+            limit -= 1
+            
+            try:
+                center = destinationsGenerator.__next__()
+            except StopIteration:
+                pass
+
+            if center in memory.map.terrain and memory.map.terrain[center].terrain_passable():
+                self.standableCenter = center
+    
+    def __seen(self, memory: Memory, coords: Coords):
+        if self.standableCenter not in memory.map.terrain:
+            return True
+        
+        if not hasattr(memory.map.terrain[self.standableCenter], 'seen'):
+            return True
+        
+        return memory.map.terrain[self.standableCenter].seen
+    
+    def __getNextUnseenTileCoords(self, memory: Memory) -> Coords:
+        for r in range(1, 15):
+            for x in range(-r, r + 1):
+                for y in range(-r, r + 1):
+                    coords = add_coords(memory.position, Coords(x, y))
+
+                    if not self.__seen(memory, coords):
+                        return coords
+
+        return None
+
+    def __goto(self, memory: Memory, coords: Coords) -> Action:
+        goToAroundAction = GoToAroundAction()
+        goToAroundAction.setDestination(coords)
+        goToAroundAction.setAllowDangerous(False)
+        return goToAroundAction.perform(memory)
+    
     @profile
     def perform(self, memory: Memory) -> Action:
-        currentSection = memory.getCurrentSection()
+        if self.standableCenter is None:
+            self.__findStandableCenter(memory)
         
-        if currentSection == 0:
-            gotoVector = Coords(-1, -1)
-        elif currentSection == 1:
-            gotoVector = Coords(1, 0)
-        elif currentSection == 2:
-            gotoVector = Coords(-1, -1)
-        elif currentSection == 3:
-            gotoVector = Coords(1, 0)
-        else:
-            gotoVector = Coords(-1, -1)
+
         
-        mul = 3
-        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
-        exploreToPos = add_coords(memory.position, gotoVector)
+        # go to center first
 
-
-        gotoAroundAction = GoToAroundAction()
-        gotoAroundAction.setDestination(exploreToPos)
-        res = gotoAroundAction.perform(memory)
-
-        if res is not None:
-            return res
+        if self.__seen(memory, self.standableCenter):
+            self.visitedCenter = True
         
-        gotoVector = Coords(random.randint(-1, 1), random.randint(-1, 1))
-        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
-        exploreToPos = add_coords(memory.position, gotoVector)
+        if not self.visitedCenter:
+            self.visitedCenter = True
+            return self.__goto(memory, self.standableCenter)
+        
+        # explore unseen tiles
 
-        gotoAroundAction.setDestination(exploreToPos)
-        res = gotoAroundAction.perform(memory)
+        nextTileToExplore = self.__getNextUnseenTileCoords(memory)
 
-        return res
+        if nextTileToExplore is None:
+            self.seenAllTiles = True
+        
+        if not self.seenAllTiles:
+            return self.__goto(memory, nextTileToExplore)
+        
+        # default to normal explore
+        
+        return super().perform(memory)
 
 class AttackClosestEnemyAction(Action):
     OUTDATED_DATA_TICKS = 16

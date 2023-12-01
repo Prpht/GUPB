@@ -274,6 +274,7 @@ class Map:
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
                             terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
+                        terrain[position].seen = False
         return Map(name, terrain)
     
     @staticmethod
@@ -287,6 +288,7 @@ class Map:
                 for x in range(size[0]):
                     position = coordinates.Coords(x, y)
                     terrain[position] = tiles.Land()
+                    terrain[position].seen = False
         
         return Map(name, terrain)
     
@@ -372,6 +374,7 @@ class Map:
                 self.terrain[coords] = newType()
             
             self.terrain[coords].tick = currentTick
+            self.terrain[coords].seen = True
             self.terrain[coords].loot = Map.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
