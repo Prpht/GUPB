@@ -235,7 +235,7 @@ class AdvancedExploreAction(ExploreAction):
         self.standableCenter = None
     
     def __findStandableCenter(self, memory: Memory):
-        center = coordinates.Coords(round(memory.map.size[0] / 2), round(memory.map.size[1] / 2))
+        center = Coords(round(memory.map.size[0] / 2), round(memory.map.size[1] / 2))
         
         destinationsGenerator = utils.aroundTileGenerator(center)
         limit = 25
