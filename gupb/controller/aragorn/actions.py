@@ -10,7 +10,7 @@ from gupb.model import weapons
 from gupb.model.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME
 from gupb.controller.aragorn import pathfinding
 from gupb.controller.aragorn import utils
 
@@ -260,12 +260,14 @@ class AttackClosestEnemyAction(Action):
         closestEnemy = None
         closestEnemyDistance = INFINITY
 
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Searching for closest enemy")
+
         for coords in memory.map.terrain:
             if (
                 # tile has character
                 memory.map.terrain[coords].character is not None
                 # ignore if data is outdated
-                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
                 and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
@@ -282,18 +284,25 @@ class AttackClosestEnemyAction(Action):
                     closestEnemyDistance = distance
         
         if closestEnemy is None:
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] No closest enemy found")
             return None
+        
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
         
         # CLOSEST ENEMY IS TOO FAR
         # just approach him
         if closestEnemyDistance > 3:
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer")
             goToAttackAction = GoToAction()
             goToAttackAction.setDestination(closestEnemy)
-            return goToAttackAction.perform(memory)
+            ret = goToAttackAction.perform(memory)
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer, result:", ret)
+            return ret
 
         # IF CLOSEST ENEMY IS NEARBY
         # GET CLOSEST FIELD YOU CAN ATTACK FROM
         # BY CALCULATING DETAILED PATHS COSTS
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is nearby, calculating detailed paths costs")
         currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
 
         if currentWeapon is None:

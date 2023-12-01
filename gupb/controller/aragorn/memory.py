@@ -483,6 +483,11 @@ class Map:
                 for position in positions:
                     if position not in dangerousTiles:
                         dangerousTiles[position] = coords
+            
+            # Make mist dangerous
+            if effects.Mist in self.terrain[coords].effects:
+                dangerousTiles[coords] = coords
+
         
         # cache
         if currentTick is not None:

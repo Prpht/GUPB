@@ -3,7 +3,7 @@ from gupb.model import arenas, characters, coordinates, weapons, consumables
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME
 from gupb.model.profiling import profile
 
 import time
@@ -44,6 +44,8 @@ class Brain:
 
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
 
+        if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
+
         if closestPotionDistance is not None and closestPotionDistance < 5:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
@@ -55,13 +57,15 @@ class Brain:
 
         oponentInRange = self.memory.getClosestOponentInRange()
 
+        if DEBUG2: print("[ARAGORN|BRAIN] oponentInRange", oponentInRange, "is on safe tile:", self.memory.position not in dangerousTilesDict.keys(), "oppo health:", oponentInRange.health if oponentInRange is not None else None, "my health:", self.memory.health)
+
         if (
             oponentInRange is not None
             and (
                 self.memory.position not in dangerousTilesDict.keys()
                 or (
                     oponentInRange.health <= self.memory.health
-                    # and oponentInRange.health <= consumables.POTION_RESTORED_HP
+                    and oponentInRange.health <= consumables.POTION_RESTORED_HP
                 )
             )
         ):
@@ -78,26 +82,30 @@ class Brain:
             yield takeToOnesLegsAction, "Defending from attack"
         
         # ------------------------------------------
-        
-        # PICKING UP WEAPON
-
-        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
-
-        if closestWeaponDistance is not None and closestWeaponDistance < 15:
-            goToWeaponAction = GoToAction()
-            goToWeaponAction.setDestination(closestWeaponCoords)
-            yield goToWeaponAction, "Picking nearby weapon"
-        
-        # ------------------------------------------
 
         # MIST FORCED MOVEMENT
 
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
+        if DEBUG2: print("[ARAGORN|BRAIN] menhirPos", menhirPos, "prob", prob)
+
         if menhirPos is not None and (self.memory.map.mist_radius < 7 or utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2):
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
             yield goToAroundAction, "Going closer to menhir"
+
+        # ------------------------------------------
+        
+        # PICKING UP WEAPON
+
+        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
+
+        if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
+
+        if closestWeaponDistance is not None and closestWeaponDistance < 15:
+            goToWeaponAction = GoToAction()
+            goToWeaponAction.setDestination(closestWeaponCoords)
+            yield goToWeaponAction, "Picking nearby weapon"
         
         # ------------------------------------------
         
