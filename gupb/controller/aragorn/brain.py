@@ -70,13 +70,13 @@ class Brain:
 
         if (
             oponentInRange is not None
-            and (
-                self.memory.position not in dangerousTilesDict.keys()
-                or (
-                    oponentInRange.health <= self.memory.health
-                    and oponentInRange.health <= consumables.POTION_RESTORED_HP
-                )
-            )
+            # and (
+                # self.memory.position not in dangerousTilesDict.keys()
+                # or (
+                #     oponentInRange.health <= self.memory.health
+                #     and oponentInRange.health <= consumables.POTION_RESTORED_HP
+                # )
+            # )
         ):
             attackAction = AttackAction()
             yield attackAction, "Attacking, since got oponent in range"
