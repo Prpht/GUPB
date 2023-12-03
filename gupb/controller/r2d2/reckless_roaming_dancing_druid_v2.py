@@ -4,6 +4,7 @@ from gupb.controller.r2d2.navigation import get_move_towards_target
 from gupb.controller.r2d2.strategies.exploration import MenhirFinder, MenhirObserver, WeaponFinder
 from gupb.controller.r2d2.strategies.potion import PotionPicker, get_nearby_potions
 from gupb.controller.r2d2.strategies.runaway import Runaway
+from gupb.controller.r2d2.strategies.mist import *
 from gupb.controller.r2d2.strategies.exploration import *
 from gupb.model import arenas
 from gupb.model import characters
@@ -115,11 +116,17 @@ class RecklessRoamingDancingDruid(controller.Controller):
                 knowledge.visible_tiles[self.champion_position].character.weapon.name
             )
 
-            # priorities 
+            # priorities
+            # - if the mist is coming, go to the menhir
+            if r2_knowledge.world_state.mist_present:
+                return MistAvoider().decide(r2_knowledge)
+            # - if the enemy is in the range of the weapon, attack
             if decide_whether_attack(r2_knowledge):
                 return characters.Action.ATTACK
+            # - if there is a threat nearby, runaway
             if self._is_threat_nearby(r2_knowledge):
                 return Runaway().decide(r2_knowledge, self.state_machine)
+            # - if there is a potion nearby, pick it up
             if len(get_nearby_potions(r2_knowledge)) > 0:
                 return PotionPicker().decide(r2_knowledge, self.state_machine)
             
