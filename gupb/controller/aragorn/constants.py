@@ -1,6 +1,6 @@
 OUR_BOT_NAME = 'Aragorn'
-DEBUG = True
-DEBUG2 = True
+DEBUG = False
+DEBUG2 = False
 USE_PF_CACHE = False
 OPTIMIZE_PF = False
 INFINITY: int = 99999999999
