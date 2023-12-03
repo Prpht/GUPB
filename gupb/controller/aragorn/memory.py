@@ -271,10 +271,11 @@ class Map:
                         position = coordinates.Coords(x, y)
                         if character in arenas.TILE_ENCODING:
                             terrain[position] = arenas.TILE_ENCODING[character]()
+                            terrain[position].seen = arenas.TILE_ENCODING[character] != tiles.Land
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
                             terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
-                        terrain[position].seen = False
+                            terrain[position].seen = False
         return Map(name, terrain)
     
     @staticmethod
@@ -488,8 +489,8 @@ class Map:
                         dangerousTiles[position] = coords
             
             # Make mist dangerous
-            if effects.Mist in self.terrain[coords].effects:
-                dangerousTiles[coords] = coords
+            # if effects.Mist in self.terrain[coords].effects:
+            #     dangerousTiles[coords] = coords
 
         
         # cache

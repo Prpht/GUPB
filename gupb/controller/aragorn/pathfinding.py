@@ -6,7 +6,8 @@ from gupb.model import characters
 from gupb.model import effects
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME, USE_PF_CACHE
+from gupb.controller.aragorn import utils
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME, USE_PF_CACHE, OPTIMIZE_PF
 
 cache = {}
 
@@ -52,22 +53,23 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         if cacheKey in cache:
             return cache[cacheKey]
     
-    considerFrom = Coords(
-        min(start.x, end.x) - 5,
-        min(start.y, end.y) - 5,
-    )
-    considerTo = Coords(
-        max(start.x, end.x) + 5,
-        max(start.y, end.y) + 5,
-    )
+    if OPTIMIZE_PF:
+        considerFrom = Coords(
+            min(start.x, end.x) - 5,
+            min(start.y, end.y) - 5,
+        )
+        considerTo = Coords(
+            max(start.x, end.x) + 5,
+            max(start.y, end.y) + 5,
+        )
 
-    if considerTo.x - considerFrom.x < 10:
-        considerTo.x -= 10
-        considerFrom.x += 10
-    
-    if considerTo.y - considerFrom.y < 10:
-        considerTo.y -= 10
-        considerFrom.y += 10
+        if considerTo.x - considerFrom.x < 10:
+            considerTo.x -= 10
+            considerFrom.x += 10
+        
+        if considerTo.y - considerFrom.y < 10:
+            considerTo.y -= 10
+            considerFrom.y += 10
 
     def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords, h_facing: characters.Facing, useAllMovements :bool = False) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
@@ -90,12 +92,18 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         mistCost = 0
         
         if h_end in memory.map.terrain and effects.Mist in memory.map.terrain[h_end].effects:
-            mistCost = 40
+            mistCost = 200
         
         dangerousTileCost = 0
 
         if h_end in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
-            dangerousTileCost = 40
+            # if dist = 1, cost += 200
+            # if dist = 2, cost += 180
+            # ...
+            # if dist = 10, cost += 20
+            # if dist = 11, cost += 0
+            # if dist = 12, cost += 0
+            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, h_end) + 1), 0 )
 
         return (turns if turns <= 2 else 2) + distance + mistCost + dangerousTileCost
 
@@ -135,9 +143,10 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         for neighbor in neighbors:
             if not neighbor in memory.map.terrain:
                 continue
-
-            if neighbor.x < considerFrom.x or neighbor.x > considerTo.x or neighbor.y < considerFrom.y or neighbor.y > considerTo.y:
-                continue
+            
+            if OPTIMIZE_PF:
+                if neighbor.x < considerFrom.x or neighbor.x > considerTo.x or neighbor.y < considerFrom.y or neighbor.y > considerTo.y:
+                    continue
 
             if (
                     neighbor in memory.map.terrain.keys()
@@ -169,5 +178,5 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
     
     return trace, INFINITY
 
-def get_path_cost(memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> int:
-    return find_path(memory, start, end, facing)[1]
+def get_path_cost(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> int:
+    return find_path(memory, start, end, facing, useAllMovements)[1]

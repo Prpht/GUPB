@@ -88,12 +88,28 @@ class Brain:
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
         if DEBUG2: print("[ARAGORN|BRAIN] menhirPos", menhirPos, "prob", prob)
+        
+        if menhirPos is not None:
+            goCloserToMenhir = False
 
-        if menhirPos is not None and (self.memory.map.mist_radius < 7 or utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2):
-            goToAroundAction = GoToAroundAction()
-            goToAroundAction.setDestination(menhirPos)
-            goToAroundAction.setAllowDangerous(True)
-            yield goToAroundAction, "Going closer to menhir"
+            if self.memory.map.mist_radius < 7:
+                goCloserToMenhir = True
+            
+            if not goCloserToMenhir:
+                dist = pathfinding.get_path_cost(self.memory, self.memory.position, menhirPos, self.memory.facing, True)
+
+                if dist is None or dist == INFINITY:
+                    dist = utils.coordinatesDistance(self.memory.position, menhirPos)
+                
+                if dist > self.memory.map.mist_radius / 2:
+                    goCloserToMenhir = True
+
+            if goCloserToMenhir:
+                goToAroundAction = GoToAroundAction()
+                goToAroundAction.setDestination(menhirPos)
+                goToAroundAction.setAllowDangerous(True)
+                goToAroundAction.setUseAllMovements(True)
+                yield goToAroundAction, "Going closer to menhir"
 
         # ------------------------------------------
         

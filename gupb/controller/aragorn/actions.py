@@ -99,11 +99,12 @@ class GoToAction(Action):
             return None
         
         [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
+        if DEBUG2: print("[ARAGORN|GOTO] Got path with cost:", cost)
 
         if path is None or len(path) <= 1:
             return None
         
-        if not self.allowDangerous and cost > 40:
+        if not self.allowDangerous and cost > 200:
             return None
 
         nextCoord = path[1]
@@ -233,6 +234,7 @@ class AdvancedExploreAction(ExploreAction):
         self.seenAllTiles = False
 
         self.standableCenter = None
+        self.nextTileToExplore = None
     
     def __findStandableCenter(self, memory: Memory):
         center = Coords(round(memory.map.size[0] / 2), round(memory.map.size[1] / 2))
@@ -252,16 +254,16 @@ class AdvancedExploreAction(ExploreAction):
                 self.standableCenter = center
     
     def __seen(self, memory: Memory, coords: Coords):
-        if self.standableCenter not in memory.map.terrain:
+        if coords not in memory.map.terrain:
             return True
         
-        if not hasattr(memory.map.terrain[self.standableCenter], 'seen'):
-            return True
+        if not hasattr(memory.map.terrain[coords], 'seen'):
+            return False
         
-        return memory.map.terrain[self.standableCenter].seen
+        return memory.map.terrain[coords].seen
     
     def __getNextUnseenTileCoords(self, memory: Memory) -> Coords:
-        for r in range(1, 15):
+        for r in range(1, max(memory.map.size[0], memory.map.size[1])):
             for x in range(-r, r + 1):
                 for y in range(-r, r + 1):
                     coords = add_coords(memory.position, Coords(x, y))
@@ -275,36 +277,53 @@ class AdvancedExploreAction(ExploreAction):
         goToAroundAction = GoToAroundAction()
         goToAroundAction.setDestination(coords)
         goToAroundAction.setAllowDangerous(False)
-        return goToAroundAction.perform(memory)
+        goToAroundAction.setUseAllMovements(False)
+        ret = goToAroundAction.perform(memory)
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going to around action, coords:", coords, "action:", ret)
+        return ret
     
     @profile
     def perform(self, memory: Memory) -> Action:
-        if self.standableCenter is None:
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Advanced explore")
+
+        if not self.visitedCenter and self.standableCenter is None:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Finding standable center")
             self.__findStandableCenter(memory)
         
+        if self.standableCenter is None:
+            # if we cannot find standable center, just do normal explore
+            self.visitedCenter = True
 
         
         # go to center first
 
         if self.__seen(memory, self.standableCenter):
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Seen center")
             self.visitedCenter = True
         
         if not self.visitedCenter:
-            self.visitedCenter = True
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going towards center")
             return self.__goto(memory, self.standableCenter)
         
         # explore unseen tiles
+        
+        if self.nextTileToExplore is not None and self.__seen(memory, self.nextTileToExplore):
+            self.nextTileToExplore = None
+        
+        if self.nextTileToExplore is None:
+            self.nextTileToExplore = self.__getNextUnseenTileCoords(memory)
 
-        nextTileToExplore = self.__getNextUnseenTileCoords(memory)
-
-        if nextTileToExplore is None:
+        if self.nextTileToExplore is None:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Seen all tiles")
             self.seenAllTiles = True
         
         if not self.seenAllTiles:
-            return self.__goto(memory, nextTileToExplore)
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going towards unseen tile, coords:", self.nextTileToExplore)
+            return self.__goto(memory, self.nextTileToExplore)
         
         # default to normal explore
-        
+
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Defaulting to normal explore")
         return super().perform(memory)
 
 class AttackClosestEnemyAction(Action):
