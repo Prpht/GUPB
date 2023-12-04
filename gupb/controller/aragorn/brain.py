@@ -155,6 +155,9 @@ class Brain:
 
     @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        if DEBUG: print()
+        if DEBUG: print("[ARAGORN|BRAIN] Deciding...")
+
         actionIndexPerformed = 0
 
         for action, dbg_ac_msg in self.prepareActions(knowledge):

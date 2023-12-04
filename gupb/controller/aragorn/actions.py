@@ -99,6 +99,9 @@ class GoToAction(Action):
             return None
         
         [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
+        
+        if DEBUG2: memory.debugCoords = path
+
         if DEBUG2: print("[ARAGORN|GOTO] Got path with cost:", cost)
 
         if path is None or len(path) <= 1:
@@ -112,7 +115,7 @@ class GoToAction(Action):
         return self.get_action_to_move_in_path(memory, nextCoord)
 
     def get_action_to_move_in_path(self, memory: Memory, destination: Coords) -> characters.Action:
-        return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination)
+        return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination, self.useAllMovements)
     
 class GoToAroundAction(GoToAction):
     @profile
@@ -215,7 +218,8 @@ class ExploreAction(Action):
 
         gotoAroundAction = GoToAroundAction()
         gotoAroundAction.setDestination(exploreToPos)
-        gotoAroundAction.setAllowDangerous(True)
+        gotoAroundAction.setAllowDangerous(False)
+        gotoAroundAction.setUseAllMovements(False)
         res = gotoAroundAction.perform(memory)
 
         if res is None:

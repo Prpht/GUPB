@@ -21,17 +21,24 @@ def makeHashable(dict: {Coords: Coords}) -> [Coords]:
 def get_action_to_move_in_path(source: Coords, sourceFacing: characters.Facing, destination: Coords, useAllMovements :bool = False) -> characters.Action:
     direction = sub_coords(destination, source)
 
-    if direction == sourceFacing.value:
-        return characters.Action.STEP_FORWARD
-    elif direction == sourceFacing.turn_left().value:
-        return characters.Action.STEP_LEFT
-    elif direction == sourceFacing.turn_right().value:
-        return characters.Action.STEP_RIGHT
-    else:
-        if not useAllMovements:
-            return characters.Action.TURN_RIGHT
+    if useAllMovements:
+        if direction == sourceFacing.value:
+            return characters.Action.STEP_FORWARD
+        elif direction == sourceFacing.turn_left().value:
+            return characters.Action.STEP_LEFT
+        elif direction == sourceFacing.turn_right().value:
+            return characters.Action.STEP_RIGHT
         else:
             return characters.Action.STEP_BACKWARD
+    else:
+        if direction == sourceFacing.value:
+            return characters.Action.STEP_FORWARD
+        elif direction == sourceFacing.turn_left().value:
+            return characters.Action.TURN_LEFT
+        elif direction == sourceFacing.turn_right().value:
+            return characters.Action.TURN_RIGHT
+        else:
+            return characters.Action.TURN_RIGHT
     
 def get_facing(f_coords: Coords) -> characters.Facing:
     if f_coords == Coords(0, 1):
@@ -91,21 +98,21 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
         
         mistCost = 0
         
-        if h_end in memory.map.terrain and effects.Mist in memory.map.terrain[h_end].effects:
+        if h_start in memory.map.terrain and effects.Mist in memory.map.terrain[h_start].effects:
             mistCost = 200
         
         dangerousTileCost = 0
 
-        if h_end in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
+        if h_start in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
             # if dist = 1, cost += 200
             # if dist = 2, cost += 180
             # ...
             # if dist = 10, cost += 20
             # if dist = 11, cost += 0
             # if dist = 12, cost += 0
-            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, h_end) + 1), 0 )
+            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, h_start) + 1), 0 )
 
-        return (turns if turns <= 2 else 2) + distance + mistCost + dangerousTileCost
+        return turns + distance + mistCost + dangerousTileCost
 
     a_coords = NamedTuple('a_coords', [('coords', Coords),
                                         ('g_cost', int),

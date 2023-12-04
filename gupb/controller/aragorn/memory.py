@@ -33,6 +33,7 @@ class Memory:
         # is a list of last 5 actions
         # with rotation actions removed
         self.lastActions: list = []
+        self.debugCoords = None
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
@@ -51,6 +52,7 @@ class Memory:
         self.health: int = 0
         
         self.lastActions: list = []
+        self.debugCoords = None
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.tick += 1
@@ -67,6 +69,7 @@ class Memory:
         self.environment.environment_action(self.no_of_champions_alive)
 
         self.health = knowledge.visible_tiles[self.position].character.health
+        self.debugCoords = None
 
     def addLastAction(self, action):
         self.lastActions.append(action)
