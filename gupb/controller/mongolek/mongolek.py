@@ -151,6 +151,9 @@ class Mongolek(controller.Controller):
 
         path = self.gps.find_path(current_coordinates, destination_coordinates)
 
+        if len(path) == 0:
+            return characters.Action.TURN_LEFT
+
         if current_coordinates.x + current_facing.value.x == path[
             0].x and current_coordinates.y + current_facing.value.y == path[0].y:
             return characters.Action.STEP_FORWARD
