@@ -129,6 +129,7 @@ class Mongolek(controller.Controller):
         self.arena = arenas.Arena.load(arena_description.name)
         self.menhir_found = False
         self.target = None
+        self.possible_menhir_coords = []
 
         for coords in self.arena.terrain.keys():
             if self.arena.terrain[coords].terrain_passable():
