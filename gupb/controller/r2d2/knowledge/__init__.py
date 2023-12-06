@@ -23,8 +23,8 @@ class R2D2Knowledge:
 class WorldState:
     def __init__(self, arena: Arena, decay: int = 5):
         self.step_counter = 0
-        self.matrix = np.zeros(LARGEST_ARENA_SHAPE, dtype=np.int8)
         self.arena_shape = arena.size[1], arena.size[0]
+        self.matrix = np.zeros(self.arena_shape, dtype=np.int8)
         for coords, tile in arena.terrain.items():
             self.matrix[coords[1], coords[0]] = tiles_mapping[tile.description().type]
 
@@ -37,8 +37,9 @@ class WorldState:
 
         # Define the decay mask
         self.decay = decay
-        self.decay_mask = np.zeros(LARGEST_ARENA_SHAPE, np.int8)
+        self.decay_mask = np.zeros(self.arena_shape, np.int8)
 
+        self.menhir_estimated_position = None
         self.menhir_position = None
         self.mist_present = False
 
@@ -108,7 +109,7 @@ class WorldState:
                 self.matrix[coords[1], coords[0]] = tiles_mapping["enymy"]
             
             if tile_description.effects:
-                if "mist" in tile_description.effects:
+                if "mist" in list(map(lambda x: x.type, tile_description.effects)):
                     self.matrix[coords[1], coords[0]] = tiles_mapping["mist"]
                     self.mist_present = True
 
