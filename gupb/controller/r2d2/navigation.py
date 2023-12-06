@@ -30,6 +30,8 @@ def get_move_towards_target(
     # - Find the path
     finder = BiAStarFinder(diagonal_movement=DiagonalMovement.never)
     path, _ = finder.find_path(start, end, grid)
+    if len(path) == 0:  # No path is possible, attack
+        return characters.Action.ATTACK, False
     next_tile_coords = Coords(path[1].x, path[1].y)
 
     # - Move to the next tile
