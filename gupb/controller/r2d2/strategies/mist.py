@@ -18,7 +18,6 @@ class MistAvoider(Strategy):
 
         # Get the menhir destination
         destination_coords = get_menhir_destination(knowledge)
-        print(f"[R2D2] Menhir destination: {destination_coords}")
 
         # Return the action towards the destination
         return get_move_towards_target(knowledge.champion_knowledge.position, destination_coords, knowledge, allow_moonwalk=True)[0]
@@ -32,7 +31,6 @@ def get_menhir_destination(knowledge: R2D2Knowledge) -> Coords:
     
     # If the menhir is not found, return the estimated position
     mist_boundary = get_mist_boundary(knowledge)
-    print(f"[R2D2]\tMist boundary: {mist_boundary}")
 
     # - If the mist boundary is empty, return the previous estimation
     if len(mist_boundary) == 0:
@@ -44,7 +42,6 @@ def get_menhir_destination(knowledge: R2D2Knowledge) -> Coords:
     cx, cy = max(1, cx), max(1, cy)
     cx, cy = min(cx, knowledge.world_state.arena_shape[0] - 2), min(cy, knowledge.world_state.arena_shape[1] - 2)
     knowledge.world_state.menhir_estimated_position = Coords(cy, cx)
-    print(f"[R2D2]\tEstimated menhir position: {knowledge.world_state.menhir_estimated_position}")
 
     return knowledge.world_state.menhir_estimated_position
 
