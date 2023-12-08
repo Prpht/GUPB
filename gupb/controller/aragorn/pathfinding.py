@@ -128,35 +128,35 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
             if USE_PF_CACHE:
                 cache[cacheKey] = (trace, int(current.h_cost + current.g_cost))
             
-            if DEBUG2:
-                print('----------')
-                for y in range(memory.map.size[1]):
-                    for x in range(memory.map.size[0]):
-                        tmp_coords = Coords(x, y)
-                        cost = None
+            # if DEBUG2:
+            #     print('----------')
+            #     for y in range(memory.map.size[1]):
+            #         for x in range(memory.map.size[0]):
+            #             tmp_coords = Coords(x, y)
+            #             cost = None
 
-                        if cost is None:
-                            if tmp_coords in closed_coords:
-                                cost = closed_coords[tmp_coords].g_cost # + closed_coords[tmp_coords].h_cost
+            #             if cost is None:
+            #                 if tmp_coords in closed_coords:
+            #                     cost = closed_coords[tmp_coords].g_cost # + closed_coords[tmp_coords].h_cost
 
-                        if cost is None:
-                            for oc in open_coords:
-                                if oc.coords == tmp_coords:
-                                    cost = oc.g_cost # + oc.h_cost
+            #             if cost is None:
+            #                 for oc in open_coords:
+            #                     if oc.coords == tmp_coords:
+            #                         cost = oc.g_cost # + oc.h_cost
                                     
 
-                        if tmp_coords == start:
-                            cost = 'S' + str(cost)
+            #             if tmp_coords == start:
+            #                 cost = 'S' + str(cost)
 
-                        if tmp_coords == end:
-                            cost = 'E' + str(cost)
+            #             if tmp_coords == end:
+            #                 cost = 'E' + str(cost)
                         
-                        print(
-                            str(cost if cost is not None else '-').ljust(4),
-                            end=' '
-                        )
-                    print()
-                print('----------')
+            #             print(
+            #                 str(cost if cost is not None else '-').ljust(4),
+            #                 end=' '
+            #             )
+            #         print()
+            #     print('----------')
             
             return trace, int(current.h_cost + current.g_cost)
 
