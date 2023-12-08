@@ -7,7 +7,7 @@ from gupb.model import effects
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn import utils
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME, USE_PF_CACHE, OPTIMIZE_PF
+from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME, USE_PF_CACHE, OPTIMIZE_PF
 
 cache = {}
 
@@ -81,38 +81,40 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
 
     def get_h_cost(memory: Memory, h_start: Coords, h_end: Coords) -> int:
         distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
-        
+        return distance + tile_cost(memory, h_start)
+
+    def tile_cost(memory: Memory, tileCoords: Coords) -> int:
         mistCost = 0
         
-        if h_start in memory.map.terrain and effects.Mist in memory.map.terrain[h_start].effects:
+        if tileCoords in memory.map.terrain and effects.Mist in memory.map.terrain[tileCoords].effects:
             mistCost = 200
         
         dangerousTileCost = 0
 
-        if h_start in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
+        if tileCoords in memory.map.getDangerousTilesWithDangerSourcePos(memory.tick):
             # if dist = 1, cost += 200
             # if dist = 2, cost += 180
             # ...
             # if dist = 10, cost += 20
             # if dist = 11, cost += 0
             # if dist = 12, cost += 0
-            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, h_start) + 1), 0 )
+            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, tileCoords) + 1), 0 )
 
-        return distance + mistCost + dangerousTileCost
+        return mistCost + dangerousTileCost
 
     a_coords = NamedTuple('a_coords', [('coords', Coords),
                                         ('g_cost', int),
                                         ('h_cost', int),
-                                        ('parent', Optional[Coords]),
-                                        ('facing', characters.Facing)])
+                                        ('parent', Optional[Coords])])
     
     open_coords: [a_coords] = []
     closed_coords: {Coords: a_coords} = {}
-    open_coords.append(a_coords(start, 0, get_h_cost(memory, start, end), None, facing))
+    open_coords.append(a_coords(start, 0, get_h_cost(memory, start, end), None))
     
     while len(open_coords) > 0:
-        open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost + x.h_cost, x.h_cost), reverse=False))
+        open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost, x.h_cost), reverse=False))
         current: a_coords = open_coords.pop(0)
+        
         closed_coords[current.coords] = current
         
         if current.coords == end:
@@ -125,6 +127,36 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
 
             if USE_PF_CACHE:
                 cache[cacheKey] = (trace, int(current.h_cost + current.g_cost))
+            
+            if DEBUG2:
+                print('----------')
+                for y in range(memory.map.size[1]):
+                    for x in range(memory.map.size[0]):
+                        tmp_coords = Coords(x, y)
+                        cost = None
+
+                        if cost is None:
+                            if tmp_coords in closed_coords:
+                                cost = closed_coords[tmp_coords].g_cost # + closed_coords[tmp_coords].h_cost
+
+                        if cost is None:
+                            for oc in open_coords:
+                                if oc.coords == tmp_coords:
+                                    cost = oc.g_cost # + oc.h_cost
+                                    
+
+                        if tmp_coords == start:
+                            cost = 'S' + str(cost)
+
+                        if tmp_coords == end:
+                            cost = 'E' + str(cost)
+                        
+                        print(
+                            str(cost if cost is not None else '-').ljust(4),
+                            end=' '
+                        )
+                    print()
+                print('----------')
             
             return trace, int(current.h_cost + current.g_cost)
 
@@ -142,14 +174,12 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                     continue
 
             if (
-                    neighbor in memory.map.terrain.keys()
-                    and memory.map.terrain[neighbor].terrain_passable()
-                    # and (memory.map.terrain[neighbor].character is None or memory.map.terrain[neighbor].character.controller_name == OUR_BOT_NAME) # check if enemy is not in the way
-                    and neighbor not in closed_coords.keys()
+                neighbor in memory.map.terrain.keys()
+                and memory.map.terrain[neighbor].terrain_passable()
+                # and (memory.map.terrain[neighbor].character is None or memory.map.terrain[neighbor].character.controller_name == OUR_BOT_NAME) # check if enemy is not in the way
+                and neighbor not in closed_coords.keys()
             ):
-                neighbor_direction: Coords = Coords(neighbor.x - current.coords.x, neighbor.y - current.coords.y)
-                neighbor_g_cost = 1 + current.g_cost
-                
+                neighbor_g_cost = 1 + current.g_cost + tile_cost(memory, neighbor)
                 neighbor_h_cost = get_h_cost(memory, neighbor, end)
 
                 for coords in open_coords:
@@ -159,8 +189,7 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
                 open_coords.append(a_coords(neighbor,
                                             neighbor_g_cost,
                                             neighbor_h_cost,
-                                            current.coords,
-                                            get_facing(neighbor_direction)))
+                                            current.coords))
     
     trace: Optional[List[Coords]] = None
     
