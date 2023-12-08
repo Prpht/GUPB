@@ -71,6 +71,8 @@ class MapKnowledge(KnowledgeSource):
         if self.epoch % 10 == 0:
             # update presumed map size
             self._update_map_center()
+        if not any([data.get('type') == 'menhir' for _, data in self.graph.nodes(data=True)]):
+            self.menhir_pos = self.get_approx_menhir_pos()
 
 
     def reset(self, arena_description: arenas.ArenaDescription):
@@ -207,8 +209,7 @@ class KnowledgeSources(KnowledgeSource):
         self.epoch: int = 0
         self.map: MapKnowledge = MapKnowledge()
         self.players: PlayersKnowledge = PlayersKnowledge(own_name)
-        # todo: make this work
-        # self.meta_ratings: Dict[MetaStrategy, int] = {meta: 0 for meta in MetaStrategy.__subclasses__}
+        self.metastrat_ratings: Dict[str, int] = defaultdict(int)
 
 
     def find_next_move_on_path(self, start: Coords, end: Coords) -> Coords | None:
@@ -261,10 +262,10 @@ class KnowledgeSources(KnowledgeSource):
             ks.reset(arena_description)
 
 
-    def praise(self, score: int, meta_strat):
-        # todo: make this work
-        # self.meta_ratings[meta] += score
-        ...
+    def praise(self, score: int, meta_strategy) -> None:
+        # meta_strategy should be a MetaStrategy object. Not imported due to circular import
+        self.metastrat_ratings[meta_strategy] += score
+        meta_strategy.praise(score)
 
 
     def __iter__(self) -> Iterator[KnowledgeSource]:

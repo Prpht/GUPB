@@ -63,32 +63,71 @@ class Path_Finder():
             return len(path) - 1
         return float('inf')
 
-
-    def calculate_next_move(self, end: Coords):
+    def next_action(self, path: list[Coords], fast_move: bool = False)-> characters.Action:
         start = self.environment.position
-        path = self.reconstruct_path(end)
 
         if path and len(path) >= 3:
             if self.environment.champion.facing.value == Coords(1, 0):
                 if self.environment.position + Coords(0, 1) == path[1] and self.environment.position + Coords(1,1) == path[2]:
-                    return characters.Action.STEP_RIGHT, path
+                    return characters.Action.STEP_RIGHT
                 if self.environment.position + Coords(0,-1) == path[1] and self.environment.position + Coords(1, -1) == path[2]:
-                    return characters.Action.STEP_LEFT, path
+                    return characters.Action.STEP_LEFT
             if self.environment.champion.facing.value == Coords(0, 1):
                 if self.environment.position + Coords(1, 0) == path[1] and self.environment.position + Coords(1, 1) == path[2]:
-                    return characters.Action.STEP_LEFT, path
+                    return characters.Action.STEP_LEFT
                 if self.environment.position + Coords(-1, 0) == path[1] and self.environment.position + Coords(-1, 1) == path[2]:
-                    return characters.Action.STEP_RIGHT, path
+                    return characters.Action.STEP_RIGHT
             if self.environment.champion.facing.value == Coords(-1, 0):
                 if self.environment.position + Coords(0,1) == path[1] and self.environment.position + Coords(-1,1) == path[2]:
-                    return characters.Action.STEP_LEFT, path
+                    return characters.Action.STEP_LEFT
                 if self.environment.position + Coords(0,-1) == path[1] and self.environment.position + Coords(-1, -1) == path[2]:
-                    return characters.Action.STEP_RIGHT, path
+                    return characters.Action.STEP_RIGHT
             if self.environment.champion.facing.value == Coords(0, -1):
                 if self.environment.position + Coords(1, 0) == path[1] and self.environment.position + Coords(1, -1) == path[2]:
-                    return characters.Action.STEP_RIGHT, path
+                    return characters.Action.STEP_RIGHT
                 if self.environment.position + Coords(-1, 0) == path[1] and self.environment.position + Coords(-1, -1) == path[2]:
-                    return characters.Action.STEP_LEFT, path
+                    return characters.Action.STEP_LEFT
+
+        if path and len(path) > 1 and fast_move:
+            next_move = path[1]
+            move_vector = next_move - start
+
+            if self.environment.champion.facing.value == Coords(1, 0):
+                if move_vector == Coords(1, 0):
+                    return characters.Action.STEP_FORWARD
+                if move_vector == Coords(0, 1):
+                    return characters.Action.STEP_RIGHT
+                if move_vector == Coords(-1, 0):
+                    return characters.Action.STEP_BACKWARD
+                if move_vector == Coords(0, -1):
+                    return characters.Action.STEP_LEFT
+            if self.environment.champion.facing.value == Coords(0, 1):
+                if move_vector == Coords(1, 0):
+                    return characters.Action.STEP_LEFT
+                if move_vector == Coords(0, 1):
+                    return characters.Action.STEP_FORWARD
+                if move_vector == Coords(-1, 0):
+                    return characters.Action.STEP_RIGHT
+                if move_vector == Coords(0, -1):
+                    return characters.Action.STEP_BACKWARD
+            if self.environment.champion.facing.value == Coords(-1, 0):
+                if move_vector == Coords(1, 0):
+                    return characters.Action.STEP_BACKWARD
+                if move_vector == Coords(0, 1):
+                    return characters.Action.STEP_LEFT
+                if move_vector == Coords(-1, 0):
+                    return characters.Action.STEP_FORWARD
+                if move_vector == Coords(0, -1):
+                    return characters.Action.STEP_RIGHT
+            if self.environment.champion.facing.value == Coords(0, -1):
+                if move_vector == Coords(1, 0):
+                    return characters.Action.STEP_RIGHT
+                if move_vector == Coords(0, 1):
+                    return characters.Action.STEP_BACKWARD
+                if move_vector == Coords(-1, 0):
+                    return characters.Action.STEP_LEFT
+                if move_vector == Coords(0, -1):
+                    return characters.Action.STEP_FORWARD
 
         if path and len(path) > 1:
             next_move = path[1]
@@ -97,20 +136,25 @@ class Path_Finder():
 
             if sub.x != 0 or sub.y != 0:
                 if sub.x == 2 or sub.y == 2 or sub.x == -2 or sub.y == -2:
-                    return characters.Action.TURN_RIGHT, path
+                    return characters.Action.TURN_RIGHT
 
                 if move_vector.x == 0:
                     if sub.x * sub.y == 1:
-                        return characters.Action.TURN_LEFT, path
+                        return characters.Action.TURN_LEFT
                     else:
-                        return characters.Action.TURN_RIGHT, path
+                        return characters.Action.TURN_RIGHT
 
                 if move_vector.y == 0:
                     if sub.x * sub.y == 1:
-                        return characters.Action.TURN_RIGHT, path
+                        return characters.Action.TURN_RIGHT
                     else:
-                        return characters.Action.TURN_LEFT, path
+                        return characters.Action.TURN_LEFT
 
-            return characters.Action.STEP_FORWARD, path
+            return characters.Action.STEP_FORWARD
         else:
-            return None, None
+            return None
+
+    def calculate_next_move(self, end: Coords):
+        path = self.reconstruct_path(end)
+        action = self.next_action(path)
+        return action, path

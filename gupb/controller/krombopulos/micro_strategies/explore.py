@@ -39,32 +39,32 @@ class ExploreMicroStrat(MicroStrategy):
             return temp, True
 
         # stuck in a hole
-        if left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
+        if (left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall') and
+              right_tile and right_tile.type in ('sea', 'wall')):
+            self.queued_action = characters.Action.TURN_RIGHT
+            return characters.Action.STEP_BACKWARD, True
+        elif left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_RIGHT
             return characters.Action.STEP_RIGHT, True
         elif right_tile and right_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall'):
             self.queued_action = characters.Action.TURN_LEFT
             return characters.Action.STEP_LEFT, True
-        elif (left_tile and left_tile.type in ('sea', 'wall') and front_tile.type in ('sea', 'wall') and
-              right_tile and right_tile.type in ('sea', 'wall')):
-            self.queued_action = characters.Action.TURN_RIGHT
-            return characters.Action.STEP_BACKWARD, True
 
         if front_tile.type in ('land', 'menhir'):
             actions_to_choose_from.append(characters.Action.STEP_FORWARD)
-            probs.append(0.2)
+            probs.append(0.4)
 
         if left_tile and left_tile.type in ('land', 'menhir') or not left_tile:
             actions_to_choose_from.append(characters.Action.STEP_LEFT)
             probs.append(0.1)
             actions_to_choose_from.append(characters.Action.TURN_LEFT)
-            probs.append(0.05)
+            probs.append(0.1)
 
         if right_tile and right_tile.type in ('land', 'menhir') or not right_tile:
             actions_to_choose_from.append(characters.Action.STEP_RIGHT)
             probs.append(0.1)
             actions_to_choose_from.append(characters.Action.TURN_RIGHT)
-            probs.append(0.05)
+            probs.append(0.1)
 
         actions_to_choose_from.append(characters.Action.ATTACK)
         probs.append(0.05)
