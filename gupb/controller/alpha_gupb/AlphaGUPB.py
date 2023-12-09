@@ -342,7 +342,7 @@ class AlphaGUPB(controller.Controller):
                         path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.menhir)
                         if path:
                             return self.find_move(path[1])
-                else:
+                        
                 furthest_tiles = self.furthest_tiles(closest_mist, self.walkable_tiles)
                 for tile in furthest_tiles:
                     if (tile not in self.mist and self.can_walk(tile)):
