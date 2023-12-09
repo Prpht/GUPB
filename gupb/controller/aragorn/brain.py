@@ -59,6 +59,8 @@ class Brain:
         if closestPotionDistance is not None and closestPotionDistance < 5:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
+            goToPotionAction.setUseAllMovements(True)
+            goToPotionAction.setAllowDangerous(True)
             yield goToPotionAction, "Picking nearby potion"
 
         # ------------------------------------------
@@ -69,10 +71,12 @@ class Brain:
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
 
-        if closestWeaponDistance is not None:
+        if closestWeaponCoords is not None:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
+        else:
+            if DEBUG2: print("[ARAGORN|BRAIN] No weapon found")
         
         # ------------------------------------------
         
@@ -80,13 +84,6 @@ class Brain:
 
         seeMoreAction = SeeMoreAction()
         yield seeMoreAction, "Rotating to see more"
-
-        # ------------------------------------------
-
-        # EXPLORE THE MAP
-
-        exploreAction = self.persistentActions['explore']
-        yield exploreAction, "Exploring action"
 
         # ------------------------------------------
 
@@ -134,6 +131,8 @@ class Brain:
         if closestPotionDistance is not None and closestPotionDistance < 5:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
+            goToPotionAction.setUseAllMovements(True)
+            goToPotionAction.setAllowDangerous(True)
             yield goToPotionAction, "Picking nearby potion"
 
         # ------------------------------------------
@@ -195,7 +194,7 @@ class Brain:
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
 
-        if closestWeaponDistance is not None and closestWeaponDistance < 15:
+        if closestWeaponCoords is not None and closestWeaponDistance < 15:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
@@ -266,6 +265,8 @@ class Brain:
         if closestPotionDistance is not None and closestPotionDistance < 5:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
+            goToPotionAction.setUseAllMovements(True)
+            goToPotionAction.setAllowDangerous(True)
             yield goToPotionAction, "Picking nearby potion"
 
         # ------------------------------------------
@@ -325,7 +326,7 @@ class Brain:
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
 
-        if closestWeaponDistance is not None and closestWeaponDistance < 5:
+        if closestWeaponCoords is not None and closestWeaponDistance < 5:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
