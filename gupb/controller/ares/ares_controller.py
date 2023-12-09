@@ -21,7 +21,7 @@ class AresController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.knBase.update(knowledge)
-        action = self.knBase.choice2()
+        action = self.knBase.choice()
         return action
 
     def praise(self, score: int) -> None:

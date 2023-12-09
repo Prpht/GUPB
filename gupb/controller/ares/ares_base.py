@@ -179,16 +179,8 @@ class KnowledgeBase():
                     action = self.followTarget()
                     return action
         return action
-    
-    '''
-    def templateStrategy(self, args):
-        action = None
-
-        return action
-    
-    '''
             
-    def choice2(self):
+    def choice(self):
         inFrontCoords, inBackCoords, inRightCoords, inLeftCoords=self.getCoordsTiles()
         inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
         inBackTile=self.mapBase.map[inBackCoords.x][inBackCoords.y]
@@ -211,110 +203,6 @@ class KnowledgeBase():
         ]
         action = self.strategyManager(strategies)
         if action not in POSSIBLE_ACTIONS:
-            action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-        return action
-
-    def choice(self):
-        '''
-        Return one of the choices described in POSSIBLE_ACTIONS.
-
-        Additionally, it could take into account changing weapons, strategy, ect.
-        
-        '''
-        if self.mapBase.position not in self.mapBase.exploredList:
-            self.mapBase.exploredList.append(self.mapBase.position)
-        inFrontCoords, inBackCoords, inRightCoords, inLeftCoords=self.getCoordsTiles()
-        inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
-        inBackTile=self.mapBase.map[inBackCoords.x][inBackCoords.y]
-        inRightTile=self.mapBase.map[inRightCoords.x][inRightCoords.y]
-        inLeftTile=self.mapBase.map[inLeftCoords.x][inLeftCoords.y]
-        currentWeaponName=self.mapBase.description.weapon.name
-        try:
-            mistPath, mistTile = self.avoidMist()
-
-            potionPath, potionTile = self.mapBase.findTarget(
-                consumables.ConsumableDescription('potion'), 
-                radius=self.tileNeighbourhood
-            )
-
-            bowPath = []
-            if currentWeaponName != 'bow':
-                bowPath, bowTile = self.mapBase.findTarget(
-                    weapons.WeaponDescription('bow')
-                )
-
-            if inFrontTile.character: # depending on a weapon
-                if currentWeaponName!="amulet":
-                    action=characters.Action.ATTACK
-                else:
-                    if tilePassable(inRightTile):
-                        action=characters.Action.STEP_RIGHT
-                    elif tilePassable(inLeftTile):
-                        action=characters.Action.STEP_LEFT
-                    elif tilePassable(inBackTile):
-                        action=characters.Action.STEP_BACKWARD
-                    else:
-                        action=characters.Action.ATTACK
-            elif len(mistPath) > 0:
-                self.actionsToMake, self.actionsTarget = mistPath, mistTile
-                action = self.followTarget()
-            elif currentWeaponName=="bow_unloaded":
-                action=characters.Action.ATTACK
-            elif currentWeaponName=="amulet" and self.amuletCharactersToAttack():
-                action=characters.Action.ATTACK
-            elif currentWeaponName=="axe" and self.axeCharactersToAttack():
-                action=characters.Action.ATTACK
-            elif currentWeaponName=="bow_loaded" and self.bowCharactersToAttack():
-                action=characters.Action.ATTACK
-            elif self.actionsToMake is not None and len(self.actionsToMake) > 0:
-                action=self.followTarget()
-            elif len(self.mapBase.visiblePotions)>0:
-                self.actionsToMake, self.actionsTarget = self.pathNearestPotion()
-                if len(self.actionsToMake)>0:
-                    action = self.followTarget()
-                else:
-                    action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-            elif currentWeaponName=="knife" and len(self.mapBase.visibleWeapons)>0:
-                self.actionsToMake, self.actionsTarget = self.lookingForWeapon()
-                if len(self.actionsToMake)>0:
-                    action = self.followTarget()
-                else:
-                    action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-            # elif self.round_counter<3:
-            #     action=characters.Action.TURN_RIGHT
-            #     self.round_counter+=1
-            elif potionPath != [] and len(potionTile) < self.tileNeighbourhood:
-                self.actionsToMake, self.actionsTarget = potionPath, potionTile
-                action = self.followTarget()
-            elif self.mapBase.menhir:
-                self.actionsToMake, self.actionsTarget = self.mapBase.findTarget(self.mapBase.menhir)
-                if len(self.actionsToMake) > self.tileNeighbourhood:
-                    action = self.followTarget()
-                else:
-                    self.actionsToMake, self.actionsTarget = [], None
-                    action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-            elif len(bowPath) > 0:
-                self.actionsToMake, self.actionsTarget = bowPath, bowTile
-                action = self.followTarget()
-            # elif len(self.mapBase.visibleOpponents)>0:
-            #     # to be implemented
-            else:
-                # map exploration
-                action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-                firstCoord=random.randint(0, self.mapBase.MAPSIZE[0]-1)
-                secondCoord=random.randint(0, self.mapBase.MAPSIZE[1]-1)
-                coordToExplore=coordinates.Coords(firstCoord, secondCoord)
-                for i in range(100):
-                    if coordToExplore in self.mapBase.exploredList:
-                        firstCoord=random.randint(0, self.mapBase.MAPSIZE[0]-1)
-                        secondCoord=random.randint(0, self.mapBase.MAPSIZE[1]-1)
-                        coordToExplore=coordinates.Coords(firstCoord, secondCoord)
-                    else:
-                        self.actionsToMake, self.actionsTarget = self.mapBase.findTarget(coordToExplore)
-                        if len(self.actionsToMake)>0:
-                            action = self.followTarget()
-                        break
-        except:
             action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
         return action
     
