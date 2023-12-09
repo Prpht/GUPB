@@ -15,86 +15,13 @@ class Brain:
 
         self.__initPersistentActions()
         self.wholeTime = 0
-        self.state = 0
     
     def __initPersistentActions(self):
         self.persistentActions = {
             'explore': AdvancedExploreAction(),
         }
 
-    def prepareActionsOpening(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.memory.update(knowledge)
-
-        # ------------------------------------------
-        
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
-
-        # ------------------------------------------
-
-        # PREVENT IDLE PENALTY
-
-        if self.memory.willGetIdlePenalty():
-            # TODO: allow to decide action, afterwards, if pos will no change - force spin
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_LEFT)
-            yield spinAction, "Spinning to prevent idle penalty"
-        
-        # ------------------------------------------
-
-        # DEFENDING FROM ATTACKS
-
-        if self.memory.position in dangerousTilesDict:
-            takeToOnesLegsAction = TakeToOnesLegsAction()
-            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
-            yield takeToOnesLegsAction, "Defending from attack"
-        
-        # ------------------------------------------
-
-        # PICKING UP POTION
-
-        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
-
-        if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
-
-        if closestPotionDistance is not None and closestPotionDistance < 5:
-            goToPotionAction = GoToAction()
-            goToPotionAction.setDestination(closestPotionCoords)
-            goToPotionAction.setUseAllMovements(True)
-            goToPotionAction.setAllowDangerous(True)
-            yield goToPotionAction, "Picking nearby potion"
-
-        # ------------------------------------------
-        
-        # PICKING UP WEAPON
-
-        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
-
-        if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
-
-        if closestWeaponCoords is not None:
-            goToWeaponAction = GoToAroundAction()
-            goToWeaponAction.setDestination(closestWeaponCoords)
-            yield goToWeaponAction, "Picking nearby weapon"
-        else:
-            if DEBUG2: print("[ARAGORN|BRAIN] No weapon found")
-        
-        # ------------------------------------------
-        
-        # ROTATE TO SEE MORE
-
-        seeMoreAction = SeeMoreAction()
-        yield seeMoreAction, "Rotating to see more"
-
-        # ------------------------------------------
-
-        # NOTHING TO DO - JUST SPIN
-
-        spinAction = SpinAction()
-        yield spinAction, "No action found, spinning"
-
-        # ==========================================
-
-    def prepareActionsMidGame(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
 
         # ------------------------------------------
@@ -233,146 +160,6 @@ class Brain:
 
         # ==========================================
 
-    def prepareActionsEndGame(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        self.memory.update(knowledge)
-
-        # ------------------------------------------
-        
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
-
-        # ------------------------------------------
-
-        # PREVENT IDLE PENALTY
-
-        if self.memory.willGetIdlePenalty():
-            # TODO: allow to decide action, afterwards, if pos will no change - force spin
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_LEFT)
-            yield spinAction, "Spinning to prevent idle penalty"
-        
-        # ------------------------------------------
-
-        # DEFENDING FROM ATTACKS
-
-        if self.memory.position in dangerousTilesDict:
-            takeToOnesLegsAction = TakeToOnesLegsAction()
-            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
-            yield takeToOnesLegsAction, "Defending from attack"
-        
-        # ------------------------------------------
-
-        # PICKING UP POTION
-
-        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
-
-        if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
-
-        if closestPotionDistance is not None and closestPotionDistance < 5:
-            goToPotionAction = GoToAction()
-            goToPotionAction.setDestination(closestPotionCoords)
-            goToPotionAction.setUseAllMovements(True)
-            goToPotionAction.setAllowDangerous(True)
-            yield goToPotionAction, "Picking nearby potion"
-
-        # ------------------------------------------
-        
-        # ATTACKING
-
-        oponentInRange = self.memory.getClosestOponentInRange()
-
-        if DEBUG2: print("[ARAGORN|BRAIN] oponentInRange", oponentInRange, "is on safe tile:", self.memory.position not in dangerousTilesDict.keys(), "oppo health:", oponentInRange.health if oponentInRange is not None else None, "my health:", self.memory.health)
-
-        if (
-            oponentInRange is not None
-            and (
-                self.memory.position not in dangerousTilesDict.keys()
-                or (
-                    oponentInRange.health <= self.memory.health
-                    and oponentInRange.health <= consumables.POTION_RESTORED_HP
-                )
-            )
-        ):
-            attackAction = AttackAction()
-            yield attackAction, "Attacking, since got oponent in range"
-        
-        # ------------------------------------------
-
-        # MIST FORCED MOVEMENT
-
-        [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
-        distanceToMenhir = None
-
-        if DEBUG2: print("[ARAGORN|BRAIN] menhirPos", menhirPos, "prob", prob)
-        
-        if menhirPos is not None:
-            goCloserToMenhir = False
-            
-            if not goCloserToMenhir:
-                distanceToMenhir = pathfinding.get_path_cost(self.memory, self.memory.position, menhirPos, self.memory.facing, True)
-
-                if distanceToMenhir is None or distanceToMenhir == INFINITY:
-                    distanceToMenhir = utils.manhattanDistance(self.memory.position, menhirPos)
-
-                if distanceToMenhir >= self.memory.map.mist_radius - 1:
-                    goCloserToMenhir = True
-
-            if goCloserToMenhir:
-                goToAroundAction = GoToAroundAction()
-                goToAroundAction.setDestination(menhirPos)
-                goToAroundAction.setAllowDangerous(True)
-                goToAroundAction.setUseAllMovements(True)
-                yield goToAroundAction, "Going closer to menhir"
-
-        # ------------------------------------------
-        
-        # PICKING UP WEAPON
-
-        [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
-
-        if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
-
-        if closestWeaponCoords is not None and closestWeaponDistance < 5:
-            goToWeaponAction = GoToAction()
-            goToWeaponAction.setDestination(closestWeaponCoords)
-            yield goToWeaponAction, "Picking nearby weapon"
-        
-        # ------------------------------------------
-        
-        # ROTATE TO SEE MORE
-
-        seeMoreAction = SeeMoreAction()
-        yield seeMoreAction, "Rotating to see more"
-
-        # ------------------------------------------
-        
-        # Go to closest enemy
-        attackClosestEnemyAction = AttackClosestEnemyAction()
-        yield attackClosestEnemyAction, "Going closer to enemy"
-
-        # ------------------------------------------
-
-        # GO TOWARDS MENHIR
-
-        if menhirPos is not None and distanceToMenhir is not None:
-            if distanceToMenhir > 7:
-                goCloserToMenhir = True
-
-            if goCloserToMenhir:
-                goToAroundAction = GoToAroundAction()
-                goToAroundAction.setDestination(menhirPos)
-                goToAroundAction.setAllowDangerous(True)
-                goToAroundAction.setUseAllMovements(True)
-                yield goToAroundAction, "Going closer to menhir"
-        
-        # ------------------------------------------
-
-        # NOTHING TO DO - JUST SPIN
-
-        spinAction = SpinAction()
-        yield spinAction, "No action found, spinning"
-
-        # ==========================================
-
     @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         if DEBUG: print()
@@ -380,39 +167,9 @@ class Brain:
 
         actionIndexPerformed = 0
 
-
-        # update state
-        
-        if self.state == 0:
-            if self.memory.tick > 10:
-                self.state = 1
-            else:
-                currentWeaponDescription = self.memory.getCurrentWeaponDescription()
-                [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
-                if closestWeaponDistance > 10:
-                    self.state = 1
-                if currentWeaponDescription is not None and currentWeaponDescription.name != 'knife':
-                    self.state = 1
-        elif self.state == 1:
-            if self.memory.map.mist_radius < self.memory.map.size[0] * 4/5:
-                [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
-                if prob == 1:
-                    self.state = 2
-
-
-        # select actions depending on state
-
-        if self.state == 0:
-            actionsFunc = self.prepareActionsOpening
-        elif self.state == 1:
-            actionsFunc = self.prepareActionsMidGame
-        else:
-            actionsFunc = self.prepareActionsEndGame
-
+        actionsFunc = self.prepareActions
         
         # pick action & perform it
-
-        if DEBUG: print("[ARAGORN|BRAIN] State=", self.state)
 
         for action, dbg_ac_msg in actionsFunc(knowledge):
             startTime = time.time()
@@ -439,7 +196,6 @@ class Brain:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.memory.reset(arena_description)
         pathfinding.invalidate_PF_cache()
-        self.state = 0
 
         self.__initPersistentActions()
     
