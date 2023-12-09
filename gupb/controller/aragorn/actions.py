@@ -362,7 +362,7 @@ class AttackClosestEnemyAction(Action):
         
         if closestEnemy is None:
             if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] No closest enemy found")
-            return None
+            return None, INFINITY
         
         if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
 
@@ -444,6 +444,10 @@ class AttackClosestEnemyAction(Action):
     @profile
     def perform(self, memory: Memory) -> Action:
         closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        
+        if closestEnemy is None:
+            return None
+        
         return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class RageAttackAction(AttackClosestEnemyAction):
@@ -484,7 +488,7 @@ class RageAttackAction(AttackClosestEnemyAction):
         
         if closestEnemy is None:
             if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] No closest enemy found")
-            return None
+            return None, INFINITY
         
         if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
         
@@ -493,6 +497,10 @@ class RageAttackAction(AttackClosestEnemyAction):
     @profile
     def perform(self, memory: Memory) -> Action:
         closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        
+        if closestEnemy is None:
+            return None
+        
         return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class TakeToOnesLegsAction(Action):
@@ -539,7 +547,7 @@ class TakeToOnesLegsAction(Action):
         res = goToAroundAction.perform(memory)
         return res
     
-    def howManySafeTilesAround(self, coords: Coords, memory: Memory, dangerousTiles) -> int:
+    def howManySafeTilesAround(self, coords: Coords, memory: Memory, dangerousTiles, watchOutForPossibleOpponents: bool = False) -> int:
         possibleTiles = [
             add_coords(coords, Coords(1, 0)),
             add_coords(coords, Coords(-1, 0)),
@@ -551,6 +559,8 @@ class TakeToOnesLegsAction(Action):
         for coords in possibleTiles:
             if self.isTileGood(coords, memory, dangerousTiles):
                 safeTiles += 1
+
+                safeTiles -= self.getTileSuspiciousness(memory, coords)
         
         return safeTiles
 
@@ -572,6 +582,25 @@ class TakeToOnesLegsAction(Action):
 
         return True
     
+    def getTileSuspiciousness(self, memory: Memory, coords: Coords):
+        suspiciousness = 0
+        
+        if coords in memory.map.enemiesPositionsApproximation.getEnemiesTiles():
+            suspiciousness += 0.1
+        
+        neighbors = [
+            add_coords(coords, Coords(1, 0)),
+            add_coords(coords, Coords(-1, 0)),
+            add_coords(coords, Coords(0, 1)),
+            add_coords(coords, Coords(0, -1)),
+        ]
+
+        for neighbor in neighbors:
+            if neighbor in memory.map.enemiesPositionsApproximation.getEnemiesTiles():
+                suspiciousness += 0.1
+        
+        return suspiciousness
+
     def runToAnySafeTile(self, memory: Memory) -> Action:
         dangerousTiles = list(memory.map.getDangerousTilesWithDangerSourcePos(memory.tick).keys())
         
@@ -587,7 +616,9 @@ class TakeToOnesLegsAction(Action):
             if not self.isTileGood(coords, memory, dangerousTiles):
                 continue
             
-            safeTiles[coords] = self.howManySafeTilesAround(coords, memory, dangerousTiles)
+            safeTiles[coords] = self.howManySafeTilesAround(coords, memory, dangerousTiles, True)
+            
+            safeTiles[coords] -= self.getTileSuspiciousness(memory, coords)
 
         # get coords from safeTiles key with maximum value
         maxSafeTile = None
