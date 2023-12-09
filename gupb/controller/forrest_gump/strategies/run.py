@@ -1,17 +1,10 @@
 from gupb.controller.forrest_gump.strategies import Strategy
-from gupb.controller.forrest_gump.utils import CharacterInfo, manhattan_distance_to, next_pos_to_action, find_path, \
-    closest_opposite
+from gupb.controller.forrest_gump.utils import CharacterInfo, manhattan_distance_to, next_pos_to_action, find_path, closest_opposite
 from gupb.model import tiles, coordinates, characters, arenas
 
 
 class Run(Strategy):
-    def __init__(
-            self,
-            arena_description: arenas.ArenaDescription,
-            close_distance: int = 5,
-            far_distance: int = 10,
-            distance_to_menhir: int = 5
-    ) -> None:
+    def __init__(self, arena_description: arenas.ArenaDescription, close_distance: int, far_distance: int, distance_to_menhir: int) -> None:
         super().__init__(arena_description)
         self.close_distance = close_distance
         self.far_distance = far_distance
@@ -52,15 +45,13 @@ class Run(Strategy):
 
         path = find_path(self.matrix, character_info.position, destination)
         next_pos = path[1] if len(path) > 1 else path[0]
-        return next_pos_to_action(next_pos.x, next_pos.y, character_info.facing, character_info.position, True)
+        return next_pos_to_action(next_pos.x, next_pos.y, character_info.facing, character_info.position, False)
 
     @property
     def priority(self) -> int:
         distance = manhattan_distance_to(self.mist, self.character_info.position)
 
         if distance <= self.close_distance:
-            return 7
-        elif distance <= self.far_distance:
             return 5
         else:
-            return 3
+            return 2
