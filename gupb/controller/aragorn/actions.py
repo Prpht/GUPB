@@ -333,9 +333,7 @@ class AdvancedExploreAction(ExploreAction):
 class AttackClosestEnemyAction(Action):
     OUTDATED_DATA_TICKS = 16
 
-    @profile
-    def perform(self, memory: Memory) -> Action:
-        # GET CLOSEST ENEMY
+    def getClosestEnemy(self, memory: Memory):
         closestEnemy = None
         closestEnemyDistance = INFINITY
 
@@ -367,7 +365,10 @@ class AttackClosestEnemyAction(Action):
             return None
         
         if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
+
+        return closestEnemy, closestEnemyDistance
         
+    def approachEnemy(self, memory: Memory, closestEnemy: Coords, closestEnemyDistance: int) -> Action:
         # CLOSEST ENEMY IS TOO FAR
         # just approach him
         if closestEnemyDistance > 3:
@@ -439,6 +440,60 @@ class AttackClosestEnemyAction(Action):
         goToAttackAction.setDestinationFacing(minCostFacing)
         goToAttackAction.setUseAllMovements(True)
         return goToAttackAction.perform(memory)
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
+
+class RageAttackAction(AttackClosestEnemyAction):
+    RAGE_ATTACK_BOTS = [
+        'Ancymon',
+        'Roger_1',
+    ]
+
+    def getClosestEnemy(self, memory: Memory):
+        # GET CLOSEST ENEMY
+        closestEnemy = None
+        closestEnemyDistance = INFINITY
+
+        if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] Searching for closest enemy")
+
+        for coords in memory.map.terrain:
+            if (
+                # tile has character
+                memory.map.terrain[coords].character is not None
+                # ignore if data is outdated
+                # and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                # ignore ourselfs
+                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # ignore our position
+                and memory.position != coords
+                # ignore enemies with greater health
+                # and memory.map.terrain[coords].character.health <= memory.health
+                # ignore enemies with health greater than reward of killing (potion restore)
+                # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
+
+                and memory.map.terrain[coords].character.controller_name in self.RAGE_ATTACK_BOTS
+            ):
+                distance = utils.manhattanDistance(memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
+        
+        if closestEnemy is None:
+            if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] No closest enemy found")
+            return None
+        
+        if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
+        
+        return closestEnemy, closestEnemyDistance
+    
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class TakeToOnesLegsAction(Action):
     def __init__(self):

@@ -207,6 +207,11 @@ class Brain:
         yield seeMoreAction, "Rotating to see more"
 
         # ------------------------------------------
+
+        # RAGE ATTACK
+
+        rageAttackAction = RageAttackAction()
+        yield rageAttackAction, "Rage attack"
         
         # Go to closest enemy
         attackClosestEnemyAction = AttackClosestEnemyAction()
