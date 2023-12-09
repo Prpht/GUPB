@@ -280,7 +280,7 @@ class Map:
                             terrain[position].seen = arenas.TILE_ENCODING[character] != tiles.Land
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
-                            terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
+                            terrain[position].loot =  Map.weaponDescriptionConverter(arenas.WEAPON_ENCODING[character]().description())
                             terrain[position].seen = False
         return Map(name, terrain)
     
