@@ -22,65 +22,77 @@ def init_grid(arena_description: ArenaDescription) -> np.ndarray:
     return arena
 
 
-def next_pos_to_action(next_x: int, next_y: int, facing: characters.Facing, position: coordinates.Coords) -> characters.Action:
+def next_pos_to_action(
+        next_x: int,
+        next_y: int,
+        facing: characters.Facing,
+        position: coordinates.Coords,
+        fast: bool
+) -> characters.Action:
     if next_x > position.x:
         if facing == characters.Facing.RIGHT:
             return characters.Action.STEP_FORWARD
-        elif facing == characters.Facing.UP or facing == characters.Facing.LEFT:
-            return characters.Action.TURN_RIGHT
+        elif facing == characters.Facing.UP:
+            return characters.Action.STEP_RIGHT if fast else characters.Action.TURN_RIGHT
+        elif facing == characters.Facing.LEFT:
+            return characters.Action.STEP_BACKWARD if fast else characters.Action.TURN_RIGHT
         elif facing == characters.Facing.DOWN:
-            return characters.Action.TURN_LEFT
+            return characters.Action.STEP_LEFT if fast else characters.Action.TURN_LEFT
     elif next_x < position.x:
         if facing == characters.Facing.LEFT:
             return characters.Action.STEP_FORWARD
-        elif facing == characters.Facing.UP or facing == characters.Facing.RIGHT:
-            return characters.Action.TURN_LEFT
+        elif facing == characters.Facing.UP:
+            return characters.Action.STEP_LEFT if fast else characters.Action.TURN_LEFT
+        elif facing == characters.Facing.RIGHT:
+            return characters.Action.STEP_BACKWARD if fast else characters.Action.TURN_LEFT
         elif facing == characters.Facing.DOWN:
-            return characters.Action.TURN_RIGHT
+            return characters.Action.STEP_RIGHT if fast else characters.Action.TURN_RIGHT
     elif next_y > position.y:
         if facing == characters.Facing.DOWN:
             return characters.Action.STEP_FORWARD
-        elif facing == characters.Facing.LEFT or facing == characters.Facing.UP:
-            return characters.Action.TURN_LEFT
+        elif facing == characters.Facing.LEFT:
+            return characters.Action.STEP_LEFT if fast else characters.Action.TURN_LEFT
+        elif facing == characters.Facing.UP:
+            return characters.Action.STEP_BACKWARD if fast else characters.Action.TURN_LEFT
         elif facing == characters.Facing.RIGHT:
-            return characters.Action.TURN_RIGHT
+            return characters.Action.STEP_RIGHT if fast else characters.Action.TURN_RIGHT
     elif next_y < position.y:
         if facing == characters.Facing.UP:
             return characters.Action.STEP_FORWARD
-        elif facing == characters.Facing.LEFT or facing == characters.Facing.DOWN:
-            return characters.Action.TURN_RIGHT
+        elif facing == characters.Facing.LEFT:
+            return characters.Action.STEP_RIGHT if fast else characters.Action.TURN_RIGHT
+        elif facing == characters.Facing.DOWN:
+            return characters.Action.STEP_BACKWARD if fast else characters.Action.TURN_RIGHT
         elif facing == characters.Facing.RIGHT:
-            return characters.Action.TURN_LEFT
+            return characters.Action.STEP_LEFT if fast else characters.Action.TURN_LEFT
     else:
-        return characters.Action.DO_NOTHING
+        return characters.Action.ATTACK
 
 
-def next_facing(facing: characters.Facing, action: characters.Action) -> characters.Facing:
-    if facing == characters.Facing.UP:
-        if action == characters.Action.TURN_LEFT:
-            return characters.Facing.LEFT
-        elif action == characters.Action.TURN_RIGHT:
-            return characters.Facing.RIGHT
-        else:
-            return facing
-    elif facing == characters.Facing.RIGHT:
-        if action == characters.Action.TURN_LEFT:
-            return characters.Facing.UP
-        elif action == characters.Action.TURN_RIGHT:
-            return characters.Facing.DOWN
-        else:
-            return facing
-    elif facing == characters.Facing.DOWN:
-        if action == characters.Action.TURN_LEFT:
-            return characters.Facing.RIGHT
-        elif action == characters.Action.TURN_RIGHT:
-            return characters.Facing.LEFT
-        else:
-            return facing
-    elif facing == characters.Facing.LEFT:
-        if action == characters.Action.TURN_LEFT:
-            return characters.Facing.DOWN
-        elif action == characters.Action.TURN_RIGHT:
-            return characters.Facing.UP
-        else:
-            return facing
+def is_facing(my_position: coordinates.Coords, other_position: coordinates.Coords, other_facing: characters.Facing):
+    if (my_position.x >= other_position.x and my_position.y >= other_position.y and
+            (other_facing == characters.Facing.DOWN or other_facing == characters.Facing.RIGHT)):
+        return True
+    elif (my_position.x >= other_position.x and my_position.y <= other_position.y and
+          (other_facing == characters.Facing.UP or other_facing == characters.Facing.RIGHT)):
+        return True
+    elif (my_position.x <= other_position.x and my_position.y >= other_position.y and
+          (other_facing == characters.Facing.DOWN or other_facing == characters.Facing.LEFT)):
+        return True
+    elif (my_position.x <= other_position.x and my_position.y <= other_position.y and
+          (other_facing == characters.Facing.UP or other_facing == characters.Facing.LEFT)):
+        return True
+    else:
+        return False
+
+
+def closest_opposite(fields: list, position: coordinates.Coords, destination: coordinates.Coords) -> list:
+    dx, dy = position.x - destination.x, position.y - destination.y
+    new_position = np.array([[position.x + dx, position.y + dy]])
+
+    fields_copy = fields.copy()
+    fields_copy.remove([position.x, position.y])
+    fields_copy = np.array(fields_copy)
+    closest = np.argmin(np.abs(fields_copy - new_position).sum(axis=1))
+
+    return fields_copy[closest].tolist()

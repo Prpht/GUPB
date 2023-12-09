@@ -1,59 +1,64 @@
 from gupb.controller.ancymon.environment import Environment
 from gupb.controller.ancymon.strategies.path_finder import Path_Finder
+from gupb.controller.ancymon.strategies.decision_enum import HUNTER_DECISION
 from gupb.model import characters
 from gupb.model.coordinates import Coords
 
-POSSIBLE_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
-    characters.Action.STEP_FORWARD,
-    characters.Action.ATTACK,
-]
-
-
 class Hunter:
-    def __init__(self, environment: Environment, path_finder: Path_Finder):
+    def __init__(self, environment: Environment):
         self.environment: Environment = environment
-        self.path_finder: Path_Finder = path_finder
-        self.poi: Coords = Coords(0, 0)
+        self.path_finder: Path_Finder = None
+
         self.next_target = None
         self.next_target_coord: Coords = None
 
-    def decide(self) -> characters.Action:
-        if self.is_enemy_neer(1) == False and self.can_attack():
-            # print("LONG RANGE ATTACK", self.environment.weapon)
-            return characters.Action.ATTACK
+        self.next_move: characters.Action = None
+        self.path: list[Coords] = None
 
-        if self.is_enemy_neer() and (
-                self.environment.champion.health > self.next_target.health or self.is_menhir_neer()):
+    def decide(self, path_finder: Path_Finder):
+        self.path_finder = path_finder
+        self.next_move = None
+        self.path = None
 
+        potential_enemies = self.neerest_enemy_list()
+
+        if len(potential_enemies) > 0:
             if self.can_attack():
-                # print("CAN ATTACK WITH", self.environment.weapon)
-                return characters.Action.ATTACK
+                self.next_move = characters.Action.ATTACK
+                return HUNTER_DECISION.ATTACK
 
-            cord_position_to_atack = self.find_coord_to_attack_spot()
+            for enemy in potential_enemies:
+                self.next_target_coord = enemy
+                self.next_target = self.environment.discovered_map.get(enemy).character
+                cord_position_to_atack = self.find_coord_to_attack_spot()
+                self.next_move, self.path = self.path_finder.calculate_next_move(cord_position_to_atack)
+                if self.next_move:
+                    return HUNTER_DECISION.CHASE
 
-            # if cord_position_to_atack == self.environment.position:
-            #     return characters.Action.TURN_RIGHT
-            # else:
-            # print("CHASING")
-            return self.path_finder.caluclate(self.environment.position, cord_position_to_atack)
-        return None
+        return HUNTER_DECISION.NO_ENEMY
 
-    def is_menhir_neer(self):
-        if self.environment.menhir:
-            margin = self.environment.enemies_left
-            if len(self.environment.discovered_map[self.environment.position].effects) > 0:
-                margin = 1
-            return (abs(self.environment.menhir[0] - self.environment.position.x) < margin and
-                    abs(self.environment.menhir[1] - self.environment.position.y) < margin)
+    def is_target_on_same_position(self):
+        if self.next_target and self.next_target_coord:
+            enemy_field = self.environment.discovered_map.get(self.next_target_coord)
+            if enemy_field and enemy_field.character:
+                return
+        self.next_target = None
+        self.next_target_coord: Coords = None
+
+    def neerest_enemy_list(self) -> list[Coords]:
+        enemy_coords_list = []
+
+        for coords, description in self.environment.discovered_map.items():
+            coords = Coords(coords[0], coords[1])
+            if description.character and description.character.controller_name != self.environment.champion.controller_name:
+                enemy_coords_list.append(coords)
+        return sorted(enemy_coords_list, key=lambda x: self.path_finder.calculate_path_length(x))
 
     def is_enemy_neer(self, size_of_searched_area: int = 3):
         for x in range(-size_of_searched_area, size_of_searched_area + 1):
             for y in range(-size_of_searched_area, size_of_searched_area + 1):
                 field = self.environment.discovered_map.get(self.environment.position + Coords(x, y))
                 if field != None and field.character != None and field.character.controller_name != self.environment.champion.controller_name:
-                    # if field.character.health <= self.environment.champion.health:
                     self.next_target = field.character
                     self.next_target_coord = Coords(x, y) + self.environment.position
                     return True
@@ -117,30 +122,58 @@ class Hunter:
 
         return False
 
-    def manhatan_distance(self, start: Coords, end: Coords):
-        return abs(start.x - end.x) + abs(start.y - end.y)
     def find_coord_to_attack_spot(self):
-        return self.next_target_coord #TODO Temporarly
+
         new_attack_spot_dist = float('inf')
-        new_attack_spot = None
+        new_attack_spot = self.next_target_coord
 
         if self.environment.weapon.name == 'knife':
             return self.next_target_coord
 
-        elif self.environment.weapon.name == 'sword':
-            for direction in [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]:
+        # elif self.environment.weapon.name == 'sword':
+        #     for direction in [Coords(0, 1), Coords(0, -1), Coords(1, 0), Coords(-1, 0)]:
+        #         further_position = self.next_target_coord
+        #         for i in range(2):
+        #             further_position += direction
+        #             spot = self.environment.visible_map.get(further_position)
+        #             if spot and spot.type == 'land':
+        #                 spot_dist = self.path_finder.calculate_path_length(further_position)
+        #                 if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
+        #                     new_attack_spot_dist = spot_dist
+        #                     new_attack_spot = further_position
+
+        elif self.environment.weapon.name == 'amulet':
+            for direction in [Coords(1, 1), Coords(1, -1), Coords(-1, 1), Coords(-1, -1)]:
                 further_position = self.next_target_coord
                 for i in range(2):
                     further_position += direction
                     spot = self.environment.discovered_map.get(further_position)
                     if spot and spot.type == 'land':
-                        spot_dist = self.manhatan_distance(self.environment.position, further_position)
+                        spot_dist = self.path_finder.calculate_path_length(further_position)
                         if (new_attack_spot == None or spot_dist < new_attack_spot_dist):
                             new_attack_spot_dist = spot_dist
                             new_attack_spot = further_position
-            if new_attack_spot:
-                # print(new_attack_spot)
-                return new_attack_spot
 
-        else:
-            return self.next_target_coord
+        elif self.environment.weapon.name == 'axe':
+            for direction in [Coords(0, 1), Coords(0, -1)]:
+                for direction_2 in [Coords(0, 0), Coords(1, 0), Coords(-1, 0)]:
+                    further_position = self.next_target_coord + direction + direction_2
+                    spot = self.environment.discovered_map.get(further_position)
+                    if spot and spot.type == 'land':
+                        spot_dist = self.path_finder.calculate_path_length(further_position)
+                        if new_attack_spot is None or spot_dist < new_attack_spot_dist:
+                            new_attack_spot_dist = spot_dist
+                            new_attack_spot = further_position
+
+            for direction in [Coords(1, 0), Coords(-1, 0)]:
+                for direction_2 in [Coords(0, 0), Coords(0, 1), Coords(0, -1)]:
+                    further_position = self.next_target_coord + direction + direction_2
+                    spot = self.environment.discovered_map.get(further_position)
+                    if spot and spot.type == 'land':
+                        spot_dist = self.path_finder.calculate_path_length(further_position)
+                        if new_attack_spot is None or spot_dist < new_attack_spot_dist:
+                            new_attack_spot_dist = spot_dist
+                            new_attack_spot = further_position
+
+        # print(new_attack_spot)
+        return new_attack_spot

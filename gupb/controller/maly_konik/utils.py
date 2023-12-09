@@ -1,13 +1,15 @@
 from gupb.model import characters
 from gupb.model import weapons
+from gupb.model import coordinates as cord
 
-BEST_WEAPONS = {
-    1: 'sword',
-    2: 'axe',
-    3: 'amulet',
-    4: 'bow_unloaded',
-    5: 'bow_loaded',
-    6: 'knife',
+
+WORST_WEAPONS = {
+     'sword': 1,
+     'axe': 3,
+     'bow_loaded': 4,
+     'bow_unloaded': 5,
+     'amulet': 2,
+     'knife': 6,
 }
 
 WEAPONS = {
@@ -24,13 +26,42 @@ ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
-    characters.Action.DO_NOTHING
+    characters.Action.DO_NOTHING,
+    characters.Action.STEP_BACKWARD
 ]
 
 CHAMPION_STARTING_HP: int = 8
 
 
 def get_weapon_value(weapon_name: str) -> int:
-    for value, weapon in BEST_WEAPONS.items():
+    for weapon, value in WORST_WEAPONS.items():
         if weapon == weapon_name:
             return value
+
+
+def get_cords_around_point(point_x: int, point_y: int):
+    x, y = point_x, point_y
+
+    distance = 1
+    while True:
+        for _ in range(distance):
+            x += 1
+            yield x, y
+
+        for _ in range(distance):
+            y += 1
+            yield x, y
+
+        distance += 1
+
+        for _ in range(distance):
+            x -= 1
+            yield x, y
+
+        for _ in range(distance):
+            y -= 1
+            yield x, y
+
+        distance += 1
+
+

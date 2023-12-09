@@ -1,12 +1,18 @@
 from abc import abstractmethod
-from random import choice
+import random
 from typing import NamedTuple, Optional, List, Tuple
+from collections import defaultdict
 
 from gupb.model.coordinates import *
 from gupb.model import characters
+from gupb.model import consumables
+from gupb.model import weapons
+from gupb.model.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY
+from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.controller.aragorn import pathfinding
+from gupb.controller.aragorn import utils
 
 
 
@@ -20,6 +26,7 @@ class SpinAction(Action):
         super().__init__()
         self.spin = characters.Action.TURN_RIGHT
     
+    @profile
     def perform(self, memory :Memory) -> characters.Action:
         return self.spin
     
@@ -33,12 +40,14 @@ class SpinAction(Action):
         self.spin = spin
 
 class RandomAction(Action):
+    @profile
     def perform(self, memory: Memory) -> characters.Action:
         available_actions = [characters.Action.STEP_FORWARD, characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
-        random_action = choice(available_actions)
+        random_action = random.choice(available_actions)
         return random_action
 
 class AttackAction(Action):
+    @profile
     def perform(self, memory: Memory) -> Action:
         return characters.Action.ATTACK
 
@@ -47,6 +56,7 @@ class GoToAction(Action):
         super().__init__()
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
+        self.useAllMovements: bool = False
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -62,6 +72,13 @@ class GoToAction(Action):
             if DEBUG:
                 print("Trying to set destination facing to non Facing object (" + str(dstFacing) + " of type " + str(type(dstFacing)) + ")")
 
+    def setUseAllMovements(self, useAllMovements: bool) -> None:
+        if isinstance(useAllMovements, bool):
+            self.useAllMovements = useAllMovements
+        else:
+            if DEBUG: print("Trying to set use all movements to non bool object (" + str(useAllMovements) + " of type " + str(type(useAllMovements)) + ")")
+    
+    @profile
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
             return None
@@ -74,7 +91,7 @@ class GoToAction(Action):
                 return characters.Action.TURN_RIGHT
             return None
         
-        [path, cost] = self.find_path(memory=memory, start=current_position, end=self.destination, facing = memory.facing)
+        [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
 
         if path is None or len(path) <= 1:
             return None
@@ -83,112 +100,23 @@ class GoToAction(Action):
         
         return self.get_action_to_move_in_path(memory, nextCoord)
 
-    def get_facing(self, f_coords: Coords) -> characters.Facing:
-        if f_coords == Coords(0, 1):
-            return characters.Facing.DOWN
-        elif f_coords == Coords(0, -1):
-            return characters.Facing.UP
-        elif f_coords == Coords(1, 0):
-            return characters.Facing.LEFT
-        elif f_coords == Coords(-1, 0):
-            return characters.Facing.RIGHT
-
     def get_action_to_move_in_path(self, memory: Memory, destination: Coords) -> characters.Action:
-        direction = sub_coords(destination, memory.position)
-
-        if direction == memory.facing.value:
-            return characters.Action.STEP_FORWARD
-        elif direction == memory.facing.turn_left().value:
-            return characters.Action.TURN_LEFT
-        else:
-            return characters.Action.TURN_RIGHT
+        return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination)
     
-    def find_path(self, memory: Memory, start: Coords, end: Coords, facing: characters.Facing) -> (Optional[List[Coords]], int):
-        def get_h_cost(h_start: Coords, h_end: Coords, h_facing: characters.Facing) -> int:
-            distance: int = abs(h_end.y - h_start.y) + abs(h_end.x - h_start.x)
-            direction: Coords = Coords(1 if h_end.x - h_start.x > 0 else -1 if h_end.x - h_start.x < 0 else 0,
-                                       1 if h_end.y - h_start.y > 0 else -1 if h_end.y - h_start.y < 0 else 0)
-            
-            turnDiffX = abs(h_facing.value.x - direction.x)
-            turnDiffY = abs(h_facing.value.y - direction.y)
-
-            if turnDiffX == 1 and turnDiffY == 1:
-                turns = 1
-            elif turnDiffX == 2 or turnDiffY == 2:
-                turns = 2
-            else:
-                turns = 0
-
-            return (turns if turns <= 2 else 2) + distance
-
-        a_coords = NamedTuple('a_coords', [('coords', Coords),
-                                           ('g_cost', int),
-                                           ('h_cost', int),
-                                           ('parent', Optional[Coords]),
-                                           ('facing', characters.Facing)])
-        
-        open_coords: [a_coords] = []
-        closed_coords: {Coords: a_coords} = {}
-        open_coords.append(a_coords(start, 0, get_h_cost(start, end, facing), None, facing))
-        
-        while len(open_coords) > 0:
-            open_coords = list(sorted(open_coords, key=lambda x: (x.g_cost + x.h_cost, x.h_cost), reverse=False))
-            current: a_coords = open_coords.pop(0)
-            closed_coords[current.coords] = current
-            
-            if current.coords == end:
-                trace: Optional[List[Coords]] = [current.coords]
-                current_parent: Optional[a_coords] = current
-
-                while current_parent.parent is not None:
-                    current_parent = closed_coords[current_parent.parent]
-                    trace.insert(0, current_parent.coords)
-
-                return trace, int(current.h_cost + current.g_cost)
-
-            neighbors: [Coords] = [add_coords(current.coords, (Coords(0, 1))),
-                                   add_coords(current.coords, (Coords(0, -1))),
-                                   add_coords(current.coords, (Coords(1, 0))),
-                                   add_coords(current.coords, (Coords(-1, 0)))]
-
-            for neighbor in neighbors:
-                if not neighbor in memory.map.terrain:
-                    continue
-
-                if (
-                        neighbor in memory.map.terrain.keys()\
-                        and memory.map.terrain[neighbor].terrain_passable()\
-                        and neighbor not in closed_coords.keys()
-                ):
-                    neighbor_direction: Coords = Coords(neighbor.x - current.coords.x, neighbor.y - current.coords.y)
-                    neighbor_g_cost = (1 if neighbor_direction == current.facing.value else
-                                       3 if add_coords(neighbor_direction, current.facing.value) == Coords(0, 0) else 2) \
-                                      + current.g_cost
-                    
-                    neighbor_h_cost = get_h_cost(neighbor, end, self.get_facing(neighbor_direction))
-
-                    for coords in open_coords:
-                        if coords.coords == neighbor:
-                            open_coords.remove(coords)
-
-                    open_coords.append(a_coords(neighbor,
-                                                neighbor_g_cost,
-                                                neighbor_h_cost,
-                                                current.coords,
-                                                self.get_facing(neighbor_direction)))
-        
-        trace: Optional[List[Coords]] = None
-        return trace, INFINITY
-
 class GoToAroundAction(GoToAction):
+    @profile
     def perform(self, memory: Memory) -> Action:
         if memory.position == self.destination:    
             return None
+        
+        if self.destination in memory.map.terrain and memory.map.terrain[self.destination].terrain_passable():
+            actionToPerform = super().perform(memory)
+        else:
+            actionToPerform = None
 
-        actionToPerform = super().perform(memory)
         
         limit = 25
-        destinationsGenerator = self.__aroundTileGenerator(self.destination)
+        destinationsGenerator = utils.aroundTileGenerator(self.destination)
 
         while actionToPerform is None and limit > 0:
             limit -= 1
@@ -198,16 +126,304 @@ class GoToAroundAction(GoToAction):
             except StopIteration:
                 pass
 
-            actionToPerform = super().perform(memory)
+            if self.destination in memory.map.terrain and memory.map.terrain[self.destination].terrain_passable():
+                actionToPerform = super().perform(memory)
+            else:
+                actionToPerform = None
         
         return actionToPerform
 
-    def __aroundTileGenerator(self, aroundDestination :Coords):
-        if not isinstance(aroundDestination, Coords):
+class ExploreAction(Action):
+    MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED = 4
+
+    def __init__(self) -> None:
+        self.is_section_explored = [False, False, False, False, False]
+        self.firstPerform = True
+        self.plan = [1, 2, 3, 4, 0]
+        self.minDistanceToSectionCenterToMarkItAsExplored = 7
+        self.regeneratePlanTimes = 0
+    
+    def __markSectionAsExplored(self, section: int) -> None:
+        if section < len(self.is_section_explored):
+            self.is_section_explored[section] = True
+        else:
+            for _ in range(section - len(self.is_section_explored) + 1):
+                self.is_section_explored.append(False)
+            self.is_section_explored[section] = True
+    
+    def __getNextSectionFromPlan(self):
+        for section in self.plan:
+            if not self.is_section_explored[section]:
+                return section
+        
+        self.regeneratePlanTimes += 1
+
+        if self.regeneratePlanTimes > 5:
+            return None
+
+        for i in range(len(self.is_section_explored)):
+            self.is_section_explored[i] = False
+        
+        return self.plan[0]
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        currentSection = memory.getCurrentSection()
+
+        if self.firstPerform:
+            self.__markSectionAsExplored(currentSection)
+            self.minDistanceToSectionCenterToMarkItAsExplored = (memory.map.size[0] + memory.map.size[1]) / 2 / 5
+            self.firstPerform = False
+            oppositeSection = memory.getOppositeSection()
+
+            remainingSections = [section for section in range(len(self.is_section_explored)) if section not in [currentSection, oppositeSection]]
+            random.shuffle(remainingSections)
+
+            self.plan = [currentSection, oppositeSection] + remainingSections
+
+        exploreToSection = self.__getNextSectionFromPlan()
+
+        if exploreToSection is None:
             return None
         
-        for r in range(7):
-            for x in range(-r, r + 1):
-                for y in range(-r, r + 1):
-                    if (x - aroundDestination.x) ** 2 + (y - aroundDestination.y) ** 2 == r ** 2:
-                        yield Coords(x, y)
+        exploreToPos = memory.getSectionCenterPos(exploreToSection)
+
+        if exploreToPos is None:
+            return None
+
+        if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
+            self.__markSectionAsExplored(exploreToSection)
+            return self.perform(memory)
+
+        gotoAroundAction = GoToAroundAction()
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
+
+        if res is None:
+            if DEBUG: print("[ARAGORN|EXPLORE] Cannot reach section", exploreToSection, "at", exploreToPos, ", marking it as explored")
+            self.__markSectionAsExplored(exploreToSection)
+            return self.perform(memory)
+        
+        if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
+        return res
+    
+class BasicExploreAction(Action):
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        currentSection = memory.getCurrentSection()
+        
+        if currentSection == 0:
+            gotoVector = Coords(-1, -1)
+        elif currentSection == 1:
+            gotoVector = Coords(1, 0)
+        elif currentSection == 2:
+            gotoVector = Coords(-1, -1)
+        elif currentSection == 3:
+            gotoVector = Coords(1, 0)
+        else:
+            gotoVector = Coords(-1, -1)
+        
+        mul = 3
+        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
+        exploreToPos = add_coords(memory.position, gotoVector)
+
+
+        gotoAroundAction = GoToAroundAction()
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
+
+        if res is not None:
+            return res
+        
+        gotoVector = Coords(random.randint(-1, 1), random.randint(-1, 1))
+        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
+        exploreToPos = add_coords(memory.position, gotoVector)
+
+        gotoAroundAction.setDestination(exploreToPos)
+        res = gotoAroundAction.perform(memory)
+
+        return res
+
+class AttackClosestEnemyAction(Action):
+    OUTDATED_DATA_TICKS = 16
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        # GET CLOSEST ENEMY
+        closestEnemy = None
+        closestEnemyDistance = INFINITY
+
+        for coords in memory.map.terrain:
+            if (
+                # tile has character
+                memory.map.terrain[coords].character is not None
+                # ignore if data is outdated
+                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                # ignore ourselfs
+                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # ignore our position
+                and memory.position != coords
+                # ignore enemies with greater health
+                # and memory.map.terrain[coords].character.health <= memory.health
+                # ignore enemies with health greater than reward of killing (potion restore)
+                # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
+            ):
+                distance = utils.coordinatesDistance(memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
+        
+        if closestEnemy is None:
+            return None
+        
+        # CLOSEST ENEMY IS TOO FAR
+        # just approach him
+        if closestEnemyDistance > 3:
+            goToAttackAction = GoToAction()
+            goToAttackAction.setDestination(closestEnemy)
+            return goToAttackAction.perform(memory)
+
+        # IF CLOSEST ENEMY IS NEARBY
+        # GET CLOSEST FIELD YOU CAN ATTACK FROM
+        # BY CALCULATING DETAILED PATHS COSTS
+        currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
+
+        if currentWeapon is None:
+            return None
+        
+        positionsToAttackFrom = {}
+        minNormalDistance = INFINITY
+
+        for facing in [
+            characters.Facing.UP,
+            characters.Facing.DOWN,
+            characters.Facing.LEFT,
+            characters.Facing.RIGHT,
+        ]:
+            for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy, facing.turn_left().turn_left()):
+                tmpDistance = utils.coordinatesDistance(memory.position, pos)
+                
+                if tmpDistance < minNormalDistance:
+                    minNormalDistance = tmpDistance
+                
+                if tmpDistance > minNormalDistance + 1:
+                    # do not add positions that are too far
+                    continue
+
+                positionsToAttackFrom[(pos, facing)] = INFINITY
+        
+        for (pos, facing) in positionsToAttackFrom:
+            tmpDistance = utils.coordinatesDistance(memory.position, pos)
+            
+            if tmpDistance > minNormalDistance + 1:
+                # do not add positions that are too far
+                # - leave them as INFINITY
+                continue
+
+            positionsToAttackFrom[(pos, facing)] = pathfinding.get_path_cost(memory, memory.position, pos, facing)
+        
+        minCost = INFINITY
+        minCostPos = None
+        minCostFacing = None
+
+        for (pos, facing) in positionsToAttackFrom:
+            if positionsToAttackFrom[(pos, facing)] < minCost:
+                minCost = positionsToAttackFrom[(pos, facing)]
+                minCostPos = pos
+                minCostFacing = facing
+        
+        if minCostPos is None:
+            return None
+        
+        # GO TO CLOSEST FIELD YOU CAN ATTACK FROM
+
+        goToAttackAction = GoToAction()
+        goToAttackAction.setDestination(minCostPos)
+        goToAttackAction.setDestinationFacing(minCostFacing)
+        return goToAttackAction.perform(memory)
+
+class TakeToOnesLegsAction(Action):
+    def __init__(self):
+        self.dangerSourcePos = None
+    
+    def setDangerSourcePos(self, dangerSourcePos: Coords) -> None:
+        if not isinstance(dangerSourcePos, Coords):
+            if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Trying to set danger source pos to non Coords object (" + str(dangerSourcePos) + " of type " + str(type(dangerSourcePos)) + ")")
+            return
+
+        self.dangerSourcePos = dangerSourcePos
+    
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        if self.dangerSourcePos is None:
+            if DEBUG: print("[ARAGORN|TAKE_TO_ONES_LEGS] Danger source pos is None")
+            return None
+        
+        runToAnySafeTileAction = self.runToAnySafeTile(memory)
+
+        if runToAnySafeTileAction is not None:
+            return runToAnySafeTileAction
+        
+        runAwayAction = self.runAway(memory)
+
+        if runAwayAction is not None:
+            return runAwayAction
+        
+        return None
+    
+    def runAway(self, memory: Memory) -> Action:
+        # get vector from danger source to our position
+        moveTowardsVector = sub_coords(memory.position, self.dangerSourcePos)
+        # multiply it * 4
+        moveTowardsVector = add_coords(moveTowardsVector, moveTowardsVector)
+        # add it to our position
+        moveTowardsPos = add_coords(memory.position, moveTowardsVector)
+
+        # go to that position
+        goToAroundAction = GoToAroundAction()
+        goToAroundAction.setDestination(moveTowardsPos)
+        goToAroundAction.setUseAllMovements(True)
+        res = goToAroundAction.perform(memory)
+        return res
+
+    def runToAnySafeTile(self, memory: Memory) -> Action:
+        dangerousTiles = memory.map.getDangerousTiles()
+        
+        possibleTiles = [
+            memory.position,
+            add_coords(memory.position, Coords(1, 0)),
+            add_coords(memory.position, Coords(-1, 0)),
+            add_coords(memory.position, Coords(0, 1)),
+            add_coords(memory.position, Coords(0, -1)),
+        ]
+        safeTiles = {}
+
+        for coords in possibleTiles:
+            if coords not in memory.map.terrain:
+                continue
+            
+            if not memory.map.terrain[coords].terrain_passable():
+                continue
+            
+            if coords in dangerousTiles:
+                continue
+            
+            safeTiles[coords] = utils.coordinatesDistance(coords, self.dangerSourcePos)
+
+        # get coords from safeTiles key with maximum value
+        maxSafeTile = None
+        maxSafeTileValue = -INFINITY
+
+        for coords in safeTiles:
+            if safeTiles[coords] > maxSafeTileValue:
+                maxSafeTileValue = safeTiles[coords]
+                maxSafeTile = coords
+            
+        # IF THERES NEARBY SAFE TILE, GO TO IT
+        if maxSafeTile is None:
+            return None
+        
+        goToAction = GoToAction()
+        goToAction.setDestination(maxSafeTile)
+        return goToAction.perform(memory)

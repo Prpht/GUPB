@@ -1,6 +1,7 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 
+
 keyboard_controller = keyboard.KeyboardController()
 
 CONFIGURATION = {
@@ -13,9 +14,6 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        random.RandomController("Asd"),
-        random.RandomController("Bo"),
-        random.RandomController("Ce"),
     ],
     'start_balancing': False,
     'visualise': True,

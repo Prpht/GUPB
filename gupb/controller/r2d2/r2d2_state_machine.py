@@ -11,17 +11,6 @@ R2D2StateValue("SearchingForMenhir", 1, "None")
 
 class R2D2StateMachine(StateMachine):
 
-    # Define StateMachine states
-    searching_for_menhir = State('SearchingForMenhir', value="SearchingForMenhir", initial=True)
-    approaching_menhir = State('ApproachingMenhir', value="ApproachingMenhir")
-    defending = State('Defending', value="Defending")
-
-    # Define the transitions of the StateMachine
-    approach_menhir = searching_for_menhir.to(approaching_menhir)
-    defend = approaching_menhir.to(defending)
-
-class R2D2StateMachineV2(StateMachine):
-
     # Define states
     # - Stage I (Find Weapons)
     st1_choose_destination = State('ChooseDestinationStI', value=R2D2StateValue(
@@ -53,6 +42,10 @@ class R2D2StateMachineV2(StateMachine):
         name="ApproachDestinationStIII", stage=3, description=""
     ))
 
+    # st4_runaway = State('RunawayStIV', value=R2D2StateValue(
+    #     name="Runaway", stage=4, description=""
+    # ))
+
     # Define transitions
     # - Stage I (Find Weapons)
     st1_destination_chosen = st1_choose_destination.to(st1_approach_destination)
@@ -70,3 +63,6 @@ class R2D2StateMachineV2(StateMachine):
     # - Stage III (Defend Menhir)
     st3_destination_chosen = st3_choose_destination.to(st3_approach_destination)
     st3_destination_reached = st3_approach_destination.to(st3_choose_destination)
+
+    # - Stage IV (Runaway)
+    # st4_runaway = st3_choose_destination.to(st4_runaway)
