@@ -20,10 +20,6 @@ class Hunter:
         self.next_move = None
         self.path = None
 
-        if self.is_enemy_neer(1) == False and self.can_attack(): #Jakaś delta hp, jeżeli się zmienia to nie atakujemy
-            self.next_move = characters.Action.ATTACK
-            return HUNTER_DECISION.LONG_RANGE_ATTACK
-
         potential_enemies = self.neerest_enemy_list()
 
         if len(potential_enemies) > 0:

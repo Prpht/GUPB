@@ -6,6 +6,7 @@ from gupb.model.coordinates import Coords
 class Environment():
     def __init__(self):
         self.old_health = 0
+        self.flee_moves = 0
         self.map_known_len = -1
         self.enemies_left = -1
         self.enemies_num = -1
@@ -28,14 +29,16 @@ class Environment():
         self.update_maps(knowledge.visible_tiles)
         self.weapon = self.champion.weapon
 
+    def took_damage(self):
+        return self.old_health > self.champion.health
     def manhatan_distance(self, node: Coords, goal:Coords):
         return abs(node.x - goal.x) + abs(node.y - goal.y)
+
     # def clear_far_maps_sector(self):
     #     for coords, description in self.discovered_map.items():
     #         coords = Coords(coords[0], coords[1])
     #         if self.manhatan_distance(self.position, coords) >= 10 and description.loot is not None:
     #             self.discovered_map.pop(coords)
-
 
     def update_maps(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]):
         self.visible_map = dict()

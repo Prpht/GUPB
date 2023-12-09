@@ -16,7 +16,6 @@ POSSIBLE_ACTIONS = [
     Action.STEP_FORWARD,
     Action.ATTACK,
 ]
-
 POSSIBLE_MOVES = [
     Action.TURN_LEFT,
     Action.TURN_RIGHT,
@@ -27,8 +26,8 @@ WEAPONS = {
     'knife': weapons.Knife,
     'sword': weapons.Sword,
     'bow': weapons.Bow,
-    # 'bow_loaded': weapons.Bow,
-    # 'bow_unloaded': weapons.Bow,
+    'bow_loaded': weapons.Bow,
+    'bow_unloaded': weapons.Bow,
     'axe': weapons.Axe,
     'amulet': weapons.Amulet
 }
@@ -36,19 +35,19 @@ WEAPONS = {
 WEAPONS_VALUE = {
     'knife': 1,
     'sword': 2,
-    'amulet': 3,
-    'axe': 4,
+    'axe': 3,
+    'amulet': 4,
     'bow': 5,
-    # 'bow_loaded': 5,
-    # 'bow_unloaded': 5
+    'bow_loaded': 5,
+    'bow_unloaded': 5
 }
 
 
 class Mongolek(controller.Controller):
     def __init__(self, first_name: str):
+        self.possible_menhir_coords = []
         self.mist_available = None
         self.move_number = 0
-        self.position = None
         self.first_name: str = first_name
         self.facing = None
         self.health = None
@@ -66,52 +65,61 @@ class Mongolek(controller.Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> Action | None | Any:
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.move_number += 1
-        self.position = knowledge.position
+        position = knowledge.position
         visible_tiles = knowledge.visible_tiles
 
-        me = knowledge.visible_tiles[self.position].character
+        me = knowledge.visible_tiles[position].character
         self.facing = me.facing
         self.health = me.health
         self.weapon = me.weapon
-
-        cut = WEAPONS[self.weapon.name].cut_positions(self.arena.terrain, self.position, self.facing)
+        cut = WEAPONS[self.weapon.name].cut_positions(self.arena.terrain, position,
+                                                      self.facing)
         for coord, tile in visible_tiles.items():
             if tile.character and Coords(coord[0],
-                                         coord[1]) in cut and self.health > 0.3 * CHAMPION_STARTING_HP:
+                                         coord[1]) in cut:
                 return Action.ATTACK
             if effects.EffectDescription(type='mist') in tile.effects:
                 self.mist_available = True
-                print("tile type:", tile.type)
-            if tile.consumable and self.distance(self.position, coord[0], coord[1]) <= 5:
+
+            if tile.consumable and self.distance(position, coord[0], coord[1]) <= 5:
                 self.target = coordinates.Coords(coord[0], coord[1])
-            if tile.type == 'menhir' and (self.mist_available or self.move_number > 40):
+
+            elif tile.loot is not None and WEAPONS_VALUE[self.weapon.name] < WEAPONS_VALUE[
+                tile.loot.name] and self.distance(position, coord[0], coord[1]) <= 10:
                 self.target = coordinates.Coords(coord[0], coord[1])
-            elif tile.type in list(WEAPONS.keys()) and self.distance(self.position, coord[0], coord[1]) <= 5 and WEAPONS_VALUE[self.weapon.name] < WEAPONS_VALUE[tile.loot.name]:
+
+            elif tile.character and tile.character.controller_name != me.controller_name and self.health > 0.3 * CHAMPION_STARTING_HP and self.distance(position, coord[0], coord[1]) <= 3:
+                for coord_cut in cut:
+                    if coord_cut in self.possible_menhir_coords:
+                        self.target = coordinates.Coords(coord_cut[0], coord_cut[1])
+                        break
+                    else:
+                        self.target = coordinates.Coords(coord[0], coord[1])
+
+            elif tile.type == 'menhir' and self.move_number > 20:
                 self.target = coordinates.Coords(coord[0], coord[1])
 
         if self.target:
-            if self.position == self.target:
+            if position == self.target:
                 self.target = None
-                return Action.TURN_LEFT
+                possible = [1, 1, 4]
+                return random.choices(POSSIBLE_MOVES, possible, k=1)[0]
             else:
                 return self.go_to_target(knowledge, self.target)
         else:
-            next_tile = self.position + self.facing.value
-            if visible_tiles[next_tile].type in ['sea', 'wall']:
-                return Action.TURN_RIGHT
-            possible = [1, 1, 4]
-            return random.choices(POSSIBLE_MOVES, possible, k=1)[0]
+            self.target = random.choice(self.possible_menhir_coords)
+            return self.go_to_target(knowledge, self.target)
 
     @staticmethod
     def distance(coords: coordinates.Coords, x: int, y: int):
         return np.abs(coords.x - x) + np.abs(coords.y - y)
 
     def praise(self, score: int) -> None:
-        pass
+        raise NotImplementedError
 
-    def reset(self, arena_description: arenas.ArenaDescription) -> None:
+    def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.facing = None
         self.health = None
         self.weapon = None
@@ -121,6 +129,10 @@ class Mongolek(controller.Controller):
         self.arena = arenas.Arena.load(arena_description.name)
         self.menhir_found = False
         self.target = None
+
+        for coords in self.arena.terrain.keys():
+            if self.arena.terrain[coords].terrain_passable():
+                self.possible_menhir_coords.append(coords)
 
     @property
     def name(self) -> str:
@@ -139,12 +151,15 @@ class Mongolek(controller.Controller):
 
         path = self.gps.find_path(current_coordinates, destination_coordinates)
 
-        if current_coordinates.x + current_facing.value.x == path[0].x and current_coordinates.y + current_facing.value.y == path[0].y:
+        if current_coordinates.x + current_facing.value.x == path[
+            0].x and current_coordinates.y + current_facing.value.y == path[0].y:
             return characters.Action.STEP_FORWARD
-        if current_coordinates.x + current_facing.turn_right().value.x == path[0].x and current_coordinates.y + current_facing.turn_right().value.y == path[0].y:
+        if current_coordinates.x + current_facing.turn_right().value.x == path[
+            0].x and current_coordinates.y + current_facing.turn_right().value.y == path[0].y:
             return characters.Action.TURN_RIGHT
         else:
             return characters.Action.TURN_LEFT
+
 
 POTENTIAL_CONTROLLERS = [
     Mongolek("Mongolek"),
