@@ -57,6 +57,7 @@ class Map():
         self.previousHealth=None
         self.visiblePotions= []
         self.visibleWeapons= {}
+        self.exploredList=[] # list of explored coords
 
     def initMap(self):
         self.map = [[None for i in range(self.MAPSIZE[1])] for j in range(self.MAPSIZE[0])]
@@ -304,7 +305,6 @@ class KnowledgeBase():
         mistPath, mistTile = self.mapBase.findTarget(target)
         return mistPath, mistTile
 
-
     def choice(self):
         '''
         Return one of the choices described in POSSIBLE_ACTIONS.
@@ -312,6 +312,8 @@ class KnowledgeBase():
         Additionally, it could take into account changing weapons, strategy, ect.
         
         '''
+        if self.mapBase.position not in self.mapBase.exploredList:
+            self.mapBase.exploredList.append(self.mapBase.position)
         inFrontCoords, inBackCoords, inRightCoords, inLeftCoords=self.getCoordsTiles()
         inFrontTile=self.mapBase.map[inFrontCoords.x][inFrontCoords.y]
         inBackTile=self.mapBase.map[inBackCoords.x][inBackCoords.y]
@@ -355,6 +357,8 @@ class KnowledgeBase():
                 action=characters.Action.ATTACK
             elif currentWeaponName=="bow_loaded" and self.bowCharactersToAttack():
                 action=characters.Action.ATTACK
+            elif self.actionsToMake is not None and len(self.actionsToMake) > 0:
+                action=self.followTarget()
             elif len(self.mapBase.visiblePotions)>0:
                 self.actionsToMake, self.actionsTarget = self.pathNearestPotion()
                 if len(self.actionsToMake)>0:
@@ -367,11 +371,9 @@ class KnowledgeBase():
                     action = self.followTarget()
                 else:
                     action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
-            elif self.round_counter<3:
-                action=characters.Action.TURN_RIGHT
-                self.round_counter+=1
-            elif self.actionsToMake is not None and len(self.actionsToMake) > 0:
-                action=self.followTarget()
+            # elif self.round_counter<3:
+            #     action=characters.Action.TURN_RIGHT
+            #     self.round_counter+=1
             elif potionPath != [] and len(potionTile) < self.tileNeighbourhood:
                 self.actionsToMake, self.actionsTarget = potionPath, potionTile
                 action = self.followTarget()
@@ -385,8 +387,24 @@ class KnowledgeBase():
             elif len(bowPath) > 0:
                 self.actionsToMake, self.actionsTarget = bowPath, bowTile
                 action = self.followTarget()
+            # elif len(self.mapBase.visibleOpponents)>0:
+            #     # to be implemented
             else:
+                # map exploration
                 action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
+                firstCoord=random.randint(0, self.mapBase.MAPSIZE[0]-1)
+                secondCoord=random.randint(0, self.mapBase.MAPSIZE[1]-1)
+                coordToExplore=coordinates.Coords(firstCoord, secondCoord)
+                for i in range(100):
+                    if coordToExplore in self.mapBase.exploredList:
+                        firstCoord=random.randint(0, self.mapBase.MAPSIZE[0]-1)
+                        secondCoord=random.randint(0, self.mapBase.MAPSIZE[1]-1)
+                        coordToExplore=coordinates.Coords(firstCoord, secondCoord)
+                    else:
+                        self.actionsToMake, self.actionsTarget = self.mapBase.findTarget(coordToExplore)
+                        if len(self.actionsToMake)>0:
+                            action = self.followTarget()
+                        break
         except:
             action = self.checkPossibleAction(inFrontTile, inRightTile, inLeftTile, inBackTile)
         return action
@@ -410,6 +428,14 @@ class KnowledgeBase():
                 nearestWeaponActions=actionsToMake
                 nearestWeaponTarget=actionsTarget
         return nearestWeaponActions, nearestWeaponTarget
+    
+    def findingPathToAttack(self):
+        for key, value in self.mapBase.visibleOpponents.items():
+            if value.health>self.mapBase.description.health: # if opponent has greater health than we have - dont attack
+                pass
+            else:
+                # to be continued depending of our weapon and opponent's weapon
+                pass
 
 
     def checkPossibleAction(self, inFrontTile: tiles.TileDescription, inRightTile:tiles.TileDescription, \
@@ -488,10 +514,10 @@ class KnowledgeBase():
         '''checks if there are characters to be attacked by axe in our range'''
         for key, value in self.mapBase.visibleOpponents.items():
             if self.facingDirection in ["left", "right"]:
-                if key.x==self.mapBase.position.x:
+                if key.y==self.mapBase.position.y:
                     return True
             else:
-                if key.y==self.mapBase.position.y:
+                if key.x==self.mapBase.position.x:
                     return True
         return False
     
