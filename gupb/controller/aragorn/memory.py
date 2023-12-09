@@ -79,6 +79,9 @@ class Memory:
         return self.lastActions
 
     def getCurrentWeaponDescription(self):
+        if self.position is None:
+            return None
+        
         return self.map.terrain[self.position].character.weapon
     
     def getCurrentWeaponName(self):
