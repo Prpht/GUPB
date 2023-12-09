@@ -5,8 +5,10 @@ from torch.utils.data import DataLoader
 
 from threading import Thread
 
+from operator import itemgetter
+
 from gupb.controller.batman.trainer.dataset import StateActionRewardDataset
-from gupb.controller.batman.trainer.net import GuessRewardNet
+from gupb.controller.batman.trainer.net import GetValueNet
 
 
 class Trainer:
@@ -32,8 +34,8 @@ class Trainer:
         self._rewards = []
 
     def add_to_buffer(self, state: np.ndarray, params: np.ndarray, reward: float):
-        if len(params) != 3:
-            return  # it shouldn't happen
+        if params is None or state is None or reward is None:
+            return
 
         self._states.append(state)
         self._params.append(params)
@@ -52,8 +54,11 @@ class Trainer:
             in_buffer, min(in_buffer, self._sample_limit), replace=False
         )
 
+        if len(selected_indices) < 1:
+            return
+
         dataset = StateActionRewardDataset(
-            Tensor(np.array(self._states)[selected_indices]),
+            itemgetter(*selected_indices)(self._states),
             Tensor(np.array(self._params)[selected_indices]),
             Tensor(np.array(self._rewards)[selected_indices]),
         )
@@ -61,8 +66,11 @@ class Trainer:
         dl = DataLoader(dataset, batch_size=32, shuffle=False)
 
         if self._net is None:
-            self._net = GuessRewardNet(self._states[0].shape, self._params[0].shape[0])
-            self._net.load()
+            try:
+                self._net = GetValueNet(self._states[0].shape, self._params[0].shape[0])
+                self._net.try_load()
+            except:
+                return
 
         self._training_thread = Thread(target=self._training, args=(dl, 1))
         self._training_end_forced = False
