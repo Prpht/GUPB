@@ -1,75 +1,93 @@
-from gupb.model import arenas, characters, coordinates, weapons
+from gupb.model import arenas, characters, coordinates, weapons, consumables
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.model.profiling import profile
 
-
+import time
 
 class Brain:
     def __init__(self):
         self.memory = Memory()
+        self.persistentActions = {}
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        self.__initPersistentActions()
+        self.wholeTime = 0
+    
+    def __initPersistentActions(self):
+        self.persistentActions = {
+            'explore': ExploreAction(),
+        }
+
+    @profile
+    def prepareActions(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.memory.update(knowledge)
 
-        actions = []
-        if DEBUG: dbg_ac_msgs = []
-
-        if self.memory.willGetIdlePenalty():
-            # TODO: allow to decide action, afterwards, if pos will no change - force spin
-            if DEBUG: dbg_ac_msgs.append("Spinning to prevent idle penalty")
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_LEFT)
-            actions.append(spinAction)
-
-        # ATTACKING
-
-        if self.memory.hasOponentInFront():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent in front")
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
-        if self.memory.hasOponentOnRight():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent on right")
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_RIGHT)
-            actions.append(spinAction)
-
-            attackAction = AttackAction()
-            actions.append(attackAction)
-
-        if self.memory.hasOponentOnLeft():
-            if DEBUG: dbg_ac_msgs.append("Attacking, since got oponent on left")
-            spinAction = SpinAction()
-            spinAction.setSpin(characters.Action.TURN_LEFT)
-            actions.append(spinAction)
-
-            attackAction = AttackAction()
-            actions.append(attackAction)
+        # ------------------------------------------
+        
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
         # ------------------------------------------
 
-        # PICKING STUFF
+        # PREVENT IDLE PENALTY
+
+        if self.memory.willGetIdlePenalty():
+            # TODO: allow to decide action, afterwards, if pos will no change - force spin
+            spinAction = SpinAction()
+            spinAction.setSpin(characters.Action.TURN_LEFT)
+            yield spinAction, "Spinning to prevent idle penalty"
         
-        # potion
+        # ------------------------------------------
+
+        # PICKING UP POTION
+
         [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
 
-        if closestPotionDistance is not None and closestPotionDistance < 8:
-            if DEBUG: dbg_ac_msgs.append("Picking nearby potion")
+        if closestPotionDistance is not None and closestPotionDistance < 5:
             goToPotionAction = GoToAction()
             goToPotionAction.setDestination(closestPotionCoords)
-            actions.append(goToPotionAction)
+            yield goToPotionAction, "Picking nearby potion"
+
+        # ------------------------------------------
+        
+        # ATTACKING
+
+        oponentInRange = self.memory.getClosestOponentInRange()
+
+        if (
+            oponentInRange is not None
+            and (
+                self.memory.position not in dangerousTilesDict.keys()
+                or (
+                    oponentInRange.health <= self.memory.health
+                    # and oponentInRange.health <= consumables.POTION_RESTORED_HP
+                )
+            )
+        ):
+            attackAction = AttackAction()
+            yield attackAction, "Attacking, since got oponent in range"
+
+        # ------------------------------------------
+
+        # DEFENDING FROM ATTACKS
+
+        if self.memory.position in dangerousTilesDict:
+            takeToOnesLegsAction = TakeToOnesLegsAction()
+            takeToOnesLegsAction.setDangerSourcePos(dangerousTilesDict[self.memory.position])
+            yield takeToOnesLegsAction, "Defending from attack"
+        
+        # ------------------------------------------
+        
+        # PICKING UP WEAPON
 
         [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
-        
-        # weapon
-        if closestWeaponDistance is not None and closestWeaponDistance < 8:
-            if DEBUG: dbg_ac_msgs.append("Picking nearby weapon")
+
+        if closestWeaponDistance is not None and closestWeaponDistance < 15:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
-            actions.append(goToWeaponAction)
+            yield goToWeaponAction, "Picking nearby weapon"
         
         # ------------------------------------------
 
@@ -77,59 +95,67 @@ class Brain:
 
         [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
 
-        if menhirPos is not None and utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2:
-            if DEBUG: dbg_ac_msgs.append("Going closer to menhir")
+        if menhirPos is not None and (self.memory.map.mist_radius < 7 or utils.coordinatesDistance(self.memory.position, menhirPos) > self.memory.map.mist_radius / 2):
             goToAroundAction = GoToAroundAction()
             goToAroundAction.setDestination(menhirPos)
-            actions.append(goToAroundAction)
+            yield goToAroundAction, "Going closer to menhir"
+        
+        # ------------------------------------------
+        
+        # Go to closest enemy
+        attackClosestEnemyAction = AttackClosestEnemyAction()
+        yield attackClosestEnemyAction, "Going closer to enemy"
         
         # ------------------------------------------
 
-        closestEnemy = None
-        closestEnemyDistance = INFINITY
+        # EXPLORE THE MAP
 
-        for coords in self.memory.map.terrain:
-            if (
-                self.memory.map.terrain[coords].character is not None
-                and self.memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
-                and self.memory.position != coords
-            ):
-                distance = utils.coordinatesDistance(self.memory.position, coords)
-                
-                if distance < closestEnemyDistance:
-                    closestEnemy = coords
-                    closestEnemyDistance = distance
-        
-        if closestEnemy is not None:
-            if DEBUG: dbg_ac_msgs.append("Going closer to enemy")
-            goToAttackAction = GoToAroundAction()
-            goToAttackAction.setDestination(closestEnemy)
-            actions.append(goToAttackAction)
+        exploreAction = self.persistentActions['explore']
+        yield exploreAction, "Exploring action"
 
-        if DEBUG: dbg_ac_msgs.append("No action found, spinning")
+        # ------------------------------------------
+
+        # NOTHING TO DO - JUST SPIN
+
         spinAction = SpinAction()
-        actions.append(spinAction)
-        
-        # ------------------------------------------
-        
+        yield spinAction, "No action found, spinning"
+
+        # ==========================================
+
+
+    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        startTime = time.time()
+
         actionIndexPerformed = 0
-        
-        for action in actions:
+
+        for action, dbg_ac_msg in self.prepareActions(knowledge):
             ret = action.perform(self.memory)
             
             if ret is not None and ret is not characters.Action.DO_NOTHING:
-                if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msgs[actionIndexPerformed])
+                if DEBUG: print("[ARAGORN|BRAIN]", action.__class__.__name__, dbg_ac_msg)
                 self.onDecisionReturning(ret)
+                
+                endTime = time.time()
+                self.wholeTime += endTime - startTime
                 return ret
+            
+            if ret is None:
+                if DEBUG: print("[ARAGORN|BRAIN]", "TRIED TO PERFORM ACTION BUT FAILED!", action.__class__.__name__, dbg_ac_msg)
             
             actionIndexPerformed += 1
         
         if DEBUG: print("[ARAGORN|BRAIN] None of actions returned anything, spinning")
         self.onDecisionReturning(characters.Action.TURN_RIGHT)
+        
+        endTime = time.time()
+        self.wholeTime += endTime - startTime
         return characters.Action.TURN_RIGHT
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.memory.reset(arena_description)
+        pathfinding.invalidate_PF_cache()
+
+        self.__initPersistentActions()
     
     def onDecisionReturning(self, action: characters.Action):
         if action in [
