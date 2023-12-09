@@ -129,7 +129,6 @@ def can_attack_check(enemies, attackable_tiles):
     if not enemies:
         return False
     for enemy in enemies: 
-        print(enemy)
         if enemy in attackable_tiles_left:
             return "left"
         if enemy in attackable_tiles_right:
