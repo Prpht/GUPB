@@ -85,7 +85,8 @@ class Memory:
         return self.map.terrain[self.position].character.weapon
     
     def getCurrentWeaponName(self):
-        return self.getCurrentWeaponDescription().name
+        weaponDescription = self.getCurrentWeaponDescription()
+        return weaponDescription.name if weaponDescription is not None else None
 
     def getCurrentWeaponClass(self):
         return Map.weaponDescriptionConverter(self.getCurrentWeaponDescription())
@@ -115,7 +116,7 @@ class Memory:
                 continue
 
             if cellCoords in self.map.terrain and self.map.terrain[cellCoords].character is not None:
-                distance = utils.coordinatesDistance(self.position, cellCoords)
+                distance = utils.manhattanDistance(self.position, cellCoords)
 
                 if distance < closestOponentDistance:
                     closestOponentDistance = distance
@@ -153,7 +154,7 @@ class Memory:
 
         for coords in self.map.terrain:
             if self.map.terrain[coords].consumable == consumables.Potion:
-                distance = utils.coordinatesDistance(self.position, coords)
+                distance = utils.manhattanDistance(self.position, coords)
 
                 if distance < minDistance:
                     minDistance = distance
@@ -171,10 +172,10 @@ class Memory:
             if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
                 #TODO: assign correct weights for weapons when the proper usage of each of them is known
-                if WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
+                if current_weapon in WEAPON_HIERARCHY and WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
                     continue
 
-                distance = utils.coordinatesDistance(self.position, coords)
+                distance = utils.manhattanDistance(self.position, coords)
 
                 if distance < minDistance:
                     minDistance = distance
@@ -255,6 +256,7 @@ class Map:
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
 
         self.menhirCalculator = MenhirCalculator(self)
+        self.enemiesPositionsApproximation = EnemiesPositionsApproximation(self)
 
         self.sectionsCenters = None
         self.centerPos = coordinates.Coords(round(self.size[0] / 2), round(self.size[1] / 2))
@@ -346,6 +348,8 @@ class Map:
     
     @profile
     def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], currentTick :int) -> None:
+        self.enemiesPositionsApproximation.update(visibleTiles, currentTick)
+        
         for coords in visibleTiles:
             visible_tile_description = visibleTiles[coords]
             
@@ -453,7 +457,7 @@ class Map:
                 if currentPos is None:
                     return coords
                 
-                distance = utils.coordinatesDistance(currentPos, coords)
+                distance = utils.manhattanDistance(currentPos, coords)
 
                 if distance < closestDistance:
                     closestCoords = coords
@@ -665,3 +669,122 @@ class MenhirCalculator:
         self.lastChangeTick = tick
         self.lastResult = (bestMenhirPos, bestMistAmount)
         return self.lastResult
+
+class EnemiesPositionsApproximation:
+    LOW_PROBABILITY_AFTER_MOVES = 8
+
+    def __init__(self, map: Map) -> None:
+        self.enemies = {}
+        self.map = map
+        self.enemiesTiles = {}
+        self.lastSeenAt = {}
+    
+    def _removeEnemy(self, enemyName: str) -> None:
+        if enemyName not in self.enemies:
+            return
+        
+        # enemiesTiles
+        for coordsToDel in self.enemies[enemyName]:
+            coordsAreInOtherEnemy = False
+
+            for tmpEnemyName, tmpEnemyTiles in self.enemies.items():
+                if tmpEnemyName != enemyName:
+                    if coordsToDel in tmpEnemyTiles:
+                        coordsAreInOtherEnemy = True
+                        break
+            
+            if not coordsAreInOtherEnemy and coordsToDel in self.enemiesTiles:
+                del self.enemiesTiles[coordsToDel]
+        # ===
+        del self.enemies[enemyName]
+
+    def update(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], crurentTick :int):
+        self.parseVisibleTiles(visibleTiles, crurentTick)
+    
+    def whereCanOneGoFrom(self, coords: coordinates.Coords) -> List[coordinates.Coords]:
+        neighbours = []
+
+        for direction in characters.Facing:
+            neighbour = coordinates.add_coords(coords, direction.value)
+
+            if neighbour in self.map.terrain and self.map.terrain[neighbour].terrain_passable():
+                neighbours.append(neighbour)
+        
+        return neighbours
+
+    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], tick: int) -> None:
+        # remove enemies with low probability
+        enemiesToRemove = []
+
+        for enemyName, lastSeenAtTick in self.lastSeenAt.items():
+            if tick - lastSeenAtTick > self.LOW_PROBABILITY_AFTER_MOVES:
+                enemiesToRemove.append(enemyName)
+        
+        for enemyName in enemiesToRemove:
+            self._removeEnemy(enemyName)
+
+        # simulate unseen movements
+        for enemyName, enemyPossiblePositions in self.enemies.items():
+            newTiles = []
+
+            for enCoords in enemyPossiblePositions:
+                neighboringCoords = self.whereCanOneGoFrom(enCoords)
+
+                for nCoord in neighboringCoords:
+                    if nCoord not in enemyPossiblePositions and nCoord not in newTiles:
+                        newTiles.append(nCoord)
+            
+            self.enemies[enemyName] += newTiles
+            
+            # enemiesTiles
+            for nt in newTiles:
+                self.enemiesTiles[nt] = True
+            # ===
+
+        # confront simulated knowledge with visible tiles
+        for coords in visibleTiles:
+            visible_tile_description = visibleTiles[coords]
+            
+            if visible_tile_description.character is not None and visible_tile_description.character.controller_name != OUR_BOT_NAME:
+                # enemy found
+                enemyName = visible_tile_description.character.controller_name
+
+                if isinstance(coords, tuple):
+                    coords = coordinates.Coords(coords[0], coords[1])
+                
+                self.lastSeenAt[enemyName] = tick
+                self._removeEnemy(enemyName)
+                self.enemies[enemyName] = [coords]
+                # enemiesTiles
+                self.enemiesTiles[coords] = True
+                # ===
+            else:
+                # no enemy found
+                for enemyName, enemyPossiblePositions in self.enemies.items():
+                    if coords in enemyPossiblePositions:
+                        enemyPossiblePositions.remove(coords)
+                        
+                        # enemiesTiles
+                        if coords in self.enemiesTiles:
+                            del self.enemiesTiles[coords]
+                        # ===
+    
+    def getEnemiesTilesPlusRadius(self, radius):
+        enemiesTiles = list(self.enemiesTiles.keys())
+
+        for _ in range(radius):
+            newTiles = []
+
+            for coords in enemiesTiles:
+                neighboringCoords = self.whereCanOneGoFrom(coords)
+
+                for nCoord in neighboringCoords:
+                    if nCoord not in enemiesTiles and nCoord not in newTiles:
+                        newTiles.append(nCoord)
+                
+            enemiesTiles += newTiles
+        
+        return enemiesTiles
+    
+    def getEnemiesTiles(self):
+        return list(self.enemiesTiles.keys())

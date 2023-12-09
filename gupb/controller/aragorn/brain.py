@@ -72,7 +72,7 @@ class Brain:
         if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
 
         if closestWeaponCoords is not None:
-            goToWeaponAction = GoToAction()
+            goToWeaponAction = GoToAroundAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
         else:
@@ -174,7 +174,7 @@ class Brain:
                 dist = pathfinding.get_path_cost(self.memory, self.memory.position, menhirPos, self.memory.facing, True)
 
                 if dist is None or dist == INFINITY:
-                    dist = utils.coordinatesDistance(self.memory.position, menhirPos)
+                    dist = utils.manhattanDistance(self.memory.position, menhirPos)
                 
                 if dist > self.memory.map.mist_radius / 2:
                     goCloserToMenhir = True
@@ -306,7 +306,7 @@ class Brain:
                 distanceToMenhir = pathfinding.get_path_cost(self.memory, self.memory.position, menhirPos, self.memory.facing, True)
 
                 if distanceToMenhir is None or distanceToMenhir == INFINITY:
-                    distanceToMenhir = utils.coordinatesDistance(self.memory.position, menhirPos)
+                    distanceToMenhir = utils.manhattanDistance(self.memory.position, menhirPos)
 
                 if distanceToMenhir >= self.memory.map.mist_radius - 1:
                     goCloserToMenhir = True
@@ -379,9 +379,15 @@ class Brain:
         # update state
         
         if self.state == 0:
-            currentWeaponDescription = self.memory.getCurrentWeaponDescription()
-            if currentWeaponDescription is not None and currentWeaponDescription.name != 'knife':
+            if self.memory.tick > 10:
                 self.state = 1
+            else:
+                currentWeaponDescription = self.memory.getCurrentWeaponDescription()
+                [closestWeaponDistance, closestWeaponCoords] = self.memory.getDistanceToClosestWeapon()
+                if closestWeaponDistance > 10:
+                    self.state = 1
+                if currentWeaponDescription is not None and currentWeaponDescription.name != 'knife':
+                    self.state = 1
         elif self.state == 1:
             if self.memory.map.mist_radius < self.memory.map.size[0] * 4/5:
                 [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)

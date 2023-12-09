@@ -356,7 +356,7 @@ class AttackClosestEnemyAction(Action):
                 # ignore enemies with health greater than reward of killing (potion restore)
                 # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
             ):
-                distance = utils.coordinatesDistance(memory.position, coords)
+                distance = utils.manhattanDistance(memory.position, coords)
                 
                 if distance < closestEnemyDistance:
                     closestEnemy = coords
@@ -398,7 +398,7 @@ class AttackClosestEnemyAction(Action):
             characters.Facing.RIGHT,
         ]:
             for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy, facing.turn_left().turn_left()):
-                tmpDistance = utils.coordinatesDistance(memory.position, pos)
+                tmpDistance = utils.manhattanDistance(memory.position, pos)
                 
                 if tmpDistance < minNormalDistance:
                     minNormalDistance = tmpDistance
@@ -410,7 +410,7 @@ class AttackClosestEnemyAction(Action):
                 positionsToAttackFrom[(pos, facing)] = INFINITY
         
         for (pos, facing) in positionsToAttackFrom:
-            tmpDistance = utils.coordinatesDistance(memory.position, pos)
+            tmpDistance = utils.manhattanDistance(memory.position, pos)
             
             if tmpDistance > minNormalDistance + 1:
                 # do not add positions that are too far
@@ -598,7 +598,7 @@ class SeeMoreAction(Action):
         
         return maxVisibleCoordsFacing.value
     
-    def getNearbyOpponentPos(self, memory: Memory) -> bool:
+    def getNearbyOpponentPos(self, memory: Memory) -> Coords:
         nearbyOponentDistance = INFINITY
         nearbyOponentPos = None
         
@@ -614,13 +614,48 @@ class SeeMoreAction(Action):
                 if memory.map.terrain[coords].character is None or memory.map.terrain[coords].character.controller_name == OUR_BOT_NAME:
                     continue
                 
-                distance = utils.coordinatesDistance(memory.position, coords)
+                distance = utils.manhattanDistance(memory.position, coords)
 
                 if distance < nearbyOponentDistance:
                     nearbyOponentDistance = distance
                     nearbyOponentPos = coords
 
-        return nearbyOponentPos
+        return nearbyOponentPos, nearbyOponentDistance
+    
+    def getNearbyPossibleOponentPos(self, memory: Memory) -> Coords:
+        possibleEnemiesTiles = memory.map.enemiesPositionsApproximation.getEnemiesTiles()
+        minDist = 2
+        minPos = None
+
+        for peTile in possibleEnemiesTiles:
+            dist = utils.manhattanDistance(memory.position, peTile)
+
+            if dist < minDist:
+                minDist = dist
+                minPos = peTile
+        
+        if minPos is None:
+            return None, INFINITY
+
+        return minPos, minDist
+    
+    def getNearbyDangerPos(self, memory: Memory):
+        nearbyOpponentPos, nearbyOpponentDist = self.getNearbyOpponentPos(memory)
+        nearbyPossibleOpponentPos, nearbyPossibleOpponentDist = self.getNearbyPossibleOponentPos(memory)
+
+        nearbyDangerPos = None
+        nearbyDangerDist = INFINITY
+
+        if nearbyOpponentPos is not None:
+            nearbyDangerPos = nearbyOpponentPos
+            nearbyDangerDist = nearbyOpponentDist
+        
+        if nearbyPossibleOpponentPos is not None and nearbyPossibleOpponentDist < nearbyDangerDist:
+            nearbyDangerPos = nearbyPossibleOpponentPos
+            nearbyDangerDist = nearbyPossibleOpponentDist
+        
+        return nearbyDangerPos
+
     
     def getMostDefensiveDirection(self, memory :Memory, nearbyOpponentPos :Coords) -> Coords:
         # get vector to closest enemy
@@ -652,13 +687,13 @@ class SeeMoreAction(Action):
 
     @profile
     def perform(self, memory: Memory) -> Action:
-        nearbyOpponentPos = self.getNearbyOpponentPos(memory)
+        nearbyDangerPos = self.getNearbyDangerPos(memory)
 
-        if nearbyOpponentPos is not None:
-            defensiveDirection = self.getMostDefensiveDirection(memory, nearbyOpponentPos)
+        if nearbyDangerPos is not None:
+            defensiveDirection = self.getMostDefensiveDirection(memory, nearbyDangerPos)
             return self.lookAtTile(memory, defensiveDirection)
 
-        if self.isGoingToSomeDirection(memory):
+        if not memory.getCurrentWeaponClass() != weapons.Amulet and self.isGoingToSomeDirection(memory):
             forwardDirection = self.getForwardDirection(memory)
             return self.lookAtTile(memory, forwardDirection)
         

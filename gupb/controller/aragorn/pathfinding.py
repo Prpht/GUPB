@@ -98,7 +98,7 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
             # if dist = 10, cost += 20
             # if dist = 11, cost += 0
             # if dist = 12, cost += 0
-            dangerousTileCost = 20 * max( (10 - utils.coordinatesDistance(memory.position, tileCoords) + 1), 0 )
+            dangerousTileCost = 20 * max( (10 - utils.manhattanDistance(memory.position, tileCoords) + 1), 0 )
 
         return mistCost + dangerousTileCost
 
