@@ -176,7 +176,7 @@ class Brain:
                 if dist is None or dist == INFINITY:
                     dist = utils.manhattanDistance(self.memory.position, menhirPos)
                 
-                if dist > self.memory.map.mist_radius / 2:
+                if dist >= self.memory.map.mist_radius - 5:
                     goCloserToMenhir = True
 
             if goCloserToMenhir:
