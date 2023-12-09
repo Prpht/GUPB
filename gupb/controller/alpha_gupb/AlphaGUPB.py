@@ -274,7 +274,6 @@ class AlphaGUPB(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        print("start")
         self.update_knowledge(knowledge.visible_tiles)
         self.alive_champions = knowledge.no_of_champions_alive
         self.position = knowledge.position
@@ -283,7 +282,6 @@ class AlphaGUPB(controller.Controller):
         blocks = self.get_blocks(self.all_knowledge)
         self.facing= knowledge.visible_tiles[knowledge.position].character.facing
         self.weapon = knowledge.visible_tiles[knowledge.position].character.weapon
-        print("pos ", self.position)
         enemies = self.get_enemies(self.all_knowledge)
         self.seen_tiles.add(self.position)
         self.attackable_tiles = attackable_tiles(self.weapon.name, self.position)
@@ -306,9 +304,6 @@ class AlphaGUPB(controller.Controller):
 
             
         can_attack = can_attack_check(enemies, self.attackable_tiles)  
-        print("can attack", can_attack)
-
-        print("knowledge updated")
 
         if (self.closest_enemy and (self.weapon.name in ['bow_loaded', 'bow_unloaded'])):
             #print("close enemy and bow") 
@@ -325,39 +320,29 @@ class AlphaGUPB(controller.Controller):
             if(self.weapon.name =='bow_loaded'):
                 return attack_enemy(self.facing, can_attack)
             if(self.should_attack2(self.closest_enemy)):
-                print("should attack, attacking")
-                print(self.facing)
                 return attack_enemy(self.facing, can_attack)
             else:
-                print("shouldnt attack")
                 furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
                 furthest_tile = self.furthest_tile_from_enemy(furthest_tiles, self.closest_enemy)
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), furthest_tile)
                 if(path):
                     return self.find_move(path[1])
                 else:
-                    print("attacking anyway")
                     return attack_enemy(self.facing, can_attack)
                 
         if(len(self.positions)>5 and len(set(self.positions[-9:])) == 1):
-            print("random action")
             self.positions = []
             return random.choice(POSSIBLE_ACTIONS)
     
         if(len(self.mist)>0):
-            print("mist")
             closest_mist = self.closest_tile(self.position, self.mist)
             if(self.distance(self.position, closest_mist) < 5):
-                print("mist close")
                 if(self.menhir): 
-                    print("know menhir")
                     if(self.distance(self.position, self.menhir) > 3):
                         path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.menhir)
                         if path:
-                            print("going to menhir")
                             return self.find_move(path[1])
                 else:
-                    print("dont know menhir")
                 furthest_tiles = self.furthest_tiles(closest_mist, self.walkable_tiles)
                 for tile in furthest_tiles:
                     if (tile not in self.mist and self.can_walk(tile)):
@@ -365,15 +350,12 @@ class AlphaGUPB(controller.Controller):
                         path = pathfinder.astar(blocks, (self.position[0], self.position[1]), tile)
                         if (path):
                             return self.find_move(path[1])
-                print("dont know where to run")
         
         if(len(tiles_with_potions)>0):
-            print("potions")
             closest_potion= self.closest_tile(self.position, tiles_with_potions)
             if(closest_potion != self.position):
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), closest_potion)
                 if(path[1] not in self.mist):
-                    print("going to potion")
                     return self.find_move(path[1])  
 
 
@@ -381,7 +363,6 @@ class AlphaGUPB(controller.Controller):
             if(self.should_attack(self.closest_enemy)):
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.closest_enemy)
                 if(path[1] not in self.mist):
-                    print("chasing enemy")
                     return self.find_move(path[1])
             
         if(self.weapon.name == 'bow_unloaded'):
@@ -398,7 +379,6 @@ class AlphaGUPB(controller.Controller):
             enemy_weapon = self.get_enemy_weapon(self.closest_enemy)
             distance = self.distance(self.position, self.closest_enemy)
             if(distance<=3 and distance>1 and self.weapon.name !='amulet' and enemy_weapon not in ['sword', 'axe', 'bow_loaded', 'bow_unloaded']):
-                print("predicting attack")
                 #print(self.closest_enemy)
                 path = pathfinder.astar(blocks, (self.position[0], self.position[1]), self.closest_enemy)
                 if(path[1][0]<self.position[0]):
@@ -411,7 +391,6 @@ class AlphaGUPB(controller.Controller):
                     direction = "up"
                 return attack_enemy(self.facing, direction)
             elif(distance<8):
-                print("running away")
                 if len(self.walkable_tiles)>0:
                     furthest_tiles = self.furthest_tiles(self.closest_enemy, self.walkable_tiles)
                     furthest_tile = self.furthest_tile_from_enemy(furthest_tiles, self.closest_enemy)
@@ -420,7 +399,6 @@ class AlphaGUPB(controller.Controller):
                         return self.find_move(path[1])
                 
         if not self.menhir and self.alive_champions < 5:
-            print("left")
             return controller.characters.Action.TURN_LEFT
             #print('exploring')
             not_explored = self.not_walked_tiles()
@@ -435,7 +413,6 @@ class AlphaGUPB(controller.Controller):
             #print("running :)")
             if(self.can_step_forward()):
                 return controller.characters.Action.STEP_FORWARD
-        print("left")
         return controller.characters.Action.TURN_LEFT
 
 
