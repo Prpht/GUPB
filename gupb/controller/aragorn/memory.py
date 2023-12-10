@@ -148,12 +148,19 @@ class Memory:
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
     
     @profile
-    def getDistanceToClosestPotion(self):
+    def getDistanceToClosestPotion(self, maxTicksAgo = None):
         minDistance = INFINITY
         minCoords = None
 
         for coords in self.map.terrain:
             if self.map.terrain[coords].consumable == consumables.Potion:
+                if (
+                    maxTicksAgo is not None
+                    and hasattr(self.map.terrain[coords], 'tick')
+                    and self.map.terrain[coords].tick < self.tick - maxTicksAgo
+                ):
+                    continue
+
                 distance = utils.manhattanDistance(self.position, coords)
 
                 if distance < minDistance:
@@ -428,9 +435,8 @@ class Map:
         for effect in effectsToConvert:
             if effect.type == 'mist':
                 convertedEffects.append(effects.Mist)
-            # we dont need to know weapon cuts
-            # elif effect.type == 'weaponcut':
-            #     convertedEffects.append(effects.WeaponCut)
+            elif effect.type == 'weaponcut':
+                convertedEffects.append(effects.WeaponCut)
         
         return convertedEffects
     
@@ -501,6 +507,10 @@ class Map:
             # Make mist dangerous
             # if effects.Mist in self.terrain[coords].effects:
             #     dangerousTiles[coords] = coords
+
+            # Watch out for damage
+            if effects.WeaponCut in self.terrain[coords].effects:
+                dangerousTiles[coords] = coords
 
         
         # cache

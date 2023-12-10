@@ -52,7 +52,7 @@ class Brain:
 
         # PICKING UP POTION
 
-        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
+        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion(5)
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
 
@@ -124,7 +124,7 @@ class Brain:
 
         # PICKING UP POTION
 
-        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
+        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion(5)
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
 
@@ -263,7 +263,7 @@ class Brain:
 
         # PICKING UP POTION
 
-        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion()
+        [closestPotionDistance, closestPotionCoords] = self.memory.getDistanceToClosestPotion(5)
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestPotionDistance", closestPotionDistance, "closestPotionCoords", closestPotionCoords)
 
