@@ -6,6 +6,8 @@ from .knowledge_sources import KnowledgeSources
 from .meta_strategies import MetaStrategy, RandomMetaStrat, ExploreHideRunMetaStrat
 
 
+# nothing changed
+
 class KrombopulosMichaelController(controller.Controller):
     """
     Oh boy, here I go killing again!
