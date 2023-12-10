@@ -477,11 +477,6 @@ class Map:
         Returns a dict. Keys are coords with danger, values are their sources
         """
 
-        def neutralizeTile(coords: coordinates.Coords):
-            if coords in self.terrain and self.terrain[coords].consumable == consumables.Potion:
-                return True
-            return False
-
         # cache
         if currentTick is not None and self.__dangerousTiles_cache_data is not None and self.__dangerousTiles_cache_tick == currentTick:
             return self.__dangerousTiles_cache_data
@@ -506,20 +501,13 @@ class Map:
                 positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
 
                 for position in positions:
-                    if neutralizeTile(position):
-                        continue
-
                     if position not in dangerousTiles:
                         dangerousTiles[position] = coords
-            
-            # consider tile (mist, damage etc.)
-            if neutralizeTile(coords):
-                continue
             
             # Make mist dangerous
             # if effects.Mist in self.terrain[coords].effects:
             #     dangerousTiles[coords] = coords
-            
+
             # Watch out for damage
             if (
                 effects.WeaponCut in self.terrain[coords].effects
