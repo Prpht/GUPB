@@ -8,6 +8,8 @@ from .knowledge_sources import KnowledgeSources
 from .meta_strategies import MetaStrategy, ExploreHideRunMetaStrat
 
 
+# nothing changed for v5
+
 class KrombopulosMichaelController(controller.Controller):
     """
     Oh boy, here I go killing again!
