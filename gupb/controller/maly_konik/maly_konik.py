@@ -10,6 +10,7 @@ from .utils import CHAMPION_STARTING_HP, ACTIONS
 from typing import Optional
 
 
+# Zglaszam! Straz jest ale nie gasi.
 class MalyKonik(controller.Controller):
 
     def __init__(self, nick: str) -> None:
@@ -105,7 +106,7 @@ class MalyKonik(controller.Controller):
                                       self.position,
                                       self.orientation,
                                       CHAMPION_STARTING_HP)
-        #self.strategy.future_moves = []
+        # self.strategy.future_moves = []
 
     @property
     def name(self) -> str:
