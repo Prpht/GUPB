@@ -360,6 +360,16 @@ class AttackClosestEnemyAction(Action):
                     closestEnemy = coords
                     closestEnemyDistance = distance
         
+        for enemyName, possiblePositions in memory.map.enemiesPositionsApproximation.enemies.items():
+            if len(possiblePositions) > 0 and len(possiblePositions) <= 5:
+                coords = possiblePositions[0]
+
+                distance = utils.manhattanDistance(memory.position, coords)
+
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
+        
         if closestEnemy is None:
             if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] No closest enemy found")
             return None, INFINITY
