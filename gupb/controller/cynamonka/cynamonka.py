@@ -129,8 +129,8 @@ class CynamonkaController(controller.Controller):
                     return self.go_randomly()
         except Exception as e:
             # Handle exceptions or errors here
-            traceback.print_exc()
-            print(f"An error occurred: {e}")
+            #traceback.print_exc()
+            #print(f"An error occurred: {e}")
             return self.go_randomly()
 
 
