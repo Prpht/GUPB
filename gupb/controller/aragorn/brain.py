@@ -15,7 +15,7 @@ class Brain:
 
         self.__initPersistentActions()
         self.wholeTime = 0
-        self.state = 0
+        self.state = 1
     
     def __initPersistentActions(self):
         self.persistentActions = {
@@ -439,7 +439,7 @@ class Brain:
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.memory.reset(arena_description)
         pathfinding.invalidate_PF_cache()
-        self.state = 0
+        self.state = 1
 
         self.__initPersistentActions()
     

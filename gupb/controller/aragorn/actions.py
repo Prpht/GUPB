@@ -462,7 +462,8 @@ class AttackClosestEnemyAction(Action):
 
 class RageAttackAction(AttackClosestEnemyAction):
     RAGE_ATTACK_BOTS = [
-        'Ancymon',
+        'AlphaGUPB',
+        'Cynamonka',
         'Roger_1',
         'Ancymon',
     ]
