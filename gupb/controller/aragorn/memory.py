@@ -509,7 +509,11 @@ class Map:
             #     dangerousTiles[coords] = coords
 
             # Watch out for damage
-            if effects.WeaponCut in self.terrain[coords].effects:
+            if (
+                effects.WeaponCut in self.terrain[coords].effects
+                and hasattr(self.terrain[coords], 'tick')
+                and self.terrain[coords].tick >= currentTick - 1
+            ):
                 dangerousTiles[coords] = coords
 
         
