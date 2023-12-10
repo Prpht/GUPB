@@ -331,7 +331,7 @@ class AdvancedExploreAction(ExploreAction):
         return super().perform(memory)
 
 class AttackClosestEnemyAction(Action):
-    OUTDATED_DATA_TICKS = 5
+    OUTDATED_DATA_TICKS = 16
 
     def getClosestEnemy(self, memory: Memory):
         closestEnemy = None
@@ -461,7 +461,6 @@ class AttackClosestEnemyAction(Action):
         return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class RageAttackAction(AttackClosestEnemyAction):
-    OUTDATED_DATA_TICKS = 10
     RAGE_ATTACK_BOTS = [
         'AlphaGUPB',
         'Cynamonka',
@@ -481,7 +480,7 @@ class RageAttackAction(AttackClosestEnemyAction):
                 # tile has character
                 memory.map.terrain[coords].character is not None
                 # ignore if data is outdated
-                and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                # and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
                 and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
@@ -626,12 +625,10 @@ class TakeToOnesLegsAction(Action):
         safeTiles = {}
 
         for coords in possibleTiles:
-            safeTiles[coords] = 0
-
             if not self.isTileGood(coords, memory, dangerousTiles):
-                safeTiles[coords] -= 100
+                continue
             
-            safeTiles[coords] += self.howManySafeTilesAround(coords, memory, dangerousTiles, True)
+            safeTiles[coords] = self.howManySafeTilesAround(coords, memory, dangerousTiles, True)
             
             safeTiles[coords] -= self.getTileSuspiciousness(memory, coords)
 

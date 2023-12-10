@@ -27,7 +27,7 @@ class Brain:
 
         # ------------------------------------------
         
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 4)
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
         # ------------------------------------------
 
@@ -99,7 +99,7 @@ class Brain:
 
         # ------------------------------------------
         
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 4)
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
         # ------------------------------------------
 
@@ -238,7 +238,7 @@ class Brain:
 
         # ------------------------------------------
         
-        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 4)
+        dangerousTilesDict = self.memory.map.getDangerousTilesWithDangerSourcePos(self.memory.tick, 7)
 
         # ------------------------------------------
 
