@@ -464,6 +464,7 @@ class RageAttackAction(AttackClosestEnemyAction):
     RAGE_ATTACK_BOTS = [
         'Ancymon',
         'Roger_1',
+        'Ancymon',
     ]
 
     def getClosestEnemy(self, memory: Memory):
