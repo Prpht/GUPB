@@ -1,4 +1,10 @@
 from gupb.model import coordinates
+from gupb.controller.aragorn.constants import INFINITY
+
+def manhattanDistance(coordA, coordB):
+    if coordA is None or coordB is None:
+        return INFINITY
+    return abs(coordA.x - coordB.x) + abs(coordA.y - coordB.y)
 
 def coordinatesDistance(coordA, coordB):
     return ((coordA.x - coordB.x) ** 2 + (coordA.y - coordB.y) ** 2) ** (1/2)
