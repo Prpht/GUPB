@@ -16,7 +16,7 @@ import questionary
 
 from gupb import controller
 from gupb import runner
-
+from gupb.model.pandas_profiler import PROFILER_SINGLETON
 
 # noinspection PyUnresolvedReferences
 @lru_cache()
@@ -180,6 +180,7 @@ def main(config_path: str, inquiry: bool, log_directory: str) -> None:
     current_config = configuration_inquiry(current_config) if inquiry else current_config
     game_runner = runner.Runner(current_config)
     game_runner.run()
+    PROFILER_SINGLETON.close()
     game_runner.print_scores()
 
 

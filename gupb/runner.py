@@ -14,6 +14,7 @@ from gupb.logger import core as logger_core
 from gupb.model import coordinates
 from gupb.model import games
 from gupb.view import render
+from gupb.model.pandas_profiler import PROFILER_SINGLETON
 
 verbose_logger = logging.getLogger('verbose')
 
@@ -38,6 +39,7 @@ class Runner:
         for i in trange(self.runs_no, desc="Playing games"):
             verbose_logger.info(f"Starting game number {i + 1}.")
             GameStartReport(i + 1).log(logging.INFO)
+            PROFILER_SINGLETON.update_epoch()
             self.run_game(i)
 
     # noinspection PyBroadException
