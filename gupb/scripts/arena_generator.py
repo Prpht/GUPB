@@ -1,6 +1,6 @@
 from itertools import repeat
 import random
-from typing import Iterator, Callable
+from typing import Callable, Iterator
 
 import networkx as nx
 import perlin_noise
