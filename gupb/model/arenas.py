@@ -20,6 +20,7 @@ verbose_logger = logging.getLogger('verbose')
 TILE_ENCODING = {
     '=': tiles.Sea,
     '.': tiles.Land,
+    '@': tiles.Forest,
     '#': tiles.Wall,
 }
 
