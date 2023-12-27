@@ -148,6 +148,10 @@ class Axe(Weapon):
         right_position = centre_position + facing.turn_right().value
         return [left_position, centre_position, right_position]
 
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut(3)
+
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
             self.cut_transparent(arena, cut_position)
@@ -156,7 +160,7 @@ class Axe(Weapon):
 class Amulet(PropheticWeapon, Weapon):
     @staticmethod
     def prescience_radius() -> int:
-        return 4
+        return 3
 
     @classmethod
     def cut_positions(

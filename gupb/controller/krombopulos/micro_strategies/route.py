@@ -1,3 +1,5 @@
+from random import choice
+
 from gupb.model import characters
 from .micro_strategy import MicroStrategy, StrategyPrecedence
 from ..knowledge_sources import KnowledgeSources
@@ -27,19 +29,22 @@ class RouteMicroStrat(MicroStrategy):
         # if we do not know where the menhir is, move to the map center
         except TypeError:
             next_pos = self.knowledge_sources.find_next_move_on_path(self.knowledge_sources.players.own_player_pos,
-                                                                     self.knowledge_sources.map.map_center)
+                                                                     self.knowledge_sources.map.map_center) 
 
         chosen_action = characters.Action.DO_NOTHING
 
         if (self.knowledge_sources.players.own_player_pos +
                 self.knowledge_sources.players.own_player_facing.turn_left().value == next_pos):
-            chosen_action = characters.Action.TURN_LEFT
+            chosen_action = characters.Action.STEP_LEFT
         elif (self.knowledge_sources.players.own_player_pos +
               self.knowledge_sources.players.own_player_facing.turn_right().value == next_pos):
-            chosen_action = characters.Action.TURN_RIGHT
+            chosen_action = characters.Action.STEP_RIGHT
         elif (self.knowledge_sources.players.own_player_pos +
               self.knowledge_sources.players.own_player_facing.value == next_pos):
             chosen_action = characters.Action.STEP_FORWARD
+        elif (self.knowledge_sources.players.own_player_pos -
+              self.knowledge_sources.players.own_player_facing.value == next_pos):
+            chosen_action = choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT])
 
         if self.knowledge_sources.is_action_possible(chosen_action):
             return chosen_action, True
