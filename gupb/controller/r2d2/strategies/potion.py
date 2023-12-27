@@ -22,7 +22,7 @@ class PotionPicker(Strategy):
 def get_nearby_potions(knowledge: R2D2Knowledge) -> list[tuple[int, int]]:
     xs, ys = np.where(knowledge.world_state.matrix == tiles_mapping["potion"])
     # get potions that are within 3 tiles of the champion
-    nearby_potions = [(x, y) for x, y in zip(xs, ys) if walking_distance(knowledge.champion_knowledge.position, (x, y), knowledge.world_state.matrix_walkable) <= 3]
+    nearby_potions = [(x, y) for x, y in zip(xs, ys) if walking_distance(knowledge.champion_knowledge.position, Coords(x, y), knowledge.world_state.matrix_walkable) <= 3]
     return nearby_potions
 
 

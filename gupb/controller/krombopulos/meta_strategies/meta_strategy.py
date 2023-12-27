@@ -12,3 +12,7 @@ class MetaStrategy(abc.ABC):
     @abc.abstractmethod
     def decide(self) -> characters.Action:
         pass
+
+    @abc.abstractmethod
+    def praise(self, score: int) -> None:
+        pass

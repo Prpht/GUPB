@@ -23,6 +23,12 @@ class PathFinder:
         return matrix
 
     def find_path(self, current_position: Coords, destination: Coords) -> List[Coords]:
+        # here it was throwing exception on grid initialization, list out of index
+        x, y = destination
+
+        if x >= len(self.arena_matrix) or y >= len(self.arena_matrix):
+            return []
+
         grid = Grid(matrix=self.arena_matrix)
         start = grid.node(current_position[0], current_position[1])
         end = grid.node(destination[0], destination[1])
