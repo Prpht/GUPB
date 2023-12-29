@@ -18,6 +18,8 @@ class ForrestGumpController(Controller):
         self.last_score = 0
         self.menhir = None
 
+        self.move_number = 0
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ForrestGumpController):
             return self.first_name == other.first_name
@@ -32,7 +34,9 @@ class ForrestGumpController(Controller):
             facing=knowledge.visible_tiles[knowledge.position].character.facing,
             weapon=knowledge.visible_tiles[knowledge.position].character.weapon.name,
             health=knowledge.visible_tiles[knowledge.position].character.health,
-            menhir=self.menhir
+            menhir=self.menhir,
+            no_alive=knowledge.no_of_champions_alive,
+            step=self.move_number
         )
 
         close_enemies = 0
@@ -72,6 +76,7 @@ class ForrestGumpController(Controller):
             self.current_strategy = next_strategy
             self.current_strategy.enter()
 
+        self.move_number += 1
         return self.current_strategy.next_action(character_info)
 
     def praise(self, score: int) -> None:
@@ -79,11 +84,11 @@ class ForrestGumpController(Controller):
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.strategies = [
-            Explore(arena_description, max_age=15),
-            GrabPotion(arena_description, max_distance=7),
-            GrabWeapon(arena_description, max_distance=3),
-            MCTS(arena_description, enter_distance=8, iterations=1500, c=50., max_depth=15),
-            Run(arena_description, close_distance=4, far_distance=6, distance_to_menhir=6)
+            Explore(arena_description, max_age=20, no_alive=4, defend_distance=7),
+            GrabPotion(arena_description, max_distance=10),
+            GrabWeapon(arena_description, max_distance=7),
+            MCTS(arena_description, enter_distance=8, exit_distance=11, iterations=1800, c=100., max_depth=10),
+            Run(arena_description, close_distance=5, far_distance=7, distance_to_menhir=5)
         ]
 
         self.default_strategy = self.strategies[0]
@@ -91,6 +96,7 @@ class ForrestGumpController(Controller):
         self.current_strategy.enter()
 
         self.menhir = None
+        self.move_number = 0
 
     @property
     def name(self) -> str:

@@ -14,11 +14,12 @@ class Run(Strategy):
         pass
 
     def should_enter(self, coords: coordinates.Coords, tile: tiles.TileDescription, character_info: CharacterInfo) -> bool:
+        self.character_info = character_info
+
         if any(effect.type == 'mist' for effect in tile.effects):
             if character_info.menhir and manhattan_distance_to(character_info.menhir, character_info.position) <= self.distance_to_menhir:
                 return False
 
-            self.character_info = character_info
             self.mist = coords
             return True
 
@@ -34,6 +35,8 @@ class Run(Strategy):
         pass
 
     def next_action(self, character_info: CharacterInfo) -> characters.Action:
+        self.character_info = character_info
+
         if character_info.menhir and character_info.menhir == character_info.position:
             return characters.Action.TURN_LEFT
 
@@ -49,9 +52,7 @@ class Run(Strategy):
 
     @property
     def priority(self) -> int:
-        distance = manhattan_distance_to(self.mist, self.character_info.position)
-
-        if distance <= self.close_distance:
+        if manhattan_distance_to(self.character_info.position, self.mist) <= self.close_distance:
             return 5
         else:
             return 2

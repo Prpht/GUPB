@@ -10,7 +10,7 @@ from gupb.model import characters, coordinates
 from gupb.model.arenas import ArenaDescription
 
 
-class CharacterInfo(namedtuple('CharacterInfo', ['position', 'facing', 'weapon', 'health', 'menhir'])):
+class CharacterInfo(namedtuple('CharacterInfo', ['position', 'facing', 'weapon', 'health', 'menhir', 'no_alive', 'step'])):
     pass
 
 
