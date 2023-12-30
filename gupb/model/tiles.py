@@ -125,6 +125,16 @@ class Wall(Tile):
         return False
 
 
+class Forest(Tile):
+    @staticmethod
+    def terrain_passable() -> bool:
+        return True
+
+    @staticmethod
+    def terrain_transparent() -> bool:
+        return False
+
+
 class Menhir(Tile):
     @staticmethod
     def terrain_passable() -> bool:

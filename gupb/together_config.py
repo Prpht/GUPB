@@ -2,7 +2,7 @@ from gupb.controller import alpha_gupb
 from gupb.controller import ancymon
 from gupb.controller import aragorn
 from gupb.controller import ares
-# from gupb.controller import batman
+from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
 from gupb.controller import forrest_gump
@@ -23,8 +23,8 @@ CONFIGURATION = {
         ancymon.AncymonController("Ancymon"),
         aragorn.AragornController("AragornController"),
         ares.AresController("Nike"),
-        # bob.FSMBot(),
-        # batman.BatmanHeuristicsController('Batman'),
+        bob.FSMBot(),
+        batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("Cynamonka"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
         # frog.FrogController('Frog'),
@@ -33,7 +33,7 @@ CONFIGURATION = {
         mongolek.Mongolek('Mongolek'),
         pat_i_kot.PatIKotController("Kot i Pat"),
         random.RandomController("Alice"),
-        # r2d2.RecklessRoamingDancingDruid("R2D2"),
+        r2d2.RecklessRoamingDancingDruid("R2D2"),
         roger.Roger('1'),
     ],
     'start_balancing': False,

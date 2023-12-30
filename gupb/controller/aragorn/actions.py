@@ -10,7 +10,7 @@ from gupb.model import weapons
 from gupb.model.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
-from gupb.controller.aragorn.constants import DEBUG, INFINITY, OUR_BOT_NAME
+from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME
 from gupb.controller.aragorn import pathfinding
 from gupb.controller.aragorn import utils
 
@@ -57,6 +57,7 @@ class GoToAction(Action):
         self.destination: Coords = None
         self.dstFacing: characters.Facing = None
         self.useAllMovements: bool = False
+        self.allowDangerous: bool = False
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -78,6 +79,12 @@ class GoToAction(Action):
         else:
             if DEBUG: print("Trying to set use all movements to non bool object (" + str(useAllMovements) + " of type " + str(type(useAllMovements)) + ")")
     
+    def setAllowDangerous(self, allowDangerous: bool) -> None:
+        if isinstance(allowDangerous, bool):
+            self.allowDangerous = allowDangerous
+        else:
+            if DEBUG: print("Trying to set allow dangerous to non bool object (" + str(allowDangerous) + " of type " + str(type(allowDangerous)) + ")")
+
     @profile
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
@@ -92,8 +99,15 @@ class GoToAction(Action):
             return None
         
         [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
+        
+        if DEBUG2: memory.debugCoords = path
+
+        if DEBUG2: print("[ARAGORN|GOTO] Got path with cost:", cost)
 
         if path is None or len(path) <= 1:
+            return None
+        
+        if not self.allowDangerous and cost > 200:
             return None
 
         nextCoord = path[1]
@@ -101,7 +115,7 @@ class GoToAction(Action):
         return self.get_action_to_move_in_path(memory, nextCoord)
 
     def get_action_to_move_in_path(self, memory: Memory, destination: Coords) -> characters.Action:
-        return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination)
+        return pathfinding.get_action_to_move_in_path(memory.position, memory.facing, destination, self.useAllMovements)
     
 class GoToAroundAction(GoToAction):
     @profile
@@ -194,9 +208,18 @@ class ExploreAction(Action):
         if utils.coordinatesDistance(memory.position, exploreToPos) <= self.MIN_DISTANCE_TO_SECTION_CENTER_TO_MARK_IT_AS_EXPLORED:
             self.__markSectionAsExplored(exploreToSection)
             return self.perform(memory)
+        
+        # if center outside of safe mehhir ring, mark it as explored
+        [menhirPos, prob] = memory.map.menhirCalculator.approximateMenhirPos(memory.tick)
+
+        if menhirPos is not None and utils.coordinatesDistance(exploreToPos, menhirPos) > memory.map.mist_radius / 2:
+            self.__markSectionAsExplored(exploreToSection)
+            return self.perform(memory)
 
         gotoAroundAction = GoToAroundAction()
         gotoAroundAction.setDestination(exploreToPos)
+        gotoAroundAction.setAllowDangerous(False)
+        gotoAroundAction.setUseAllMovements(False)
         res = gotoAroundAction.perform(memory)
 
         if res is None:
@@ -206,59 +229,122 @@ class ExploreAction(Action):
         
         if DEBUG: print("[ARAGORN|EXPLORE] Going to section", exploreToSection, "at", exploreToPos)
         return res
+
+class AdvancedExploreAction(ExploreAction):
+    def __init__(self) -> None:
+        super().__init__()
+        
+        self.visitedCenter = False
+        self.seenAllTiles = False
+
+        self.standableCenter = None
+        self.nextTileToExplore = None
     
-class BasicExploreAction(Action):
+    def __findStandableCenter(self, memory: Memory):
+        center = Coords(round(memory.map.size[0] / 2), round(memory.map.size[1] / 2))
+        
+        destinationsGenerator = utils.aroundTileGenerator(center)
+        limit = 25
+
+        while self.standableCenter is None and limit > 0:
+            limit -= 1
+            
+            try:
+                center = destinationsGenerator.__next__()
+            except StopIteration:
+                pass
+
+            if center in memory.map.terrain and memory.map.terrain[center].terrain_passable():
+                self.standableCenter = center
+    
+    def __seen(self, memory: Memory, coords: Coords):
+        if coords not in memory.map.terrain:
+            return True
+        
+        if not hasattr(memory.map.terrain[coords], 'seen'):
+            return False
+        
+        return memory.map.terrain[coords].seen
+    
+    def __getNextUnseenTileCoords(self, memory: Memory) -> Coords:
+        for r in range(1, max(memory.map.size[0], memory.map.size[1])):
+            for x in range(-r, r + 1):
+                for y in range(-r, r + 1):
+                    coords = add_coords(memory.position, Coords(x, y))
+
+                    if not self.__seen(memory, coords):
+                        return coords
+
+        return None
+
+    def __goto(self, memory: Memory, coords: Coords) -> Action:
+        goToAroundAction = GoToAroundAction()
+        goToAroundAction.setDestination(coords)
+        goToAroundAction.setAllowDangerous(False)
+        goToAroundAction.setUseAllMovements(False)
+        ret = goToAroundAction.perform(memory)
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going to around action, coords:", coords, "action:", ret)
+        return ret
+    
     @profile
     def perform(self, memory: Memory) -> Action:
-        currentSection = memory.getCurrentSection()
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Advanced explore")
+
+        if not self.visitedCenter and self.standableCenter is None:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Finding standable center")
+            self.__findStandableCenter(memory)
         
-        if currentSection == 0:
-            gotoVector = Coords(-1, -1)
-        elif currentSection == 1:
-            gotoVector = Coords(1, 0)
-        elif currentSection == 2:
-            gotoVector = Coords(-1, -1)
-        elif currentSection == 3:
-            gotoVector = Coords(1, 0)
-        else:
-            gotoVector = Coords(-1, -1)
+        if self.standableCenter is None:
+            # if we cannot find standable center, just do normal explore
+            self.visitedCenter = True
+
         
-        mul = 3
-        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
-        exploreToPos = add_coords(memory.position, gotoVector)
+        # go to center first
 
-
-        gotoAroundAction = GoToAroundAction()
-        gotoAroundAction.setDestination(exploreToPos)
-        res = gotoAroundAction.perform(memory)
-
-        if res is not None:
-            return res
+        if self.__seen(memory, self.standableCenter):
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Seen center")
+            self.visitedCenter = True
         
-        gotoVector = Coords(random.randint(-1, 1), random.randint(-1, 1))
-        gotoVector = Coords(gotoVector.x * mul, gotoVector.y * mul)
-        exploreToPos = add_coords(memory.position, gotoVector)
+        if not self.visitedCenter:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going towards center")
+            return self.__goto(memory, self.standableCenter)
+        
+        # explore unseen tiles
+        
+        if self.nextTileToExplore is not None and self.__seen(memory, self.nextTileToExplore):
+            self.nextTileToExplore = None
+        
+        if self.nextTileToExplore is None:
+            self.nextTileToExplore = self.__getNextUnseenTileCoords(memory)
 
-        gotoAroundAction.setDestination(exploreToPos)
-        res = gotoAroundAction.perform(memory)
+        if self.nextTileToExplore is None:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Seen all tiles")
+            self.seenAllTiles = True
+        
+        if not self.seenAllTiles:
+            if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Going towards unseen tile, coords:", self.nextTileToExplore)
+            return self.__goto(memory, self.nextTileToExplore)
+        
+        # default to normal explore
 
-        return res
+        if DEBUG2: print("[ARAGORN|ADVANCED_EXPLORE] Defaulting to normal explore")
+        return super().perform(memory)
 
 class AttackClosestEnemyAction(Action):
     OUTDATED_DATA_TICKS = 16
 
-    @profile
-    def perform(self, memory: Memory) -> Action:
-        # GET CLOSEST ENEMY
+    def getClosestEnemy(self, memory: Memory):
         closestEnemy = None
         closestEnemyDistance = INFINITY
+
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Searching for closest enemy")
 
         for coords in memory.map.terrain:
             if (
                 # tile has character
                 memory.map.terrain[coords].character is not None
                 # ignore if data is outdated
-                and (hasattr(memory.map.terrain[coords], 'tick') and memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
                 and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
@@ -268,25 +354,46 @@ class AttackClosestEnemyAction(Action):
                 # ignore enemies with health greater than reward of killing (potion restore)
                 # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
             ):
-                distance = utils.coordinatesDistance(memory.position, coords)
+                distance = utils.manhattanDistance(memory.position, coords)
                 
                 if distance < closestEnemyDistance:
                     closestEnemy = coords
                     closestEnemyDistance = distance
         
-        if closestEnemy is None:
-            return None
+        for enemyName, possiblePositions in memory.map.enemiesPositionsApproximation.enemies.items():
+            if len(possiblePositions) > 0 and len(possiblePositions) <= 5:
+                coords = possiblePositions[0]
+
+                distance = utils.manhattanDistance(memory.position, coords)
+
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
         
+        if closestEnemy is None:
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] No closest enemy found")
+            return None, INFINITY
+        
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
+
+        return closestEnemy, closestEnemyDistance
+        
+    def approachEnemy(self, memory: Memory, closestEnemy: Coords, closestEnemyDistance: int) -> Action:
         # CLOSEST ENEMY IS TOO FAR
         # just approach him
         if closestEnemyDistance > 3:
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer")
             goToAttackAction = GoToAction()
             goToAttackAction.setDestination(closestEnemy)
-            return goToAttackAction.perform(memory)
+            goToAttackAction.setUseAllMovements(True)
+            ret = goToAttackAction.perform(memory)
+            if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is too far, going closer, result:", ret)
+            return ret
 
         # IF CLOSEST ENEMY IS NEARBY
         # GET CLOSEST FIELD YOU CAN ATTACK FROM
         # BY CALCULATING DETAILED PATHS COSTS
+        if DEBUG2: print("[ARAGORN|ATTACK_CLOSEST_ENEMY] Closest enemy is nearby, calculating detailed paths costs")
         currentWeapon :weapons.Weapon = memory.getCurrentWeaponClass()
 
         if currentWeapon is None:
@@ -302,7 +409,7 @@ class AttackClosestEnemyAction(Action):
             characters.Facing.RIGHT,
         ]:
             for pos in currentWeapon.cut_positions(memory.map.terrain, closestEnemy, facing.turn_left().turn_left()):
-                tmpDistance = utils.coordinatesDistance(memory.position, pos)
+                tmpDistance = utils.manhattanDistance(memory.position, pos)
                 
                 if tmpDistance < minNormalDistance:
                     minNormalDistance = tmpDistance
@@ -314,7 +421,7 @@ class AttackClosestEnemyAction(Action):
                 positionsToAttackFrom[(pos, facing)] = INFINITY
         
         for (pos, facing) in positionsToAttackFrom:
-            tmpDistance = utils.coordinatesDistance(memory.position, pos)
+            tmpDistance = utils.manhattanDistance(memory.position, pos)
             
             if tmpDistance > minNormalDistance + 1:
                 # do not add positions that are too far
@@ -341,7 +448,72 @@ class AttackClosestEnemyAction(Action):
         goToAttackAction = GoToAction()
         goToAttackAction.setDestination(minCostPos)
         goToAttackAction.setDestinationFacing(minCostFacing)
+        goToAttackAction.setUseAllMovements(True)
         return goToAttackAction.perform(memory)
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        
+        if closestEnemy is None:
+            return None
+        
+        return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
+
+class RageAttackAction(AttackClosestEnemyAction):
+    RAGE_ATTACK_BOTS = [
+        'AlphaGUPB',
+        'Cynamonka',
+        'Roger_1',
+        'Ancymon',
+    ]
+
+    def getClosestEnemy(self, memory: Memory):
+        # GET CLOSEST ENEMY
+        closestEnemy = None
+        closestEnemyDistance = INFINITY
+
+        if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] Searching for closest enemy")
+
+        for coords in memory.map.terrain:
+            if (
+                # tile has character
+                memory.map.terrain[coords].character is not None
+                # ignore if data is outdated
+                # and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
+                # ignore ourselfs
+                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # ignore our position
+                and memory.position != coords
+                # ignore enemies with greater health
+                # and memory.map.terrain[coords].character.health <= memory.health
+                # ignore enemies with health greater than reward of killing (potion restore)
+                # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
+
+                and memory.map.terrain[coords].character.controller_name in self.RAGE_ATTACK_BOTS
+            ):
+                distance = utils.manhattanDistance(memory.position, coords)
+                
+                if distance < closestEnemyDistance:
+                    closestEnemy = coords
+                    closestEnemyDistance = distance
+        
+        if closestEnemy is None:
+            if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] No closest enemy found")
+            return None, INFINITY
+        
+        if DEBUG2: print("[ARAGORN|RAGE_ATTACK_ENEMY] Closest enemy found at", closestEnemy, "with distance", closestEnemyDistance)
+        
+        return closestEnemy, closestEnemyDistance
+    
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        closestEnemy, closestEnemyDistance = self.getClosestEnemy(memory)
+        
+        if closestEnemy is None:
+            return None
+        
+        return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class TakeToOnesLegsAction(Action):
     def __init__(self):
@@ -386,12 +558,65 @@ class TakeToOnesLegsAction(Action):
         goToAroundAction.setUseAllMovements(True)
         res = goToAroundAction.perform(memory)
         return res
+    
+    def howManySafeTilesAround(self, coords: Coords, memory: Memory, dangerousTiles, watchOutForPossibleOpponents: bool = False) -> int:
+        possibleTiles = [
+            add_coords(coords, Coords(1, 0)),
+            add_coords(coords, Coords(-1, 0)),
+            add_coords(coords, Coords(0, 1)),
+            add_coords(coords, Coords(0, -1)),
+        ]
+        safeTiles = 0
+
+        for coords in possibleTiles:
+            if self.isTileGood(coords, memory, dangerousTiles):
+                safeTiles += 1
+
+                safeTiles -= self.getTileSuspiciousness(memory, coords)
+        
+        return safeTiles
+
+    def isTileGood(self, coords: Coords, memory: Memory, dangerousTiles) -> bool:
+        if coords not in memory.map.terrain:
+            return False
+        
+        if not memory.map.terrain[coords].terrain_passable():
+            return False
+        
+        if coords in dangerousTiles:
+            return False
+        
+        if coords == memory.position:
+            return False
+        
+        if memory.map.terrain[coords].character is not None and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME:
+            return False
+
+        return True
+    
+    def getTileSuspiciousness(self, memory: Memory, coords: Coords):
+        suspiciousness = 0
+        
+        if coords in memory.map.enemiesPositionsApproximation.getEnemiesTiles():
+            suspiciousness += 0.1
+        
+        neighbors = [
+            add_coords(coords, Coords(1, 0)),
+            add_coords(coords, Coords(-1, 0)),
+            add_coords(coords, Coords(0, 1)),
+            add_coords(coords, Coords(0, -1)),
+        ]
+
+        for neighbor in neighbors:
+            if neighbor in memory.map.enemiesPositionsApproximation.getEnemiesTiles():
+                suspiciousness += 0.1
+        
+        return suspiciousness
 
     def runToAnySafeTile(self, memory: Memory) -> Action:
-        dangerousTiles = memory.map.getDangerousTiles()
+        dangerousTiles = list(memory.map.getDangerousTilesWithDangerSourcePos(memory.tick).keys())
         
         possibleTiles = [
-            memory.position,
             add_coords(memory.position, Coords(1, 0)),
             add_coords(memory.position, Coords(-1, 0)),
             add_coords(memory.position, Coords(0, 1)),
@@ -400,16 +625,12 @@ class TakeToOnesLegsAction(Action):
         safeTiles = {}
 
         for coords in possibleTiles:
-            if coords not in memory.map.terrain:
+            if not self.isTileGood(coords, memory, dangerousTiles):
                 continue
             
-            if not memory.map.terrain[coords].terrain_passable():
-                continue
+            safeTiles[coords] = self.howManySafeTilesAround(coords, memory, dangerousTiles, True)
             
-            if coords in dangerousTiles:
-                continue
-            
-            safeTiles[coords] = utils.coordinatesDistance(coords, self.dangerSourcePos)
+            safeTiles[coords] -= self.getTileSuspiciousness(memory, coords)
 
         # get coords from safeTiles key with maximum value
         maxSafeTile = None
@@ -424,6 +645,157 @@ class TakeToOnesLegsAction(Action):
         if maxSafeTile is None:
             return None
         
-        goToAction = GoToAction()
-        goToAction.setDestination(maxSafeTile)
-        return goToAction.perform(memory)
+        if maxSafeTile == add_coords(memory.position, memory.facing.value):
+            return characters.Action.STEP_FORWARD
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_left().value):
+            return characters.Action.STEP_LEFT
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_right().value):
+            return characters.Action.STEP_RIGHT
+        elif maxSafeTile == add_coords(memory.position, memory.facing.turn_left().turn_left().value):
+            return characters.Action.STEP_BACKWARD
+        
+        return None
+
+class SeeMoreAction(Action):
+    def isGoingToSomeDirection(self, memory: Memory) -> bool:
+        last2Actions = memory.getLastActions()[-2:]
+        
+        if len(last2Actions) < 2:
+            return False
+        
+        return (
+            last2Actions[0] == last2Actions[1]
+            and last2Actions[0] in [
+                characters.Action.STEP_LEFT,
+                characters.Action.STEP_RIGHT,
+                characters.Action.STEP_BACKWARD,
+            ]
+        )
+    
+    def getForwardDirection(self, memory: Memory) -> Coords:
+        return sub_coords(memory.position, memory.lastPosition)
+    
+    def directionWithMostVisibleCoords(self, memory: Memory) -> Coords:
+        amountOfVisibleCoords = {
+            characters.Facing.UP: 0,
+            characters.Facing.RIGHT: 0,
+            characters.Facing.DOWN: 0,
+            characters.Facing.LEFT: 0,
+        }
+
+        for facing in amountOfVisibleCoords:
+            amountOfVisibleCoords[facing] = len(memory.map.visible_coords(facing, memory.position, memory.getCurrentWeaponClass()))
+        
+        maxVisibleCoords = -INFINITY
+        maxVisibleCoordsFacing = None
+
+        for facing in amountOfVisibleCoords:
+            if amountOfVisibleCoords[facing] > maxVisibleCoords:
+                maxVisibleCoords = amountOfVisibleCoords[facing]
+                maxVisibleCoordsFacing = facing
+        
+        return maxVisibleCoordsFacing.value
+    
+    def getNearbyOpponentPos(self, memory: Memory) -> Coords:
+        nearbyOponentDistance = INFINITY
+        nearbyOponentPos = None
+        
+        r = 3
+
+        for x in range(memory.position.x - r, memory.position.x + r + 1):
+            for y in range(memory.position.x - r, memory.position.x + r + 1):
+                coords = Coords(x, y)
+
+                if coords not in memory.map.terrain:
+                    continue
+
+                if memory.map.terrain[coords].character is None or memory.map.terrain[coords].character.controller_name == OUR_BOT_NAME:
+                    continue
+                
+                distance = utils.manhattanDistance(memory.position, coords)
+
+                if distance < nearbyOponentDistance:
+                    nearbyOponentDistance = distance
+                    nearbyOponentPos = coords
+
+        return nearbyOponentPos, nearbyOponentDistance
+    
+    def getNearbyPossibleOponentPos(self, memory: Memory) -> Coords:
+        possibleEnemiesTiles = memory.map.enemiesPositionsApproximation.getEnemiesTiles()
+        minDist = 2
+        minPos = None
+
+        for peTile in possibleEnemiesTiles:
+            dist = utils.manhattanDistance(memory.position, peTile)
+
+            if dist < minDist:
+                minDist = dist
+                minPos = peTile
+        
+        if minPos is None:
+            return None, INFINITY
+
+        return minPos, minDist
+    
+    def getNearbyDangerPos(self, memory: Memory):
+        nearbyOpponentPos, nearbyOpponentDist = self.getNearbyOpponentPos(memory)
+        nearbyPossibleOpponentPos, nearbyPossibleOpponentDist = self.getNearbyPossibleOponentPos(memory)
+
+        nearbyDangerPos = None
+        nearbyDangerDist = INFINITY
+
+        if nearbyOpponentPos is not None:
+            nearbyDangerPos = nearbyOpponentPos
+            nearbyDangerDist = nearbyOpponentDist
+        
+        if nearbyPossibleOpponentPos is not None and nearbyPossibleOpponentDist < nearbyDangerDist:
+            nearbyDangerPos = nearbyPossibleOpponentPos
+            nearbyDangerDist = nearbyPossibleOpponentDist
+        
+        return nearbyDangerPos
+
+    
+    def getMostDefensiveDirection(self, memory :Memory, nearbyOpponentPos :Coords) -> Coords:
+        # get vector to closest enemy
+        opponentDirection = sub_coords(nearbyOpponentPos, memory.position)
+
+        # normalize its coords
+        maxC = max(abs(opponentDirection.x), abs(opponentDirection.y))
+        opponentDirection = Coords(opponentDirection.x // maxC, opponentDirection.y // maxC)
+        
+        # if both coords are 1s or -1s, set one of them to 0
+        if opponentDirection.x != 0 and opponentDirection.y != 0:
+            opponentDirection = Coords(opponentDirection.x, 0)
+
+        return opponentDirection
+    
+    def lookAtTile(self, memory: Memory, tile: Coords) -> Action:
+        if tile == memory.facing.value:
+            # seems OK - do other actions
+            return None
+        
+        if tile == memory.facing.turn_left().value:
+            return characters.Action.TURN_LEFT
+        
+        if tile == memory.facing.turn_right().value:
+            return characters.Action.TURN_RIGHT
+        
+        if tile == memory.facing.turn_left().turn_left().value:
+            return characters.Action.TURN_RIGHT
+
+    @profile
+    def perform(self, memory: Memory) -> Action:
+        nearbyDangerPos = self.getNearbyDangerPos(memory)
+
+        if nearbyDangerPos is not None:
+            defensiveDirection = self.getMostDefensiveDirection(memory, nearbyDangerPos)
+            return self.lookAtTile(memory, defensiveDirection)
+
+        if not memory.getCurrentWeaponClass() != weapons.Amulet and self.isGoingToSomeDirection(memory):
+            forwardDirection = self.getForwardDirection(memory)
+            return self.lookAtTile(memory, forwardDirection)
+        
+        # bestDirection = self.directionWithMostVisibleCoords(memory)
+        # return self.lookAtTile(memory, bestDirection)
+
+        return None

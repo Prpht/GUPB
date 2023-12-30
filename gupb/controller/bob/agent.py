@@ -11,6 +11,7 @@ from gupb.model.tiles import TileDescription
 
 # Random comment as we did not change anything
 # Once again
+# Next round
 
 POSSIBLE_RANDOM_ACTIONS = [
     Action.TURN_LEFT,
