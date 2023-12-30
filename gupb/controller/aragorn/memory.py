@@ -1,9 +1,11 @@
 import os, random
 from typing import Dict, NamedTuple, Optional, List
+import bresenham
 
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
+from gupb.model.profiling import profile
 
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY, OUR_BOT_NAME
@@ -17,47 +19,74 @@ class Memory:
 
         self.idleTime = 0
         self.position: coordinates.Coords = None
+        self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
+        self.numberOfVisibleTiles: int = 0
         
         self.map: Map = None
         self.environment: Environment = None
 
         self.health: int = 0
+        
+        # create last actions variable that
+        # is a list of last 5 actions
+        # with rotation actions removed
+        self.lastActions: list = []
+        self.debugCoords = None
     
     def reset(self, arena_description: arenas.ArenaDescription) -> None:
         self.tick = 0
 
         self.idleTime = 0
         self.position: coordinates.Coords = None
+        self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
         self.no_of_champions_alive: int = 0
+        self.numberOfVisibleTiles: int = 0
 
         # self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
         self.map = Map.load(arena_description.name)
         self.environment = Environment(self.map)
 
         self.health: int = 0
+        
+        self.lastActions: list = []
+        self.debugCoords = None
     
     def update(self, knowledge: characters.ChampionKnowledge) -> None:
         self.tick += 1
 
+        self.lastPosition = self.position
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
         self.map.parseVisibleTiles(knowledge.visible_tiles, self.tick)
+        self.numberOfVisibleTiles = len(knowledge.visible_tiles)
         
         self.idleTime += 1
         self.environment.environment_action(self.no_of_champions_alive)
 
         self.health = knowledge.visible_tiles[self.position].character.health
+        self.debugCoords = None
+
+    def addLastAction(self, action):
+        self.lastActions.append(action)
+        self.lastActions = self.lastActions[-5:]
+    
+    def getLastActions(self):
+        return self.lastActions
 
     def getCurrentWeaponDescription(self):
+        if self.position is None:
+            return None
+        
         return self.map.terrain[self.position].character.weapon
     
     def getCurrentWeaponName(self):
-        return self.getCurrentWeaponDescription().name
+        weaponDescription = self.getCurrentWeaponDescription()
+        return weaponDescription.name if weaponDescription is not None else None
 
     def getCurrentWeaponClass(self):
         return Map.weaponDescriptionConverter(self.getCurrentWeaponDescription())
@@ -87,7 +116,7 @@ class Memory:
                 continue
 
             if cellCoords in self.map.terrain and self.map.terrain[cellCoords].character is not None:
-                distance = utils.coordinatesDistance(self.position, cellCoords)
+                distance = utils.manhattanDistance(self.position, cellCoords)
 
                 if distance < closestOponentDistance:
                     closestOponentDistance = distance
@@ -118,13 +147,21 @@ class Memory:
     def willGetIdlePenalty(self):
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
     
-    def getDistanceToClosestPotion(self):
+    @profile
+    def getDistanceToClosestPotion(self, maxTicksAgo = None):
         minDistance = INFINITY
         minCoords = None
 
         for coords in self.map.terrain:
             if self.map.terrain[coords].consumable == consumables.Potion:
-                distance = utils.coordinatesDistance(self.position, coords)
+                if (
+                    maxTicksAgo is not None
+                    and hasattr(self.map.terrain[coords], 'tick')
+                    and self.map.terrain[coords].tick < self.tick - maxTicksAgo
+                ):
+                    continue
+
+                distance = utils.manhattanDistance(self.position, coords)
 
                 if distance < minDistance:
                     minDistance = distance
@@ -132,6 +169,7 @@ class Memory:
         
         return [minDistance, minCoords]
 
+    @profile
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
@@ -141,10 +179,10 @@ class Memory:
             if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
                 #TODO: assign correct weights for weapons when the proper usage of each of them is known
-                if WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
+                if current_weapon in WEAPON_HIERARCHY and WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
                     continue
 
-                distance = utils.coordinatesDistance(self.position, coords)
+                distance = utils.manhattanDistance(self.position, coords)
 
                 if distance < minDistance:
                     minDistance = distance
@@ -225,9 +263,14 @@ class Map:
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
 
         self.menhirCalculator = MenhirCalculator(self)
+        self.enemiesPositionsApproximation = EnemiesPositionsApproximation(self)
 
         self.sectionsCenters = None
         self.centerPos = coordinates.Coords(round(self.size[0] / 2), round(self.size[1] / 2))
+        self.__dangerousTiles_cache_data = None
+        self.__dangerousTiles_cache_tick = 0
+
+        if DEBUG: print("[ARAGORN|MEMORY] loaded map " + self.name + " with size " + str(self.size))
 
     @staticmethod
     def load(name: str) -> 'Map':
@@ -243,9 +286,11 @@ class Map:
                         position = coordinates.Coords(x, y)
                         if character in arenas.TILE_ENCODING:
                             terrain[position] = arenas.TILE_ENCODING[character]()
+                            terrain[position].seen = arenas.TILE_ENCODING[character] != tiles.Land
                         elif character in arenas.WEAPON_ENCODING:
                             terrain[position] = tiles.Land()
-                            terrain[position].loot =  Map.weaponDescriptionConverter(weapons.WeaponDescription(arenas.WEAPON_ENCODING[character]().description()))
+                            terrain[position].loot =  Map.weaponDescriptionConverter(arenas.WEAPON_ENCODING[character]().description())
+                            terrain[position].seen = False
         return Map(name, terrain)
     
     @staticmethod
@@ -259,10 +304,59 @@ class Map:
                 for x in range(size[0]):
                     position = coordinates.Coords(x, y)
                     terrain[position] = tiles.Land()
+                    terrain[position].seen = False
         
         return Map(name, terrain)
     
+    @profile
+    def visible_coords(self, characterFacing :characters.Facing, characterPosition :coordinates.Coords, characterWeapon :weapons.Weapon = None) -> set[coordinates.Coords]:
+        def estimate_border_point() -> tuple[coordinates.Coords, int]:
+            if characterFacing == characters.Facing.UP:
+                return coordinates.Coords(characterPosition.x, 0), characterPosition[1]
+            elif characterFacing == characters.Facing.RIGHT:
+                return coordinates.Coords(self.size[0] - 1, characterPosition.y), self.size[0] - characterPosition[0]
+            elif characterFacing == characters.Facing.DOWN:
+                return coordinates.Coords(characterPosition.x, self.size[1] - 1), self.size[1] - characterPosition.y
+            elif characterFacing == characters.Facing.LEFT:
+                return coordinates.Coords(0, characterPosition.y), characterPosition[0]
+
+        def champion_left_and_right() -> list[coordinates.Coords]:
+            if characterFacing == characters.Facing.UP or characterFacing == characters.Facing.DOWN:
+                return [
+                    coordinates.Coords(characterPosition.x + 1, characterPosition.y),
+                    coordinates.Coords(characterPosition.x - 1, characterPosition.y),
+                ]
+            elif characterFacing == characters.Facing.LEFT or characterFacing == characters.Facing.RIGHT:
+                return [
+                    coordinates.Coords(characterPosition.x, characterPosition.y + 1),
+                    coordinates.Coords(characterPosition.x, characterPosition.y - 1),
+                ]
+
+        border, distance = estimate_border_point()
+        left = characterFacing.turn_left().value
+        targets = [border + coordinates.Coords(i * left.x, i * left.y) for i in range(-distance, distance + 1)]
+        visible = set()
+        visible.add(characterPosition)
+        for coords in targets:
+            ray = bresenham.bresenham(characterPosition.x, characterPosition.y, coords[0], coords[1])
+            next(ray)
+            for ray_coords in ray:
+                if ray_coords not in self.terrain:
+                    break
+                visible.add(ray_coords)
+                if not self.terrain[ray_coords].transparent:
+                    break
+        if characterWeapon is not None:
+            for coords in characterWeapon.prescience(characterPosition, characterFacing):
+                if coords in self.terrain:
+                    visible.add(coords)
+        visible.update(champion_left_and_right())
+        return visible
+    
+    @profile
     def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], currentTick :int) -> None:
+        self.enemiesPositionsApproximation.update(visibleTiles, currentTick)
+        
         for coords in visibleTiles:
             visible_tile_description = visibleTiles[coords]
             
@@ -298,6 +392,7 @@ class Map:
                 self.terrain[coords] = newType()
             
             self.terrain[coords].tick = currentTick
+            self.terrain[coords].seen = True
             self.terrain[coords].loot = Map.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
@@ -306,7 +401,7 @@ class Map:
             self.terrain[coords].effects = tileEffects
 
             if effects.Mist in tileEffects:
-                self.menhirCalculator.addMist(coords)
+                self.menhirCalculator.addMist(coords, tick=currentTick)
     
     @staticmethod
     def weaponDescriptionConverter(weaponDescription: weapons.WeaponDescription) -> weapons.Weapon:
@@ -340,9 +435,8 @@ class Map:
         for effect in effectsToConvert:
             if effect.type == 'mist':
                 convertedEffects.append(effects.Mist)
-            # we dont need to know weapon cuts
-            # elif effect.type == 'weaponcut':
-            #     convertedEffects.append(effects.WeaponCut)
+            elif effect.type == 'weaponcut':
+                convertedEffects.append(effects.WeaponCut)
         
         return convertedEffects
     
@@ -369,7 +463,7 @@ class Map:
                 if currentPos is None:
                     return coords
                 
-                distance = utils.coordinatesDistance(currentPos, coords)
+                distance = utils.manhattanDistance(currentPos, coords)
 
                 if distance < closestDistance:
                     closestCoords = coords
@@ -377,34 +471,17 @@ class Map:
         
         return closestCoords
     
-    def getDangerousTiles(self):
-        """
-        Returns list of tiles that are in range of enemy weapon
-        """
-
-        dangerousTiles = []
-
-        for coords in self.terrain:
-            enemyDescription = self.terrain[coords].character
-            
-            if enemyDescription is not None:
-                weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
-
-                if weapon is None:
-                    continue
-
-                positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
-
-                for position in positions:
-                    if position not in dangerousTiles:
-                        dangerousTiles.append(position)
-        
-        return dangerousTiles
-
+    @profile
     def getDangerousTilesWithDangerSourcePos(self, currentTick :int = None, maxTicksBehind :int = None):
         """
         Returns a dict. Keys are coords with danger, values are their sources
         """
+
+        # cache
+        if currentTick is not None and self.__dangerousTiles_cache_data is not None and self.__dangerousTiles_cache_tick == currentTick:
+            return self.__dangerousTiles_cache_data
+
+
 
         dangerousTiles = {}
 
@@ -426,6 +503,24 @@ class Map:
                 for position in positions:
                     if position not in dangerousTiles:
                         dangerousTiles[position] = coords
+            
+            # Make mist dangerous
+            # if effects.Mist in self.terrain[coords].effects:
+            #     dangerousTiles[coords] = coords
+
+            # Watch out for damage
+            if (
+                effects.WeaponCut in self.terrain[coords].effects
+                and hasattr(self.terrain[coords], 'tick')
+                and self.terrain[coords].tick >= currentTick - 1
+            ):
+                dangerousTiles[coords] = coords
+
+        
+        # cache
+        if currentTick is not None:
+            self.__dangerousTiles_cache_data = dangerousTiles
+            self.__dangerousTiles_cache_tick = currentTick
         
         return dangerousTiles
     
@@ -511,22 +606,24 @@ class MenhirCalculator:
 
         self.menhirPos = None
         self.mistCoordinates = []
-        self.recentlyChanged = True
+        self.lastChangeTick = -INFINITY
+        self.lastResult = None
 
     def setMenhirPos(self, menhirPos: coordinates.Coords) -> None:
         if not isinstance(menhirPos, coordinates.Coords):
             print("[MenhirCalculator] Trying to set menhir pos to non Coords object (" + str(menhirPos) + " of type " + str(type(menhirPos)) + ")")
         self.menhirPos = menhirPos
     
-    def addMist(self, mistPos: coordinates.Coords) -> None:
+    def addMist(self, mistPos: coordinates.Coords, tick :int) -> None:
         if mistPos not in self.mistCoordinates:
-            self.recentlyChanged = True
+            self.lastChangeTick = tick
             self.mistCoordinates.append(mistPos)
     
     def isMenhirPosFound(self) -> bool:
         return self.menhirPos is not None
     
-    def approximateMenhirPos(self, tick :int = None) -> coordinates.Coords:
+    @profile
+    def approximateMenhirPos(self, tick :int) -> coordinates.Coords:
         mistRadius = self.map.mist_radius
 
         if self.menhirPos is not None:
@@ -536,7 +633,7 @@ class MenhirCalculator:
         if len(mistCoordinates) == 0:
             return None, None
         
-        if not self.recentlyChanged:
+        if self.lastChangeTick >= tick - 13 and self.lastResult is not None:
             return self.lastResult
         
         bestMenhirPos = None
@@ -553,7 +650,7 @@ class MenhirCalculator:
                 mistMax = 0
 
                 for coords in self.map.terrain:
-                    if tick is not None and hasattr(self.map.terrain[coords], 'tick'):
+                    if hasattr(self.map.terrain[coords], 'tick'):
                         if self.map.terrain[coords].tick < tick - 16:
                             continue
                     
@@ -583,6 +680,125 @@ class MenhirCalculator:
                     bestMenhirPos = try_menhir
                     bestMistAmount = mistFound/mistMax
         
-        self.recentlyChanged = False
+        self.lastChangeTick = tick
         self.lastResult = (bestMenhirPos, bestMistAmount)
         return self.lastResult
+
+class EnemiesPositionsApproximation:
+    LOW_PROBABILITY_AFTER_MOVES = 8
+
+    def __init__(self, map: Map) -> None:
+        self.enemies = {}
+        self.map = map
+        self.enemiesTiles = {}
+        self.lastSeenAt = {}
+    
+    def _removeEnemy(self, enemyName: str) -> None:
+        if enemyName not in self.enemies:
+            return
+        
+        # enemiesTiles
+        for coordsToDel in self.enemies[enemyName]:
+            coordsAreInOtherEnemy = False
+
+            for tmpEnemyName, tmpEnemyTiles in self.enemies.items():
+                if tmpEnemyName != enemyName:
+                    if coordsToDel in tmpEnemyTiles:
+                        coordsAreInOtherEnemy = True
+                        break
+            
+            if not coordsAreInOtherEnemy and coordsToDel in self.enemiesTiles:
+                del self.enemiesTiles[coordsToDel]
+        # ===
+        del self.enemies[enemyName]
+
+    def update(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], crurentTick :int):
+        self.parseVisibleTiles(visibleTiles, crurentTick)
+    
+    def whereCanOneGoFrom(self, coords: coordinates.Coords) -> List[coordinates.Coords]:
+        neighbours = []
+
+        for direction in characters.Facing:
+            neighbour = coordinates.add_coords(coords, direction.value)
+
+            if neighbour in self.map.terrain and self.map.terrain[neighbour].terrain_passable():
+                neighbours.append(neighbour)
+        
+        return neighbours
+
+    def parseVisibleTiles(self, visibleTiles: Dict[coordinates.Coords, tiles.Tile], tick: int) -> None:
+        # remove enemies with low probability
+        enemiesToRemove = []
+
+        for enemyName, lastSeenAtTick in self.lastSeenAt.items():
+            if tick - lastSeenAtTick > self.LOW_PROBABILITY_AFTER_MOVES:
+                enemiesToRemove.append(enemyName)
+        
+        for enemyName in enemiesToRemove:
+            self._removeEnemy(enemyName)
+
+        # simulate unseen movements
+        for enemyName, enemyPossiblePositions in self.enemies.items():
+            newTiles = []
+
+            for enCoords in enemyPossiblePositions:
+                neighboringCoords = self.whereCanOneGoFrom(enCoords)
+
+                for nCoord in neighboringCoords:
+                    if nCoord not in enemyPossiblePositions and nCoord not in newTiles:
+                        newTiles.append(nCoord)
+            
+            self.enemies[enemyName] += newTiles
+            
+            # enemiesTiles
+            for nt in newTiles:
+                self.enemiesTiles[nt] = True
+            # ===
+
+        # confront simulated knowledge with visible tiles
+        for coords in visibleTiles:
+            visible_tile_description = visibleTiles[coords]
+            
+            if visible_tile_description.character is not None and visible_tile_description.character.controller_name != OUR_BOT_NAME:
+                # enemy found
+                enemyName = visible_tile_description.character.controller_name
+
+                if isinstance(coords, tuple):
+                    coords = coordinates.Coords(coords[0], coords[1])
+                
+                self.lastSeenAt[enemyName] = tick
+                self._removeEnemy(enemyName)
+                self.enemies[enemyName] = [coords]
+                # enemiesTiles
+                self.enemiesTiles[coords] = True
+                # ===
+            else:
+                # no enemy found
+                for enemyName, enemyPossiblePositions in self.enemies.items():
+                    if coords in enemyPossiblePositions:
+                        enemyPossiblePositions.remove(coords)
+                        
+                        # enemiesTiles
+                        if coords in self.enemiesTiles:
+                            del self.enemiesTiles[coords]
+                        # ===
+    
+    def getEnemiesTilesPlusRadius(self, radius):
+        enemiesTiles = list(self.enemiesTiles.keys())
+
+        for _ in range(radius):
+            newTiles = []
+
+            for coords in enemiesTiles:
+                neighboringCoords = self.whereCanOneGoFrom(coords)
+
+                for nCoord in neighboringCoords:
+                    if nCoord not in enemiesTiles and nCoord not in newTiles:
+                        newTiles.append(nCoord)
+                
+            enemiesTiles += newTiles
+        
+        return enemiesTiles
+    
+    def getEnemiesTiles(self):
+        return list(self.enemiesTiles.keys())

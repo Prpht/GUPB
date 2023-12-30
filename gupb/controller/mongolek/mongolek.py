@@ -129,6 +129,7 @@ class Mongolek(controller.Controller):
         self.arena = arenas.Arena.load(arena_description.name)
         self.menhir_found = False
         self.target = None
+        self.possible_menhir_coords = []
 
         for coords in self.arena.terrain.keys():
             if self.arena.terrain[coords].terrain_passable():
@@ -150,6 +151,9 @@ class Mongolek(controller.Controller):
         current_facing = champion_knowledge.visible_tiles[champion_knowledge.position].character.facing
 
         path = self.gps.find_path(current_coordinates, destination_coordinates)
+
+        if len(path) == 0:
+            return characters.Action.TURN_LEFT
 
         if current_coordinates.x + current_facing.value.x == path[
             0].x and current_coordinates.y + current_facing.value.y == path[0].y:
