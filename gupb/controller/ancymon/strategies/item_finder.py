@@ -76,5 +76,3 @@ class Item_Finder:
                 if self.loot_coord is None or path_len_to_coords < loot_dist:
                     self.loot_coord = coords
                     loot_dist = path_len_to_coords
-
-
