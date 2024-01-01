@@ -11,6 +11,8 @@ from .meta_strategies import MetaStrategy, ExploreHideRunMetaStrat
 # nothing changed for this version of Krombopulos
 
 
+# nothing changed
+
 class KrombopulosMichaelController(controller.Controller):
     """
     Oh boy, here I go killing again!
