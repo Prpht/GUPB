@@ -7,6 +7,9 @@ from gupb.model import arenas, characters
 from .knowledge_sources import KnowledgeSources
 from .meta_strategies import MetaStrategy, ExploreHideRunMetaStrat
 
+# happy new year
+# nothing changed for this version of Krombopulos
+
 
 class KrombopulosMichaelController(controller.Controller):
     """
