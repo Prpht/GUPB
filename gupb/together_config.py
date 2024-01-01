@@ -17,7 +17,7 @@ from gupb.controller import r2d2
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
-    'arenas': arena_generator.generate_arenas(1),
+    'arenas': arena_generator.generate_arenas(50, arena_generator.random_size_generator()),
     'controllers': [
         alpha_gupb.AlphaGUPB("AlphaGUPB"),
         ancymon.AncymonController("Ancymon"),
@@ -27,7 +27,7 @@ CONFIGURATION = {
         batman.BatmanHeuristicsController('Batman'),
         cynamonka.CynamonkaController("Cynamonka"),
         forrest_gump.ForrestGumpController("Forrest Gump"),
-        frog.FrogController('Frog'),
+        # frog.FrogController('Frog'),
         krombopulos.KrombopulosMichaelController(),
         maly_konik.MalyKonik("LittlePonny"),
         mongolek.Mongolek('Mongolek'),

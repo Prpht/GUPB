@@ -1,58 +1,22 @@
-from random import choice
-
 import numpy as np
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
 
 from gupb.controller import Controller
-from gupb.controller.forrest_gump.utils import init_grid, next_pos_to_action, next_facing
-from gupb.model import arenas
-from gupb.model import characters
-from gupb.model import coordinates
-from gupb.model import weapons
-from gupb.model import tiles
-
-
-WEAPONS = {
-    'knife': weapons.Knife,
-    'sword': weapons.Sword,
-    'bow': weapons.Bow,
-    'bow_loaded': weapons.Bow,
-    'bow_unloaded': weapons.Bow,
-    'axe': weapons.Axe,
-    'amulet': weapons.Amulet
-}
-
-WEAPONS_VALUE = {
-    'knife': 2,
-    'sword': 3,
-    'axe': 5,
-    'amulet': 4,
-    'bow': 1,
-    'bow_loaded': 1,
-    'bow_unloaded': 1
-}
+from gupb.controller.forrest_gump.strategies import *
+from gupb.controller.forrest_gump.utils import CharacterInfo, manhattan_distance_to
+from gupb.model import arenas, characters, coordinates
 
 
 class ForrestGumpController(Controller):
-    PICKUP_DISTANCE = 5
-    POTION_DISTANCE = 5
-    ATTACK_DISTANCE = 4
-    HIDE_DISTANCE = 3
-    DEFEND_DISTANCE = 3
-
     def __init__(self, first_name: str) -> None:
         self.first_name = first_name
 
-        self.arena = None
-        self.matrix = None
-        self.fields = None
-        self.fields_copy = None
+        self.strategies = []
+        self.current_strategy = None
+        self.default_strategy = None
 
-        self.final_coords = None
-        self.destination_coords = None
-        self.destination_age = 0
+        self.close_distance = 3
+        self.last_score = 0
+        self.menhir = None
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ForrestGumpController):
@@ -62,173 +26,71 @@ class ForrestGumpController(Controller):
     def __hash__(self) -> int:
         return hash(self.first_name)
 
-    def find_nearest_field(self, position: coordinates.Coords) -> tuple:
-        position = np.array([position.x, position.y])
-        return self.fields_copy[np.argmin(np.abs(self.fields_copy - position).sum(axis=1))]
-
-    def find_path(self, position: coordinates.Coords, destination: coordinates.Coords) -> list:
-        finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
-        grid = Grid(matrix=self.matrix)
-
-        start = grid.node(position.x, position.y)
-        finish = grid.node(*self.find_nearest_field(destination))
-
-        return finder.find_path(start, finish, grid)[0]
-
-    def distance(self, position: coordinates.Coords, destination: coordinates.Coords) -> int:
-        return len(self.find_path(position, destination)) - 1
-
-    def grab_item(self, position: coordinates.Coords, destination: coordinates.Coords, weapon: str, tile: tiles.TileDescription) -> bool:
-        return ((tile.loot and self.distance(position, destination) <= self.PICKUP_DISTANCE and
-                WEAPONS_VALUE[weapon] < WEAPONS_VALUE[tile.loot.name]) or
-                (tile.consumable and self.distance(position, destination) <= self.POTION_DISTANCE))
-
-    def go_to_destination(self, position: coordinates.Coords, facing: characters.Facing) -> characters.Action:
-        path = self.find_path(position, self.destination_coords)
-        next_pos = path[1] if len(path) > 1 else path[0]
-        self.destination_age -= 1
-        return next_pos_to_action(next_pos.x, next_pos.y, facing, position)
-
-    def cut_positions(self, position: coordinates.Coords, facing: characters.Facing, weapon: str) -> list:
-        return WEAPONS[weapon].cut_positions(self.arena.terrain, position, facing)
-
-    @staticmethod
-    def opposite_direction(position: coordinates.Coords, destination: coordinates.Coords) -> coordinates.Coords:
-        dx, dy = position.x - destination.x, position.y - destination.y
-        return coordinates.Coords(position.x + 2 * dx, position.y + 2 * dy)
-
-    def set_destination(self, destination: coordinates.Coords, override: bool, max_age: int) -> None:
-        if override:
-            self.destination_coords = destination
-            self.destination_age = max_age
-
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        character = knowledge.visible_tiles[knowledge.position].character
-        position = knowledge.position
-        weapon = character.weapon.name
-        facing = character.facing
+        character_info = CharacterInfo(
+            position=knowledge.position,
+            facing=knowledge.visible_tiles[knowledge.position].character.facing,
+            weapon=knowledge.visible_tiles[knowledge.position].character.weapon.name,
+            health=knowledge.visible_tiles[knowledge.position].character.health,
+            menhir=self.menhir
+        )
 
-        nearest_mist_distance = float('inf')
-        nearest_mist_coords = None
-        override = True
+        close_enemies = 0
 
-        if self.final_coords and self.distance(position, self.final_coords) > self.DEFEND_DISTANCE:
-            self.set_destination(self.final_coords, override, 50)
-        elif self.destination_age <= 0 or position == self.destination_coords:
-            x, y = choice(self.fields)
-            self.set_destination(coordinates.Coords(x, y), override, 30)
+        ordered_tiles = np.array([tile for tile in knowledge.visible_tiles])
+        pos_ndarray = np.array([knowledge.position.x, knowledge.position.y])
+        order = np.argsort(np.abs(ordered_tiles - pos_ndarray).sum(axis=1))
+        ordered_tiles = ordered_tiles[order]
 
-        for (x, y), tile in knowledge.visible_tiles.items():
+        if self.current_strategy.should_leave(character_info):
+            next_strategy = self.default_strategy
+        else:
+            next_strategy = self.current_strategy
+
+        for x, y in ordered_tiles:
             coords = coordinates.Coords(x, y)
+            tile = knowledge.visible_tiles[coords]
 
-            if coords == position:
+            if coords == knowledge.position:
                 continue
 
-            if tile.character:
-                if (coords in self.cut_positions(position, facing, weapon) and
-                        position not in self.cut_positions(coords, tile.character.facing, tile.character.weapon.name)):
-                    return characters.Action.ATTACK
+            if tile.type == 'menhir':
+                self.menhir = coords
 
-                if character.health + 3 >= tile.character.health or character.health >= 6:
-                    if coords in self.cut_positions(position, facing, weapon):
-                        return characters.Action.ATTACK
-                    elif coords in self.cut_positions(position, next_facing(facing, characters.Action.TURN_LEFT), weapon):
-                        return characters.Action.TURN_LEFT
-                    elif coords in self.cut_positions(position, next_facing(facing, characters.Action.TURN_RIGHT), weapon):
-                        return characters.Action.TURN_RIGHT
-                    elif self.distance(position, coords) <= self.ATTACK_DISTANCE:
-                        if weapon == 'amulet':
-                            possible_pos = np.array([
-                                [x + 1, y + 1], [x + 1, y - 1], [x - 1, y + 1], [x - 1, y - 1],
-                                [x + 2, y + 2], [x + 2, y - 2], [x - 2, y + 2], [x - 2, y - 2],
-                            ])
+            if tile.character and manhattan_distance_to(knowledge.position, coords) <= self.close_distance:
+                close_enemies += 1
 
-                            for new_x, new_y in possible_pos[np.argsort(np.abs(possible_pos - position).sum(axis=1))]:
-                                if [new_x, new_y] in self.fields:
-                                    self.set_destination(coordinates.Coords(new_x, new_y), override, 10)
-                                    override = False
-                        else:
-                            self.set_destination(coords, override, 10)
-                            override = False
+            for strategy in self.strategies:
+                if close_enemies >= 2 and strategy.__class__.__name__ == 'MCTS':
+                    continue
 
-                if (position in self.cut_positions(coords, tile.character.facing, tile.character.weapon.name) or
-                        self.distance(position, coords) <= self.HIDE_DISTANCE):
-                    if tile.character.weapon.name == 'amulet':
-                        possible_pos = np.array([
-                            [x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1],
-                            [x + 2, y], [x - 2, y], [x, y + 2], [x, y - 2],
-                            [x + 2, y + 1], [x + 2, y - 1], [x - 2, y + 1], [x - 2, y - 1],
-                            [x + 1, y + 2], [x + 1, y - 2], [x - 1, y + 2], [x - 1, y - 2],
-                        ])
+                if strategy.should_enter(coords, tile, character_info) and strategy.priority > next_strategy.priority:
+                    next_strategy = strategy
 
-                        for new_x, new_y in possible_pos[np.argsort(np.abs(possible_pos - position).sum(axis=1))]:
-                            if [new_x, new_y] in self.fields:
-                                self.set_destination(coordinates.Coords(new_x, new_y), override, 10)
-                                override = False
-                    else:
-                        new_coords = self.opposite_direction(position, coords)
+        if next_strategy != self.current_strategy:
+            self.current_strategy.left()
+            self.current_strategy = next_strategy
+            self.current_strategy.enter()
 
-                        if new_coords.x == x and (tile.character.facing == characters.Facing.UP or tile.character.facing == characters.Facing.DOWN):
-                            for new_x, new_y in [[new_coords.x + 1, new_coords.y], [new_coords.x - 1, new_coords.y]]:
-                                if [new_x, new_y] in self.fields:
-                                    self.set_destination(coordinates.Coords(new_x, new_y), override, 10)
-                                    override = False
-                        elif new_coords.y == y and (tile.character.facing == characters.Facing.LEFT or tile.character.facing == characters.Facing.RIGHT):
-                            for new_x, new_y in [[new_coords.x, new_coords.y + 1], [new_coords.x, new_coords.y - 1]]:
-                                if [new_x, new_y] in self.fields:
-                                    self.set_destination(coordinates.Coords(new_x, new_y), override, 10)
-                                    override = False
-                        else:
-                            self.set_destination(new_coords, override, 10)
-                            override = False
-
-            if self.grab_item(position, coords, weapon, tile):
-                self.set_destination(coords, override, 10)
-                override = False
-
-            if not self.final_coords:
-                if tile.type == 'menhir':
-                    self.fields = self.fields_copy
-                    self.final_coords = coords
-                    self.set_destination(coords, override, 50)
-                else:
-                    try:
-                        self.fields.remove([x, y])
-                    except ValueError:
-                        pass
-
-            if (any(effect.type == 'mist' for effect in tile.effects) and
-                    (dist := self.distance(position, coords)) < nearest_mist_distance):
-                nearest_mist_distance = dist
-                nearest_mist_coords = coords
-
-        if nearest_mist_coords:
-            if self.final_coords:
-                if position == self.final_coords:
-                    return characters.Action.TURN_LEFT
-                self.set_destination(self.final_coords, True, 10)
-            else:
-                new_pos = self.opposite_direction(position, nearest_mist_coords)
-                self.set_destination(new_pos, True, 10)
-
-        while coordinates.Coords(*self.find_nearest_field(self.destination_coords)) == position:
-            x, y = choice(self.fields)
-            self.set_destination(coordinates.Coords(x, y), True, 30)
-
-        return self.go_to_destination(position, facing)
+        return self.current_strategy.next_action(character_info)
 
     def praise(self, score: int) -> None:
-        pass
+        self.last_score = score
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self.arena = arenas.Arena.load(arena_description.name)
-        self.matrix = init_grid(arena_description)
-        self.fields = np.argwhere(self.matrix.T == 1).tolist()
-        self.fields_copy = self.fields.copy()
+        self.strategies = [
+            Explore(arena_description, max_age=15),
+            GrabPotion(arena_description, max_distance=7),
+            GrabWeapon(arena_description, max_distance=3),
+            MCTS(arena_description, enter_distance=8, iterations=1500, c=50., max_depth=15),
+            Run(arena_description, close_distance=4, far_distance=6, distance_to_menhir=6)
+        ]
 
-        self.final_coords = None
-        self.destination_coords = None
-        self.destination_age = 0
+        self.default_strategy = self.strategies[0]
+        self.current_strategy = self.default_strategy
+        self.current_strategy.enter()
+
+        self.menhir = None
 
     @property
     def name(self) -> str:

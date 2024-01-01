@@ -3,6 +3,7 @@ from gupb.model.coordinates import Coords
 
 
 LARGEST_ARENA_SHAPE = (100, 100)
+MAX_STEPS_EXPLORING = 250
 
 # Non walking tiles are: [0, 2, 3]
 tiles_mapping = {
@@ -29,6 +30,17 @@ weapon_translate = {
     8: "bow",
     9: "axe",
     10: "amulet",
+}
+
+items_ranking = {
+    'potion': 0, # 'potion' is not a weapon, but it is the most important item
+    'amulet': 1,
+    'bow': 2,
+    'bow_loaded': 2,
+    'bow_unloaded': 2,
+    'axe': 3,
+    'sword': 4,
+    'knife': 5,
 }
 
 update_facing_right = {
