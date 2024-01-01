@@ -28,8 +28,13 @@ class BatmanHeuristicsController(controller.Controller):
 
         self._event_detector = EventDetector()
 
-        self._trainer = Trainer()
-        self._params = np.array([3])  # default
+        self._failed_training = False
+
+        try:
+            self._trainer = Trainer()
+        except Exception:
+            self._failed_training = True
+        self._params = np.array([3, 0, 0])  # default
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         assert (
@@ -62,8 +67,12 @@ class BatmanHeuristicsController(controller.Controller):
         return action
 
     def praise(self, score: int) -> None:
-        self._trainer.add_to_buffer(self._state, self._params, score / 1000)
-        self._trainer.force_training_end()
+        if not self._failed_training:
+            try:
+                self._trainer.add_to_buffer(self._state, self._params, score / 1000)
+                self._trainer.force_training_end()
+            except Exception:
+                self._failed_training = True
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self._episode = 0
@@ -72,7 +81,11 @@ class BatmanHeuristicsController(controller.Controller):
         self._navigation = Navigation(self._knowledge)
         self._passthrough = Passthrough(self._knowledge, self._navigation, samples=1000)
 
-        self._trainer.train()
+        if not self._failed_training:
+            try:
+                self._trainer.train()
+            except Exception:
+                self._failed_training = True
 
     def _parametrize_strategies(self):
         self._state = np.concatenate(
@@ -97,18 +110,26 @@ class BatmanHeuristicsController(controller.Controller):
 
     def _select_params(self, epsilon):
         possible_params = list(self._strategies.possible_params())
-        if random.random() < epsilon:
-            return np.concatenate((random.choice(possible_params), self._init_position))
-        else:
-            best_reward = 0
-            best_params = self._params
-            for params in possible_params:
-                params = np.concatenate((params, self._init_position))
-                reward = self._trainer.guess_reward(self._state, params)
-                if reward > best_reward:
-                    best_reward = reward
-                    best_params = params
+
+        if self._failed_training:
+            return np.array([3, 0, 0])  # default
+
+        try:
+            if random.random() < epsilon:
+                return np.concatenate((random.choice(possible_params), self._init_position))
+            else:
+                best_reward = float('-inf')
+                best_params = self._params
+                for params in possible_params:
+                    params = np.concatenate((params, self._init_position))
+                    reward = self._trainer.guess_reward(self._state, params)
+                    if reward > best_reward:
+                        best_reward = reward
+                        best_params = params
             return best_params
+        except Exception:
+            self._failed_training = True
+            return np.array([3, 0, 0])
 
     @property
     def name(self) -> str:
