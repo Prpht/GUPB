@@ -45,8 +45,9 @@ class SpriteRepository:
     def __init__(self) -> None:
         self.size = (INIT_TILE_SIZE, INIT_TILE_SIZE)
         self.sprites: dict[Any, Sprite] = {
-            tiles.Land: load_sprite('tiles', 'land'),
             tiles.Sea: load_sprite('tiles', 'sea'),
+            tiles.Land: load_sprite('tiles', 'land'),
+            tiles.Forest: load_sprite('tiles', 'forest'),
             tiles.Wall: load_sprite('tiles', 'wall'),
             tiles.Menhir: load_sprite('tiles', 'menhir'),
 

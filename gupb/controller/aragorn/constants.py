@@ -1,6 +1,8 @@
 OUR_BOT_NAME = 'Aragorn'
 DEBUG = False
+DEBUG2 = False
 USE_PF_CACHE = False
+OPTIMIZE_PF = False
 INFINITY: int = 99999999999
 WEAPON_HIERARCHY = {
     "axe" : 4,

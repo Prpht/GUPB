@@ -116,9 +116,11 @@ class BatmanHeuristicsController(controller.Controller):
 
         try:
             if random.random() < epsilon:
-                return np.concatenate((random.choice(possible_params), self._init_position))
+                return np.concatenate(
+                    (random.choice(possible_params), self._init_position)
+                )
             else:
-                best_reward = float('-inf')
+                best_reward = float("-inf")
                 best_params = self._params
                 for params in possible_params:
                     params = np.concatenate((params, self._init_position))
