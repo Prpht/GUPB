@@ -5,8 +5,6 @@ from gupb.controller import ares
 from gupb.controller import batman
 from gupb.controller import bob
 from gupb.controller import cynamonka
-from gupb.controller import cynamonka_v2
-from gupb.controller import cynamonka_v3
 from gupb.controller import forrest_gump
 from gupb.controller import frog
 from gupb.controller import krombopulos
