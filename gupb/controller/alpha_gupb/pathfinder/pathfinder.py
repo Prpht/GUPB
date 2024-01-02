@@ -16,7 +16,7 @@ def is_walkable(blocks, x, y):
     for block in blocks:
         if block['x'] == x and block['y'] == y:
             return block['walkable']
-    return True  # Default to walkable if position not found in blocks
+    return True  # Default to walkable if position is not found in blocks
 
 def astar(blocks, start, end):
     start_node = Node(None, start)
