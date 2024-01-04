@@ -462,8 +462,12 @@ class AttackClosestEnemyAction(Action):
 
 class RageAttackAction(AttackClosestEnemyAction):
     HAPPY_NEW_YEAR = [
-        53254780140597,
-        16210931983372679264624916789,
+        # 53254780140597,
+        # 16210931983372679264624916789,
+        
+        47403228639173111709310103423398415522718923899712,
+        912483974970427094311,
+        14461117651760316,
     ]
     rage_attack_bots = None
 
