@@ -292,21 +292,6 @@ class Map:
                             terrain[position].seen = False
         return Map(name, terrain)
     
-    @staticmethod
-    def loadRandom(name: str = 'generated', size: coordinates.Coords = None) -> 'Map':
-        terrain = dict()
-
-        # load empty map
-        # if size is given - assume everything a land
-        if size is not None:
-            for y in range(size[1]):
-                for x in range(size[0]):
-                    position = coordinates.Coords(x, y)
-                    terrain[position] = tiles.Land()
-                    terrain[position].seen = False
-        
-        return Map(name, terrain)
-    
     @profile
     def visible_coords(self, characterFacing :characters.Facing, characterPosition :coordinates.Coords, characterWeapon :weapons.Weapon = None) -> set[coordinates.Coords]:
         def estimate_border_point() -> tuple[coordinates.Coords, int]:
