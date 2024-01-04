@@ -21,6 +21,7 @@ class Memory:
         self.position: coordinates.Coords = None
         self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
+        self.weaponDescription: weapons.WeaponDescription = (weapons.Knife()).description()
         self.no_of_champions_alive: int = 0
         self.numberOfVisibleTiles: int = 0
         
@@ -42,6 +43,7 @@ class Memory:
         self.position: coordinates.Coords = None
         self.lastPosition: coordinates.Coords = None
         self.facing: characters.Facing = characters.Facing.random()
+        self.weaponDescription: weapons.WeaponDescription = (weapons.Knife()).description()
         self.no_of_champions_alive: int = 0
         self.numberOfVisibleTiles: int = 0
 
@@ -60,6 +62,7 @@ class Memory:
         self.lastPosition = self.position
         self.position = knowledge.position
         self.facing = knowledge.visible_tiles[self.position].character.facing
+        self.weaponDescription = knowledge.visible_tiles[self.position].character.weapon
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
         self.map.parseVisibleTiles(knowledge.visible_tiles, self.tick)
@@ -79,14 +82,10 @@ class Memory:
         return self.lastActions
 
     def getCurrentWeaponDescription(self):
-        if self.position is None:
-            return None
-        
-        return self.map.terrain[self.position].character.weapon
+        return self.weaponDescription
     
     def getCurrentWeaponName(self):
-        weaponDescription = self.getCurrentWeaponDescription()
-        return weaponDescription.name if weaponDescription is not None else None
+        return self.weaponDescription.name if self.weaponDescription is not None else None
 
     def getCurrentWeaponClass(self):
         return Map.weaponDescriptionConverter(self.getCurrentWeaponDescription())
@@ -395,6 +394,10 @@ class Map:
             self.terrain[coords].seen = True
             self.terrain[coords].loot = Map.weaponDescriptionConverter(visible_tile_description.loot)
             self.terrain[coords].character = visible_tile_description.character
+            
+            if coords == self.memory.position:
+                self.terrain[coords].character = None
+            
             self.terrain[coords].consumable = self.consumableDescriptionConverter(visible_tile_description.consumable)
             
             tileEffects = self.effectsDescriptionConverter(visible_tile_description.effects)
@@ -477,6 +480,9 @@ class Map:
         Returns a dict. Keys are coords with danger, values are their sources
         """
 
+        NOT_DANGEROUS_OPPONENTS = [
+        ]
+
         # cache
         if currentTick is not None and self.__dangerousTiles_cache_data is not None and self.__dangerousTiles_cache_tick == currentTick:
             return self.__dangerousTiles_cache_data
@@ -491,8 +497,12 @@ class Map:
                     continue
             
             enemyDescription = self.terrain[coords].character
-            
-            if enemyDescription is not None and enemyDescription.controller_name != OUR_BOT_NAME:
+
+            if (
+                enemyDescription is not None
+                and coords != self.memory.position
+                and enemyDescription.controller_name not in NOT_DANGEROUS_OPPONENTS
+            ):
                 weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
 
                 if weapon is None:

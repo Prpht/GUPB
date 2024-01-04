@@ -346,7 +346,7 @@ class AttackClosestEnemyAction(Action):
                 # ignore if data is outdated
                 and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
-                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
                 and memory.position != coords
                 # ignore enemies with greater health
@@ -510,7 +510,7 @@ class RageAttackAction(AttackClosestEnemyAction):
                 # ignore if data is outdated
                 # and (not hasattr(memory.map.terrain[coords], 'tick') or memory.map.terrain[coords].tick >= memory.tick - self.OUTDATED_DATA_TICKS)
                 # ignore ourselfs
-                and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
+                # and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME
                 # ignore our position
                 and memory.position != coords
                 # ignore enemies with greater health
@@ -617,7 +617,7 @@ class TakeToOnesLegsAction(Action):
         if coords == memory.position:
             return False
         
-        if memory.map.terrain[coords].character is not None and memory.map.terrain[coords].character.controller_name != OUR_BOT_NAME:
+        if memory.map.terrain[coords].character is not None and coords != memory.position:
             return False
 
         return True
@@ -737,7 +737,7 @@ class SeeMoreAction(Action):
                 if coords not in memory.map.terrain:
                     continue
 
-                if memory.map.terrain[coords].character is None or memory.map.terrain[coords].character.controller_name == OUR_BOT_NAME:
+                if memory.map.terrain[coords].character is None or coords == memory.position:
                     continue
                 
                 distance = utils.manhattanDistance(memory.position, coords)
