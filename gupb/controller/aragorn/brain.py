@@ -448,6 +448,9 @@ class Brain:
             characters.Action.TURN_LEFT,
             characters.Action.TURN_RIGHT,
             characters.Action.STEP_FORWARD,
+            characters.Action.STEP_BACKWARD,
+            characters.Action.STEP_LEFT,
+            characters.Action.STEP_RIGHT,
         ]:
             self.memory.resetIdle()
         
