@@ -89,11 +89,13 @@ class FirstStrategy:
         if self.health < self.mapa.enemy.health:
             return False
 
-        if WORST_WEAPONS[self.mapa.enemy.weapon.name] >= WORST_WEAPONS[self.weapon_name] and self.__can_attack_enemy(knowledge, self.position, self.orientation):
+        if (WORST_WEAPONS[self.mapa.enemy.weapon.name] >= WORST_WEAPONS[self.weapon_name]) and \
+                (self.__can_attack_enemy(knowledge, self.position, self.orientation)) and \
+                (self.health > self.mapa.enemy.health):
             return True
-
-        if self.health == self.mapa.enemy.health and WORST_WEAPONS[self.mapa.enemy.weapon.name] == WORST_WEAPONS[self.weapon_name]:
-            return True
+        #pyt
+        # if self.health == self.mapa.enemy.health and WORST_WEAPONS[self.mapa.enemy.weapon.name] == WORST_WEAPONS[self.weapon_name]:
+        #     return True
 
         return False
 
@@ -294,15 +296,15 @@ class FirstStrategy:
 
         if self.mapa.menhir_position is not None and self.__is_mist():
             self.future_moves = self.__astar_path(self.mapa.menhir_position[0], self.mapa.menhir_position[1])
+        elif self.spot_to_attack is not None:
+            self.future_moves = self.__astar_path(self.spot_to_attack.x, self.spot_to_attack.y)
+            self.spot_to_attack = None
         elif self.mapa.potion_position is not None and self.going_for_potion:
             self.future_moves = self.__astar_path(self.mapa.potion_position[0], self.mapa.potion_position[1])
             self.potion_position_flag = cord.Coords(self.future_moves[-1].x, self.future_moves[-1].y)
         elif self.mapa.weapon_position is not None and self.going_for_weapon:
             self.future_moves = self.__astar_path(self.mapa.weapon_position[0], self.mapa.weapon_position[1])
             self.weapon_position_flag = cord.Coords(self.future_moves[-1].x, self.future_moves[-1].y)
-        elif self.spot_to_attack is not None:
-            self.future_moves = self.__astar_path(self.spot_to_attack.x, self.spot_to_attack.y)
-            self.spot_to_attack = None
         else:
             if not self.run_from_mist:
                 try:

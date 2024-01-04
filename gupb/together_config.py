@@ -37,7 +37,7 @@ CONFIGURATION = {
         roger.Roger('1'),
     ],
     'start_balancing': False,
-    'visualise': False,
+    'visualise': True,
     'show_sight': False,
-    'runs_no': 1000,
+    'runs_no': 3,
 }
