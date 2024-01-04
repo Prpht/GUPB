@@ -48,7 +48,7 @@ class Memory:
         self.numberOfVisibleTiles: int = 0
 
         # self.map = Map.loadRandom('random', coordinates.Coords(24, 24))
-        self.map = Map.load(arena_description.name)
+        self.map = Map.load(arena_description.name, memory=self)
         self.environment = Environment(self.map)
 
         self.health: int = 0
@@ -272,7 +272,7 @@ class Map:
         if DEBUG: print("[ARAGORN|MEMORY] loaded map " + self.name + " with size " + str(self.size))
 
     @staticmethod
-    def load(name: str) -> 'Map':
+    def load(name: str, memory: Memory) -> 'Map':
         terrain = dict()
 
         # predefined map
@@ -290,7 +290,7 @@ class Map:
                             terrain[position] = tiles.Land()
                             terrain[position].loot =  Map.weaponDescriptionConverter(arenas.WEAPON_ENCODING[character]().description())
                             terrain[position].seen = False
-        return Map(name, terrain)
+        return Map(name, terrain, memory)
     
     @profile
     def visible_coords(self, characterFacing :characters.Facing, characterPosition :coordinates.Coords, characterWeapon :weapons.Weapon = None) -> set[coordinates.Coords]:
