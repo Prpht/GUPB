@@ -254,9 +254,11 @@ class Environment:
             self.episodes_since_mist_increase = 0
 
 class Map:
-    def __init__(self, name: str, terrain: arenas.Terrain) -> None:
+    def __init__(self, name: str, terrain: arenas.Terrain, memory: Memory) -> None:
         self.name = name
         self.terrain: arenas.Terrain = terrain
+        self.memory = memory
+        
         self.size: tuple[int, int] = arenas.terrain_size(self.terrain)
         self.menhir_position: Optional[coordinates.Coords] = None
         self.mist_radius = int(self.size[0] * 2 ** 0.5) + 1
