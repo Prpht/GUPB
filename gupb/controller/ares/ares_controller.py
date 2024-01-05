@@ -5,6 +5,8 @@ from gupb.model import characters
 from gupb.controller.ares.ares_base import KnowledgeBase
 
 # adding the same version
+# and again for the last round
+
 class AresController(controller.Controller):
 
     def __init__(self, first_name: str):
