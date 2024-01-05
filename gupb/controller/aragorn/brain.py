@@ -1,10 +1,11 @@
 from gupb.model import arenas, characters, coordinates, weapons, consumables
+from gupb.model.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import utils
+from gupb.controller.aragorn import pathfinding
 from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME
-from gupb.model.profiling import profile
 
 import time
 
