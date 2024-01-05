@@ -1,5 +1,5 @@
 from gupb.controller.forrest_gump.strategies import Strategy
-from gupb.controller.forrest_gump.utils import CharacterInfo, find_path, distance_to, next_pos_to_action
+from gupb.controller.forrest_gump.utils import CharacterInfo, find_path, manhattan_distance_to, next_pos_to_action
 from gupb.model import tiles, coordinates, characters, arenas
 
 
@@ -12,7 +12,7 @@ class GrabPotion(Strategy):
         pass
 
     def should_enter(self, coords: coordinates.Coords, tile: tiles.TileDescription, character_info: CharacterInfo) -> bool:
-        if tile.consumable and distance_to(self.matrix, coords, character_info.position) <= self.max_distance:
+        if tile.consumable and manhattan_distance_to(character_info.position, coords) <= self.max_distance:
             self.destination = coords
             return True
 
@@ -27,7 +27,7 @@ class GrabPotion(Strategy):
     def next_action(self, character_info: CharacterInfo) -> characters.Action:
         path = find_path(self.matrix, character_info.position, self.destination)
         next_pos = path[1] if len(path) > 1 else path[0]
-        return next_pos_to_action(next_pos.x, next_pos.y, character_info.facing, character_info.position, False)
+        return next_pos_to_action(next_pos.x, next_pos.y, character_info.facing, character_info.position, True)
 
     @property
     def priority(self) -> int:

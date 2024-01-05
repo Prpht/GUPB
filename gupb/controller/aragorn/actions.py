@@ -461,12 +461,40 @@ class AttackClosestEnemyAction(Action):
         return self.approachEnemy(memory, closestEnemy, closestEnemyDistance)
 
 class RageAttackAction(AttackClosestEnemyAction):
-    RAGE_ATTACK_BOTS = [
-        'AlphaGUPB',
-        'Cynamonka',
-        'Roger_1',
-        'Ancymon',
+    HAPPY_NEW_YEAR = [
+        53254780140597,
+        16210931983372679264624916789,
     ]
+    rage_attack_bots = None
+
+    def __init__(self) -> None:
+        super().__init__()
+        
+        if RageAttackAction.rage_attack_bots is None:
+            RageAttackAction.rage_attack_bots = [
+                self.d(x, 32378946584) for x in self.HAPPY_NEW_YEAR
+            ]
+    
+    def d(self, int_to_decrypt, key):
+        ints = []
+        while int_to_decrypt > 0:
+            ints.append(int_to_decrypt & 0xff)
+            int_to_decrypt >>= 8
+        ints.reverse()
+
+        seed = key
+
+        def rc():
+            nonlocal seed
+            seed = (seed * 1103515245 + 12345) & 0x7fffffff
+            return seed
+        
+        ret = ""
+
+        for i in ints:
+            ret += chr(i ^ (rc() % 255))
+
+        return ret
 
     def getClosestEnemy(self, memory: Memory):
         # GET CLOSEST ENEMY
@@ -490,7 +518,7 @@ class RageAttackAction(AttackClosestEnemyAction):
                 # ignore enemies with health greater than reward of killing (potion restore)
                 # and memory.map.terrain[coords].character.health <= consumables.POTION_RESTORED_HP
 
-                and memory.map.terrain[coords].character.controller_name in self.RAGE_ATTACK_BOTS
+                and memory.map.terrain[coords].character.controller_name in RageAttackAction.rage_attack_bots
             ):
                 distance = utils.manhattanDistance(memory.position, coords)
                 
