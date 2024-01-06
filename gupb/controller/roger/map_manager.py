@@ -13,7 +13,7 @@ from gupb.model import coordinates, tiles, characters
 from gupb.model.arenas import Terrain, TILE_ENCODING, WEAPON_ENCODING
 from gupb.model.characters import ChampionDescription, Facing, Action
 from gupb.model.coordinates import Coords
-from gupb.model.tiles import Land, Menhir
+from gupb.model.tiles import Land, Menhir, Forest
 
 
 class MapManager:
@@ -180,16 +180,16 @@ class MapManager:
     def extract_walkable_tiles(self):
         items = self.terrain.items()
         try:
-            return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), items))
+            return list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir) or isinstance(x[1], Forest), items))
         except Exception:
-            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir', items))
+            return list(filter(lambda x: x[1][0].type == 'land' or x[1][0].type == 'menhir' or x[1][0].type == 'forest', items))
 
     def extract_walkable_coords(self, coords: List[Coords]) -> List[Coords]:
         tiles = self.terrain
         walkable_coords = []
         for coord in coords:
             tile = tiles[coord]
-            if isinstance(tile, Land) or isinstance(tile, Menhir):
+            if isinstance(tile, Land) or isinstance(tile, Menhir) or isinstance(tile,  Forest):
                 seen_tile = self.seen_tiles.get(coord)
                 if seen_tile:
                     if seen_tile[0].character is None:
