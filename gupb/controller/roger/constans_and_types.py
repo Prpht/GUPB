@@ -10,8 +10,8 @@ class WeaponValue(Enum):
     BOW_UNLOADED    = 2
     BOW_LOADED      = 3
     AMULET          = 4
-    AXE             = 5
-    SWORD           = 6
+    SWORD           = 5
+    AXE             = 6
 
 
 class States(Enum):
