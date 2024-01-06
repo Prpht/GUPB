@@ -1,4 +1,4 @@
-from gupb.model import characters
+from gupb.model import characters, consumables
 
 from gupb.controller.aragorn.actions import *
 from gupb.controller.aragorn import pathfinding
