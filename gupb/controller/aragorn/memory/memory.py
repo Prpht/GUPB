@@ -182,17 +182,24 @@ class Memory:
         return [minDistance, minCoords]
 
     @profile
-    def getDistanceToClosestWeapon(self):
+    def getDistanceToClosestWeapon(self, weaponHierarchy = None):
         minDistance = INFINITY
         minCoords = None
         current_weapon = self.getCurrentWeaponName()
+        
+        if weaponHierarchy is None:
+            weaponHierarchy = WEAPON_HIERARCHY
    
         for coords in self.map.terrain:
             if self.map.terrain[coords].loot is not None and issubclass(self.map.terrain[coords].loot, weapons.Weapon):
                 possible_new_weapon = self.map.terrain[coords].loot.__name__.lower()
-                #TODO: assign correct weights for weapons when the proper usage of each of them is known
-                if current_weapon in WEAPON_HIERARCHY and WEAPON_HIERARCHY[possible_new_weapon] <= WEAPON_HIERARCHY[current_weapon] :
+
+                if current_weapon in weaponHierarchy and weaponHierarchy[possible_new_weapon] <= weaponHierarchy[current_weapon] :
                     continue
+
+                if self.debugCoords is None:
+                    self.debugCoords = []
+                self.debugCoords.append(coords)
 
                 distance = utils.manhattanDistance(self.position, coords)
 
