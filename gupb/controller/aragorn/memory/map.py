@@ -165,7 +165,7 @@ class Map:
             return weapons.Sword
         elif weaponDescription.name == 'axe':
             return weapons.Axe
-        elif weaponDescription.name in ['bow' 'bow_loaded' 'bow_unloaded']:
+        elif weaponDescription.name in ['bow', 'bow_loaded', 'bow_unloaded']:
             return weapons.Bow
         elif weaponDescription.name == 'amulet':
             return weapons.Amulet
@@ -273,7 +273,7 @@ class Map:
             if (
                 effects.WeaponCut in self.terrain[coords].effects
                 and hasattr(self.terrain[coords], 'tick')
-                and self.terrain[coords].tick >= currentTick - 1
+                and self.terrain[coords].tick >= currentTick - 2
             ):
                 dangerousTiles[coords] = coords
 

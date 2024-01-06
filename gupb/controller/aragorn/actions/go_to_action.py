@@ -79,8 +79,8 @@ class GoToAction(Action):
 
         self.last_path_cost = cost
         
-        if DEBUG2:
-            if len(self.avoidCells) > 0: memory.debugCoords = self.avoidCells
+        # if DEBUG2 and len(self.avoidCells) > 0: memory.debugCoords = self.avoidCells
+        # if DEBUG2: memory.debugCoords = path
 
         if DEBUG2: print("[ARAGORN|GOTO] Got path with cost:", cost)
 
