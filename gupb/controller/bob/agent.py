@@ -17,6 +17,9 @@ POSSIBLE_RANDOM_ACTIONS = [
     Action.TURN_RIGHT,
     Action.STEP_FORWARD,
     Action.ATTACK,
+    Action.STEP_BACKWARD,
+    Action.STEP_LEFT,
+    Action.STEP_RIGHT,
 ]
 
 # This can be later switched to MAB :)
@@ -41,7 +44,8 @@ TERRAIN_MAPPING = {
     'land': tiles.Land,
     'sea': tiles.Sea,
     'wall': tiles.Wall,
-    'menhir': tiles.Menhir
+    'menhir': tiles.Menhir,
+    'forest': tiles.Forest,
 }
 
 
