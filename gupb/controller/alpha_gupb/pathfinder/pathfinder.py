@@ -1,4 +1,16 @@
 from queue import PriorityQueue
+import time
+
+def timeit(func):
+    """Decorator to time a function or method"""
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"{func.__name__} took {end-start} seconds to run.")
+        return result
+    return wrapper
+
 
 class Node():
     def __init__(self, parent=None, position=None):
@@ -16,7 +28,7 @@ def is_walkable(blocks, x, y):
     for block in blocks:
         if block['x'] == x and block['y'] == y:
             return block['walkable']
-    return True  # Default to walkable if position is not found in blocks
+    return True  # Default to walkable if position not found in blocks
 
 def astar(blocks, start, end):
     start_node = Node(None, start)
@@ -27,7 +39,7 @@ def astar(blocks, start, end):
 
     open_list.append(start_node)
     i = 0
-    while open_list and i<200:
+    while open_list and i<100:
         i+=1
         current_node = open_list[0]
         current_index = 0
