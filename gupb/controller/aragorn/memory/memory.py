@@ -1,6 +1,6 @@
 import random
 
-from gupb.model import arenas, characters, consumables, coordinates, weapons
+from gupb.model import arenas, characters, consumables, coordinates, weapons, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
 from gupb.model.profiling import profile
 
@@ -28,6 +28,7 @@ class Memory:
         self.environment: Environment = None
 
         self.health: int = 0
+        self.last_health: int = 0
         
         # create last actions variable that
         # is a list of last 5 actions
@@ -51,6 +52,7 @@ class Memory:
         self.environment = Environment(self.map)
 
         self.health: int = 0
+        self.last_health: int = 0
         
         self.lastActions: list = []
         self.debugCoords = None
@@ -65,6 +67,7 @@ class Memory:
         self.no_of_champions_alive = knowledge.no_of_champions_alive
 
         self.map.parseVisibleTiles(knowledge.visible_tiles, self.tick)
+
         self.numberOfVisibleTiles = len(knowledge.visible_tiles)
         
         self.idleTime += 1
@@ -72,6 +75,17 @@ class Memory:
 
         self.health = knowledge.visible_tiles[self.position].character.health
         self.debugCoords = None
+
+        # fix error of not always seeing cut effect on my coords
+        # (it may be cleared by game before we see it)
+        if self.health < self.last_health:
+            if self.map.terrain[self.position].effects is None:
+                self.map.terrain[self.position].effects = []
+            if effects.WeaponCut not in self.map.terrain[self.position].effects:
+                self.map.terrain[self.position].effects.append(effects.WeaponCut)
+        # =====================
+        
+        self.last_health = self.health
 
     def addLastAction(self, action):
         self.lastActions.append(action)

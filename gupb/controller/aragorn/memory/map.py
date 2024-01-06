@@ -229,7 +229,6 @@ class Map:
         """
 
         NOT_DANGEROUS_OPPONENTS = [
-            'Ancymon',
             'Cynamonka',
             'RandomControllerAlice',
         ]
@@ -255,7 +254,6 @@ class Map:
                 and coords != self.memory.position
                 and enemyDescription.controller_name not in NOT_DANGEROUS_OPPONENTS
             ):
-                print(enemyDescription.controller_name)
                 weapon = Map.weaponDescriptionConverter(enemyDescription.weapon)
 
                 if weapon is None:
