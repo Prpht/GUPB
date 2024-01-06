@@ -31,6 +31,8 @@ def timeit(func):
         return result
     return wrapper
 
+
+#TODO refactoring xD
 class AlphaGUPB(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
