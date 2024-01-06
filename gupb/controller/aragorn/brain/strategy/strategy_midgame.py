@@ -6,9 +6,11 @@ from .strategy import Strategy
 
 class StrategyMidgame(Strategy):
     def prepare_actions(self) -> characters.Action:
+        self._clear_variables()
+
         yield self._prevent_idle_penalty()
         yield self._defend_from_attacks()
-        yield self._pick_up_potion(5)
+        yield self._pick_up_potion(8)
         yield self._attack_in_range()
         yield self._mist_forced_movement()
         yield self._pick_up_weapon(15)

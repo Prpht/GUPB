@@ -262,12 +262,11 @@ class Map:
                 positions = weapon.cut_positions(self.terrain, coords, enemyDescription.facing)
 
                 for position in positions:
-                    if position not in dangerousTiles:
-                        dangerousTiles[position] = coords
+                    dangerousTiles[position] = coords
             
             # Make mist dangerous
-            # if effects.Mist in self.terrain[coords].effects:
-            #     dangerousTiles[coords] = coords
+            if effects.Mist in self.terrain[coords].effects:
+                dangerousTiles[coords] = coords
 
             # Watch out for damage
             if (

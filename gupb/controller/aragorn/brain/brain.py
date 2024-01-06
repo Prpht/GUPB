@@ -60,6 +60,8 @@ class Brain:
 
         # update memory
 
+        pathfinding.invalidate_PF_cache()
+
         self.memory.update(knowledge)
 
         # update state
