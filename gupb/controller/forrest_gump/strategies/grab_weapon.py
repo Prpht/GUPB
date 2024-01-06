@@ -1,16 +1,16 @@
 from gupb.controller.forrest_gump.strategies import Strategy
-from gupb.controller.forrest_gump.utils import CharacterInfo, find_path, next_pos_to_action, distance_to
+from gupb.controller.forrest_gump.utils import CharacterInfo, find_path, next_pos_to_action, manhattan_distance_to
 from gupb.model import tiles, coordinates, characters, arenas
 
 
 WEAPONS_VALUE = {
     'knife': 1,
     'sword': 2,
+    'bow': 2,
+    'bow_loaded': 2,
+    'bow_unloaded': 2,
     'axe': 3,
-    'bow': 4,
-    'bow_loaded': 4,
-    'bow_unloaded': 4,
-    'amulet': 5
+    'amulet': 3
 }
 
 
@@ -25,7 +25,7 @@ class GrabWeapon(Strategy):
     def should_enter(self, coords: coordinates.Coords, tile: tiles.TileDescription, character_info: CharacterInfo) -> bool:
         if (tile.loot and
                 WEAPONS_VALUE[tile.loot.name] > WEAPONS_VALUE[character_info.weapon] and
-                distance_to(self.matrix, coords, character_info.position) <= self.max_distance):
+                manhattan_distance_to(character_info.position, coords) <= self.max_distance):
             self.destination = coords
             return True
 
