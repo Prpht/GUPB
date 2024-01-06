@@ -8,5 +8,6 @@ from .go_to_around_action import GoToAroundAction
 from .rage_attack_action import RageAttackAction
 from .random_action import RandomAction
 from .see_more_action import SeeMoreAction
+from .sneaky_attack_action import SneakyAttackAction
 from .spin_action import SpinAction
 from .take_to_ones_legs_action import TakeToOnesLegsAction

@@ -16,6 +16,9 @@ class GoToAction(Action):
         self.dstFacing: characters.Facing = None
         self.useAllMovements: bool = False
         self.allowDangerous: bool = False
+        self.avoidCells: list = []
+
+        self.last_path_cost = None
 
     def setDestination(self, destination: Coords) -> None:
         if isinstance(destination, Coords):
@@ -43,6 +46,15 @@ class GoToAction(Action):
         else:
             if DEBUG: print("Trying to set allow dangerous to non bool object (" + str(allowDangerous) + " of type " + str(type(allowDangerous)) + ")")
 
+    def setAvoidCells(self, avoidCells: list) -> None:
+        if isinstance(avoidCells, list):
+            self.avoidCells = avoidCells
+        else:
+            if DEBUG: print("Trying to set avoid cells to non list object (" + str(avoidCells) + " of type " + str(type(avoidCells)) + ")")
+    
+    def get_last_path_cost(self):
+        return self.last_path_cost
+
     @profile
     def perform(self, memory :Memory) -> characters.Action:        
         if not self.destination:
@@ -56,9 +68,19 @@ class GoToAction(Action):
                 return characters.Action.TURN_RIGHT
             return None
         
-        [path, cost] = pathfinding.find_path(memory=memory, start=current_position, end=self.destination, facing=memory.facing, useAllMovements=self.useAllMovements)
+        [path, cost] = pathfinding.find_path(
+            memory=memory,
+            start=current_position,
+            end=self.destination,
+            facing=memory.facing,
+            useAllMovements=self.useAllMovements,
+            avoid_cells=self.avoidCells
+        )
+
+        self.last_path_cost = cost
         
-        if DEBUG2: memory.debugCoords = path
+        if DEBUG2:
+            if len(self.avoidCells) > 0: memory.debugCoords = self.avoidCells
 
         if DEBUG2: print("[ARAGORN|GOTO] Got path with cost:", cost)
 
