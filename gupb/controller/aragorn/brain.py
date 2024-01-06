@@ -209,8 +209,11 @@ class Brain:
 
         # ------------------------------------------
 
-        # RAGE ATTACK
+        # SNEAKY ATTACK
+        sneakyAttackAction = SneakyAttackAction()
+        yield sneakyAttackAction, "Sneaky attack"
 
+        # RAGE ATTACK
         rageAttackAction = RageAttackAction()
         yield rageAttackAction, "Rage attack"
         
