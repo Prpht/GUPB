@@ -2,7 +2,6 @@ from queue import PriorityQueue
 import time
 
 def timeit(func):
-    """Decorator to time a function or method"""
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
@@ -28,7 +27,7 @@ def is_walkable(blocks, x, y):
     for block in blocks:
         if block['x'] == x and block['y'] == y:
             return block['walkable']
-    return True  # Default to walkable if position not found in blocks
+    return True  
 
 def astar(blocks, start, end):
     start_node = Node(None, start)
@@ -60,11 +59,9 @@ def astar(blocks, start, end):
             return path[::-1]
 
         children = []
-        # Only move left, right, up, or down (no diagonals)
         for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
             node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
-            # Check if it's walkable
             if not is_walkable(blocks, node_position[0], node_position[1]):
                 continue
 
