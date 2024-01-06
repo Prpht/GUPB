@@ -54,6 +54,12 @@ class SneakyAttackAction(AttackClosestEnemyAction):
                 goToNormalAction.setUseAllMovements(True)
                 retNormal = goToNormalAction.perform(memory)
                 costNormal = goToNormalAction.get_last_path_cost()
+
+                if costSneaky is None:
+                    costSneaky = INFINITY
+
+                if costNormal is None:
+                    costNormal = 0
                 
                 if costSneaky < costNormal + 4:
                     return retSneaky
