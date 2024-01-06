@@ -22,6 +22,7 @@ tiles_mapping = {
     "potion": 11,
     "enymy": 12,
     "mist": 13,
+    "forest": 14,
 }
 
 weapon_translate = {
