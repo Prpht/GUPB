@@ -27,9 +27,9 @@ class Brain:
     
     def _init_strategies(self):
         self.strategies = {
-            0: StrategyOpening(),
-            1: StrategyMidgame(),
-            2: StrategyEndgame(),
+            0: StrategyOpening(self),
+            1: StrategyMidgame(self),
+            2: StrategyEndgame(self),
         }
 
     def update_state(self):
@@ -80,7 +80,9 @@ class Brain:
 
         if DEBUG: print("[ARAGORN|BRAIN] State=", self.state)
 
-        for action, dbg_ac_msg in strategy.prepare_actions(self):
+        for action, dbg_ac_msg in strategy.prepare_actions():
+            if action is None:
+                continue
             startTime = time.time()
             ret = action.perform(self.memory)
             endTime = time.time()
