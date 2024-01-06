@@ -13,7 +13,7 @@ class StrategyMidgame(Strategy):
     def prepare_actions(self, brain: 'Brain') -> characters.Action:
         # ------------------------------------------
         
-        dangerousTilesDict = brain.memory.map.getDangerousTilesWithDangerSourcePos(brain.memory.tick, 7)
+        dangerousTilesDict = brain.memory.map.getDangerousTilesWithDangerSourcePos(brain.memory.tick, 3)
 
         # ------------------------------------------
 

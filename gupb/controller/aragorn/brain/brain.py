@@ -48,6 +48,8 @@ class Brain:
                 [menhirPos, prob] = self.memory.map.menhirCalculator.approximateMenhirPos(self.memory.tick)
                 if prob == 1:
                     self.state = 2
+            if self.memory.health >= 16:
+                self.state = 2
     
     @profile
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:

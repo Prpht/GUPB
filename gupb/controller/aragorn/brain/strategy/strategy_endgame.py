@@ -13,7 +13,7 @@ class StrategyEndgame(Strategy):
     def prepare_actions(self, brain: 'Brain') -> characters.Action:
         # ------------------------------------------
         
-        dangerousTilesDict = brain.memory.map.getDangerousTilesWithDangerSourcePos(brain.memory.tick, 7)
+        dangerousTilesDict = brain.memory.map.getDangerousTilesWithDangerSourcePos(brain.memory.tick, 3)
 
         # ------------------------------------------
 
@@ -80,23 +80,8 @@ class StrategyEndgame(Strategy):
         if DEBUG2: print("[ARAGORN|BRAIN] menhirPos", menhirPos, "prob", prob)
         
         if menhirPos is not None:
-            goCloserToMenhir = False
-            
-            if not goCloserToMenhir:
-                distanceToMenhir = pathfinding.get_path_cost(brain.memory, brain.memory.position, menhirPos, brain.memory.facing, True)
-
-                if distanceToMenhir is None or distanceToMenhir == INFINITY:
-                    distanceToMenhir = utils.manhattanDistance(brain.memory.position, menhirPos)
-
-                if distanceToMenhir >= brain.memory.map.mist_radius - 1:
-                    goCloserToMenhir = True
-
-            if goCloserToMenhir:
-                goToAroundAction = GoToAroundAction()
-                goToAroundAction.setDestination(menhirPos)
-                goToAroundAction.setAllowDangerous(True)
-                goToAroundAction.setUseAllMovements(True)
-                yield goToAroundAction, "Going closer to menhir"
+            conquerMenhirAction = ConquerMenhirAction()
+            yield conquerMenhirAction, "Conquering menhir"
 
         # ------------------------------------------
         
@@ -106,7 +91,7 @@ class StrategyEndgame(Strategy):
 
         if DEBUG2: print("[ARAGORN|BRAIN] closestWeaponDistance", closestWeaponDistance, "closestWeaponCoords", closestWeaponCoords)
 
-        if closestWeaponCoords is not None and closestWeaponDistance < 5:
+        if closestWeaponCoords is not None and closestWeaponDistance < 3:
             goToWeaponAction = GoToAction()
             goToWeaponAction.setDestination(closestWeaponCoords)
             yield goToWeaponAction, "Picking nearby weapon"
@@ -124,21 +109,6 @@ class StrategyEndgame(Strategy):
         attackClosestEnemyAction = AttackClosestEnemyAction()
         yield attackClosestEnemyAction, "Going closer to enemy"
 
-        # ------------------------------------------
-
-        # GO TOWARDS MENHIR
-
-        if menhirPos is not None and distanceToMenhir is not None:
-            if distanceToMenhir > 7:
-                goCloserToMenhir = True
-
-            if goCloserToMenhir:
-                goToAroundAction = GoToAroundAction()
-                goToAroundAction.setDestination(menhirPos)
-                goToAroundAction.setAllowDangerous(True)
-                goToAroundAction.setUseAllMovements(True)
-                yield goToAroundAction, "Going closer to menhir"
-        
         # ------------------------------------------
 
         # NOTHING TO DO - JUST SPIN

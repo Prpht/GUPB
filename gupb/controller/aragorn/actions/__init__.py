@@ -2,6 +2,7 @@ from .action import Action
 from .advanced_explore_action import AdvancedExploreAction
 from .attack_action import AttackAction
 from .attack_closest_enemy_action import AttackClosestEnemyAction
+from .conquer_menhir_action import ConquerMenhirAction
 from .explore_action import ExploreAction
 from .go_to_action import GoToAction
 from .go_to_around_action import GoToAroundAction
