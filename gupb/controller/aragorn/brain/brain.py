@@ -66,7 +66,8 @@ class Brain:
 
         # select actions depending on state
         
-        strategyNumber = self.state - 2 % 3
+        strategyNumber = self.state
+        
         if strategyNumber in self.strategies:
             strategy: Strategy = self.strategies[strategyNumber]
         else:
