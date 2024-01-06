@@ -38,7 +38,7 @@ def astar(blocks, start, end):
 
     open_list.append(start_node)
     i = 0
-    while open_list and i<100:
+    while open_list and i<50:
         i+=1
         current_node = open_list[0]
         current_index = 0
