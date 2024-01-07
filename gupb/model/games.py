@@ -12,6 +12,7 @@ from gupb.logger import core as logger_core
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
+from gupb.model.pandas_profiler import PROFILER_SINGLETON
 
 verbose_logger = logging.getLogger('verbose')
 
@@ -90,6 +91,7 @@ class Game(statemachine.StateMachine):
         self.episodes_since_mist_increase += 1
         verbose_logger.debug(f"Starting episode {self.episode}.")
         EpisodeStartReport(self.episode).log(logging.DEBUG)
+        PROFILER_SINGLETON.update_step()
         if self.episodes_since_mist_increase >= MIST_TTH_PER_CHAMPION * len(self.champions):
             self.arena.increase_mist()
             self.episodes_since_mist_increase = 0
