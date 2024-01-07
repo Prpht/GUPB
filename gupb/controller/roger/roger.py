@@ -20,7 +20,7 @@ from gupb.model.tiles import Land, Menhir, Forest
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Roger(controller.Controller):
-    # v5
+    # v7
     def __init__(self, _id: str):
         self._id = _id
         self.current_position: Optional[coordinates.Coords] = None
