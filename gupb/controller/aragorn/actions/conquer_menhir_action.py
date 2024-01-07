@@ -7,6 +7,7 @@ from gupb.controller.aragorn import pathfinding
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.constants import INFINITY
 from .go_to_action import GoToAction
+from .attack_action import AttackAction
 from .go_to_around_action import GoToAroundAction
 
 
@@ -92,33 +93,59 @@ class ConquerMenhirAction:
                     add_coords(menhirPos, Coords( 0,  1)),
                 ]
             
-            minCost = INFINITY
-            minTile = None
+            if memory.position not in destinationTiles:
+                # go there
+                minCost = INFINITY
+                minTile = None
 
-            for destinationTile in destinationTiles:
-                path, cost = pathfinding.find_path(
-                    memory=memory,
-                    start=memory.position,
-                    end=destinationTile,
-                    facing=memory.facing,
-                    useAllMovements=False,
-                    avoid_cells=[]
-                )
+                for destinationTile in destinationTiles:
+                    path, cost = pathfinding.find_path(
+                        memory=memory,
+                        start=memory.position,
+                        end=destinationTile,
+                        facing=memory.facing,
+                        useAllMovements=False,
+                        avoid_cells=[]
+                    )
 
-                if minCost is None or cost < minCost:
-                    minCost = cost
-                    minTile = destinationTile
-            
-            if minTile is None:
-                # no direct path found - just go around menhir
-                goToAroundAction = GoToAroundAction()
-                goToAroundAction.setDestination(menhirPos)
-                goToAroundAction.setAllowDangerous(False)
-                goToAroundAction.setUseAllMovements(False)
-                return goToAroundAction.perform(memory)
-            
-            goToAction = GoToAction()
-            goToAction.setDestination(minTile)
-            goToAction.setUseAllMovements(False)
-            goToAction.setAllowDangerous(False)
-            return goToAction.perform(memory)
+                    if minCost is None or cost < minCost:
+                        minCost = cost
+                        minTile = destinationTile
+                
+                if minTile is None:
+                    # no direct path found - just go around menhir
+                    goToAroundAction = GoToAroundAction()
+                    goToAroundAction.setDestination(menhirPos)
+                    goToAroundAction.setAllowDangerous(False)
+                    goToAroundAction.setUseAllMovements(False)
+                    return goToAroundAction.perform(memory)
+                
+                goToAction = GoToAction()
+                goToAction.setDestination(minTile)
+                goToAction.setUseAllMovements(False)
+                goToAction.setAllowDangerous(False)
+                return goToAction.perform(memory)
+            else:
+                currentWeapon = self.getCurrentWeaponClass()
+
+                if currentWeapon is None:
+                    return None
+                
+                rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
+
+                if menhirPos in rangeCells:
+                    # attack menhir
+                    attackAction = AttackAction()
+                    return attackAction.perform()
+                else:
+                    # rotate to reach menhir
+                    rangeCellsLeft  = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing.turn_left())
+                    rangeCellsRight = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing.turn_right())
+
+                    if menhirPos in rangeCellsLeft:
+                        return characters.Action.TURN_LEFT
+                    elif menhirPos in rangeCellsRight:
+                        return characters.Action.TURN_RIGHT
+                    else:
+                        return characters.Action.TURN_RIGHT
+                

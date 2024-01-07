@@ -15,7 +15,7 @@ class StrategyMidgame(Strategy):
         yield self._mist_forced_movement()
         yield self._pick_up_weapon(15)
         yield self._rotate_to_see_more()
-        yield self._attack_approach_sneaky()
+        # yield self._attack_approach_sneaky()
         yield self._attack_approach_rage()
         yield self._attack_approach_normal()
         yield self._explore_the_map()
