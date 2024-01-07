@@ -17,6 +17,7 @@ class RageAttackAction(AttackClosestEnemyAction):
         47403228639173111709310103423398415522718923899712,
         912483974970427094311,
         14461117651760316,
+        947871564346996264452,
     ]
     rage_attack_bots = None
 
