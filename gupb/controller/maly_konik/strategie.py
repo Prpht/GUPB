@@ -210,55 +210,6 @@ class FirstStrategy:
             if self.__can_attack_enemy(knowledge, self.position, self.orientation) and self.should_attack(knowledge):
                 self.it_is_time_to_attack = True
 
-            # Warto zaatakować ale nie mamy dobrej pozycji
-            if self.should_attack(knowledge) and not self.__can_attack_enemy(knowledge, self.position, self.orientation):
-                spiral_cords = get_cords_around_point(self.mapa.closest_enemy_cord[0], self.mapa.closest_enemy_cord[1])
-
-                spiral_list = []
-
-                for _ in range(100):
-                    spiral_list.append(next(spiral_cords))
-
-                stop_flag = False
-
-                for possible_position in spiral_list:
-                    pos = cord.Coords(possible_position[0], possible_position[1])
-
-                    for coord in WEAPONS[self.weapon_name].cut_positions(self.mapa.arena.terrain, pos, characters.Facing.UP):
-                        if coord == self.mapa.closest_enemy_cord and self.mapa.grid_matrix[pos.y, pos.x] == 1: # noqa
-                            self.spot_to_attack = pos
-                            stop_flag = True
-
-                        if stop_flag:
-                            break
-
-                    for coord in WEAPONS[self.weapon_name].cut_positions(self.mapa.arena.terrain, pos, characters.Facing.UP):
-                        if coord == self.mapa.closest_enemy_cord and self.mapa.grid_matrix[pos.y, pos.x] == 1: # noqa
-                            self.spot_to_attack = pos
-                            stop_flag = True
-
-                            if stop_flag:
-                                break
-
-                    for coord in WEAPONS[self.weapon_name].cut_positions(self.mapa.arena.terrain, pos, characters.Facing.UP):
-                        if coord == self.mapa.closest_enemy_cord and self.mapa.grid_matrix[pos.y, pos.x] == 1: # noqa
-                            self.spot_to_attack = pos
-                            stop_flag = True
-
-                            if stop_flag:
-                                break
-
-                    for coord in WEAPONS[self.weapon_name].cut_positions(self.mapa.arena.terrain, pos, characters.Facing.UP):
-                        if coord == self.mapa.closest_enemy_cord and self.mapa.grid_matrix[pos.y, pos.x] == 1: # noqa
-                            self.spot_to_attack = pos
-                            stop_flag = True
-
-                            if stop_flag:
-                                break
-
-                    if stop_flag:
-                        break
-
             if self.__enemy_in_front_of_me(knowledge) and not self.should_attack(knowledge) and not self.run_from_mist:
                 # print("Mam wroga ale nie powinienem go atakować")
                 self.it_is_time_to_run = True
@@ -296,9 +247,9 @@ class FirstStrategy:
 
         if self.mapa.menhir_position is not None and self.__is_mist():
             self.future_moves = self.__astar_path(self.mapa.menhir_position[0], self.mapa.menhir_position[1])
-        elif self.spot_to_attack is not None:
-            self.future_moves = self.__astar_path(self.spot_to_attack.x, self.spot_to_attack.y)
-            self.spot_to_attack = None
+        # elif self.spot_to_attack is not None:
+        #     self.future_moves = self.__astar_path(self.spot_to_attack.x, self.spot_to_attack.y)
+        #     self.spot_to_attack = None
         elif self.mapa.potion_position is not None and self.going_for_potion:
             self.future_moves = self.__astar_path(self.mapa.potion_position[0], self.mapa.potion_position[1])
             self.potion_position_flag = cord.Coords(self.future_moves[-1].x, self.future_moves[-1].y)
