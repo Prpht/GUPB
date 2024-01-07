@@ -49,6 +49,41 @@ class ConquerMenhirAction:
                     add_coords(menhirPos, Coords( 1, -1)),
                     add_coords(menhirPos, Coords( 1,  1)),
                 ]
+            elif memory.getCurrentWeaponName() in [
+                'bow',
+                'bow_loaded',
+                'bow_unloaded',
+            ]:
+                destinationTiles = [
+                    add_coords(menhirPos, Coords(-4,  0)),
+                    add_coords(menhirPos, Coords( 4,  0)),
+                    add_coords(menhirPos, Coords( 0, -4)),
+                    add_coords(menhirPos, Coords( 0,  4)),
+
+                    add_coords(menhirPos, Coords(-3,  0)),
+                    add_coords(menhirPos, Coords( 3,  0)),
+                    add_coords(menhirPos, Coords( 0, -3)),
+                    add_coords(menhirPos, Coords( 0,  3)),
+
+                    add_coords(menhirPos, Coords(-2,  0)),
+                    add_coords(menhirPos, Coords( 2,  0)),
+                    add_coords(menhirPos, Coords( 0, -2)),
+                    add_coords(menhirPos, Coords( 0,  2)),
+                ]
+            elif memory.getCurrentWeaponName() in [
+                'sword',
+            ]:
+                destinationTiles = [
+                    add_coords(menhirPos, Coords(-3,  0)),
+                    add_coords(menhirPos, Coords( 3,  0)),
+                    add_coords(menhirPos, Coords( 0, -3)),
+                    add_coords(menhirPos, Coords( 0,  3)),
+
+                    add_coords(menhirPos, Coords(-2,  0)),
+                    add_coords(menhirPos, Coords( 2,  0)),
+                    add_coords(menhirPos, Coords( 0, -2)),
+                    add_coords(menhirPos, Coords( 0,  2)),
+                ]
             else:
                 destinationTiles = [
                     add_coords(menhirPos, Coords(-1,  0)),

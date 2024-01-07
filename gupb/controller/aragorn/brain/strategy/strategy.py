@@ -96,7 +96,7 @@ class Strategy:
 
         return None, None
     
-    def _attack_in_range(self):
+    def _attack_in_range(self, opponentHealthThreshold = consumables.POTION_RESTORED_HP):
         oponentInRange = self._brain.memory.getClosestOponentInRange()
 
         if DEBUG2: print("[ARAGORN|BRAIN] oponentInRange", oponentInRange, "is on safe tile:", self._brain.memory.position not in self.dangerousTilesDict.keys(), "oppo health:", oponentInRange.health if oponentInRange is not None else None, "my health:", self._brain.memory.health)
@@ -107,7 +107,7 @@ class Strategy:
                 self._brain.memory.position not in self.dangerousTilesDict.keys()
                 or (
                     oponentInRange.health <= self._brain.memory.health
-                    and oponentInRange.health <= consumables.POTION_RESTORED_HP
+                    and oponentInRange.health <= opponentHealthThreshold
                 )
             )
         ):
