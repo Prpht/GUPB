@@ -126,12 +126,12 @@ class ConquerMenhirAction:
                 goToAction.setAllowDangerous(False)
                 return goToAction.perform(memory)
             else:
-                currentWeapon = self.getCurrentWeaponClass()
+                currentWeapon = memory.getCurrentWeaponClass()
 
                 if currentWeapon is None:
                     return None
                 
-                rangeCells = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing)
+                rangeCells = currentWeapon.cut_positions(memory.map.terrain, memory.position, memory.facing)
 
                 if menhirPos in rangeCells:
                     # attack menhir
@@ -139,8 +139,8 @@ class ConquerMenhirAction:
                     return attackAction.perform()
                 else:
                     # rotate to reach menhir
-                    rangeCellsLeft  = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing.turn_left())
-                    rangeCellsRight = currentWeapon.cut_positions(self.map.terrain, self.position, self.facing.turn_right())
+                    rangeCellsLeft  = currentWeapon.cut_positions(memory.map.terrain, memory.position, memory.facing.turn_left())
+                    rangeCellsRight = currentWeapon.cut_positions(memory.map.terrain, memory.position, memory.facing.turn_right())
 
                     if menhirPos in rangeCellsLeft:
                         return characters.Action.TURN_LEFT
@@ -148,4 +148,3 @@ class ConquerMenhirAction:
                         return characters.Action.TURN_RIGHT
                     else:
                         return characters.Action.TURN_RIGHT
-                
