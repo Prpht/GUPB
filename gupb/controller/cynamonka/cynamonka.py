@@ -128,9 +128,6 @@ class CynamonkaController(controller.Controller):
                     self.times_in_row_amulet = 0
                     return self.go_randomly()
         except Exception as e:
-            # Handle exceptions or errors here
-            #traceback.print_exc()
-            #print(f"An error occurred: {e}")
             return self.go_randomly()
 
 

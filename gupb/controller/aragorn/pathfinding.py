@@ -51,7 +51,14 @@ def get_facing(f_coords: Coords) -> characters.Facing:
         return characters.Facing.RIGHT
 
 @profile
-def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Facing, useAllMovements :bool = False) -> (Optional[List[Coords]], int):
+def find_path(
+    memory: Memory,
+    start: Coords,
+    end: Coords,
+    facing: characters.Facing,
+    useAllMovements :bool = False,
+    avoid_cells: list = []
+) -> (Optional[List[Coords]], int):
     # TODO: remove facing param - it's not used
     global cache
 
@@ -167,6 +174,9 @@ def find_path(memory: Memory, start: Coords, end: Coords, facing: characters.Fac
 
         for neighbor in neighbors:
             if not neighbor in memory.map.terrain:
+                continue
+
+            if neighbor in avoid_cells:
                 continue
             
             if OPTIMIZE_PF:

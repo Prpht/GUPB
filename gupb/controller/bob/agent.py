@@ -10,14 +10,16 @@ from gupb.model.coordinates import Coords
 from gupb.model.tiles import TileDescription
 
 # Random comment as we did not change anything
-# Once again
-# Next round
+# Round 6
 
 POSSIBLE_RANDOM_ACTIONS = [
     Action.TURN_LEFT,
     Action.TURN_RIGHT,
     Action.STEP_FORWARD,
     Action.ATTACK,
+    Action.STEP_BACKWARD,
+    Action.STEP_LEFT,
+    Action.STEP_RIGHT,
 ]
 
 # This can be later switched to MAB :)
@@ -42,7 +44,8 @@ TERRAIN_MAPPING = {
     'land': tiles.Land,
     'sea': tiles.Sea,
     'wall': tiles.Wall,
-    'menhir': tiles.Menhir
+    'menhir': tiles.Menhir,
+    'forest': tiles.Forest,
 }
 
 

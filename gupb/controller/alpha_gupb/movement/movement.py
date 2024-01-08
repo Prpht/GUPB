@@ -12,6 +12,47 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_FORWARD
 ]
 
+def go_right_slow(facing):
+    if(facing == characters.Facing.RIGHT):
+        return characters.Action.STEP_FORWARD
+    if(facing == characters.Facing.LEFT):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.UP):
+        return characters.Action.TURN_RIGHT
+    if(facing == characters.Facing.DOWN):
+        return characters.Action.TURN_LEFT
+    
+def go_left_slow(facing):
+    if(facing == characters.Facing.RIGHT):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.LEFT):
+        return characters.Action.STEP_FORWARD
+    if(facing == characters.Facing.UP):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.DOWN):
+        return characters.Action.TURN_RIGHT
+    
+def go_up_slow(facing):
+    if(facing == characters.Facing.UP):
+        return characters.Action.STEP_FORWARD
+    if(facing == characters.Facing.LEFT):
+        return characters.Action.TURN_RIGHT
+    if(facing == characters.Facing.RIGHT):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.DOWN):
+        return characters.Action.TURN_LEFT   
+    
+def go_down_slow(facing):
+    if(facing == characters.Facing.RIGHT):
+        return characters.Action.TURN_RIGHT
+    if(facing == characters.Facing.LEFT):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.UP):
+        return characters.Action.TURN_LEFT
+    if(facing == characters.Facing.DOWN):
+        return characters.Action.STEP_FORWARD   
+
+
 
 def go_right(facing):
     if facing == characters.Facing.RIGHT:
