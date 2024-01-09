@@ -14,13 +14,13 @@ from gupb.controller.roger.utils import get_distance
 from gupb.model import arenas, coordinates
 from gupb.model import characters
 from gupb.model.coordinates import Coords
-from gupb.model.tiles import Land, Menhir
+from gupb.model.tiles import Land, Menhir, Forest
 
 
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class Roger(controller.Controller):
-    # v5
+    # v7
     def __init__(self, _id: str):
         self._id = _id
         self.current_position: Optional[coordinates.Coords] = None
@@ -118,7 +118,7 @@ class Roger(controller.Controller):
         return None
 
     def chose_next_tile(self) -> Coords:
-        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.arena.terrain.items()))
+        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir) or isinstance(x[1], Forest), self.arena.terrain.items()))
         walkable_coords = set(map(lambda x: x[0], walkable))
         seen_coords = set(self.arena.seen_tiles.keys())
         unseen_coords = walkable_coords - seen_coords
@@ -140,7 +140,7 @@ class Roger(controller.Controller):
         return best_coords
 
     def chose_next_tile_neighbourhood(self) -> Coords:
-        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir), self.arena.terrain.items()))
+        walkable = list(filter(lambda x: isinstance(x[1], Land) or isinstance(x[1], Menhir) or isinstance(x[1], Forest), self.arena.terrain.items()))
         walkable_coords = list(map(lambda x: x[0], walkable))
         nearest_walkable_coords = set(filter(lambda x: get_distance(self.current_position, x) < 5, walkable_coords))
         seen_coords = set(self.arena.seen_tiles.keys())

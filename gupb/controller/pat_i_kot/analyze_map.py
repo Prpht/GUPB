@@ -14,7 +14,7 @@ class PathFinder:
     def create_arena(self):
         matrix = [[0 for _ in range(self.arena.size[0])] for _ in range(self.arena.size[1])]
         for coords, tile in self.arena.terrain.items():
-            if tile.description().type in ["land", "menhir"]:
+            if tile.description().type in ["land", "menhir", "forest"]:
                 matrix[coords[1]][coords[0]] = 1
             else:
                 matrix[coords[1]][coords[0]] = 0

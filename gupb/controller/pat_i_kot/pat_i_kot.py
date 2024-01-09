@@ -11,7 +11,7 @@ WEAPON_WITH_WEIGHTS = {
     'sword': 5,
     'bow_unloaded': 1,
     'bow_loaded': 1,
-    'axe': 3
+    'axe': 6
 }
 
 ACTIONS_WITH_WEIGHTS = {

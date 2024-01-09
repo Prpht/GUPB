@@ -6,10 +6,10 @@ from gupb.model import coordinates as cord
 WORST_WEAPONS = {
      'sword': 1,
      'axe': 2,
-     'bow_loaded': 3,
-     'bow_unloaded': 4,
-     'amulet': 6,
-     'knife': 5,
+     'bow_loaded': 4,
+     'bow_unloaded': 5,
+     'amulet': 3,
+     'knife': 6,
 }
 
 WEAPONS = {
