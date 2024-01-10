@@ -1,6 +1,6 @@
 from typing import NamedTuple, Optional, List, Tuple
 
-from gupb.model.profiling import profile
+from gupb.profiler.profiling import profile
 from gupb.model.coordinates import *
 from gupb.model import characters
 from gupb.model import effects

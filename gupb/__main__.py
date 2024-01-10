@@ -16,7 +16,7 @@ import questionary
 
 from gupb import controller
 from gupb import runner
-from gupb.model.pandas_profiler import PROFILER_SINGLETON
+from gupb.profiler.pandas_profiler import PROFILER_SINGLETON
 
 # noinspection PyUnresolvedReferences
 @lru_cache()

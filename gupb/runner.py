@@ -9,12 +9,12 @@ from tqdm import trange
 
 from gupb import controller
 from gupb.controller import keyboard
-from gupb.model.profiling import PROFILE_RESULTS, print_stats
+from gupb.profiler.profiling import PROFILE_RESULTS, print_stats
 from gupb.logger import core as logger_core
 from gupb.model import coordinates
 from gupb.model import games
 from gupb.view import render
-from gupb.model.pandas_profiler import PROFILER_SINGLETON
+from gupb.profiler.pandas_profiler import PROFILER_SINGLETON
 
 verbose_logger = logging.getLogger('verbose')
 

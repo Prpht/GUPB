@@ -7,7 +7,7 @@ from gupb.model.coordinates import *
 from gupb.model import characters
 from gupb.model import consumables
 from gupb.model import weapons
-from gupb.model.profiling import profile
+from gupb.profiler.profiling import profile
 
 from gupb.controller.aragorn.memory import Memory
 from gupb.controller.aragorn.constants import DEBUG, DEBUG2, INFINITY, OUR_BOT_NAME
@@ -86,7 +86,7 @@ class GoToAction(Action):
             if DEBUG: print("Trying to set allow dangerous to non bool object (" + str(allowDangerous) + " of type " + str(type(allowDangerous)) + ")")
 
     @profile
-    def perform(self, memory :Memory) -> characters.Action:        
+    def perform(self, memory :Memory) -> characters.Action:
         if not self.destination:
             return None
         

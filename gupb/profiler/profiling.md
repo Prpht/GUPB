@@ -6,13 +6,15 @@
 ## Profiling
 
 ### Zbieranie czasów wykonań danej funkcji
+
 ```python
-import gupb.model.profiling.profile
+import gupb.profiler.profiling.profile
+
 
 class RandomController:
 
     @profile
-    def decide(cls,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(cls, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
 ```
 
@@ -64,13 +66,15 @@ Profiler ten pozwala na zapisywanie wszystkich statystyk do jednego pliku CSV. Z
 - błąd zwrócony przez kontroler
 
 Aby go wykorzystać dodaj następujący dekorator do funkcji decide:
+
 ```python
-from gupb.model.pandas_profiler import pandas_profile
+from gupb.profiler.pandas_profiler import pandas_profile
+
 
 class RandomController:
 
     @pandas_profile
-    def decide(cls,  knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(cls, knowledge: characters.ChampionKnowledge) -> characters.Action:
         return random.choice(POSSIBLE_ACTIONS)
 ```
 

@@ -5,7 +5,7 @@ import bresenham
 from gupb.model import arenas, tiles, coordinates, weapons, games
 from gupb.model import characters, consumables, effects
 from gupb.model.characters import CHAMPION_STARTING_HP
-from gupb.model.profiling import profile
+from gupb.profiler.profiling import profile
 
 from gupb.controller.aragorn import utils
 from gupb.controller.aragorn.constants import DEBUG, INFINITY, WEAPON_HIERARCHY, OUR_BOT_NAME
@@ -147,7 +147,6 @@ class Memory:
     def willGetIdlePenalty(self):
         return self.idleTime > characters.PENALISED_IDLE_TIME - 1
     
-    @profile
     def getDistanceToClosestPotion(self, maxTicksAgo = None):
         minDistance = INFINITY
         minCoords = None
@@ -169,7 +168,6 @@ class Memory:
         
         return [minDistance, minCoords]
 
-    @profile
     def getDistanceToClosestWeapon(self):
         minDistance = INFINITY
         minCoords = None
@@ -622,7 +620,6 @@ class MenhirCalculator:
     def isMenhirPosFound(self) -> bool:
         return self.menhirPos is not None
     
-    @profile
     def approximateMenhirPos(self, tick :int) -> coordinates.Coords:
         mistRadius = self.map.mist_radius
 

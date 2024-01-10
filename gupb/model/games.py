@@ -12,7 +12,7 @@ from gupb.logger import core as logger_core
 from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
-from gupb.model.pandas_profiler import PROFILER_SINGLETON
+from gupb.profiler.pandas_profiler import PROFILER_SINGLETON
 
 verbose_logger = logging.getLogger('verbose')
 

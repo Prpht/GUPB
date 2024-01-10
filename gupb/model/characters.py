@@ -234,6 +234,9 @@ class Action(Enum):
     def __call__(self, *args):
         self.value(*args)
 
+    def __repr__(self):
+        return self.name
+
 
 @dataclass(frozen=True)
 class ChampionPickedActionReport(logger_core.LoggingMixin):
