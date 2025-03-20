@@ -119,24 +119,27 @@ class Arena:
                     coordinates.Coords(champion.position.x, champion.position.y - 1),
                 ]
 
-        border, distance = estimate_border_point()
-        left = champion.facing.turn_left().value
-        targets = [border + coordinates.Coords(i * left.x, i * left.y) for i in range(-distance, distance + 1)]
         visible = set()
         visible.add(champion.position)
-        for coords in targets:
-            ray = bresenham.bresenham(champion.position.x, champion.position.y, coords[0], coords[1])
-            next(ray)
-            for ray_coords in ray:
-                if ray_coords not in self.terrain:
-                    break
-                visible.add(ray_coords)
-                if not self.terrain[ray_coords].transparent:
-                    break
-        for coords in champion.weapon.prescience(champion.position, champion.facing):
-            if coords in self.terrain:
-                visible.add(coords)
-        visible.update(champion_left_and_right())
+        prescience = champion.weapon.prescience(champion.position, champion.facing)
+        if len(prescience) > 0:
+            for coords in prescience:
+                if coords in self.terrain:
+                    visible.add(coords)
+        else:
+            border, distance = estimate_border_point()
+            left = champion.facing.turn_left().value
+            targets = [border + coordinates.Coords(i * left.x, i * left.y) for i in range(-distance, distance + 1)]
+            for coords in targets:
+                ray = bresenham.bresenham(champion.position.x, champion.position.y, coords[0], coords[1])
+                next(ray)
+                for ray_coords in ray:
+                    if ray_coords not in self.terrain:
+                        break
+                    visible.add(ray_coords)
+                    if not self.terrain[ray_coords].transparent:
+                        break
+            visible.update(champion_left_and_right())
         return visible
 
     def visible_tiles(self, champion: characters.Champion) -> dict[coordinates.Coords, tiles.TileDescription]:
