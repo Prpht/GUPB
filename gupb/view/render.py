@@ -45,8 +45,9 @@ class SpriteRepository:
     def __init__(self) -> None:
         self.size = (INIT_TILE_SIZE, INIT_TILE_SIZE)
         self.sprites: dict[Any, Sprite] = {
-            tiles.Land: load_sprite('tiles', 'land'),
             tiles.Sea: load_sprite('tiles', 'sea'),
+            tiles.Land: load_sprite('tiles', 'land'),
+            tiles.Forest: load_sprite('tiles', 'forest'),
             tiles.Wall: load_sprite('tiles', 'wall'),
             tiles.Menhir: load_sprite('tiles', 'menhir'),
 
@@ -139,7 +140,7 @@ class SpriteRepository:
 class Renderer:
     def __init__(self, ms_per_time_unit: int = 5):
         pygame.display.set_caption('GUPB')
-        self.screen = pygame.display.set_mode((100, 100), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
         self.sprite_repository = SpriteRepository()
         self.clock = pygame.time.Clock()
         self.time_passed = 0

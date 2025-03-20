@@ -1,24 +1,35 @@
+from itertools import repeat
+import random
+from typing import Callable, Iterator
+
 import networkx as nx
 import perlin_noise
-import random
 import scipy.stats as scp_stats
 from tqdm import tqdm
+
+import gupb.model.arenas as arenas
 
 ArenaDefinition = list[list[str]]
 
 DEFAULT_WIDTH = 24
 DEFAULT_HEIGHT = 24
+MIN_SIZE = 28
+MAX_SIZE = 42
 PERLIN_NOISE_OCTAVES = 4
-REQUIRED_AREA = 250
+REQUIRED_AREA_COEFFICIENT = 0.4
 WEAPONS_PER_BUILDING = 2
-BUILDINGS_PER_ARENA = 8
-MAX_BUILDING_SIZE = 7
+BUILDINGS_PER_ARENA = 10
+MAX_BUILDING_SIZE = 10
 
 WEAPONS = ['S', 'A', 'B', 'M']
 
 
+def forest_probability(intensity: float) -> float:
+    return scp_stats.logistic.cdf(intensity, loc=0.35, scale=0.05) - mountain_probability(intensity)
+
+
 def mountain_probability(intensity: float) -> float:
-    return scp_stats.logistic.cdf(intensity, loc=0.30, scale=0.05)
+    return scp_stats.logistic.cdf(intensity, loc=0.50, scale=0.05)
 
 
 def sea_probability(intensity: float) -> float:
@@ -30,6 +41,13 @@ def empty_arena(width: int, height: int) -> ArenaDefinition:
 
 
 def perlin_landscape_arena(width: int, height: int) -> ArenaDefinition:
+    def potentially_resolve_coin(roll: float, probability_eater: Callable[[float], float], mark: str):
+        roll -= probability_eater(noise_picture[i][j])
+        if roll < 0.0:
+            arena[i + 1][j + 1] = mark
+            return True
+        return False
+
     arena = empty_arena(width, height)
     perlin_width, perlin_height = width - 2, height - 2
     noise = perlin_noise.PerlinNoise(octaves=PERLIN_NOISE_OCTAVES)
@@ -37,16 +55,15 @@ def perlin_landscape_arena(width: int, height: int) -> ArenaDefinition:
         [noise([i / perlin_width, j / perlin_height]) for j in range(perlin_width)]
         for i in range(perlin_height)
     ]
+
     for i in range(perlin_height):
         for j in range(perlin_width):
             coin = random.random()
-            coin -= mountain_probability(noise_picture[i][j])
-            if coin < 0.0:
-                arena[i + 1][j + 1] = '#'
+            if potentially_resolve_coin(coin, mountain_probability, '#'):
                 continue
-            coin -= sea_probability(noise_picture[i][j])
-            if coin < 0.0:
-                arena[i + 1][j + 1] = '='
+            if potentially_resolve_coin(coin, sea_probability, '='):
+                continue
+            if potentially_resolve_coin(coin, forest_probability, '@'):
                 continue
             arena[i + 1][j + 1] = '.'
     return arena
@@ -94,7 +111,7 @@ def add_buildings(arena: ArenaDefinition) -> None:
 
 
 def is_passable(field: str) -> bool:
-    return field == '.' or field in WEAPONS
+    return field in WEAPONS or arenas.TILE_ENCODING[field].terrain_passable()
 
 
 def create_arena_graph(arena: ArenaDefinition) -> nx.Graph:
@@ -130,11 +147,12 @@ def remove_disconnected_islands(arena: ArenaDefinition) -> int:
 
 
 def generate_arena(width: int, height: int) -> ArenaDefinition:
+    required_area = int(width * height * REQUIRED_AREA_COEFFICIENT)
     while True:
         arena = perlin_landscape_arena(width, height)
         add_buildings(arena)
         playable_area = remove_disconnected_islands(arena)
-        if playable_area > REQUIRED_AREA:
+        if playable_area > required_area:
             break
     return arena
 
@@ -160,12 +178,21 @@ def save_arena(arena: ArenaDefinition, file_name: str) -> None:
     remove_last_new_line()
 
 
-def generate_arenas(how_many: int) -> list[str]:
+def generate_arenas(
+        how_many: int,
+        size_generator: Iterator[tuple[int, int]] = repeat((DEFAULT_WIDTH, DEFAULT_HEIGHT))
+) -> list[str]:
     arena_names = [f"generated_{i}" for i in range(how_many)]
     for name in tqdm(arena_names, desc="Generating arenas"):
-        arena = generate_arena(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        arena = generate_arena(*next(size_generator))
         save_arena(arena, name)
     return arena_names
+
+
+def random_size_generator() -> Iterator[tuple[int, int]]:
+    while True:
+        size = random.randint(MIN_SIZE, MAX_SIZE)
+        yield size, size
 
 
 def main() -> None:

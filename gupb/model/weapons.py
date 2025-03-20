@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+import math
 from typing import NamedTuple, List
 
 from gupb.model import arenas
@@ -31,13 +33,21 @@ class Weapon(ABC):
         raise NotImplementedError
 
     @classmethod
+    def prescience(cls, position: coordinates.Coords, facing: characters.Facing) -> list[coordinates.Coords]:
+        return []
+
+    @classmethod
     def droppable(cls) -> bool:
         return True
 
-    @staticmethod
-    def cut_transparent(arena: arenas.Arena, position: coordinates.Coords) -> None:
+    @classmethod
+    def cut_transparent(cls, arena: arenas.Arena, position: coordinates.Coords) -> None:
         if position in arena.terrain and arena.terrain[position].terrain_transparent():
-            arena.register_effect(effects.WeaponCut(), position)
+            arena.register_effect(cls.cut_effect(), position)
+
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut()
 
 
 class LineWeapon(Weapon, ABC):
@@ -69,6 +79,23 @@ class LineWeapon(Weapon, ABC):
             self.cut_transparent(arena, cut_position)
 
 
+class PropheticWeapon(Weapon, ABC):
+    @classmethod
+    def prescience(cls, position: coordinates.Coords, facing: characters.Facing) -> list[coordinates.Coords]:
+        radius = cls.prescience_radius()
+        visible_coordinates = []
+        for x in range(position.x - radius, position.x + radius + 1):
+            for y in range(position.y - radius, position.y + radius + 1):
+                if math.sqrt((x - position.x) ** 2 + (y - position.y) ** 2) <= radius:
+                    visible_coordinates.append(coordinates.Coords(x, y))
+        return visible_coordinates
+
+    @staticmethod
+    @abstractmethod
+    def prescience_radius() -> int:
+        raise NotImplementedError
+
+
 class Knife(LineWeapon):
     @staticmethod
     def reach() -> int:
@@ -96,6 +123,10 @@ class Bow(LineWeapon):
     def reach() -> int:
         return 50
 
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut(3)
+
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         if self.ready:
             super().cut(arena, position, facing)
@@ -117,12 +148,20 @@ class Axe(Weapon):
         right_position = centre_position + facing.turn_right().value
         return [left_position, centre_position, right_position]
 
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.WeaponCut(3)
+
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
             self.cut_transparent(arena, cut_position)
 
 
-class Amulet(Weapon):
+class Amulet(PropheticWeapon, Weapon):
+    @staticmethod
+    def prescience_radius() -> int:
+        return 3
+
     @classmethod
     def cut_positions(
             cls,
