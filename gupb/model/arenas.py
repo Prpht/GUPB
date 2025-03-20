@@ -30,6 +30,7 @@ WEAPON_ENCODING = {
     'A': weapons.Axe,
     'B': weapons.Bow,
     'M': weapons.Amulet,
+    'C': weapons.Scroll,
 }
 
 FIXED_MENHIRS = {

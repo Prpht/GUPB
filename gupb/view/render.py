@@ -28,6 +28,7 @@ HEALTH_BAR_OVERFILL_COLOR = (150, 0, 0)
 HEALTH_BAR_EMPTY_COLOR = (0, 0, 0)
 
 BLACK = pygame.Color('black')
+WHITE = pygame.Color('white')
 GAME_FONT = pygame.freetype.Font("resources/fonts/whitrabt.ttf", 24)
 
 
@@ -56,6 +57,7 @@ class SpriteRepository:
             weapons.Axe: load_sprite('weapons', 'axe', BLACK),
             weapons.Bow: load_sprite('weapons', 'bow', BLACK),
             weapons.Amulet: load_sprite('weapons', 'amulet', BLACK),
+            weapons.Scroll: load_sprite('weapons', 'scroll', BLACK),
 
             consumables.Potion: load_sprite('consumables', 'potion', BLACK),
 
@@ -75,6 +77,7 @@ class SpriteRepository:
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
+            effects.Fire: load_sprite('effects', 'fire', WHITE),
         }
         self.rotation_values: dict[characters.Facing, int] = {
             characters.Facing.RIGHT: 0,

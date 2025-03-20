@@ -21,7 +21,7 @@ WEAPONS_PER_BUILDING = 2
 BUILDINGS_PER_ARENA = 10
 MAX_BUILDING_SIZE = 10
 
-WEAPONS = ['S', 'A', 'B', 'M']
+WEAPONS = ['S', 'A', 'B', 'M', 'C']
 
 
 def forest_probability(intensity: float) -> float:

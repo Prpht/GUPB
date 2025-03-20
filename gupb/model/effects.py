@@ -13,6 +13,7 @@ verbose_logger = logging.getLogger('verbose')
 
 CUT_DAMAGE: int = 2
 MIST_DAMAGE: int = 1
+FIRE_DAMAGE: int = 3
 
 
 class EffectDescription(NamedTuple):
@@ -57,9 +58,10 @@ class Mist(Effect):
 
     @staticmethod
     def stay(champion: characters.Champion) -> None:
-        verbose_logger.debug(f"Champion {champion.controller.name} was damaged by deadly mist.")
-        ChampionDamagedByMistReport(champion.controller.name, MIST_DAMAGE).log(logging.DEBUG)
-        champion.damage(MIST_DAMAGE)
+        if champion:
+            verbose_logger.debug(f"Champion {champion.controller.name} was damaged by deadly mist.")
+            ChampionDamagedByMistReport(champion.controller.name, MIST_DAMAGE).log(logging.DEBUG)
+            champion.damage(MIST_DAMAGE)
 
     @staticmethod
     def lifetime() -> EffectLifetime:
@@ -71,9 +73,10 @@ class WeaponCut(Effect):
         self.damage: int = damage
 
     def instant(self, champion: characters.Champion) -> None:
-        verbose_logger.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
-        ChampionDamagedByWeaponCutReport(champion.controller.name, self.damage).log(logging.DEBUG)
-        champion.damage(self.damage)
+        if champion:
+            verbose_logger.debug(f"Champion {champion.controller.name} was damaged by weapon cut.")
+            ChampionDamagedByWeaponCutReport(champion.controller.name, self.damage).log(logging.DEBUG)
+            champion.damage(self.damage)
 
     @staticmethod
     def stay(champion: characters.Champion) -> None:
@@ -82,6 +85,27 @@ class WeaponCut(Effect):
     @staticmethod
     def lifetime() -> EffectLifetime:
         return EffectLifetime.INSTANT
+
+
+class Fire(Effect):
+    @staticmethod
+    def burn(champion: characters.Champion) -> None:
+        if champion:
+            verbose_logger.debug(f"Champion {champion.controller.name} was damaged by fire.")
+            ChampionDamagedByFireReport(champion.controller.name, FIRE_DAMAGE).log(logging.DEBUG)
+            champion.damage(FIRE_DAMAGE)
+
+    @staticmethod
+    def instant(champion: characters.Champion) -> None:
+        Fire.burn(champion)
+
+    @staticmethod
+    def stay(champion: characters.Champion) -> None:
+        Fire.burn(champion)
+
+    @staticmethod
+    def lifetime() -> EffectLifetime:
+        return EffectLifetime.ETERNAL
 
 
 @dataclass(frozen=True)
@@ -96,9 +120,16 @@ class ChampionDamagedByWeaponCutReport(logger_core.LoggingMixin):
     damage: int
 
 
+@dataclass(frozen=True)
+class ChampionDamagedByFireReport(logger_core.LoggingMixin):
+    controller_name: str
+    damage: int
+
+
 EFFECTS_ORDER = {
     Mist,
     WeaponCut,
+    Fire,
 }
 for i, effect in enumerate(EFFECTS_ORDER):
     effect.order = i

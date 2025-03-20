@@ -183,3 +183,25 @@ class Amulet(PropheticWeapon, Weapon):
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
             self.cut_transparent(arena, cut_position)
+
+
+class Scroll(LineWeapon):
+    def __init__(self):
+        self.charges: int = 5
+
+    @staticmethod
+    def reach() -> int:
+        return 1
+
+    @classmethod
+    def droppable(cls) -> bool:
+        return False
+
+    @staticmethod
+    def cut_effect() -> effects.Effect:
+        return effects.Fire()
+
+    def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
+        if self.charges > 0:
+            super().cut(arena, position, facing)
+            self.charges -= 1
