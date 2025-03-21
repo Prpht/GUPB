@@ -5,16 +5,6 @@ venv/
 .run/
 results/
 *.DS_STORE
-gupb/controller/botelka_ml/tmp/
 .vscode/
-gupb/our.py
 env
 resources/arenas/generated_*.gupb
-
-# Added by R2D2
-wandb/
-runs/
-models/
-checkpoints/
-gupb/r2d2_config.py
-
