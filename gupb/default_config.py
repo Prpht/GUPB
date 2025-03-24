@@ -1,5 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import kirby
 
 
 keyboard_controller = keyboard.KeyboardController()
@@ -14,6 +15,8 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        kirby.KirbyController("Kirby")
+
     ],
     'start_balancing': False,
     'visualise': True,
