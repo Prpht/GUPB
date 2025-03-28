@@ -41,7 +41,7 @@ class PiratController(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.WHITE
+        return characters.Tabard.PIRAT
 
 
 POTENTIAL_CONTROLLERS = [
