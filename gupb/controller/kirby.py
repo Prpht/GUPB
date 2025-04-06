@@ -19,7 +19,7 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
 ]
-EPSILON = 0.50
+EPSILON = 0.00
 weapons_power = {
     Knife().description(): 2,
     Sword().description(): 3,
@@ -47,9 +47,10 @@ class KirbyController(controller.Controller):
         self.weapon = None
         self.model_A = Net().to(device)
         self.loss_fn = torch.nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.model_A.parameters(), lr=5.0e-6)
+        self.optimizer = torch.optim.Adam(self.model_A.parameters(), lr=1.0e-4)
         self.time = 0
         self.prediction = None
+
         self.losses = []
         self.game_losses = []
         self.averaged_results = []
@@ -128,7 +129,7 @@ class KirbyController(controller.Controller):
         if self.prev_map is not None:
             expected_reward = self.model_A(self.prev_map.to(device))[0, self.prev_action]
             reward = (
-                    Q[0].max().detach() + my_health - 0.1 * sum(c.health for c in self.characters.values()) - expected_reward.detach()
+                    0.9 * Q[0].max().detach() + my_health - 0.1 * sum(c.health for c in self.characters.values()) - expected_reward.detach()
             ).to(device)
             loss = self.loss_fn(expected_reward, reward)
             self.losses.append(loss.item())

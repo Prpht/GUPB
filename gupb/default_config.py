@@ -29,6 +29,6 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 1501,
+    'runs_no': 10,
     'profiling_metrics': [],
 }
