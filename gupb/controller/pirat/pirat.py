@@ -14,6 +14,7 @@ from gupb.model import arenas
 from gupb.model.arenas import ArenaDescription, Arena
 from gupb.model import characters
 from gupb.controller.pirat.menhir_finder import MenhirFinder
+import random
 
 
 POSSIBLE_ACTIONS = [
@@ -39,7 +40,7 @@ PREDEFINE_POSSIBILITEIS = {
 # noinspection PyMethodMayBeStatic
 class PiratController(controller.Controller):
 
-    def __init__(self, first_name: str, threeshold = 0, reset = None, dynamic_reg = False, region_size = 5):
+    def __init__(self, first_name: str, threeshold = 0, reset = None, dynamic_reg = False, region_size = 5, rand_turn = 0):
         self.first_name: str = first_name
         self.menhir_finder = None
 
@@ -53,6 +54,7 @@ class PiratController(controller.Controller):
         self.threeshold = threeshold
         self.i = 0
         self.res = reset
+        self.rand_turn = rand_turn
 
     def __eq__(self, other: object) -> bool:
         print("eq")
@@ -83,14 +85,14 @@ class PiratController(controller.Controller):
                     self.actual_path = []
 
                 if self.actual_path:
+                    if random.random() < self.rand_turn:
+                        return characters.Action.TURN_LEFT
                     return self._move_along_path(knowledge)
                 else:
                     reg = self.menhir_finder.get_max_probability_region()
                     end = self.get_first_standable_tile(reg)
                     start = knowledge.position
                     self.actual_path = self.path_finder.find_the_shortest_path(start, end)
-                    print(f"pozycja {knowledge.position}")
-                    print(f"aktualna trasa {self.actual_path}")
             else:
                 return self._move_towards_menhir(knowledge)
 
@@ -135,7 +137,6 @@ class PiratController(controller.Controller):
             start = knowledge.position
             end = self.menhir_finder.menhir  
             self.actual_path = self.path_finder.find_the_shortest_path(start, end)
-            print(f"Obliczona ścieżka do menhira: {self.actual_path}")
 
         return self._move_along_path(knowledge)
 
@@ -191,9 +192,6 @@ class PiratController(controller.Controller):
                     return pos
         return None
     
- 
-
-
 
     @property
     def name(self) -> str:

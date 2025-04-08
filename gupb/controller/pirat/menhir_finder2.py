@@ -19,7 +19,7 @@ class MenhirFinder2():
 
 
     def init_regions(self) -> None:
-        self.all_pos = { coordinates.Coords(x, y) for x in range(24) for y in range(24) }
+        self.all_pos = { coordinates.Coords(x, y) for x in range(self.arena_size[0]) for y in range(self.arena_size[1]) }
         self.checked_regions = defaultdict(int)
 
         for coord in self.all_pos:
