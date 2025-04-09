@@ -12,13 +12,25 @@ from gupb.model import weapons
 
 from gupb.model.arenas import Arena
 from gupb.model.coordinates import Coords
+from gupb.model.characters import Action, Facing
+from gupb.model.tiles import TileDescription
 
 
-POSSIBLE_ACTIONS = [
+RANDOM_POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
     characters.Action.ATTACK,
+]
+
+ACTIONS = [
+    Action.TURN_LEFT,
+    Action.TURN_RIGHT,
+    Action.STEP_FORWARD,
+    Action.STEP_LEFT,
+    Action.STEP_RIGHT,
+    # Pacifist gameplay
+    # Action.ATTACK,
 ]
 
 DAMAGE: dict[str, int] = {
@@ -74,49 +86,106 @@ class ReinforcedRogueController(controller.Controller):
     # =====================================================
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self.terrain = Arena.load(arena_description.name).terrain
-        self.damage: dict[Coords, int] = {}
-        self.health = characters.CHAMPION_STARTING_HP
-
-        for position, tile in self.terrain.items():
-            self.damage[position] = DAMAGE[tile.description().type]
-
-        self.seen: set[Coords] = set()
+        self.arena = Arena.load(arena_description.name)
+        self.visible_tiles: dict[Coords, TileDescription] = {}
+        # Menhir position
         self.menhir: Optional[Coords] = None
+        # Champion attributes
+        self.position: Optional[Coords] = None
+        self.facing: Optional[Facing] = None
+        self.health: int = characters.CHAMPION_STARTING_HP
+        # Damage value functions
+        self.persistent_damage: dict[Coords, int] = {}
+        self.potential_damage: dict[Coords, int] = {}
+        # Number of steps since last seeing given tile (initially `inf`)
+        self.last_seen: dict[Coords, int] = {}
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        visible = knowledge.visible_tiles
-        my_position = knowledge.position
+        for position, tile in self.arena.terrain.items():
+            self.persistent_damage[position] = DAMAGE[tile.description().type]
+            self.potential_damage[position] = DAMAGE[tile.description().type]
+            self.last_seen[position] = inf
 
-        # --- Update health
-        self.health = visible[my_position].character.health
+    def score(self, action: Action) -> float:
+        match action:
+            case Action.TURN_LEFT:
+                next_position = self.position
+                next_facing = self.facing.turn_left()
+            case Action.TURN_RIGHT:
+                next_position = self.position
+                next_facing = self.facing.turn_right()
+            case Action.STEP_FORWARD:
+                next_position = self.position + self.facing.value
+                next_facing = self.facing
+            case Action.STEP_LEFT:
+                next_position = self.position + self.facing.turn_left().value
+                next_facing = self.facing
+            case Action.STEP_RIGHT:
+                next_position = self.position + self.facing.turn_right().value
+                next_facing = self.facing
 
-        # --- Potential damage initialization
-        potential_damage = {position: 0 for position in self.damage}
+        health_gain = self.health - self.potential_damage[next_position]
+        visibility_gain = ...
+        mobility_gain = ...
+        menhir_gain = ...
 
-        for position, tile in visible.items():
-            # --- Update `seen` set for menhir search
-            if not self.menhir:
-                self.seen.add(position)
+        return health_gain
 
-            # --- See menhir?
-            if tile.type == "menhir":
-                self.menhir = position
+    def decide(self, knowledge: characters.ChampionKnowledge) -> Action:
+        try:
+            # --- Get visible tiles
+            self.visible_tiles = knowledge.visible_tiles
 
-            # --- Compute potential damage
-            if position != my_position and tile.character:
-                potential_damage[position] = +inf
-                weapon = WEAPONS[tile.character.weapon.name]
+            # --- Get champion's current attributes
+            self.position = knowledge.position
+            self.facing = self.visible_tiles[self.position].character.facing
+            self.health = self.visible_tiles[self.position].character.health
 
-                for cut_position in weapon.cut_positions(self.terrain, position, tile.character.facing):
-                    potential_damage[cut_position] += DAMAGE[weapon.cut_effect().description().type]
+            # --- Initialize potential damage
+            self.potential_damage = self.persistent_damage.copy()
 
-            # --- Compute actual damage
-            self.damage[position] = DAMAGE[tile.type] + sum(DAMAGE[effect.type] for effect in tile.effects)
-            if tile.consumable:
-                self.damage[position] += DAMAGE[tile.consumable.name]
+            for position, tile in self.visible_tiles.items():
+                # --- Update last seen counter
+                self.last_seen[position] = 0
 
-        return random.choice(POSSIBLE_ACTIONS)
+                # --- See menhir?
+                if tile.type == "menhir":
+                    self.menhir = position
+
+                # --- Update persistent damage
+                self.persistent_damage[position] = DAMAGE[tile.type]
+
+                if tile.effects:
+                    self.persistent_damage[position] += sum(DAMAGE[effect.type] for effect in tile.effects)
+
+                if tile.consumable:
+                    self.persistent_damage[position] += DAMAGE[tile.consumable.name]
+
+                # --- Update potential damage
+                self.potential_damage[position] = self.persistent_damage[position]
+
+                if tile.character and position != self.position:
+                    self.potential_damage[position] = inf
+
+                    weapon = WEAPONS[tile.character.weapon.name]
+                    if weapon != "bow_unloaded":
+                        for cut_position in weapon.cut_positions(self.arena.terrain, position, tile.character.facing):
+                            self.potential_damage[cut_position] += DAMAGE[weapon.cut_effect().description().type]
+
+            for position in set(self.last_seen) - set(self.visible_tiles):
+                self.last_seen[position] += 1
+
+            # ϵ-Greedy action choice (TODO: not sure if ϵ needed)
+            ϵ = 0
+            if random.random() < ϵ:
+                action = random.choice(RANDOM_POSSIBLE_ACTIONS)
+            else:
+                action = max(ACTIONS, key=lambda action: (self.score(action), random.random()))
+
+        except Exception as e:
+            # Short circuit in case of failure
+            action = random.choice(RANDOM_POSSIBLE_ACTIONS)
+
+        return action
 
 
 POTENTIAL_CONTROLLERS = [
