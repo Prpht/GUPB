@@ -70,6 +70,13 @@ class CamperBotController(controller.Controller):
             tile_right = knowledge.visible_tiles.get(possible_step_right, None)
             tile_left = knowledge.visible_tiles.get(possible_step_left, None)
 
+            if tile_forward and tile_forward.character:
+                return characters.Action.ATTACK
+            if tile_right and tile_right.character:
+                return characters.Action.TURN_RIGHT
+            if tile_left and tile_left.character:
+                return characters.Action.TURN_LEFT
+
             if tile_forward and tile_forward.type not in ['sea', 'wall']:
                 if possible_step_forward not in self.visited:
                     priority_actions.append(characters.Action.STEP_FORWARD)
