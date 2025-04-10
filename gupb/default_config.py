@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller import kirby
+from gupb.controller import kirby_test, kirby
 
 
 keyboard_controller = keyboard.KeyboardController()
@@ -18,17 +18,18 @@ CONFIGURATION = {
         'wasteland',
     ],
     'controllers': [
-        #keyboard_controller,
+        # keyboard_controller,
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        kirby.KirbyController("Kirby")
+        kirby.KirbyController("Kirby"),
+        # kirby_test.KirbyTestController("KirbyTest")
 
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 3001,
+    'runs_no': kirby.ROUNDS_NO,
     'profiling_metrics': [],
 }

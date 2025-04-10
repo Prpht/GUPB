@@ -7,13 +7,11 @@ class Net(nn.Module):
         super().__init__()
         relu = nn.ReLU()
 
-        layer1 = nn.Linear(111, 444)
-        layer2 = nn.Linear(444, 148)
-        layer3 = nn.Linear(148, 4)
-        layer4 = nn.Linear(384, 192)
+        layer1 = nn.Linear(85, 255)
+        layer2 = nn.Linear(255, 51)
+        layer3 = nn.Linear(51, 4)
+        # layer4 = nn.Linear(34, 4)
         layer5 = nn.Linear(192, 96)
-        layer6 = nn.Linear(96, 64)
-        layer7 = nn.Linear(64, 32)
 
         self.sequence = nn.Sequential(
             layer1, relu, layer2, relu, layer3
