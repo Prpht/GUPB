@@ -1,17 +1,22 @@
-from fontTools.misc.psOperators import ps_string
-
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 import random
 import networkx as nx
 from gupb.model.coordinates import Coords
-import time
 
-POSSIBLE_ACTIONS = [
+
+TURNING_ACTIONS = [
     characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT,
+    characters.Action.TURN_RIGHT
+]
+MOVEMENT_ACTIONS = [
     characters.Action.STEP_FORWARD,
+    characters.Action.STEP_LEFT,
+    characters.Action.STEP_RIGHT,
+    characters.Action.STEP_BACKWARD
+]
+ATTACK_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
@@ -22,7 +27,7 @@ class CamperBotController(controller.Controller):
         self.arena_description = None
         self.is_menhir_found = False
         self.menhir_cords = None
-        self.visited = []
+        self.visited = set()
         self.arena = None
         self.arena_graph = None
         self.path_to_menhir = None
@@ -51,6 +56,7 @@ class CamperBotController(controller.Controller):
                 if neighbor_tile and neighbor_tile.terrain_passable():
                     self.arena_graph.add_edge(coord, neighbor)
 
+        self.visited = set()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, CamperBotController):
@@ -86,28 +92,60 @@ class CamperBotController(controller.Controller):
         character = knowledge.visible_tiles[knowledge.position].character
         facing = character.facing
 
-        self.visited.append(current_position)
-
-
+        self.visited.add(current_position)
         if not self.is_menhir_found:
             self.find_menhir(knowledge)
 
+        possible_step_forward = current_position + self.step_forward(facing)
+        possible_step_forward = Coords(possible_step_forward[0], possible_step_forward[1])
 
-        possible_step = current_position + self.step_forward(facing)
+        possible_step_right = current_position + self.step_right(facing)
+        possible_step_right = Coords(possible_step_right[0], possible_step_right[1])
+
+        possible_step_left = current_position + self.step_left(facing)
+        possible_step_left = Coords(possible_step_left[0], possible_step_left[1])
+
+        priority_actions = []
+        secondary_actions = TURNING_ACTIONS.copy()
 
         if not self.is_menhir_found:
 
-            next_tile = knowledge.visible_tiles.get(possible_step, None)
+            tile_forward = knowledge.visible_tiles.get(possible_step_forward, None)
+            tile_right = knowledge.visible_tiles.get(possible_step_right, None)
+            tile_left = knowledge.visible_tiles.get(possible_step_left, None)
 
-            if possible_step not in self.visited:
-                if next_tile is None or (next_tile.type not in ['sea', 'wall']):
-                    return characters.Action.STEP_FORWARD
+            if tile_forward and tile_forward.character:
+                return characters.Action.ATTACK
+            if tile_right and tile_right.character:
+                return characters.Action.TURN_RIGHT
+            if tile_left and tile_left.character:
+                return characters.Action.TURN_LEFT
+
+            if tile_forward and tile_forward.type not in ['sea', 'wall']:
+                if possible_step_forward not in self.visited:
+                    priority_actions.append(characters.Action.STEP_FORWARD)
                 else:
-                    return random.choice(POSSIBLE_ACTIONS[:-1])
-            elif next_tile and next_tile.type not in ['sea','wall']:
-                return random.choice(POSSIBLE_ACTIONS[:-1])
+                    secondary_actions.append(characters.Action.STEP_FORWARD)
+
+            if tile_right and tile_right.type not in ['sea', 'wall']:
+                if possible_step_right not in self.visited:
+                    priority_actions.append(characters.Action.STEP_RIGHT)
+                else:
+                    secondary_actions.append(characters.Action.STEP_RIGHT)
+
+            if tile_left and tile_left.type not in ['sea', 'wall']:
+                if possible_step_left not in self.visited:
+                    priority_actions.append(characters.Action.STEP_LEFT)
+                else:
+                    secondary_actions.append(characters.Action.STEP_LEFT)
+
+            if priority_actions:
+                return random.choice(priority_actions)
+            elif len(secondary_actions) > 2:
+                return random.choice(secondary_actions)
             else:
-                return random.choice(POSSIBLE_ACTIONS[:-1])
+                return characters.Action.STEP_BACKWARD
+
         else:
             if self.path_to_menhir is None:
                 self.find_path_to_menhir(knowledge)
@@ -119,7 +157,7 @@ class CamperBotController(controller.Controller):
                 return next_step_action
             # spinning around when we are close to menhir
             else:
-                return random.choice(POSSIBLE_ACTIONS[:-2])
+                return random.choice(TURNING_ACTIONS)
 
     def step_to_menhir(self, knowledge: characters.ChampionKnowledge, next_position: Coords):
         "Chosing action to step toward menhir"
@@ -238,7 +276,7 @@ class CamperBotController(controller.Controller):
         self.arena_description = arena_description
         self.is_menhir_found = False
         self.menhir_cords = None
-        self.visited = []
+        self.visited = set()
         self.arena = None
         self.path_to_menhir = None
         self.arena_graph = None
