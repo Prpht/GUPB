@@ -42,9 +42,7 @@ class MenhirFinder2():
     def look_for_menhir(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> None:
         for coord, tile in visible_tiles.items():
             if tile.type == "menhir":
-                self.menhir = coord
-                print("************MENHIR**************8")
-                
+                self.menhir = coord                
                 break
             else:
                 if coord not in self.pos_wthout_menhir:

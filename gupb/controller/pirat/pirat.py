@@ -68,7 +68,6 @@ class PiratController(controller.Controller):
             if self.i == 0:
                 weapon_decider = WeaponDecider(self.arena)
                 path = weapon_decider.check_if_need_to_go(knowledge.position, self.path_finder)
-                print(path)
                 self.actual_path = path
                 
 
@@ -78,7 +77,6 @@ class PiratController(controller.Controller):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"Error updating mist detector: {e}")
             mist_escape_path = None
             if self.menhir_finder.menhir is None:
                 self.menhir_finder.look_for_menhir(knowledge.visible_tiles)
@@ -103,7 +101,7 @@ class PiratController(controller.Controller):
                 else:
                     return self._move_towards_menhir(knowledge)
 
-            # Priority: escaping mist
+            # Priority: escaping mists
 
             if mist_escape_path:
                 self.actual_path = mist_escape_path

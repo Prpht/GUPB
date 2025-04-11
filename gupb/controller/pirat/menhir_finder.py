@@ -32,7 +32,6 @@ class MenhirFinder:
             for cords, tile in knowledge.visible_tiles.items():
                 if tile.type == "menhir":
                     self.menhir_position = cords
-                    print("MENHIR FOUND")
                     return
 
                 self.is_menhir_possible[cords[0], cords[1]] = 0
@@ -44,7 +43,6 @@ class MenhirFinder:
                 #     print("MENHIR FOUND BY EXCLUSION")
                 #     return self.is_menhir_possible.flatten().argmax()
 
-            print("possible menhirs: ", self.is_menhir_possible.flatten().sum())
 
         except Exception as e:
             traceback.print_exc()
