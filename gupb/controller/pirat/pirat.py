@@ -34,7 +34,6 @@ class PiratController(controller.Controller):
     def __init__(self, first_name: str, threeshold = 0, reset = None, dynamic_reg = False, region_size = 5, rand_turn = 0, percent_of_route = 1, in_all_turn = False):
         self.first_name: str = first_name
         self.menhir_finder = None
-
         self.arena: Arena = None
         self.actual_path: List[coordinates.Coords] = []
         self.region_size = region_size
@@ -87,16 +86,25 @@ class PiratController(controller.Controller):
                     self.actual_path = []
 
         try:
-            # Priority: escaping mist
-            if mist_escape_path:
-                self.actual_path = mist_escape_path
-                return self._move_along_path(knowledge)
+           
 
             # Priority: menhir
 
             character = self._check_if_facing_opponent(knowledge)
             if character is not None:
                 return characters.Action.ATTACK
+
+            if self.menhir_finder.menhir is not None:
+                if knowledge.position == self.menhir_finder.menhir:
+                    return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
+                else:
+                    return self._move_towards_menhir(knowledge)
+
+            # Priority: escaping mist
+
+            if mist_escape_path:
+                self.actual_path = mist_escape_path
+                return self._move_along_path(knowledge)
 
 
             if self.menhir_finder.menhir is None:
@@ -120,11 +128,7 @@ class PiratController(controller.Controller):
 
                     new_path = self.path_finder.find_the_shortest_path(start, end)
                     self.actual_path = new_path
-            else:
-                if knowledge.position == self.menhir_finder.menhir:
-                    return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
-                else:
-                    return self._move_towards_menhir(knowledge)
+            
         except Exception as e:
             print(f"Error updating mist detector: {e}")
 
@@ -180,7 +184,6 @@ class PiratController(controller.Controller):
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        print("reset")
         self.arena = arenas.Arena.load(arena_description.name)
         self.menhir_finder = MenhirFinder2(arena=self.arena)
         self.path_finder = PathFinder(arena=self.arena)

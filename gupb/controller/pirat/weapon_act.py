@@ -13,7 +13,7 @@ class WeaponDecider:
         self.actualize_weapons(arena)
         self.max_tiles_for_weapon = max_tiles_for_weapon
         if max_tiles_for_weapon is None:
-            self.max_tiles_for_weapon = {"sword": 6, "axe": 6, "amulet": 6, "bow_unloaded": 5 , "scroll": 6}
+            self.max_tiles_for_weapon = {"sword": 4, "axe": 6, "amulet": 6, "bow_unloaded": 0 , "scroll": 6}
 
     def actualize_weapons(self, arena: Arena):
         for coord in arena.terrain:
@@ -28,7 +28,8 @@ class WeaponDecider:
             for coord in self.weapons[weapon]:
                 path = path_finder.find_the_shortest_path(start, coord)
                 len_of_path = len(path)
-                if len_of_path <= self.max_tiles_for_weapon[weapon] and len(best_route) > 0 and len_of_path < len(best_route):
+                if len_of_path <= self.max_tiles_for_weapon[weapon] and (len_of_path < len(best_route) or len(best_route) == 0):
                     best_route = path
 
         return best_route
+    
