@@ -38,11 +38,7 @@ class GarekController(controller.Controller):
 
         # Get current tile and facing
         current_tile = visible_tiles.get(current_pos)
-        if not current_tile or not current_tile.character:
-            return random.choice(POSSIBLE_ACTIONS)
-
         current_facing = current_tile.character.facing
-        current_has_mist = any(effect.type == 'mist' for effect in current_tile.effects)
 
         # Directions for possible steps
         step_actions = [
@@ -66,20 +62,17 @@ class GarekController(controller.Controller):
                 if passable and no_character and no_mist:
                     safe_actions.append(action)
 
-        # Prioritize escaping mist if present
-        if current_has_mist:
-            if safe_actions:
-                return safe_actions[0]  # Prefer first safe action
-            else:
-                return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT])
+        if safe_actions:
+            return self._pick_safe_action(safe_actions)
         else:
-            if safe_actions:
-                # Introduce randomness to avoid loops
-                random.shuffle(safe_actions)
-                return safe_actions[0]
-            else:
-                # No safe moves, random turn
-                return random.choice([characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT])
+            # No safe moves, pick random move
+            return random.choice(POSSIBLE_ACTIONS)
+
+    def _pick_safe_action(self, safe_actions: list[characters.Action]) -> characters.Action:
+        if random.random() > 0.8:
+            return safe_actions[0]  # 80% chance to pick the first safe action
+        else:
+            return random.choice(safe_actions) # 20% chance to pick a random safe action
 
     def praise(self, score: int) -> None:
         pass
