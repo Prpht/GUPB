@@ -93,11 +93,11 @@ class PiratController(controller.Controller):
                 return characters.Action.ATTACK
 
             if self.menhir_finder.menhir is not None:
+                if knowledge.position == self.menhir_finder.menhir:
+                    return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
                 if mist_escape_path:
                     self.actual_path = mist_escape_path
                     return self._move_along_path(knowledge)
-                if knowledge.position == self.menhir_finder.menhir:
-                    return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
                 else:
                     return self._move_towards_menhir(knowledge)
 
