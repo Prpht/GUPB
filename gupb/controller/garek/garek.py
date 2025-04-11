@@ -87,10 +87,3 @@ class GarekController(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.GAREK
-
-
-POTENTIAL_CONTROLLERS = [
-    GarekController("The Great"),
-    GarekController("Exterminator"),
-    GarekController("The Conqueror"),
-]
