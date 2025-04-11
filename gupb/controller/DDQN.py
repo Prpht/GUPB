@@ -19,15 +19,3 @@ class Net(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         return self.sequence(x)
-
-
-"""# Przykładowe wywołanie modelu
-model = ResNet()
-loss_fn = torch.nn.MSELoss()
-x = torch.randn(1, 3, 32, 32)  # Przykładowy batch
-print(x.dtype)
-output = model(x)
-print()
-
-loss = loss_fn(torch.tensor(7, dtype=torch.float32), output.max())
-loss.backward()"""

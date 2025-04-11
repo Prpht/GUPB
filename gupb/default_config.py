@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller import kirby_test, kirby
+from gupb.controller import kirby_learning, kirby
 
 
 keyboard_controller = keyboard.KeyboardController()
@@ -23,13 +23,13 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        kirby.KirbyController("Kirby"),
-        # kirby_test.KirbyTestController("KirbyTest")
+        # kirby_learning.KirbyLearningController("KirbyLearning"),
+        kirby.KirbyController("Kirby")
 
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': kirby.ROUNDS_NO,
+    'runs_no': 10,  # kirby.ROUNDS_NO,
     'profiling_metrics': [],
 }
