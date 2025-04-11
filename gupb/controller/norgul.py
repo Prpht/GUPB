@@ -3,6 +3,7 @@ import numpy as np
 import random
 import traceback
 from itertools import product
+from collections import defaultdict
 from math import inf, sqrt
 
 from gupb import controller
@@ -23,9 +24,13 @@ class NorgulController(controller.Controller):
         norgul.arena_width = 0
         norgul.arena_height = 0
         norgul.arena : dict[coordinates.Coords, tiles.TileDescription] = {}
+        norgul.saw_mist = False
         norgul.obelisk_pos = None  # menhir
         norgul.current_pos = None
         norgul.current_dir = None
+        norgul.current_weapon = "knife"
+
+        norgul.time_count = 0
 
         # Hyperparameters
         norgul.radius = 4
@@ -44,17 +49,23 @@ class NorgulController(controller.Controller):
 
 
     def decide(norgul, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        # norgul.time_count += 1
+        # if norgul.time_count % 10 == 0:
+        #     norgul._forget_other_characters()
 
         # Step 1
         # - Update arena state based on obtained knowledge)
         norgul.current_pos = knowledge.position
         norgul.current_dir = knowledge.visible_tiles[norgul.current_pos].character.facing
+        norgul.current_weapon = knowledge.visible_tiles[norgul.current_pos].character.weapon.name
         action = None
 
         for coord, tile_info in knowledge.visible_tiles.items():
             norgul.arena[coord] = tile_info
             if tile_info.type == "menhir":
                 norgul.obelisk_pos = coord
+            if norgul.arena[coord].effects and ("mist",) in norgul.arena[coord].effects:
+                norgul.saw_mist = True
 
         # Step 2
         # - Locate target square (either escaping mist / enemies or not) !!!
@@ -70,6 +81,7 @@ class NorgulController(controller.Controller):
         # - If target square (or set of squares) is already reached, rotate and gain more knowledge
         return action if action is not None else characters.Action.TURN_RIGHT
 
+
     def praise(norgul, score: int) -> None:
         pass
 
@@ -80,8 +92,15 @@ class NorgulController(controller.Controller):
         norgul.obelisk_pos = None
         norgul.current_pos = None
         norgul.current_dir = None
+        norgul.saw_mist = False
+        norgul.current_weapon = "knife"
 
     def pick_target(norgul):
+        if not norgul.saw_mist:
+            target_sq = norgul._pick_forest()
+            if target_sq is not None:
+                return target_sq
+
         # Calculate current important zone around our character
         character_zone = [norgul.current_pos + diff for diff in product(range(-norgul.radius, norgul.radius + 1),
                                                                         range(-norgul.radius, norgul.radius + 1))]
@@ -127,6 +146,25 @@ class NorgulController(controller.Controller):
         return target_sq
 
 
+    def _pick_forest(norgul) -> coordinates.Coords:
+        if norgul.arena[norgul.current_pos].type == "forest":
+            return norgul.current_pos
+
+        character_zone = [norgul.current_pos + diff for diff in product(range(-norgul.radius, norgul.radius + 1),
+                                                                        range(-norgul.radius, norgul.radius + 1))]
+        character_zone = [sq for sq in character_zone if 0 <= sq[0] < norgul.arena_height and 0 <= sq[1] < norgul.arena_width]
+
+        min_distance = inf
+        best_sq = None
+        for sq in character_zone:
+            distance = norgul._manhattan_distance(norgul.current_pos, sq)
+            if norgul.arena[sq].type == "forest" and norgul.arena[sq].character is None and distance < min_distance:
+                min_distance = distance
+                best_sq = sq
+
+        return best_sq
+
+
     def move_to_target(norgul, target, fast=False):
         """If Fast -> do not waste moves to turn"""
 
@@ -145,7 +183,10 @@ class NorgulController(controller.Controller):
             else:
                 return characters.Action.STEP_FORWARD
 
+        
         elif norgul.arena[norgul.current_pos + norgul.current_dir.value].character is not None:
+            if norgul.arena[norgul.current_pos + norgul.current_dir.value].type == "forest":
+                return None
             return characters.Action.ATTACK
 
 
@@ -264,19 +305,27 @@ class NorgulController(controller.Controller):
         if norgul.arena[sq_to].type in ["sea", "wall"]:
             return inf
         
-        cost = 1.0
+        cost = 100.0
 
         # Some other character blocking the pass
         if norgul.arena[sq_to].character is not None:
-            cost = 3.0
+            cost += 5.0
+
+        # Potions
+        if norgul.arena[sq_to].consumable is not None and norgul.arena[sq_to].consumable == "potion":
+            cost -= 49
+        
+        # Weapons
+        if norgul.arena[sq_to].loot is not None and norgul.arena[sq_to].loot in ["scroll", "amulet"]:
+            cost += 1000
 
         # Penalize walking through mist or fire
         if norgul.arena[sq_to].effects and ("mist",) in norgul.arena[sq_to].effects:
-            cost += 5
+            cost += 25
         if norgul.arena[sq_to].effects and ("fire",) in norgul.arena[sq_to].effects:
-            cost += 10
+            cost += 50
 
-        return cost
+        return max(cost, 1)
     
 
     def _connections(norgul, sq_from: coordinates.Coords) -> list[coordinates.Coords]:
