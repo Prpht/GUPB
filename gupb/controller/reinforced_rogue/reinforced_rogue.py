@@ -16,6 +16,8 @@ from gupb.model import characters
 from gupb.model import consumables
 from gupb.model import coordinates
 
+from .constants import DIST_MATRIX_ORDINARY_CHAOS
+
 
 RANDOM_POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
@@ -183,8 +185,9 @@ class ReinforcedRogueController(controller.Controller):
         # TODO: Remove before PR (it is only to speed-up experimentation)
         # with open("distmatrix.pickle", "wb") as file:
         #   pickle.dump(self.dist, file, protocol=pickle.HIGHEST_PROTOCOL)
-        with open("distmatrix.pickle", "rb") as file:
-            self.dist = pickle.load(file)
+        # with open("distmatrix.pickle", "rb") as file:
+        #     self.dist = pickle.load(file)
+        self.dist = DIST_MATRIX_ORDINARY_CHAOS
 
         # --- Compute exploration landmarks
         # Greedy approach, no time to think if this is optimal or hard (NP)
@@ -251,7 +254,10 @@ class ReinforcedRogueController(controller.Controller):
         for position, tile in self.map.items():
             if (
                 self.last_seen[position] == 0
-                and tile.type != "forest"
+                and (
+                    tile.type != "forest"
+                    or (tile.type == "forest" and self.arena.terrain[self.position].description().type == "forest")
+                )
                 and tile.character
                 and self.health - self.potential_damage[self.position] > 0
                 and DAMAGE[self.weapon.description().name] >= self.potential_damage[self.position]
@@ -273,7 +279,7 @@ class ReinforcedRogueController(controller.Controller):
         exploration_gain = inf
 
         # TODO: Constant value
-        ϵ_visibility = 0.4
+        ϵ_visibility = 0.5
 
         if self.arena.terrain[next_position].passable:
             # Health gain
@@ -334,14 +340,16 @@ class ReinforcedRogueController(controller.Controller):
 
             visible = self.visible_coords(next_position, next_facing, self.weapon)
             normalizing_constant = 0
+            count = 0
 
             for position in visible:
                 if position in self.map and self.arena.terrain[position].passable and next_position != position:
                     visibility_gain += self.last_seen[position] * 1 / self.dist[next_position][position]
                     normalizing_constant += 1 / self.dist[next_position][position]
+                    count += 1
 
             if normalizing_constant > 0:
-                visibility_gain /= normalizing_constant
+                visibility_gain /= count * normalizing_constant
 
             # TODO: Mobility gain (avoid back alleys)
             # ---------------------------------------
@@ -380,6 +388,11 @@ class ReinforcedRogueController(controller.Controller):
                 if self.dist[self.position][landmark] <= LANDMARK_RADIUS:
                     logger.debug(f"Yes, landmark at {landmark}")
                     self.landmarks_visited[landmark] = True
+
+            # If all landmarks visited and still no menhir then try again visiting landmarks
+            if all(self.landmarks_visited.values()) and not self.menhir:
+                for landmark in self.landmarks_visited:
+                    self.landmarks_visited[landmark] = False
 
             # --- Update world
             for position, tile in self.visible_tiles.items():
@@ -450,7 +463,7 @@ class ReinforcedRogueController(controller.Controller):
             # TODO: Constant value
             ϵ = 0.05
             if random.random() < ϵ:
-                action = random.choice(RANDOM_POSSIBLE_ACTIONS)
+                action = random.choice(PACIFIST_POSSIBLE_ACTIONS)
             else:
                 if self.should_attack():
                     action = characters.Action.ATTACK
