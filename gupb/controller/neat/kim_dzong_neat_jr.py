@@ -20,6 +20,7 @@ POSSIBLE_ACTIONS = [
 
 CIRCLE_PATTERN = [
     characters.Action.TURN_RIGHT,
+    characters.Action.STEP_FORWARD,
 ]
 
 
