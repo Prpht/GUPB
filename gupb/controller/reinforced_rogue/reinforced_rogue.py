@@ -253,7 +253,7 @@ class ReinforcedRogueController(controller.Controller):
                 and tile.type != "forest"
                 and self.arena.terrain[self.position].description().type != "forest"
                 and tile.character
-                and self.health - self.potential_damage[self.position] > 0.5 * characters.CHAMPION_STARTING_HP
+                and self.health - self.potential_damage[self.position] >= 0
                 and DAMAGE[self.weapon.description().name] >= self.potential_damage[self.position]
                 and any(
                     cut_position == position
@@ -290,10 +290,8 @@ class ReinforcedRogueController(controller.Controller):
                     # but we don't compute the safety factor for them since we want to be able to
                     # attack
                     damage = self.potential_damage[next_position + step]
-                    if damage == inf and self.last_seen[next_position + step] == 0:
+                    if damage == inf:
                         damage = 0
-                    elif damage == inf:
-                        damage = 1
                     safety_gain -= damage
             # If we have seen Menhir and potential damage of our position is not 0 then probably
             # it's the mist and we should just move towards the Menhir using the shortest path. This
