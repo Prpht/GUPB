@@ -39,12 +39,12 @@ class MenhirFinder2():
                 self.checked_regions[self.get_region(coord)] += 1
 
 
-    def look_for_menhir(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription], percent, menhir_in,i ) -> None:
+    def look_for_menhir(self, visible_tiles: Dict[coordinates.Coords, tiles.TileDescription]) -> None:
         for coord, tile in visible_tiles.items():
             if tile.type == "menhir":
                 self.menhir = coord
-                print(f"**************find_menhir************{percent}")
-                menhir_in += [i]
+                print("************MENHIR**************8")
+                
                 break
             else:
                 if coord not in self.pos_wthout_menhir:

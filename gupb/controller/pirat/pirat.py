@@ -6,6 +6,8 @@ from gupb.model import tiles
 from gupb.controller.pirat.menhir_finder2 import MenhirFinder2
 
 from gupb.controller.pirat.pathfinding import PathFinder
+from gupb.controller.pirat.weapon_act import WeaponDecider
+
 
 from gupb import controller
 from gupb.model import arenas
@@ -29,18 +31,6 @@ POSSIBLE_ACTIONS = [
 # noinspection PyUnusedLocal
 # noinspection PyMethodMayBeStatic
 class PiratController(controller.Controller):
-
-    def __init__(
-        self,
-        first_name: str,
-        threeshold=0,
-        reset=None,
-        dynamic_reg=False,
-        region_size=5,
-        rand_turn=0,
-    ):
-        self.first_name: str = first_name
-        self.menhir_finder = None
     def __init__(self, first_name: str, threeshold = 0, reset = None, dynamic_reg = False, region_size = 5, rand_turn = 0, percent_of_route = 1, in_all_turn = False):
         self.first_name: str = first_name
         self.menhir_finder = None
@@ -56,8 +46,8 @@ class PiratController(controller.Controller):
         self.rand_turn = rand_turn
         self.mist_detector = None
         self.percent_of_route = percent_of_route
-        self.find_menhir_in = []
         self.prob_in_turn = in_all_turn
+
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, PiratController):
@@ -75,52 +65,76 @@ class PiratController(controller.Controller):
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         self.update_info(knowledge)
-        self.i += 1
-
         try:
+            if self.i == 0:
+                weapon_decider = WeaponDecider(self.arena)
+                path = weapon_decider.check_if_need_to_go(knowledge.position, self.path_finder)
+                print(path)
+                self.actual_path = path
+                
+
+            self.i += 1
             mist_escape_path = self.mist_detector.update(knowledge)
+
         except Exception as e:
             import traceback
             traceback.print_exc()
             print(f"Error updating mist detector: {e}")
             mist_escape_path = None
             if self.menhir_finder.menhir is None:
-                self.menhir_finder.look_for_menhir(knowledge.visible_tiles, self.percent_of_route, self.find_menhir_in, self.i)
+                self.menhir_finder.look_for_menhir(knowledge.visible_tiles)
                 if self.res != None and self.i % self.res == 0:
                     self.actual_path = []
 
-        # Priority: escaping mist
-        if mist_escape_path:
-            self.actual_path = mist_escape_path
-            return self._move_along_path(knowledge)
-
-        # Priority: menhir
-        if self.menhir_finder.menhir is None:
-            self.menhir_finder.look_for_menhir(knowledge.visible_tiles)
-            if self.res != None and self.i % self.res == 0:
-                self.actual_path = []
-
-            if len(self.actual_path) < self.threeshold:
-                self.actual_path = []
-
-            if self.actual_path:
-                if random.random() < self.rand_turn:
-                    return characters.Action.TURN_LEFT
+        try:
+            # Priority: escaping mist
+            if mist_escape_path:
+                self.actual_path = mist_escape_path
                 return self._move_along_path(knowledge)
-            else:
-                reg = self.menhir_finder.get_max_probability_region()
-                end = self.get_first_standable_tile(reg)
-                start = knowledge.position
 
-                new_path = self.path_finder.find_the_shortest_path(start, end)
-                self.actual_path = new_path
-        else:
-            if knowledge.position == self.menhir_finder.menhir:
-                return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
+            # Priority: menhir
+
+            character = self._check_if_facing_opponent(knowledge)
+            if character is not None:
+                return characters.Action.ATTACK
+
+
+            if self.menhir_finder.menhir is None:
+                self.menhir_finder.look_for_menhir(knowledge.visible_tiles)
+                if self.res != None and self.i % self.res == 0:
+                    self.actual_path = []
+
+                if len(self.actual_path) < self.threeshold:
+                    self.actual_path = []
+
+                if self.actual_path:
+                    if random.random() < self.rand_turn:
+                        return characters.Action.TURN_LEFT
+                    move = self._move_along_path(knowledge)
+                    return move
+                    
+                else:
+                    reg = self.menhir_finder.get_max_probability_region()
+                    end = self.get_first_standable_tile(reg)
+                    start = knowledge.position
+
+                    new_path = self.path_finder.find_the_shortest_path(start, end)
+                    self.actual_path = new_path
             else:
-                return self._move_towards_menhir(knowledge)
+                if knowledge.position == self.menhir_finder.menhir:
+                    return random.choice([characters.Action.ATTACK, characters.Action.ATTACK, characters.Action.TURN_LEFT])
+                else:
+                    return self._move_towards_menhir(knowledge)
+        except Exception as e:
+            print(f"Error updating mist detector: {e}")
+
+
 
         return random.choice(POSSIBLE_ACTIONS)
+    
+    def _check_if_facing_opponent(self, knowledge: characters.ChampionKnowledge):
+        return knowledge.visible_tiles[(self.hero.facing.value + knowledge.position)].character
+    
 
     def _move_along_path(
         self, knowledge: characters.ChampionKnowledge
@@ -174,9 +188,11 @@ class PiratController(controller.Controller):
         self.mist_detector = MistDetector(self.arena)
         if self.dynamic_reg:
             self.region_size = self.arena.size[0] // 5
-        print(f"Pirat {self.first_name} {self.percent_of_route}",self.find_menhir_in)
         self.i = 0
         pass
+
+        
+
 
     def get_first_standable_tile(self, region: Tuple[int, int]) -> coordinates.Coords:
         x_start = region[0] * self.region_size

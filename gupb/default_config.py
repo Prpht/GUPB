@@ -19,6 +19,6 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': True,
     'show_sight': keyboard_controller,
-    'runs_no': 1,
+    'runs_no': 5,
     'profiling_metrics': [],
 }
