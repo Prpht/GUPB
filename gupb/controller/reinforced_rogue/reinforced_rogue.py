@@ -255,7 +255,7 @@ class ReinforcedRogueController(controller.Controller):
             if (
                 self.last_seen[position] == 0
                 and (
-                    tile.type != "forest"
+                    (tile.type != "forest" and self.arena.terrain[self.position].description().type != "forest")
                     or (tile.type == "forest" and self.arena.terrain[self.position].description().type == "forest")
                 )
                 and tile.character
@@ -279,7 +279,7 @@ class ReinforcedRogueController(controller.Controller):
         exploration_gain = inf
 
         # TODO: Constant value
-        ϵ_visibility = 0.5
+        ϵ_visibility = 0.4
 
         if self.arena.terrain[next_position].passable:
             # Health gain
@@ -315,10 +315,6 @@ class ReinforcedRogueController(controller.Controller):
                 # proximity.
                 menhir_gain *= not (self.potential_damage[self.position] == 0 and menhir_gain < MENHIR_RADIUS)
                 menhir_gain *= -1
-                # `rand` is passed to `score` to denote whether we should prioritize exploatation
-                # i.e. moving toward the specified point - Menhir / Landmark or prioritize
-                # exploration i.e. incresing visibility
-                menhir_gain *= rand < 1 - ϵ_visibility
 
             # Exploration gain
             # ----------------
