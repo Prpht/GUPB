@@ -1,7 +1,9 @@
 import heapq
+import numpy as np
 import random
 import traceback
-from math import inf
+from itertools import product
+from math import inf, sqrt
 
 from gupb import controller
 from gupb.model import arenas
@@ -25,6 +27,11 @@ class NorgulController(controller.Controller):
         norgul.current_pos = None
         norgul.current_dir = None
 
+        # Hyperparameters
+        norgul.radius = 4
+        norgul.mist_vec_weight = 50
+        norgul.enemy_vec_weight = 5
+
 
     def __eq__(norgul, other: object) -> bool:
         if isinstance(other, NorgulController):
@@ -37,8 +44,9 @@ class NorgulController(controller.Controller):
 
 
     def decide(norgul, knowledge: characters.ChampionKnowledge) -> characters.Action:
+
         # Step 1
-        # - Update arena state based on obtained knowledge
+        # - Update arena state based on obtained knowledge)
         norgul.current_pos = knowledge.position
         norgul.current_dir = knowledge.visible_tiles[norgul.current_pos].character.facing
         action = None
@@ -50,19 +58,17 @@ class NorgulController(controller.Controller):
 
         # Step 2
         # - Locate target square (either escaping mist / enemies or not) !!!
-        # ...
         target = norgul.pick_target()
 
         # Step 3
         # - Move towards target square
-        action = norgul.move_to_target(target, fast=True)
+        action = norgul.move_to_target(target, fast=False)
 
-
+        # print(action)
 
         # Step 4
         # - If target square (or set of squares) is already reached, rotate and gain more knowledge
         return action if action is not None else characters.Action.TURN_RIGHT
-
 
     def praise(norgul, score: int) -> None:
         pass
@@ -71,10 +77,54 @@ class NorgulController(controller.Controller):
     def reset(norgul, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         arena_path = "resources/arenas/" + arena_description.name + ".gupb"
         norgul._load_arena_state(arena_path)
-
+        norgul.obelisk_pos = None
+        norgul.current_pos = None
+        norgul.current_dir = None
 
     def pick_target(norgul):
-        return (3, 2) if norgul.obelisk_pos is None else norgul.obelisk_pos  # Follow your heart
+        # Calculate current important zone around our character
+        character_zone = [norgul.current_pos + diff for diff in product(range(-norgul.radius, norgul.radius + 1),
+                                                                        range(-norgul.radius, norgul.radius + 1))]
+        character_zone = [sq for sq in character_zone if 0 <= sq[0] < norgul.arena_height and 0 <= sq[1] < norgul.arena_width]
+        
+        # Target vector
+        target_vec = np.array([0.0, 0.0])
+
+        # Mist center calculation
+        mist_mean = np.array([0.0, 0.0])
+        mist_count = 0
+
+        for sq in character_zone:
+            if norgul.arena[sq].effects and ("mist",) in norgul.arena[sq].effects:
+                mist_mean = mist_mean + sq
+                mist_count += 1
+            if norgul.arena[sq].character is not None and sq != norgul.current_pos:
+                vec = np.array(norgul.current_pos) - sq
+                target_vec = target_vec + (vec * norgul.enemy_vec_weight)
+        
+        # Calculate mist center and add mist vector
+        if mist_count > 0:
+            mist_mean = mist_mean / mist_count
+            vec = np.array(norgul.current_pos) - mist_mean
+            target_vec = target_vec + (vec * norgul.mist_vec_weight)
+        
+        
+        if target_vec[0] == 0 and target_vec[1] == 0:
+            return norgul.current_pos
+        
+        # Normalize target vector
+        target_vec = target_vec * (1 / sqrt(target_vec[0] ** 2 + target_vec[1] ** 2))
+
+        target_sq = norgul.current_pos
+        for i in range(1, 10):
+            some_sq = np.array(norgul.current_pos) + target_vec * i
+            some_sq = coordinates.Coords(int(some_sq[0]), int(some_sq[1]))
+            if not (0 <= some_sq[0] < norgul.arena_width) or not (0 <= some_sq[1] < norgul.arena_height):
+                continue
+            if abs(some_sq[0] - norgul.current_pos[0]) <= norgul.radius and abs(some_sq[1] - norgul.current_pos[1]) <= norgul.radius:
+                target_sq = some_sq
+        
+        return target_sq
 
 
     def move_to_target(norgul, target, fast=False):
@@ -113,7 +163,7 @@ class NorgulController(controller.Controller):
                     tile_name = tile_type.__name__.lower()
                     weapon_name = arenas.WEAPON_ENCODING[tile].__name__.lower() if str.isalpha(tile) else None
 
-                    norgul.arena[coords] = tiles.TileDescription(tile_name, weapon_name, None, None, None)  # TODO sieci sie, nie ma byc [] ?
+                    norgul.arena[coords] = tiles.TileDescription(tile_name, weapon_name, None, None, [])  # TODO sieci sie, nie ma byc [] ?
 
                     norgul.arena_width = j + 1
                 
@@ -221,9 +271,9 @@ class NorgulController(controller.Controller):
             cost = 3.0
 
         # Penalize walking through mist or fire
-        if norgul.arena[sq_to].effects and "mist" in norgul.arena[sq_to].effects:
+        if norgul.arena[sq_to].effects and ("mist",) in norgul.arena[sq_to].effects:
             cost += 5
-        if norgul.arena[sq_to].effects and "fire" in norgul.arena[sq_to].effects:
+        if norgul.arena[sq_to].effects and ("fire",) in norgul.arena[sq_to].effects:
             cost += 10
 
         return cost
