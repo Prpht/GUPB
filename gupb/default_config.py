@@ -1,5 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller.neat.kim_dzong_neat_jr import KimDzongNeatJuniorController
 
 
 keyboard_controller = keyboard.KeyboardController()
@@ -14,6 +15,7 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        KimDzongNeatJuniorController(),
     ],
     'start_balancing': False,
     'visualise': True,
