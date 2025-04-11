@@ -55,7 +55,6 @@ class KimDzongNeatJuniorController(controller.Controller):
         if mist_detected:
             self.fleeing_from_mist = True
             action = self.flee_from_mist(knowledge)
-            print(f"Wykryto mgłę! Akcja ucieczki: {action}")
             return action
         else:
             self.fleeing_from_mist = False
