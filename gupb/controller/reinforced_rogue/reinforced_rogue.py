@@ -253,7 +253,7 @@ class ReinforcedRogueController(controller.Controller):
                 and tile.type != "forest"
                 and self.arena.terrain[self.position].description().type != "forest"
                 and tile.character
-                and self.health - self.potential_damage[self.position] >= 0
+                and self.health - self.potential_damage[self.position] > 0
                 and DAMAGE[self.weapon.description().name] >= self.potential_damage[self.position]
                 and any(
                     cut_position == position
