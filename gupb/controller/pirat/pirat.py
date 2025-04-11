@@ -41,6 +41,10 @@ class PiratController(controller.Controller):
     ):
         self.first_name: str = first_name
         self.menhir_finder = None
+    def __init__(self, first_name: str, threeshold = 0, reset = None, dynamic_reg = False, region_size = 5, rand_turn = 0, percent_of_route = 1, in_all_turn = False):
+        self.first_name: str = first_name
+        self.menhir_finder = None
+
         self.arena: Arena = None
         self.actual_path: List[coordinates.Coords] = []
         self.region_size = region_size
@@ -51,9 +55,11 @@ class PiratController(controller.Controller):
         self.res = reset
         self.rand_turn = rand_turn
         self.mist_detector = None
+        self.percent_of_route = percent_of_route
+        self.find_menhir_in = []
+        self.prob_in_turn = in_all_turn
 
     def __eq__(self, other: object) -> bool:
-        print("eq")
         if isinstance(other, PiratController):
             return self.first_name == other.first_name
         return False
@@ -78,6 +84,10 @@ class PiratController(controller.Controller):
             traceback.print_exc()
             print(f"Error updating mist detector: {e}")
             mist_escape_path = None
+            if self.menhir_finder.menhir is None:
+                self.menhir_finder.look_for_menhir(knowledge.visible_tiles, self.percent_of_route, self.find_menhir_in, self.i)
+                if self.res != None and self.i % self.res == 0:
+                    self.actual_path = []
 
         # Priority: escaping mist
         if mist_escape_path:
@@ -134,11 +144,10 @@ class PiratController(controller.Controller):
                 self.current_target = None
             return characters.Action.STEP_FORWARD
         elif delta == self.hero.facing.turn_left().value:
-            return characters.Action.STEP_LEFT
+            return characters.Action.TURN_LEFT
         elif delta == self.hero.facing.turn_right().value:
-            return characters.Action.STEP_RIGHT
+            return characters.Action.TURN_RIGHT
         else:
-
             return characters.Action.TURN_LEFT
 
     def _move_towards_menhir(
@@ -154,7 +163,6 @@ class PiratController(controller.Controller):
         return self._move_along_path(knowledge)
 
     def praise(self, score: int) -> None:
-        print("praise")
         pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
@@ -166,6 +174,8 @@ class PiratController(controller.Controller):
         self.mist_detector = MistDetector(self.arena)
         if self.dynamic_reg:
             self.region_size = self.arena.size[0] // 5
+        print(f"Pirat {self.first_name} {self.percent_of_route}",self.find_menhir_in)
+        self.i = 0
         pass
 
     def get_first_standable_tile(self, region: Tuple[int, int]) -> coordinates.Coords:
