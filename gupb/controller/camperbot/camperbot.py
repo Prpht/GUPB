@@ -6,15 +6,12 @@ import networkx as nx
 from gupb.model.coordinates import Coords
 
 
-TURNING_ACTIONS = [
-    characters.Action.TURN_LEFT,
-    characters.Action.TURN_RIGHT
-]
+TURNING_ACTIONS = [characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
 MOVEMENT_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.STEP_LEFT,
     characters.Action.STEP_RIGHT,
-    characters.Action.STEP_BACKWARD
+    characters.Action.STEP_BACKWARD,
 ]
 ATTACK_ACTIONS = [
     characters.Action.ATTACK,
@@ -92,10 +89,9 @@ class CamperBotController(controller.Controller):
 
     def find_menhir(self, knowledge: characters.ChampionKnowledge):
         for coords, visible_tile in knowledge.visible_tiles.items():
-            if visible_tile.type == 'menhir':
+            if visible_tile.type == "menhir":
                 self.is_menhir_found = True
                 self.menhir_cords = coords
-
 
     def find_path(self, source: Coords, target: Coords):
         try:
@@ -109,13 +105,12 @@ class CamperBotController(controller.Controller):
     def find_path_to_menhir(self, knowledge: characters.ChampionKnowledge):
         current_position = knowledge.position
         menhir_position = self.menhir_cords
-        self.path_to_menhir =  self.find_path(current_position, menhir_position)
+        self.path_to_menhir = self.find_path(current_position, menhir_position)
 
     def find_path_to_forrest(self, knowledge: characters.ChampionKnowledge):
         current_position = knowledge.position
-        closest_forrest  = sorted(self.forrest_tiles_list, key=lambda x: self.manhattan_distance(current_position, x))[0]
+        closest_forrest = sorted(self.forrest_tiles_list, key=lambda x: self.manhattan_distance(current_position, x))[0]
         self.path_to_forrest = self.find_path(current_position, closest_forrest)
-
 
     def is_tile_mist(self, tile: tiles.TileDescription) -> bool:
         for elem in tile.effects:
@@ -165,8 +160,7 @@ class CamperBotController(controller.Controller):
 
                 if tile_left and not self.is_tile_mist(tile_left):
                     return characters.Action.STEP_LEFT
-                #TODO: find a better way to escape form mnist
-
+                # TODO: find a better way to escape form mnist
 
             if tile_forward and tile_forward.character:
                 return characters.Action.ATTACK
@@ -175,19 +169,19 @@ class CamperBotController(controller.Controller):
             if tile_left and tile_left.character:
                 return characters.Action.TURN_LEFT
 
-            if tile_forward and tile_forward.type not in ['sea', 'wall']:
+            if tile_forward and tile_forward.type not in ["sea", "wall"]:
                 if possible_step_forward not in self.visited:
                     priority_actions.append(characters.Action.STEP_FORWARD)
                 else:
                     secondary_actions.append(characters.Action.STEP_FORWARD)
 
-            if tile_right and tile_right.type not in ['sea', 'wall']:
+            if tile_right and tile_right.type not in ["sea", "wall"]:
                 if possible_step_right not in self.visited:
                     priority_actions.append(characters.Action.STEP_RIGHT)
                 else:
                     secondary_actions.append(characters.Action.STEP_RIGHT)
 
-            if tile_left and tile_left.type not in ['sea', 'wall']:
+            if tile_left and tile_left.type not in ["sea", "wall"]:
                 if possible_step_left not in self.visited:
                     priority_actions.append(characters.Action.STEP_LEFT)
                 else:
@@ -201,10 +195,9 @@ class CamperBotController(controller.Controller):
                 return characters.Action.STEP_BACKWARD
 
         else:
-
             # Going to forrest
             if self.go_to_forrest:
-                #If we are in forrest na mnist arround - go to menhir
+                # If we are in forrest na mnist arround - go to menhir
                 if self.is_mist_arround(knowledge):
                     self.find_path_to_menhir(knowledge)
                     next_tile = self.path_to_menhir.pop(0)
@@ -229,7 +222,7 @@ class CamperBotController(controller.Controller):
                 if self.path_to_menhir is None:
                     self.find_path_to_menhir(knowledge)
 
-                #Slow up going to menhir, until mist is close enough
+                # Slow up going to menhir, until mist is close enough
                 if self.is_mist_arround(knowledge):
                     # condition to stop going towards menhir as we are close
                     if len(self.path_to_menhir) > 1:
@@ -268,7 +261,6 @@ class CamperBotController(controller.Controller):
         elif facing == characters.Facing.DOWN:
             return characters.Action.STEP_LEFT
 
-
     def step_absolute_left(self, facing):
         if facing == characters.Facing.RIGHT:
             return characters.Action.STEP_BACKWARD
@@ -281,7 +273,6 @@ class CamperBotController(controller.Controller):
 
         elif facing == characters.Facing.DOWN:
             return characters.Action.STEP_RIGHT
-
 
     def step_absoulute_up(self, facing):
         if facing == characters.Facing.RIGHT:
@@ -309,46 +300,45 @@ class CamperBotController(controller.Controller):
         elif facing == characters.Facing.DOWN:
             return characters.Action.STEP_FORWARD
 
-
     def step_forward(self, facing):
         if facing == characters.Facing.RIGHT:
-            return Coords(1,0)
+            return Coords(1, 0)
         elif facing == characters.Facing.LEFT:
-            return Coords(-1,0)
+            return Coords(-1, 0)
         elif facing == characters.Facing.UP:
-            return Coords(0,-1)
+            return Coords(0, -1)
         elif facing == characters.Facing.DOWN:
-            return Coords(0,1)
+            return Coords(0, 1)
 
     def step_backward(self, facing):
         if facing == characters.Facing.RIGHT:
-            return Coords(-1,0)
+            return Coords(-1, 0)
         elif facing == characters.Facing.LEFT:
-            return Coords(1,0)
+            return Coords(1, 0)
         elif facing == characters.Facing.UP:
-            return Coords(0,1)
+            return Coords(0, 1)
         elif facing == characters.Facing.DOWN:
-            return Coords(0,-1)
+            return Coords(0, -1)
 
     def step_right(self, facing):
         if facing == characters.Facing.RIGHT:
-            return Coords(0,1)
+            return Coords(0, 1)
         elif facing == characters.Facing.LEFT:
-            return Coords(0,-1)
+            return Coords(0, -1)
         elif facing == characters.Facing.UP:
-            return Coords(1,0)
+            return Coords(1, 0)
         elif facing == characters.Facing.DOWN:
-            return Coords(-1,0)
+            return Coords(-1, 0)
 
     def step_left(self, facing):
         if facing == characters.Facing.RIGHT:
-            return Coords(0,-1)
+            return Coords(0, -1)
         elif facing == characters.Facing.LEFT:
-            return Coords(0,1)
+            return Coords(0, 1)
         elif facing == characters.Facing.UP:
-            return Coords(-1,0)
+            return Coords(-1, 0)
         elif facing == characters.Facing.DOWN:
-            return Coords(1,0)
+            return Coords(1, 0)
 
     def praise(self, score: int) -> None:
         pass
@@ -367,10 +357,9 @@ class CamperBotController(controller.Controller):
         self.go_to_forrest = True
         self.load_arena_to_graph()
 
-
     @property
     def name(self) -> str:
-        return f'CamperBot{self.first_name}'
+        return f"CamperBot{self.first_name}"
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
