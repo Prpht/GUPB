@@ -31,9 +31,9 @@ class KirbyController(KirbyLearningController):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        new_map, _ = self.analyse_knoledge(knowledge)
+        new_map, _, _ = self.analyse_knoledge(knowledge)
         with torch.no_grad():
-            predicted_health = self.model_A(new_map.to(device))
+            predicted_health = self.critic_A(new_map.to(device))
 
         choice_idx = predicted_health[0].argmax()
         choice = POSSIBLE_ACTIONS[choice_idx]
@@ -50,8 +50,8 @@ class KirbyController(KirbyLearningController):
         if game_no == 0:
             if os.path.exists("best_weights.pth"):
                 checkpoint = torch.load("best_weights.pth", weights_only=True)
-                self.model_A.load_state_dict(checkpoint["model"])
-                self.model_B.load_state_dict(checkpoint["model"])
+                self.critic_A.load_state_dict(checkpoint["model"])
+                self.critic_B.load_state_dict(checkpoint["model"])
 
         arena = Arena.load(arena_description.name)
         terrain = arena.terrain

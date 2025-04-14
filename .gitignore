@@ -7,4 +7,6 @@ results/
 *.DS_STORE
 .vscode/
 env
+plots/
+weights/
 resources/arenas/generated_*.gupb

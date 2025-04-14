@@ -23,13 +23,13 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        # kirby_learning.KirbyLearningController("KirbyLearning"),
-        kirby.KirbyController("Kirby")
+        kirby_learning.KirbyLearningController("KirbyLearning"),
+        # kirby.KirbyController("Kirby")
 
     ],
     'start_balancing': False,
     'visualise': False,
     'show_sight': None,
-    'runs_no': 10,  # kirby.ROUNDS_NO,
+    'runs_no': kirby_learning.ROUNDS_NO,
     'profiling_metrics': [],
 }
