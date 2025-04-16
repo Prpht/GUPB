@@ -1,6 +1,10 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller import kirby_learning, kirby
+from gupb.controller import roomba
+from gupb.controller.pirat import pirat
+from gupb.controller import norgul
+from gupb.controller.neat.kim_dzong_neat_jr import KimDzongNeatJuniorController
 
 
 keyboard_controller = keyboard.KeyboardController()
@@ -18,18 +22,20 @@ CONFIGURATION = {
         'wasteland',
     ],
     'controllers': [
-        # keyboard_controller,
+        keyboard_controller,
+        pirat.PiratController("Pirat"),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
+        roomba.RoombaController("Roomba"),
+        norgul.NorgulController("Norgul")
         kirby_learning.KirbyLearningController("KirbyLearning"),
-        # kirby.KirbyController("Kirby")
-
+        KimDzongNeatJuniorController(),
     ],
     'start_balancing': False,
-    'visualise': False,
-    'show_sight': None,
-    'runs_no': kirby_learning.ROUNDS_NO,
+    'visualise': True,
+    'show_sight': keyboard_controller,
+    'runs_no': 5,
     'profiling_metrics': [],
 }

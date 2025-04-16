@@ -8,6 +8,7 @@ from gupb.model import arenas
 from gupb.model import characters
 from gupb.model.arenas import Arena
 
+
 POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
