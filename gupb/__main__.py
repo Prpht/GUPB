@@ -17,7 +17,6 @@ import questionary
 from gupb import controller
 from gupb import runner
 
-
 # noinspection PyUnresolvedReferences
 @lru_cache()
 def possible_controllers() -> list[controller.Controller]:
