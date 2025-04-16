@@ -46,17 +46,10 @@ class Tabard(Enum):
     TURQUOISE = 'Turquoise'
     VIOLET = 'Violet'
     WHITE = 'White'
-    YELLOW = 'Yellow'
-    ALPHA = "AlphaGUPB"
-    ANCYMON = "Ancymon"
-    ARAGORN = 'Aragorn'
-    FROG = 'Frog'
-    KROMBOPULOS = 'Krombopulos'
-    MONGOL = 'Mongolek'
-    PIKACHU = 'Pikachu'
-    R2D2 = 'R2D2'
     NORGUL = 'Norgul'
-
+    KIMDZONGNEAT = 'KimDzongNeat'
+    CAMPER = 'Camper'
+    
 
 class Champion:
     def __init__(self, starting_position: coordinates.Coords, arena: arenas.Arena) -> None:
