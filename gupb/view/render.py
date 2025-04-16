@@ -75,6 +75,8 @@ class SpriteRepository:
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
             characters.Tabard.KIRBY: load_sprite('characters', 'kirby', BLACK),
+            characters.Tabard.KIMDZONGNEAT: load_sprite('characters', 'kim_dzong', BLACK),
+            characters.Tabard.CAMPER: load_sprite('characters', 'champion_camper', BLACK),
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
@@ -104,6 +106,8 @@ class SpriteRepository:
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
                     characters.Tabard.KIRBY,
+                    characters.Tabard.KIMDZONGNEAT,
+                    characters.Tabard.CAMPER,
                 ],
                 [
                     characters.Facing.RIGHT,
