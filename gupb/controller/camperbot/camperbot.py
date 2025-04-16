@@ -340,6 +340,7 @@ class CamperBotController(controller.Controller):
         elif facing == characters.Facing.DOWN:
             return Coords(1, 0)
 
+
     def praise(self, score: int) -> None:
         pass
 
