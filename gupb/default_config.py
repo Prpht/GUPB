@@ -6,18 +6,18 @@ from gupb.controller import kirby_learning, kirby
 keyboard_controller = keyboard.KeyboardController()
 
 CONFIGURATION = {
-    'arenas': [
-        'archipelago',
-        'dungeon',
-        'fisher_island',
-        'island',
-        'isolated_shrine',
-        'lone_sanctum',
-        'mini',
-        'ordinary_chaos',
-        'wasteland',
+    "arenas": [
+        "archipelago",
+        "dungeon",
+        "fisher_island",
+        "island",
+        "isolated_shrine",
+        "lone_sanctum",
+        "mini",
+        "ordinary_chaos",
+        "wasteland",
     ],
-    'controllers': [
+    "controllers": [
         # keyboard_controller,
         random.RandomController("Alice"),
         random.RandomController("Bob"),
@@ -25,11 +25,10 @@ CONFIGURATION = {
         random.RandomController("Darius"),
         kirby_learning.KirbyLearningController("KirbyLearning"),
         # kirby.KirbyController("Kirby")
-
     ],
-    'start_balancing': False,
-    'visualise': False,
-    'show_sight': None,
-    'runs_no': kirby_learning.ROUNDS_NO,
-    'profiling_metrics': [],
+    "start_balancing": True,
+    "visualise": False,
+    "show_sight": "KirbyLearning",
+    "runs_no": kirby_learning.ROUNDS_NO,
+    "profiling_metrics": [],
 }

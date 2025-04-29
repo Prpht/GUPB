@@ -21,6 +21,10 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 class KirbyController(KirbyLearningController):
     def __init__(self, first_name: str = "Kirby"):
         super().__init__(first_name)
+        if os.path.exists("best_weights.pth"):
+            checkpoint = torch.load("best_weights.pth", weights_only=False)
+            self.model_A.load_state_dict(checkpoint["model"])
+            self.model_B.load_state_dict(checkpoint["model"])
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, KirbyController):
@@ -31,17 +35,22 @@ class KirbyController(KirbyLearningController):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        new_map, _, _ = self.analyse_knoledge(knowledge)
+        new_map, can_move_forward, attack_effects = self.analyse_knoledge(
+            knowledge
+        )
         with torch.no_grad():
-            predicted_health = self.critic_A(new_map.to(device))
+            policy_B, predicted_value_B = self.model_B(new_map.to(device))
 
-        choice_idx = predicted_health[0].argmax()
-        choice = POSSIBLE_ACTIONS[choice_idx]
+        choice_idx = np.random.choice(
+            [0, 1, 2, 3],
+            p=policy_B.cpu().detach().numpy()[0]
+            if self.prev_map is not None
+            else None,
+        )
 
         self.time += 1
-        self.prev_map = new_map.clone()
-        self.prev_action = choice_idx
-        return choice
+
+        return POSSIBLE_ACTIONS[choice_idx]
 
     def praise(self, score: int) -> None:
         pass
@@ -49,16 +58,20 @@ class KirbyController(KirbyLearningController):
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         if game_no == 0:
             if os.path.exists("best_weights.pth"):
-                checkpoint = torch.load("best_weights.pth", weights_only=True)
-                self.critic_A.load_state_dict(checkpoint["model"])
-                self.critic_B.load_state_dict(checkpoint["model"])
+                checkpoint = torch.load("best_weights.pth", weights_only=False)
+                self.model_A.load_state_dict(checkpoint["model"])
+                self.model_B.load_state_dict(self.model_A.state_dict())
+                self.optimizer.load_state_dict(checkpoint["optimizer"])
 
         arena = Arena.load(arena_description.name)
-        terrain = arena.terrain
+        self.terrain = arena.terrain
 
         self.map = torch.zeros(arena.size)
         self.seen = torch.zeros(arena.size)
         self.time = 0
+
+        self.could_go_forward = True
+        self.could_attack = True
 
         self.consumables: set = set()
         self.loot: set = set()
@@ -70,11 +83,11 @@ class KirbyController(KirbyLearningController):
 
         self.menhir = (0, 0)
 
-        for coords, tile in terrain.items():
+        for coords, tile in self.terrain.items():
             self.map[coords] += int(tile.passable)
-        self.map = torch.tensor(np.pad(
-            self.map, ((1, 1), (1, 1)), "constant", constant_values=(0, 0)
-        ))
+        self.map = torch.tensor(
+            np.pad(self.map, ((3, 3), (3, 3)), "constant", constant_values=(0, 0))
+        )
         self.prev_map = None
         self.prev_action = None
 

@@ -6,9 +6,11 @@ import importlib
 import importlib.util
 import logging
 import os
+import shutil
 import pathlib
 import pkgutil
 import sys
+from gupb.controller import kirby
 from typing import Any, Union
 
 import click
@@ -23,7 +25,12 @@ from gupb import runner
 def possible_controllers() -> list[controller.Controller]:
     controllers = []
     pkg_path = os.path.dirname(controller.__file__)
-    names = [name for _, name, _ in pkgutil.iter_modules(path=[pkg_path], prefix=f"{controller.__name__}.")]
+    names = [
+        name
+        for _, name, _ in pkgutil.iter_modules(
+            path=[pkg_path], prefix=f"{controller.__name__}."
+        )
+    ]
     for name in names:
         module = importlib.import_module(name)
         controllers.extend(module.POTENTIAL_CONTROLLERS)
@@ -47,19 +54,25 @@ def possible_arenas() -> set[str]:
 
 def configuration_inquiry(initial_config: dict[str, Any]) -> dict[str, Any]:
     def when_show_sight(current_answers: dict[str, Any]) -> bool:
-        chosen_controllers.extend([
-            {
-                'name': possible_controller.name,
-                'value': possible_controller,
-            }
-            for possible_controller in current_answers['controllers']
-        ])
-        default_controller = [c for c in chosen_controllers if c['value'] == initial_config['show_sight']]
-        other_controllers = [c for c in chosen_controllers if c['value'] != initial_config['show_sight']]
+        chosen_controllers.extend(
+            [
+                {
+                    "name": possible_controller.name,
+                    "value": possible_controller,
+                }
+                for possible_controller in current_answers["controllers"]
+            ]
+        )
+        default_controller = [
+            c for c in chosen_controllers if c["value"] == initial_config["show_sight"]
+        ]
+        other_controllers = [
+            c for c in chosen_controllers if c["value"] != initial_config["show_sight"]
+        ]
         chosen_controllers.clear()
         chosen_controllers.extend(default_controller)
         chosen_controllers.extend(other_controllers)
-        return current_answers['visualise']
+        return current_answers["visualise"]
 
     def validate_runs_no(runs_no: str) -> Union[bool, str]:
         try:
@@ -70,64 +83,64 @@ def configuration_inquiry(initial_config: dict[str, Any]) -> dict[str, Any]:
 
     chosen_controllers = [
         {
-            'name': 'None',
-            'value': None,
+            "name": "None",
+            "value": None,
         },
     ]
     questions = [
         {
-            'type': 'checkbox',
-            'name': 'arenas',
-            'message': 'Which arenas should be used in this run?',
-            'choices': [
+            "type": "checkbox",
+            "name": "arenas",
+            "message": "Which arenas should be used in this run?",
+            "choices": [
                 {
-                    'name': possible_arena,
-                    'checked': possible_arena in initial_config['arenas']
+                    "name": possible_arena,
+                    "checked": possible_arena in initial_config["arenas"],
                 }
                 for possible_arena in possible_arenas()
             ],
         },
         {
-            'type': 'checkbox',
-            'name': 'controllers',
-            'message': 'Which controllers should participate in this run?',
-            'choices': [
+            "type": "checkbox",
+            "name": "controllers",
+            "message": "Which controllers should participate in this run?",
+            "choices": [
                 {
-                    'name': possible_controller.name,
-                    'value': possible_controller,
-                    'checked': possible_controller in initial_config['controllers'],
+                    "name": possible_controller.name,
+                    "value": possible_controller,
+                    "checked": possible_controller in initial_config["controllers"],
                 }
                 for possible_controller in possible_controllers()
             ],
         },
         {
-            'type': 'confirm',
-            'name': 'visualise',
-            'message': 'Show the live game visualisation?',
-            'default': initial_config['visualise'],
+            "type": "confirm",
+            "name": "visualise",
+            "message": "Show the live game visualisation?",
+            "default": initial_config["visualise"],
         },
         {
-            'type': 'select',
-            'name': 'show_sight',
-            'message': 'Which controller should have its sight visualised?',
-            'when': when_show_sight,
-            'choices': chosen_controllers,
-            'filter': lambda result: None if result == 'None' else result,
-            'default': initial_config['show_sight'],
+            "type": "select",
+            "name": "show_sight",
+            "message": "Which controller should have its sight visualised?",
+            "when": when_show_sight,
+            "choices": chosen_controllers,
+            "filter": lambda result: None if result == "None" else result,
+            "default": initial_config["show_sight"],
         },
         {
-            'type': 'input',
-            'name': 'runs_no',
-            'message': 'How many games should be played?',
-            'validate': validate_runs_no,
-            'filter': int,
-            'default': str(initial_config['runs_no']),
+            "type": "input",
+            "name": "runs_no",
+            "message": "How many games should be played?",
+            "validate": validate_runs_no,
+            "filter": int,
+            "default": str(initial_config["runs_no"]),
         },
         {
-            'type': 'confirm',
-            'name': 'start_balancing',
-            'message': 'Repeat positions until every controller tried each at least once?',
-            'default': initial_config['start_balancing'],
+            "type": "confirm",
+            "name": "start_balancing",
+            "message": "Repeat positions until every controller tried each at least once?",
+            "default": initial_config["start_balancing"],
         },
     ]
     answers = questionary.prompt(questions)
@@ -138,22 +151,22 @@ def configure_logging(log_directory: str) -> None:
     logging_dir_path = pathlib.Path(log_directory)
     logging_dir_path.mkdir(parents=True, exist_ok=True)
     logging_dir_path.chmod(0o777)
-    time = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
-    verbose_logger = logging.getLogger('verbose')
+    verbose_logger = logging.getLogger("verbose")
     verbose_logger.propagate = False
-    verbose_file_path = logging_dir_path / f'gupb__{time}.log'
+    verbose_file_path = logging_dir_path / f"gupb__{time}.log"
     verbose_file_handler = logging.FileHandler(verbose_file_path.as_posix())
     verbose_formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s'
+        "%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s"
     )
     verbose_file_handler.setFormatter(verbose_formatter)
     verbose_logger.addHandler(verbose_file_handler)
     verbose_logger.setLevel(logging.DEBUG)
 
-    json_logger = logging.getLogger('json')
+    json_logger = logging.getLogger("json")
     json_logger.propagate = False
-    json_file_path = logging_dir_path / f'gupb__{time}.json'
+    json_file_path = logging_dir_path / f"gupb__{time}.json"
     json_file_handler = logging.FileHandler(json_file_path.as_posix())
     json_formatter = logging.Formatter(
         '{"time_stamp": "%(asctime)s",'
@@ -168,20 +181,45 @@ def configure_logging(log_directory: str) -> None:
 
 
 @click.command()
-@click.option('-c', '--config_path', default='gupb/default_config.py',
-              type=click.Path(exists=True), help="The path to run configuration file.")
-@click.option('-i', '--inquiry',
-              is_flag=True, help="Whether to configure the runner interactively on start.")
-@click.option('-l', '--log_directory', default='results',
-              type=click.Path(exists=False), help="The path to log storage directory.")
+@click.option(
+    "-c",
+    "--config_path",
+    default="gupb/default_config.py",
+    type=click.Path(exists=True),
+    help="The path to run configuration file.",
+)
+@click.option(
+    "-i",
+    "--inquiry",
+    is_flag=True,
+    help="Whether to configure the runner interactively on start.",
+)
+@click.option(
+    "-l",
+    "--log_directory",
+    default="results",
+    type=click.Path(exists=False),
+    help="The path to log storage directory.",
+)
 def main(config_path: str, inquiry: bool, log_directory: str) -> None:
     configure_logging(log_directory)
     current_config = load_initial_config(config_path)
-    current_config = configuration_inquiry(current_config) if inquiry else current_config
+    current_config = (
+        configuration_inquiry(current_config) if inquiry else current_config
+    )
     game_runner = runner.Runner(current_config)
     game_runner.run()
     game_runner.print_scores()
 
+    """weights_files = os.listdir("weights/")
+    for file in weights_files:
+        shutil.copy(os.path.join("weights", file), "best_weights.pth")
+        current_config = load_initial_config(config_path)
+        current_config = configuration_inquiry(current_config) if inquiry else current_config
+        game_runner = runner.Runner(current_config)
+        game_runner.run()
+        print(f"\n{file} {game_runner.scores['Kirby']}\n")"""
 
-if __name__ == '__main__':
-    main(prog_name='python -m gupb')
+
+if __name__ == "__main__":
+    main(prog_name="python -m gupb")
