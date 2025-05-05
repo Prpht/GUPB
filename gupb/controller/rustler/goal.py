@@ -1,37 +1,29 @@
+from typing_extensions import override
 from gupb.model import characters, coordinates
+from dataclasses import dataclass
 
 
+@dataclass(slots=True, eq=False)
 class Goal:
-    def __init__(
-        self,
-        name: str,
-        priority: float,
-        target_cords: coordinates.Coords,
-        vanishable: bool = False,
-        facing: characters.Facing = None,
-        wandering: int = 0,
-    ):
-        self.name = name
-        self.priority = priority
-        self.journey_target = target_cords
-        self.vanishable = (
-            vanishable  # True if the goal should be deleted when stepped on
+    name: str
+    priority: float
+    journey_target: coordinates.Coords
+    vanishable: bool
+    facing: characters.Facing
+    wandering: int
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Goal):
+            return False
+
+        return (
+            self.name == other.name
+            and self.priority == other.priority
+            and self.journey_target == other.journey_target
         )
-        self.facing = facing
-        self.wandering = wandering
 
-    def __eq__(self, other):
-        if isinstance(other, Goal):
-            return (
-                self.name == other.name
-                and self.priority == other.priority
-                and self.journey_target == other.journey_target
-                and self.vanishable == other.vanishable
-                and self.facing == other.facing
-                and self.wandering == other.wandering
-            )
-        return False
-
+    @override
     def __hash__(self):
         return hash(
             (
@@ -44,5 +36,8 @@ class Goal:
             )
         )
 
-    def __lt__(self, other):
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, Goal):
+            return False
+
         return self.priority < other.priority
