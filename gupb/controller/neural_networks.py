@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class ActorCriticNet(nn.Module):
-    def __init__(self, input_size=96, hidden1=320, hidden2=160, action_size=4):
+    def __init__(self, input_size=118, hidden1=320, hidden2=160, action_size=6):
         super().__init__()
         self.shared = nn.Sequential(
             nn.Linear(input_size, hidden1),

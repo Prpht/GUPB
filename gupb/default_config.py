@@ -24,7 +24,7 @@ CONFIGURATION = {
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
         kirby_learning.KirbyLearningController("KirbyLearning"),
-        # kirby.KirbyController("Kirby")
+        kirby.KirbyController("Kirby")
     ],
     "start_balancing": True,
     "visualise": False,
