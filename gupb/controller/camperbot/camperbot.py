@@ -139,7 +139,7 @@ class CamperBotController(controller.Controller):
 
         possible_step_forward = current_position + self.step_forward(facing)
         possible_step_forward = Coords(possible_step_forward[0], possible_step_forward[1])
-        # ConsumableDescription(name='potion')
+
         possible_step_backward = current_position + self.step_backward(facing)
         possible_step_backward = Coords(possible_step_backward[0], possible_step_backward[1])
 
@@ -173,7 +173,7 @@ class CamperBotController(controller.Controller):
         if not self.is_menhir_found:
 
 
-            if self.is_mist_arround(knowledge):
+            if self.is_mist_arround(knowledge, mist_arround_trehshold=4):
                 if tile_forward and not self.is_tile_mist(tile_forward):
                     return characters.Action.STEP_FORWARD
 
@@ -218,7 +218,7 @@ class CamperBotController(controller.Controller):
                     self.find_path_to_menhir(knowledge)
 
                 # Slow up going to menhir, until mist is close enough
-                if self.is_mist_arround(knowledge):
+                if self.is_mist_arround(knowledge, mist_arround_trehshold=4):
                     # condition to stop going towards menhir as we are close
                     if len(self.path_to_menhir) > 1:
                         next_tile = self.path_to_menhir.pop(0)
