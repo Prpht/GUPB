@@ -300,7 +300,7 @@ class ReinforcedRogueController(controller.Controller):
         logger.debug(f"Visib. gain = {visibility_gain}")
 
         return (
-            health_gain + damage_gain + 0.5 * (safety_gain + danger_gain),
+            2 * health_gain + damage_gain + 0.5 * (safety_gain + danger_gain),
             loot_gain,
             menhir_gain,
             exploration_gain,
