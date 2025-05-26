@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 from gupb import controller
 from gupb.model import arenas, characters, coordinates
@@ -12,6 +13,8 @@ POSSIBLE_ACTIONS = [
     characters.Action.STEP_LEFT,
     characters.Action.STEP_RIGHT,
 ]
+
+MIST_HORIZON_RADIUS = 10  # How far to scan for mist
 
 
 # noinspection PyUnusedLocal
@@ -36,9 +39,29 @@ class GarekController(controller.Controller):
         current_pos = knowledge.position
         visible_tiles = knowledge.visible_tiles
 
-        # Get current tile and facing
         current_tile = visible_tiles.get(current_pos)
+        if not current_tile or not current_tile.character:
+            return random.choice(POSSIBLE_ACTIONS)
         current_facing = current_tile.character.facing
+
+        # Scan for mist in a radius
+        mist_coords = []
+        for dx in range(-MIST_HORIZON_RADIUS, MIST_HORIZON_RADIUS + 1):
+            for dy in range(-MIST_HORIZON_RADIUS, MIST_HORIZON_RADIUS + 1):
+                check_pos = coordinates.Coords(current_pos.x + dx, current_pos.y + dy)
+                tile = visible_tiles.get(check_pos)
+                if tile and any(effect.type == 'mist' for effect in tile.effects):
+                    mist_coords.append(np.array([check_pos.x, check_pos.y]))
+
+        # Calculate mist avoidance vector
+        flee_vector = np.array([0.0, 0.0])
+        if mist_coords:
+            mist_center = np.mean(mist_coords, axis=0)
+            my_pos = np.array([current_pos.x, current_pos.y])
+            flee_vector = my_pos - mist_center
+            norm = np.linalg.norm(flee_vector)
+            if norm > 0:
+                flee_vector = flee_vector / norm
 
         # Directions for possible steps
         step_actions = [
@@ -48,6 +71,8 @@ class GarekController(controller.Controller):
             (characters.Action.STEP_RIGHT, current_facing.turn_right().value),
         ]
 
+        best_action = None
+        best_score = -float('inf')
         safe_actions = []
         for action, direction in step_actions:
             new_x = current_pos.x + direction.x
@@ -55,17 +80,26 @@ class GarekController(controller.Controller):
             new_pos = coordinates.Coords(new_x, new_y)
             tile = visible_tiles.get(new_pos)
             if tile:
-                # Check if tile is safe: passable, no character, no mist
                 passable = tile.type in ['land', 'forest', 'menhir']
                 no_character = tile.character is None
                 no_mist = all(effect.type != 'mist' for effect in tile.effects)
                 if passable and no_character and no_mist:
                     safe_actions.append(action)
-
+                    # If mist is present, prefer moves that go away from mist
+                    if mist_coords:
+                        move_vec = np.array([new_x, new_y]) - np.array([current_pos.x, current_pos.y])
+                        score = np.dot(move_vec, flee_vector)
+                        # Prefer forest tiles for extra safety
+                        if tile.type == 'forest':
+                            score += 0.2
+                        if score > best_score:
+                            best_score = score
+                            best_action = action
+        if mist_coords and best_action is not None:
+            return best_action
         if safe_actions:
             return self._pick_safe_action(safe_actions)
         else:
-            # No safe moves, pick random move
             return random.choice(POSSIBLE_ACTIONS)
 
     def _pick_safe_action(self, safe_actions: list[characters.Action]) -> characters.Action:
