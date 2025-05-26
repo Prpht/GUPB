@@ -326,12 +326,20 @@ class KimDzongNeatMidController(Controller):
         my_tile = knowledge.visible_tiles[my_pos]
         my_weapon_name = my_tile.character.weapon.name
         my_facing = my_tile.character.facing
-
+    
         if not any(self.actions_history) and len(self.actions_history) == self.actions_history.maxlen:
             return None
-
+    
         if my_weapon_name == "scroll":
-            if self.known_map_tiles.get(my_pos, tiles.TileDescription(type="land",loot=None,character=None, effects=[])).type == "menhir":
+            # Poprawka: użyj wszystkich wymaganych pól TileDescription
+            default_tile = tiles.TileDescription(
+                type="land",
+                loot=None,
+                character=None,
+                consumable=None,
+                effects=[]
+            )
+            if self.known_map_tiles.get(my_pos, default_tile).type == "menhir":
                 self.last_scroll_use_turn = self.turn_counter
                 return Action.ATTACK
             
@@ -347,13 +355,13 @@ class KimDzongNeatMidController(Controller):
                 self.last_scroll_use_turn = self.turn_counter
                 return Action.ATTACK
             return None
-
+    
         for coord, tile_desc in knowledge.visible_tiles.items():
             if tile_desc.character is not None and coord != my_pos:
                 target_tile_desc = self.known_map_tiles.get(coord)
                 if target_tile_desc and target_tile_desc.type == "forest": continue
                 if coord in self.last_known_mist_coords: continue
-
+    
                 if self._can_attack_target_with_facing(my_pos, my_facing, my_weapon_name, coord, knowledge):
                     return Action.ATTACK
         return None
