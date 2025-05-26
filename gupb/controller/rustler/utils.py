@@ -31,9 +31,9 @@ def on_fire(tile_description: tiles.TileDescription) -> bool:
 
 def facing_to_cords(facing: characters.Facing) -> coordinates.Coords:
     if facing == characters.Facing.UP:
-        return coordinates.Coords(0, 1)
-    if facing == characters.Facing.DOWN:
         return coordinates.Coords(0, -1)
+    if facing == characters.Facing.DOWN:
+        return coordinates.Coords(0, 1)
     if facing == characters.Facing.RIGHT:
         return coordinates.Coords(1, 0)
     if facing == characters.Facing.LEFT:

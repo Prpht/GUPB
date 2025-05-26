@@ -9,7 +9,7 @@ class Goal:
     priority: float
     journey_target: coordinates.Coords
     vanishable: bool
-    facing: characters.Facing
+    facing: characters.Facing | None
     wandering: int
 
     @override
