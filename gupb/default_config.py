@@ -2,7 +2,7 @@ from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller.camperbot import camperbot
 from gupb.controller.neat import kim_dzong_neat_jr
-from gupb.controller import kirby_learning
+from gupb.controller import kirby
 from gupb.controller import norgul
 from gupb.controller import reinforced_rogue
 from gupb.controller import garek
@@ -23,7 +23,7 @@ CONFIGURATION = {
         random.RandomController("Alice"),
         camperbot.CamperBotController("Camper"),
         kim_dzong_neat_jr.KimDzongNeatJuniorController(),
-        kirby_learning.KirbyLearningController("KirbyLearning"),
+        kirby.KirbyController("Kirby"),
         norgul.NorgulController("Norgul"),
         reinforced_rogue.ReinforcedRogueController("ReinforcedRogue"),
         garek.GarekController("Garek"),
