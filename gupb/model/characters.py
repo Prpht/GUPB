@@ -46,6 +46,15 @@ class Tabard(Enum):
     TURQUOISE = 'Turquoise'
     VIOLET = 'Violet'
     WHITE = 'White'
+    YELLOW = 'Yellow'
+    ALPHA = "AlphaGUPB"
+    ANCYMON = "Ancymon"
+    ARAGORN = 'Aragorn'
+    FROG = 'Frog'
+    KROMBOPULOS = 'Krombopulos'
+    MONGOL = 'Mongolek'
+    PIKACHU = 'Pikachu'
+    R2D2 = 'R2D2'
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
 
