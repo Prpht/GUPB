@@ -359,177 +359,180 @@ class KimDzongNeatMidController(Controller):
         return None
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
-        self._update_knowledge(knowledge)
-        my_pos = knowledge.position
-        
-        # Bot zawsze widzi siebie
-        my_tile = knowledge.visible_tiles[my_pos]
-        my_facing = my_tile.character.facing
-        
-        newly_seen_mist_this_turn = set()
-        for coord, tile_desc in knowledge.visible_tiles.items():
-            if tile_desc.effects:
-                for effect in tile_desc.effects:
-                    if effect.type == "mist":  # Użyj tekstu zamiast effects.EffectDescription.MIST
-                        newly_seen_mist_this_turn.add(coord)
-        
-        player_danger_zones = self._get_player_danger_zones(knowledge)
-        occupied_by_players = self._get_occupied_by_players_coords(knowledge)
-        self.bot_moved_or_turned_this_turn = False
+        try:
+            self._update_knowledge(knowledge)
+            my_pos = knowledge.position
 
-        if (my_pos in self.last_known_mist_coords or newly_seen_mist_this_turn) and \
-           self.current_state != "FLEEING_MIST":
-            #print(f"Bot {self.name} wykrył mgłę. Zmiana stanu na FLEEING_MIST.")
-            self.current_state = "FLEEING_MIST"
-            self.path = []
-            self.target_coord = None
-            self.flee_attempts_in_a_row = 0
-        
-        combat_action = self._handle_combat(knowledge)
-        if combat_action:
-            self.actions_history.append(False) 
-            return combat_action
-        
-        next_action: Action = Action.DO_NOTHING
+            # Bot zawsze widzi siebie
+            my_tile = knowledge.visible_tiles[my_pos]
+            my_facing = my_tile.character.facing
 
-        if self.current_state == "INITIAL_ASSESSMENT":
-             if self.map_strategy == "TREES": self.current_state = "SEARCHING_FOR_TREE"
-             elif self.map_strategy in ["NO_TREES_CENTER", "UNKNOWN_CENTER_THEN_TREES"]:
-                 self.current_state = "GOING_TO_CENTER_OR_MENHIR"
-                 if self.known_menhir_coord: self.target_coord = self.known_menhir_coord
-                 elif self.center_coord: self.target_coord = self.center_coord
-                 else: self.current_state = "IDLE_AT_TARGET"
-             else:
-                 self.current_state = "IDLE_AT_TARGET"
+            newly_seen_mist_this_turn = set()
+            for coord, tile_desc in knowledge.visible_tiles.items():
+                if tile_desc.effects:
+                    for effect in tile_desc.effects:
+                        if effect.type == "mist":  # Użyj tekstu zamiast effects.EffectDescription.MIST
+                            newly_seen_mist_this_turn.add(coord)
 
-        if self.current_state == "GOING_TO_CENTER_OR_MENHIR":
-            if self.target_coord and my_pos == self.target_coord:
-                self.current_state = "IDLE_AT_TARGET"
+            player_danger_zones = self._get_player_danger_zones(knowledge)
+            occupied_by_players = self._get_occupied_by_players_coords(knowledge)
+            self.bot_moved_or_turned_this_turn = False
+
+            if (my_pos in self.last_known_mist_coords or newly_seen_mist_this_turn) and \
+               self.current_state != "FLEEING_MIST":
+                #print(f"Bot {self.name} wykrył mgłę. Zmiana stanu na FLEEING_MIST.")
+                self.current_state = "FLEEING_MIST"
                 self.path = []
-            elif not self.path and self.target_coord:
-                self.path = self._bfs_path(my_pos, self.target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)
-            
-            if self.path:
-                next_step_coord = self.path[0]
-                action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
-                if action_to_target == Action.STEP_FORWARD:
-                    if self._is_tile_safe(next_step_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords):
-                        self.path.pop(0)
-                        next_action = Action.STEP_FORWARD
-                    else: self.path = []; self.target_coord = None
-                else: next_action = action_to_target
-            elif self.target_coord:
-                next_action = Action.TURN_RIGHT
-            else:
-                self.current_state = "IDLE_AT_TARGET"
+                self.target_coord = None
+                self.flee_attempts_in_a_row = 0
 
-        elif self.current_state == "SEARCHING_FOR_TREE":
-            if self.target_coord and my_pos == self.target_coord:
-                self.current_state = "IN_TREE_IDLE"; self.path = []; self.spin_idx = 0
-                next_action = self.spin_actions_in_bush[self.spin_idx]
-            else:
-                if not self.path or (self.path and not self._is_tile_safe(self.path[0], knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)):
-                    empty_bushes = self._find_empty_bushes(knowledge, occupied_by_players)
-                    if empty_bushes:
-                        self.target_coord = empty_bushes[0]
-                        self.path = self._bfs_path(my_pos, self.target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)
-                    else:
-                        self.target_coord = None; self.path = []
-                        if self.map_strategy == "TREES" and self.turn_counter > 30:
-                            self.current_state = "GOING_TO_CENTER_OR_MENHIR"; self.map_strategy = "NO_TREES_CENTER"
-                            self.target_coord = self.center_coord if self.center_coord else my_pos
-                
+            combat_action = self._handle_combat(knowledge)
+            if combat_action:
+                self.actions_history.append(False) 
+                return combat_action
+
+            next_action: Action = Action.DO_NOTHING
+
+            if self.current_state == "INITIAL_ASSESSMENT":
+                 if self.map_strategy == "TREES": self.current_state = "SEARCHING_FOR_TREE"
+                 elif self.map_strategy in ["NO_TREES_CENTER", "UNKNOWN_CENTER_THEN_TREES"]:
+                     self.current_state = "GOING_TO_CENTER_OR_MENHIR"
+                     if self.known_menhir_coord: self.target_coord = self.known_menhir_coord
+                     elif self.center_coord: self.target_coord = self.center_coord
+                     else: self.current_state = "IDLE_AT_TARGET"
+                 else:
+                     self.current_state = "IDLE_AT_TARGET"
+
+            if self.current_state == "GOING_TO_CENTER_OR_MENHIR":
+                if self.target_coord and my_pos == self.target_coord:
+                    self.current_state = "IDLE_AT_TARGET"
+                    self.path = []
+                elif not self.path and self.target_coord:
+                    self.path = self._bfs_path(my_pos, self.target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)
+
                 if self.path:
                     next_step_coord = self.path[0]
                     action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
                     if action_to_target == Action.STEP_FORWARD:
                         if self._is_tile_safe(next_step_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords):
-                            self.path.pop(0); next_action = Action.STEP_FORWARD
+                            self.path.pop(0)
+                            next_action = Action.STEP_FORWARD
                         else: self.path = []; self.target_coord = None
                     else: next_action = action_to_target
-                elif self.target_coord :
+                elif self.target_coord:
                     next_action = Action.TURN_RIGHT
                 else:
-                    next_action = Action.TURN_RIGHT
+                    self.current_state = "IDLE_AT_TARGET"
 
-        elif self.current_state == "IN_TREE_IDLE":
-            current_tile_desc = self.known_map_tiles.get(my_pos)
-            if not current_tile_desc or current_tile_desc.type != "forest":
-                self.current_state = "SEARCHING_FOR_TREE"; self.target_coord = None
-                next_action = Action.TURN_RIGHT
-            else:
-                self.spin_idx = (self.spin_idx + 1) % len(self.spin_actions_in_bush)
-                next_action = self.spin_actions_in_bush[self.spin_idx]
+            elif self.current_state == "SEARCHING_FOR_TREE":
+                if self.target_coord and my_pos == self.target_coord:
+                    self.current_state = "IN_TREE_IDLE"; self.path = []; self.spin_idx = 0
+                    next_action = self.spin_actions_in_bush[self.spin_idx]
+                else:
+                    if not self.path or (self.path and not self._is_tile_safe(self.path[0], knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)):
+                        empty_bushes = self._find_empty_bushes(knowledge, occupied_by_players)
+                        if empty_bushes:
+                            self.target_coord = empty_bushes[0]
+                            self.path = self._bfs_path(my_pos, self.target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords)
+                        else:
+                            self.target_coord = None; self.path = []
+                            if self.map_strategy == "TREES" and self.turn_counter > 30:
+                                self.current_state = "GOING_TO_CENTER_OR_MENHIR"; self.map_strategy = "NO_TREES_CENTER"
+                                self.target_coord = self.center_coord if self.center_coord else my_pos
 
-        elif self.current_state == "IDLE_AT_TARGET":
-            self.spin_idx = (self.spin_idx + 1) % len(self.spin_actions_in_bush)
-            next_action = self.spin_actions_in_bush[self.spin_idx]
-            if not self.known_menhir_coord and self.target_coord != self.known_menhir_coord:
-                 for coord_tile, desc_tile in knowledge.visible_tiles.items():
-                     if desc_tile.type == "menhir":
-                         self.known_menhir_coord = coord_tile
-                         self.current_state = "GOING_TO_CENTER_OR_MENHIR"
-                         self.target_coord = coord_tile
-                         self.path = []
-                         break
-
-        if self.current_state == "FLEEING_MIST":
-            self.flee_attempts_in_a_row += 1
-            action_taken_fleeing = False
-            if self.path and self._is_tile_safe(self.path[0], knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True):
-                next_step_coord = self.path[0]
-                action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
-                if action_to_target == Action.STEP_FORWARD:
-                    self.path.pop(0); self.flee_attempts_in_a_row = 0
-                next_action = action_to_target
-                action_taken_fleeing = True
-            else:
-                self.path = []
-                flee_destination = self._get_flee_destination(my_pos, knowledge, player_danger_zones, occupied_by_players)
-                if flee_destination:
-                    self.path = self._bfs_path(my_pos, flee_destination, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True)
                     if self.path:
                         next_step_coord = self.path[0]
                         action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
                         if action_to_target == Action.STEP_FORWARD:
-                            self.path.pop(0); self.flee_attempts_in_a_row = 0
-                        next_action = action_to_target
-                        action_taken_fleeing = True
-            
-            if not action_taken_fleeing:
-                best_panic_move: Optional[Action] = None
-                potential_panic_directions = [my_facing.value, my_facing.turn_right().value, my_facing.turn_left().value]
-                
-                for direction in potential_panic_directions:
-                    panic_target_coord = add_coords(my_pos, direction)
-                    if self._is_tile_safe(panic_target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True) and panic_target_coord not in self.last_known_mist_coords:
-                        if direction == my_facing.value:
-                            best_panic_move = Action.STEP_FORWARD
-                            break
-                        elif direction == my_facing.turn_right().value:
-                            best_panic_move = Action.TURN_RIGHT
-                            break
-                        elif direction == my_facing.turn_left().value:
-                            best_panic_move = Action.TURN_LEFT
-                            break
-                
-                if best_panic_move:
-                    next_action = best_panic_move
-                    self.flee_attempts_in_a_row = 0
-                else:
-                    next_action = Action.TURN_RIGHT if self.flee_attempts_in_a_row % 2 == 0 else Action.TURN_LEFT
-            
-            if not self.last_known_mist_coords and not newly_seen_mist_this_turn:
-                #print(f"Bot {self.name} nie widzi już mgły. Powrót do poprzedniej strategii.")
-                if self.map_strategy == "TREES": self.current_state = "SEARCHING_FOR_TREE"
-                else: self.current_state = "GOING_TO_CENTER_OR_MENHIR"
-                self.target_coord = None
-                self.path = []
+                            if self._is_tile_safe(next_step_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords):
+                                self.path.pop(0); next_action = Action.STEP_FORWARD
+                            else: self.path = []; self.target_coord = None
+                        else: next_action = action_to_target
+                    elif self.target_coord :
+                        next_action = Action.TURN_RIGHT
+                    else:
+                        next_action = Action.TURN_RIGHT
 
-        self.bot_moved_or_turned_this_turn = next_action in [Action.STEP_FORWARD, Action.TURN_LEFT, Action.TURN_RIGHT]
-        self.actions_history.append(self.bot_moved_or_turned_this_turn)
-        
-        return next_action
+            elif self.current_state == "IN_TREE_IDLE":
+                current_tile_desc = self.known_map_tiles.get(my_pos)
+                if not current_tile_desc or current_tile_desc.type != "forest":
+                    self.current_state = "SEARCHING_FOR_TREE"; self.target_coord = None
+                    next_action = Action.TURN_RIGHT
+                else:
+                    self.spin_idx = (self.spin_idx + 1) % len(self.spin_actions_in_bush)
+                    next_action = self.spin_actions_in_bush[self.spin_idx]
+
+            elif self.current_state == "IDLE_AT_TARGET":
+                self.spin_idx = (self.spin_idx + 1) % len(self.spin_actions_in_bush)
+                next_action = self.spin_actions_in_bush[self.spin_idx]
+                if not self.known_menhir_coord and self.target_coord != self.known_menhir_coord:
+                     for coord_tile, desc_tile in knowledge.visible_tiles.items():
+                         if desc_tile.type == "menhir":
+                             self.known_menhir_coord = coord_tile
+                             self.current_state = "GOING_TO_CENTER_OR_MENHIR"
+                             self.target_coord = coord_tile
+                             self.path = []
+                             break
+
+            if self.current_state == "FLEEING_MIST":
+                self.flee_attempts_in_a_row += 1
+                action_taken_fleeing = False
+                if self.path and self._is_tile_safe(self.path[0], knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True):
+                    next_step_coord = self.path[0]
+                    action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
+                    if action_to_target == Action.STEP_FORWARD:
+                        self.path.pop(0); self.flee_attempts_in_a_row = 0
+                    next_action = action_to_target
+                    action_taken_fleeing = True
+                else:
+                    self.path = []
+                    flee_destination = self._get_flee_destination(my_pos, knowledge, player_danger_zones, occupied_by_players)
+                    if flee_destination:
+                        self.path = self._bfs_path(my_pos, flee_destination, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True)
+                        if self.path:
+                            next_step_coord = self.path[0]
+                            action_to_target = self._get_move_action_to_target(my_pos, my_facing, next_step_coord)
+                            if action_to_target == Action.STEP_FORWARD:
+                                self.path.pop(0); self.flee_attempts_in_a_row = 0
+                            next_action = action_to_target
+                            action_taken_fleeing = True
+
+                if not action_taken_fleeing:
+                    best_panic_move: Optional[Action] = None
+                    potential_panic_directions = [my_facing.value, my_facing.turn_right().value, my_facing.turn_left().value]
+
+                    for direction in potential_panic_directions:
+                        panic_target_coord = add_coords(my_pos, direction)
+                        if self._is_tile_safe(panic_target_coord, knowledge, player_danger_zones, occupied_by_players, self.last_known_mist_coords, True, True) and panic_target_coord not in self.last_known_mist_coords:
+                            if direction == my_facing.value:
+                                best_panic_move = Action.STEP_FORWARD
+                                break
+                            elif direction == my_facing.turn_right().value:
+                                best_panic_move = Action.TURN_RIGHT
+                                break
+                            elif direction == my_facing.turn_left().value:
+                                best_panic_move = Action.TURN_LEFT
+                                break
+                            
+                    if best_panic_move:
+                        next_action = best_panic_move
+                        self.flee_attempts_in_a_row = 0
+                    else:
+                        next_action = Action.TURN_RIGHT if self.flee_attempts_in_a_row % 2 == 0 else Action.TURN_LEFT
+
+                if not self.last_known_mist_coords and not newly_seen_mist_this_turn:
+                    #print(f"Bot {self.name} nie widzi już mgły. Powrót do poprzedniej strategii.")
+                    if self.map_strategy == "TREES": self.current_state = "SEARCHING_FOR_TREE"
+                    else: self.current_state = "GOING_TO_CENTER_OR_MENHIR"
+                    self.target_coord = None
+                    self.path = []
+
+            self.bot_moved_or_turned_this_turn = next_action in [Action.STEP_FORWARD, Action.TURN_LEFT, Action.TURN_RIGHT]
+            self.actions_history.append(self.bot_moved_or_turned_this_turn)
+
+            return next_action
+        except Exception:
+            return Action.TURN_RIGHT
 
     @property
     def name(self) -> str:
