@@ -34,6 +34,7 @@ class CamperBotController(controller.Controller):
         self.path_to_forrest = None
         self.go_to_forrest = True
         self.go_to_menhir = False
+        self.path_to_potion = None
         self.seen = set()
 
     def is_mist_arround(self, knowledge: characters.ChampionKnowledge, mist_arround_trehshold: int = 2) -> bool:
@@ -154,8 +155,10 @@ class CamperBotController(controller.Controller):
         tile_left = knowledge.visible_tiles.get(possible_step_left, None)
         tile_backward = knowledge.visible_tiles.get(possible_step_backward, None)
 
-        if tile_forward and tile_forward.character:
+        if tile_forward and tile_forward.character and tile_forward.type != "forrest":
             return characters.Action.ATTACK
+        elif tile_forward and tile_forward.character and tile_forward.type == "forrest":
+            return characters.Action.STEP_BACKWARD
         if tile_right and tile_right.character:
             return characters.Action.TURN_RIGHT
         if tile_left and tile_left.character:
@@ -166,12 +169,17 @@ class CamperBotController(controller.Controller):
             return characters.Action.STEP_FORWARD
         if tile_right and self.is_tile_with_potion(tile_right):
             return characters.Action.STEP_RIGHT
-        if tile_left and tile_right and self.is_tile_with_potion(tile_right):
+        if tile_left and self.is_tile_with_potion(tile_left):
             return characters.Action.STEP_LEFT
+
+        self.path_to_potion = None
+        for crd, tile in knowledge.visible_tiles.items():
+            if self.is_tile_with_potion(tile):
+                self.path_to_potion = self.find_path(current_position, crd)
+                break
 
 
         if not self.is_menhir_found:
-
 
             if self.is_mist_arround(knowledge, mist_arround_trehshold=4):
                 if tile_forward and not self.is_tile_mist(tile_forward):
@@ -186,6 +194,11 @@ class CamperBotController(controller.Controller):
                 if tile_left and not self.is_tile_mist(tile_left):
                     return characters.Action.STEP_LEFT
                 # TODO: find a better way to escape form mnist
+
+            if self.path_to_potion is not None and len(self.path_to_potion) > 0:
+                next_tile = self.path_to_potion.pop(0)
+                next_step_action = self.step_to_target(knowledge, next_tile)
+                return next_step_action
 
             return self.explore(current_position, facing)
 
@@ -206,6 +219,11 @@ class CamperBotController(controller.Controller):
                 # condition to stop going towards menhir as we are close
                 if self.path_to_forrest is not None and len(self.path_to_forrest) > 0:
                     next_tile = self.path_to_forrest.pop(0)
+                    next_step_action = self.step_to_target(knowledge, next_tile)
+                    return next_step_action
+                # searching for potion
+                elif self.path_to_potion is not None and len(self.path_to_potion) > 0:
+                    next_tile = self.path_to_potion.pop(0)
                     next_step_action = self.step_to_target(knowledge, next_tile)
                     return next_step_action
                 # spinning around when we are close to menhir
@@ -374,7 +392,7 @@ class CamperBotController(controller.Controller):
                 best_action = action
             elif value == best_value and np.random.uniform() > 0.5:
                 best_value = value
-                best_action = action
+                best_action = random.choice(TURNING_ACTIONS)
         return best_action
 
 
