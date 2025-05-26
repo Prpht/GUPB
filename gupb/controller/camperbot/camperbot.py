@@ -4,19 +4,21 @@ from gupb.model import characters, tiles
 import random
 import networkx as nx
 from gupb.model.coordinates import Coords
-
+import logging
+import numpy as np
 
 TURNING_ACTIONS = [characters.Action.TURN_LEFT, characters.Action.TURN_RIGHT]
 MOVEMENT_ACTIONS = [
     characters.Action.STEP_FORWARD,
     characters.Action.STEP_LEFT,
     characters.Action.STEP_RIGHT,
-    characters.Action.STEP_BACKWARD,
+    # characters.Action.STEP_BACKWARD,
+
 ]
 ATTACK_ACTIONS = [
     characters.Action.ATTACK,
 ]
-
+logger = logging.getLogger("verbose")
 
 class CamperBotController(controller.Controller):
     def __init__(self, first_name: str):
@@ -32,6 +34,7 @@ class CamperBotController(controller.Controller):
         self.path_to_forrest = None
         self.go_to_forrest = True
         self.go_to_menhir = False
+        self.seen = set()
 
     def is_mist_arround(self, knowledge: characters.ChampionKnowledge, mist_arround_trehshold: int = 2) -> bool:
         for coords, visible_tile in knowledge.visible_tiles.items():
@@ -51,7 +54,6 @@ class CamperBotController(controller.Controller):
         return dist
 
     def load_arena_to_graph(self):
-        self.arena = arenas.Arena.load(self.arena_description.name)
         self.arena_graph = nx.Graph()
 
         for coord, tile in self.arena.terrain.items():
@@ -118,10 +120,18 @@ class CamperBotController(controller.Controller):
                 return True
         return False
 
+    def is_tile_with_potion(self, tile: tiles.TileDescription) -> bool:
+        if tile.consumable and tile.consumable.name == "potion":
+            return True
+        else:
+            return False
+
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
         current_position = knowledge.position
+
         character = knowledge.visible_tiles[knowledge.position].character
         facing = character.facing
+        self.seen.update(self.visible_cords(current_position, facing))
 
         self.visited.add(current_position)
         if not self.is_menhir_found:
@@ -129,7 +139,7 @@ class CamperBotController(controller.Controller):
 
         possible_step_forward = current_position + self.step_forward(facing)
         possible_step_forward = Coords(possible_step_forward[0], possible_step_forward[1])
-
+        # ConsumableDescription(name='potion')
         possible_step_backward = current_position + self.step_backward(facing)
         possible_step_backward = Coords(possible_step_backward[0], possible_step_backward[1])
 
@@ -139,14 +149,29 @@ class CamperBotController(controller.Controller):
         possible_step_left = current_position + self.step_left(facing)
         possible_step_left = Coords(possible_step_left[0], possible_step_left[1])
 
-        priority_actions = []
-        secondary_actions = TURNING_ACTIONS.copy()
+        tile_forward = knowledge.visible_tiles.get(possible_step_forward, None)
+        tile_right = knowledge.visible_tiles.get(possible_step_right, None)
+        tile_left = knowledge.visible_tiles.get(possible_step_left, None)
+        tile_backward = knowledge.visible_tiles.get(possible_step_backward, None)
+
+        if tile_forward and tile_forward.character:
+            return characters.Action.ATTACK
+        if tile_right and tile_right.character:
+            return characters.Action.TURN_RIGHT
+        if tile_left and tile_left.character:
+            return characters.Action.TURN_LEFT
+
+
+        if tile_forward and self.is_tile_with_potion(tile_forward):
+            return characters.Action.STEP_FORWARD
+        if tile_right and self.is_tile_with_potion(tile_right):
+            return characters.Action.STEP_RIGHT
+        if tile_left and tile_right and self.is_tile_with_potion(tile_right):
+            return characters.Action.STEP_LEFT
+
 
         if not self.is_menhir_found:
-            tile_forward = knowledge.visible_tiles.get(possible_step_forward, None)
-            tile_right = knowledge.visible_tiles.get(possible_step_right, None)
-            tile_left = knowledge.visible_tiles.get(possible_step_left, None)
-            tile_backward = knowledge.visible_tiles.get(possible_step_backward, None)
+
 
             if self.is_mist_arround(knowledge):
                 if tile_forward and not self.is_tile_mist(tile_forward):
@@ -162,43 +187,13 @@ class CamperBotController(controller.Controller):
                     return characters.Action.STEP_LEFT
                 # TODO: find a better way to escape form mnist
 
-            if tile_forward and tile_forward.character:
-                return characters.Action.ATTACK
-            if tile_right and tile_right.character:
-                return characters.Action.TURN_RIGHT
-            if tile_left and tile_left.character:
-                return characters.Action.TURN_LEFT
-
-            if tile_forward and tile_forward.type not in ["sea", "wall"]:
-                if possible_step_forward not in self.visited:
-                    priority_actions.append(characters.Action.STEP_FORWARD)
-                else:
-                    secondary_actions.append(characters.Action.STEP_FORWARD)
-
-            if tile_right and tile_right.type not in ["sea", "wall"]:
-                if possible_step_right not in self.visited:
-                    priority_actions.append(characters.Action.STEP_RIGHT)
-                else:
-                    secondary_actions.append(characters.Action.STEP_RIGHT)
-
-            if tile_left and tile_left.type not in ["sea", "wall"]:
-                if possible_step_left not in self.visited:
-                    priority_actions.append(characters.Action.STEP_LEFT)
-                else:
-                    secondary_actions.append(characters.Action.STEP_LEFT)
-
-            if priority_actions:
-                return random.choice(priority_actions)
-            elif len(secondary_actions) > 2:
-                return random.choice(secondary_actions)
-            else:
-                return characters.Action.STEP_BACKWARD
+            return self.explore(current_position, facing)
 
         else:
             # Going to forrest
             if self.go_to_forrest:
                 # If we are in forrest na mnist arround - go to menhir
-                if self.is_mist_arround(knowledge):
+                if self.is_mist_arround(knowledge, mist_arround_trehshold=4):
                     self.find_path_to_menhir(knowledge)
                     next_tile = self.path_to_menhir.pop(0)
                     next_step_action = self.step_to_target(knowledge, next_tile)
@@ -206,10 +201,10 @@ class CamperBotController(controller.Controller):
                     self.go_to_menhir = True
                     return next_step_action
 
-                if self.path_to_forrest is None:
+                if len(self.forrest_tiles_list) > 0 and self.path_to_forrest is None:
                     self.find_path_to_forrest(knowledge)
                 # condition to stop going towards menhir as we are close
-                if len(self.path_to_forrest) > 0:
+                if self.path_to_forrest is not None and len(self.path_to_forrest) > 0:
                     next_tile = self.path_to_forrest.pop(0)
                     next_step_action = self.step_to_target(knowledge, next_tile)
                     return next_step_action
@@ -340,6 +335,88 @@ class CamperBotController(controller.Controller):
         elif facing == characters.Facing.DOWN:
             return Coords(1, 0)
 
+    def visible_cords(self, position: Coords, facing: characters.Facing):
+        champion = characters.Champion(position, self.arena)
+        champion.facing = facing
+        return [coord for coord in self.arena.visible_tiles(champion).keys() if isinstance(coord, Coords)]
+
+    def simulate_move(self, position: Coords, facing: characters.Facing, action: characters.Action):
+        if action == characters.Action.STEP_BACKWARD:
+            next_position, next_facing = position - facing.value, facing
+        elif action == characters.Action.STEP_FORWARD:
+            next_position, next_facing = position + facing.value, facing
+        elif action == characters.Action.STEP_LEFT:
+            next_position, next_facing = position + facing.turn_left().value, facing
+        elif action == characters.Action.STEP_RIGHT:
+            next_position, next_facing = position + facing.turn_right().value, facing
+        elif action == characters.Action.TURN_LEFT:
+            next_position, next_facing = position, facing.turn_left()
+        elif action == characters.Action.TURN_RIGHT:
+            next_position, next_facing = position, facing.turn_right()
+
+        return next_position, next_facing
+
+    def explore(self, position, facing, depth=3, discount=0.5):
+        best_action = None
+        best_value = -float("inf")
+
+        for action in TURNING_ACTIONS + MOVEMENT_ACTIONS:
+            value = self._estimate_future_gain(
+                position,
+                facing,
+                action,
+                remaining_depth=depth,
+                discount=discount,
+                already_seen=set(self.seen)  # copy
+            )
+            if value > best_value:
+                best_value = value
+                best_action = action
+            elif value == best_value and np.random.uniform() > 0.5:
+                best_value = value
+                best_action = action
+        return best_action
+
+
+    def _estimate_future_gain(
+        self,
+        position,
+        facing,
+        action,
+        remaining_depth,
+        discount,
+        already_seen
+    ):
+
+        next_position, next_facing = self.simulate_move(position, facing, action)
+
+
+        if not self.arena.terrain.get(next_position, None) or not self.arena.terrain[next_position].passable:
+            return 0
+
+        visible_now = set(self.visible_cords(next_position, next_facing))
+        new_here = visible_now - already_seen
+        gain_here = len(new_here)
+
+        if remaining_depth <= 1:
+            return gain_here
+
+        already_seen_next = already_seen.union(new_here)
+        best_future = 0.0
+
+        for next_action in TURNING_ACTIONS + MOVEMENT_ACTIONS:
+            future_gain = self._estimate_future_gain(
+                next_position,
+                next_facing,
+                next_action,
+                remaining_depth=remaining_depth - 1,
+                discount=discount,
+                already_seen=already_seen_next
+            )
+            if future_gain > best_future:
+                best_future = future_gain
+
+        return gain_here + discount * best_future
 
     def praise(self, score: int) -> None:
         pass
@@ -349,7 +426,7 @@ class CamperBotController(controller.Controller):
         self.is_menhir_found = False
         self.menhir_cords = None
         self.visited = set()
-        self.arena = None
+        self.arena = arenas.Arena.load(arena_description.name)
         self.path_to_menhir = None
         self.arena_graph = None
         self.path_to_forrest = None
@@ -368,5 +445,5 @@ class CamperBotController(controller.Controller):
 
 
 POTENTIAL_CONTROLLERS = [
-    CamperBotController("V0"),
+    CamperBotController("V2"),
 ]
