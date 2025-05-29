@@ -1,4 +1,3 @@
-from math import inf
 from gupb.model import effects
 from gupb.model import weapons
 from gupb.model import characters
@@ -12,7 +11,7 @@ RANDOM_ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-ACTIONS = [
+POSSIBLE_ACTIONS = [
     characters.Action.TURN_LEFT,
     characters.Action.TURN_RIGHT,
     characters.Action.STEP_FORWARD,
@@ -21,25 +20,14 @@ ACTIONS = [
     characters.Action.ATTACK,
 ]
 
-FACINGS = [
-    characters.Facing.DOWN,
-    characters.Facing.LEFT,
-    characters.Facing.RIGHT,
-    characters.Facing.UP,
-]
 
-DAMAGE: dict[str, int] = {
-    "land": 0,
-    "sea": +inf,
-    "wall": +inf,
-    "forest": 0,
-    "menhir": 0,
+DAMAGE_DICT: dict[str, int] = {
     "mist": effects.MIST_DAMAGE,
     "fire": effects.FIRE_DAMAGE,
     "potion": -consumables.POTION_RESTORED_HP,
     "knife": weapons.Knife.cut_effect().damage,
     "sword": weapons.Sword.cut_effect().damage,
-    "bow_loaded": weapons.Bow.cut_effect().damage,
+    "bow_loaded": weapons.Bow.cut_effect().damage / 2,
     "bow_unloaded": 0,
     "axe": weapons.Axe.cut_effect().damage,
     "amulet": weapons.Amulet.cut_effect().damage,
@@ -50,7 +38,7 @@ _bow_loaded = weapons.Bow()
 _bow_loaded.ready = True
 _bow_unloaded = weapons.Bow()
 _bow_unloaded.ready = False
-WEAPONS: dict[str, weapons.Weapon] = {
+WEAPON_DICT: dict[str, weapons.Weapon] = {
     "knife": weapons.Knife(),
     "sword": weapons.Sword(),
     "bow_loaded": _bow_loaded,
@@ -62,11 +50,13 @@ WEAPONS: dict[str, weapons.Weapon] = {
 
 WEAPON_ORDER = ("scroll", "knife", "bow_unloaded", "bow_loaded", "sword", "amulet", "axe")
 
-N_LANDMARKS = 8
 MENHIR_RADIUS = 8
 LANDMARK_RADIUS = 3
+EPSILON = 0.4
+GAMMA = 0.5
+ENEMY_CLEANUP_TIME = 4
 
-PRECOMPUTED_LANDMARKS = {
+LANDMARKS = {
     "archipelago": {
         coordinates.Coords(x=6, y=17),
         coordinates.Coords(x=47, y=3),
