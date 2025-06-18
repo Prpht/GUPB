@@ -18,7 +18,7 @@ keyboard_controller = keyboard.KeyboardController()
 
 CONFIGURATION = {
     'arenas': [
-        'ordinary_chaos',
+        'ordinary_chaos'
     ],
     'controllers': [
         random.RandomController("Alice"),
@@ -40,7 +40,7 @@ CONFIGURATION = {
     ],
     'start_balancing': False,
     'visualise': False,
-    'show_sight': None,
+    'show_sight': False,
     'runs_no': 1000,
     'profiling_metrics': [],
 }
