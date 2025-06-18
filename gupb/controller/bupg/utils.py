@@ -1,32 +1,7 @@
-import numpy as np
-
 from gupb.model import characters
 from gupb.model.characters import Facing
 from gupb.model.coordinates import Coords
-
-
-def circle_from_points(p1, p2, p3):
-    # Convert points to numpy arrays
-    A = np.array([
-        [p1[0], p1[1], 1],
-        [p2[0], p2[1], 1],
-        [p3[0], p3[1], 1]
-    ])
-
-    B = np.array([
-        -(p1[0] ** 2 + p1[1] ** 2),
-        -(p2[0] ** 2 + p2[1] ** 2),
-        -(p3[0] ** 2 + p3[1] ** 2)
-    ])
-
-    # Solve using least squares (to be safe in degenerate cases)
-    X = np.linalg.lstsq(A, B, rcond=None)[0]
-
-    # Circle center coordinates
-    cx = -0.5 * X[0]
-    cy = -0.5 * X[1]
-
-    return cx, cy
+from gupb.model.weapons import Axe, Sword, Bow, Knife, Scroll, Amulet
 
 
 def position_change_to_move(curr_pos: tuple, new_pos: tuple, facing: Facing):
@@ -45,3 +20,19 @@ def position_change_to_move(curr_pos: tuple, new_pos: tuple, facing: Facing):
         return characters.Action.STEP_RIGHT
 
     return characters.Action.DO_NOTHING
+
+
+def weapon_class(weapon_name: str):
+    if weapon_name == "axe":
+        return Axe
+    if weapon_name == "sword":
+        return Sword
+    if weapon_name == "bow_unloaded" or weapon_name == "bow_loaded":
+        return Bow
+    if weapon_name == "knife":
+        return Knife
+    if weapon_name == "scroll":
+        return Scroll
+    if weapon_name == "amulet":
+        return Amulet
+    raise Exception("No such weapon: " + weapon_name)
