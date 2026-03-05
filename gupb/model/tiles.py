@@ -57,6 +57,11 @@ class Tile(ABC):
     def terrain_transparent() -> bool:
         raise NotImplementedError
 
+    @staticmethod
+    @abstractmethod
+    def terrain_solid() -> bool:
+        raise NotImplementedError
+
     @property
     def empty(self) -> bool:
         return self.passable and not self.loot and not self.character
@@ -104,6 +109,10 @@ class Land(Tile):
     def terrain_transparent() -> bool:
         return True
 
+    @staticmethod
+    def terrain_solid() -> bool:
+        return False
+
 
 class Sea(Tile):
     @staticmethod
@@ -113,6 +122,10 @@ class Sea(Tile):
     @staticmethod
     def terrain_transparent() -> bool:
         return True
+
+    @staticmethod
+    def terrain_solid() -> bool:
+        return False
 
 
 class Wall(Tile):
@@ -124,6 +137,10 @@ class Wall(Tile):
     def terrain_transparent() -> bool:
         return False
 
+    @staticmethod
+    def terrain_solid() -> bool:
+        return True
+
 
 class Forest(Tile):
     @staticmethod
@@ -134,6 +151,10 @@ class Forest(Tile):
     def terrain_transparent() -> bool:
         return False
 
+    @staticmethod
+    def terrain_solid() -> bool:
+        return False
+
 
 class Menhir(Tile):
     @staticmethod
@@ -142,6 +163,10 @@ class Menhir(Tile):
 
     @staticmethod
     def terrain_transparent() -> bool:
+        return True
+
+    @staticmethod
+    def terrain_solid() -> bool:
         return True
 
 

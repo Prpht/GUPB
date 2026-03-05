@@ -41,8 +41,8 @@ class Weapon(ABC):
         return True
 
     @classmethod
-    def cut_transparent(cls, arena: arenas.Arena, position: coordinates.Coords) -> None:
-        if position in arena.terrain and arena.terrain[position].terrain_transparent():
+    def cut_non_solid(cls, arena: arenas.Arena, position: coordinates.Coords) -> None:
+        if position in arena.terrain and not arena.terrain[position].terrain_solid():
             arena.register_effect(cls.cut_effect(), position)
 
     @staticmethod
@@ -76,7 +76,7 @@ class LineWeapon(Weapon, ABC):
 
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
-            self.cut_transparent(arena, cut_position)
+            self.cut_non_solid(arena, cut_position)
 
 
 class PropheticWeapon(Weapon, ABC):
@@ -154,7 +154,7 @@ class Axe(Weapon):
 
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
-            self.cut_transparent(arena, cut_position)
+            self.cut_non_solid(arena, cut_position)
 
 
 class Amulet(PropheticWeapon, Weapon):
@@ -182,7 +182,7 @@ class Amulet(PropheticWeapon, Weapon):
 
     def cut(self, arena: arenas.Arena, position: coordinates.Coords, facing: characters.Facing) -> None:
         for cut_position in self.cut_positions(arena.terrain, position, facing):
-            self.cut_transparent(arena, cut_position)
+            self.cut_non_solid(arena, cut_position)
 
 
 class Scroll(LineWeapon):
