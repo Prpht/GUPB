@@ -12,10 +12,15 @@ The projects requires Python 3.11 or higher.
 
 ## Installation
 
-When in project root directory install the requirements using the following command.
-Using `virtualenv` is recommended, as it will allow to isolate the installed dependencies from main environment.
+When in project root directory install the requirements using one of the following commands.
+Using a virtual environment is recommended, as it will allow to isolate the installed dependencies from main environment.
 ```
 pip install -r requirements.txt
+```
+
+Alternatively, you can install the project using `uv`:
+```
+uv pip install .
 ```
 
 ## Usage
