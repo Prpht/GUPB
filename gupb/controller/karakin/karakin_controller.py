@@ -1,5 +1,3 @@
-import random
-
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
