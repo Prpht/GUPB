@@ -19,12 +19,7 @@ class KarakinController(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return random.choice([
-            characters.Action.TURN_LEFT,
-            characters.Action.TURN_RIGHT,
-            characters.Action.STEP_FORWARD,
-            characters.Action.ATTACK,
-        ])
+        return characters.Action.ATTACK
 
     def praise(self, score: int) -> None:
         pass
