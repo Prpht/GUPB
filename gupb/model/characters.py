@@ -58,6 +58,7 @@ class Tabard(Enum):
     KIRBY = 'Kirby'
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
+    SYNTAX_TERROR = 'Syntax Terror'
 
 
 class Champion:
