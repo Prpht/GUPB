@@ -1,10 +1,10 @@
-from .benjamin_netanyahu import BenjaminNetanyahu
+from .czak_norris import CzakNoris
 
 __all__ = [
-    "BenjaminNetanyahu",
+    "CzakNoris",
     "POTENTIAL_CONTROLLERS",
 ]
 
 POTENTIAL_CONTROLLERS = [
-    BenjaminNetanyahu("Benjamin Netanyahu"),
+    CzakNoris("Czak Norris"),
 ]
