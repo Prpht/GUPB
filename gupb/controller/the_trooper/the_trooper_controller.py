@@ -28,4 +28,4 @@ class TheTrooper(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.PINK
+        return characters.Tabard.THE_TROOPER
