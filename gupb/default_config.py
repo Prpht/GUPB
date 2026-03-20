@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller import bitbot
+from gupb.controller import bigbot
 
 keyboard_controller = keyboard.KeyboardController()
 
@@ -14,7 +14,7 @@ CONFIGURATION = {
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
         keyboard_controller,
-        bitgot.BIGbot("BIGbot"),
+        bigbot.BIGbot("BIGbot"),
     ],
     'start_balancing': False,
     'visualise': True,

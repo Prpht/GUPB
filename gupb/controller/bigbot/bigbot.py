@@ -13,7 +13,7 @@ from gupb.model import arenas
 from gupb.model import characters
 from gupb.model import coordinates
 
-from gupb.controller import observation_parser
+from . import observation_parser
 
 # Rozmiar wejścia sieci – użyj przy definicji modelu (np. warstwa wejściowa)
 INPUT_DIM = observation_parser.INPUT_DIM
