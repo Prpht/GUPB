@@ -1,6 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
-from gupb.controller import simple_nn_bot
+from gupb.controller import bitbot
 
 keyboard_controller = keyboard.KeyboardController()
 
@@ -14,7 +14,7 @@ CONFIGURATION = {
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
         keyboard_controller,
-        simple_nn_bot.SimpleNNBot("BigBot"), # Sonia Weiss, Stanisław Mościcki, Wojciech Maćkowiak
+        bitgot.BIGbot("BIGbot"),                # Sonia Weiss, Stanisław Mościcki, Wojciech Maćkowiak
     ],
     'start_balancing': False,
     'visualise': True,
