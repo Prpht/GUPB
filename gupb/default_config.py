@@ -14,7 +14,7 @@ CONFIGURATION = {
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
         keyboard_controller,
-        bitgot.BIGbot("BIGbot"),                # Sonia Weiss, Stanisław Mościcki, Wojciech Maćkowiak
+        bitgot.BIGbot("BIGbot"),
     ],
     'start_balancing': False,
     'visualise': True,
