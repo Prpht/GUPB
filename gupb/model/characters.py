@@ -35,7 +35,7 @@ class ChampionDescription(NamedTuple):
 
 class Tabard(Enum):
     BLUE = 'Blue'
-    BENJAMIN_NETANYAHU = 'Benjamin Netanyahu'
+    CZAK_NORIS = 'Czak Noris'
     BROWN = 'Brown'
     GREY = 'Grey'
     GREEN = 'Green'

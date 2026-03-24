@@ -3,12 +3,12 @@ from gupb.model import arenas
 from gupb.model import characters
 
 
-class BenjaminNetanyahu(controller.Controller):
+class CzakNoris(controller.Controller):
     def __init__(self, bot_name: str) -> None:
         self.bot_name = bot_name
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, BenjaminNetanyahu):
+        if isinstance(other, CzakNoris):
             return self.bot_name == other.bot_name
         return False
 
@@ -30,4 +30,4 @@ class BenjaminNetanyahu(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.BENJAMIN_NETANYAHU
+        return characters.Tabard.CZAK_NORIS
