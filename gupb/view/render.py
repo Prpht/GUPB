@@ -76,6 +76,7 @@ class SpriteRepository:
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
             characters.Tabard.JEFFREY_E: load_sprite('characters', 'jeffrey_e', BLACK),
+            characters.Tabard.KARAKIN: load_sprite('characters', 'karakin', BLACK),
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
@@ -106,6 +107,7 @@ class SpriteRepository:
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
                     characters.Tabard.JEFFREY_E,
+                    characters.Tabard.KARAKIN,
                 ],
                 [
                     characters.Facing.RIGHT,

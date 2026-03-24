@@ -60,6 +60,7 @@ class Tabard(Enum):
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
     JEFFREY_E = 'JeffreyE'
+    KARAKIN = 'Karakin'
 
 
 class Champion:
