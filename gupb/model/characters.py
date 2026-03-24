@@ -37,6 +37,7 @@ class Tabard(Enum):
     BLUE = 'Blue'
     BENJAMIN_NETANYAHU = 'Benjamin Netanyahu'
     THE_TROOPER = 'The Trooper'
+    BOB = 'Bob'
     BROWN = 'Brown'
     GREY = 'Grey'
     GREEN = 'Green'
@@ -60,6 +61,8 @@ class Tabard(Enum):
     KIRBY = 'Kirby'
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
+    JEFFREY_E = 'JeffreyE'
+    KARAKIN = 'Karakin'
 
 
 class Champion:
@@ -91,7 +94,10 @@ class Champion:
             self.store_previous_state()
             action = self.pick_action()
             verbose_logger.debug(f"Champion {self.verbose_name()} picked action {action}.")
-            ChampionPickedActionReport(self.verbose_name(), action.name).log(logging.DEBUG)
+            action_name = getattr(action, 'name', None) or getattr(
+                getattr(action, 'func', action), '__name__', str(action)
+            )
+            ChampionPickedActionReport(self.verbose_name(), action_name).log(logging.DEBUG)
             action(self)
             self.arena.stay(self)
             self.assess_idle_penalty()
