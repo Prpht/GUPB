@@ -63,6 +63,8 @@ class SpriteRepository:
 
             characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
             characters.Tabard.BENJAMIN_NETANYAHU: load_sprite('characters', 'champion_benjamin_netanyahu', BLACK),
+            characters.Tabard.THE_TROOPER: load_sprite('characters', 'champion_the_trooper', BLACK),
+            characters.Tabard.BOB: load_sprite('characters', 'champion_bob', BLACK),
             characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
             characters.Tabard.GREY: load_sprite('characters', 'champion_grey', BLACK),
             characters.Tabard.GREEN: load_sprite('characters', 'champion_green', BLACK),
@@ -75,6 +77,8 @@ class SpriteRepository:
             characters.Tabard.VIOLET: load_sprite('characters', 'champion_violet', BLACK),
             characters.Tabard.WHITE: load_sprite('characters', 'champion_white', BLACK),
             characters.Tabard.YELLOW: load_sprite('characters', 'champion_yellow', BLACK),
+            characters.Tabard.JEFFREY_E: load_sprite('characters', 'jeffrey_e', BLACK),
+            characters.Tabard.KARAKIN: load_sprite('characters', 'karakin', BLACK),
 
             effects.Mist: load_sprite('effects', 'mist', BLACK),
             effects.WeaponCut: load_sprite('effects', 'blood', BLACK),
@@ -92,6 +96,8 @@ class SpriteRepository:
                 [
                     characters.Tabard.BLUE,
                     characters.Tabard.BENJAMIN_NETANYAHU,
+                    characters.Tabard.THE_TROOPER,
+                    characters.Tabard.BOB,
                     characters.Tabard.BROWN,
                     characters.Tabard.GREY,
                     characters.Tabard.GREEN,
@@ -104,6 +110,8 @@ class SpriteRepository:
                     characters.Tabard.VIOLET,
                     characters.Tabard.WHITE,
                     characters.Tabard.YELLOW,
+                    characters.Tabard.JEFFREY_E,
+                    characters.Tabard.KARAKIN,
                 ],
                 [
                     characters.Facing.RIGHT,
