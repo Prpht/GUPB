@@ -62,6 +62,7 @@ class Tabard(Enum):
     KIRBY = 'Kirby'
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
+    SYNTAX_TERROR = 'SyntaxTerror'
     JEFFREY_E = 'JeffreyE'
     KARAKIN = 'Karakin'
 
