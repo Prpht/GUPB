@@ -10,3 +10,4 @@ env
 plots/
 weights/
 resources/arenas/generated_*.gupb
+.env/

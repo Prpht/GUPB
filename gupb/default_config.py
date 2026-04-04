@@ -1,8 +1,10 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller import bigbot
+from gupb.controller.pudzian import Pudzian
 
 keyboard_controller = keyboard.KeyboardController()
+pudzian_controller = Pudzian("Pudzian")
 
 CONFIGURATION = {
     'arenas': [
@@ -13,13 +15,14 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        keyboard_controller,
-        bigbot.BIGbot("BIGbot"),
+        pudzian_controller,
+        # keyboard_controller,
+        # bigbot.BIGbot("BIGbot"),
     ],
     'start_balancing': False,
-    'visualise': True,
-    'show_sight': keyboard_controller,
-    'runs_no': 2,
+    'visualise': False,
+    'show_sight': pudzian_controller,
+    'runs_no': 256,
     'profiling_metrics': [],
 }
 
