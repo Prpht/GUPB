@@ -14,7 +14,6 @@ class QStrategy(Strategy):
         self.alpha = 0.25
         self.gamma = 0.95
         self.epsilon = 0.20
-        self.epsilon_decay = 0.9
 
         self.q_table: dict[tuple[tuple, characters.Action], float] = defaultdict(float) # Q(state, action) -> value; Q[((1,0,1,0,0,1), STEP_FORWARD)] = 0.73
 
@@ -27,7 +26,6 @@ class QStrategy(Strategy):
         self.menhir_position: Optional[Coords] = None
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self.q_table.clear()
         self.last_state = None
         self.last_action = None
         self.last_position = None
@@ -73,8 +71,6 @@ class QStrategy(Strategy):
             new_q = old_q + self.alpha * (final_reward - old_q)
             self.q_table[(self.last_state, self.last_action)] = new_q
 
-        self.epsilon = max(0.05, self.epsilon * self.epsilon_decay)
-
     def _build_state(self, knowledge: characters.ChampionKnowledge) -> tuple:
         position = knowledge.position
         facing = self._get_my_facing(knowledge)
@@ -104,10 +100,10 @@ class QStrategy(Strategy):
             characters.Action.TURN_RIGHT,
             characters.Action.STEP_FORWARD,
             characters.Action.ATTACK,
-            characters.Action.STEP_LEFT,
-            characters.Action.STEP_RIGHT,
-            characters.Action.STEP_BACKWARD,
-            # characters.Action.DO_NOTHING,
+            #characters.Action.STEP_LEFT, caused worse results, maybe the state is too simple
+            #characters.Action.STEP_RIGHT,
+            #characters.Action.STEP_BACKWARD,
+            #characters.Action.DO_NOTHING,
         ]
 
     def _choose_action(self, state: tuple) -> characters.Action:
@@ -145,30 +141,21 @@ class QStrategy(Strategy):
         if previous_position is None:
             return 0.0
 
-        reward = 0
-
-        if self.menhir_position is not None:
-            previous_distance = self._distance(previous_position, self.menhir_position)
-            current_distance = self._distance(current_position, self.menhir_position)
-            if previous_distance is not None and current_distance is not None:
-                if current_distance < previous_distance:
-                    reward += 0.5
-                elif current_distance > previous_distance:
-                    reward -= 0.5
+        reward = -0.05
 
         if current_position == previous_position:
-            reward -= 0.5
+            reward -= 0.4
+        else:
+            reward += 0.1
 
-        if previous_action == characters.Action.ATTACK and self._enemy_ahead(knowledge):
-            reward += 1.0
+        if previous_action == characters.Action.ATTACK:
+            if self._enemy_ahead(knowledge):
+                reward += 0.4
+            else:
+                reward -= 0.2
 
         if current_position in self.visited:
-            reward -= 0.3
-        else:
-            reward += 0.3
-
-        if self._loot_visible(knowledge):
-            reward += 0.5
+            reward -= 0.1
 
         return reward
 
@@ -192,6 +179,8 @@ class QStrategy(Strategy):
         return knowledge.visible_tiles.get(coords)
 
     def _is_blocked(self, tile) -> bool:
+        if tile is None:
+            return True
         return tile.type in {"wall", "sea"}
 
     def _enemy_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
