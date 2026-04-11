@@ -19,7 +19,7 @@ class KarakinController(controller.Controller):
             first_name: str = "Karakin_SARSA",
             step_size: float = 0.1,
             step_no: int = 3,
-            experiment_rate: float = 1.0,
+            experiment_rate: float = 0.05,
             discount_factor: float = 0.9,
             is_training: bool = True
         ) -> None:
@@ -30,11 +30,10 @@ class KarakinController(controller.Controller):
         self.step_size: float = step_size if is_training else 0.0
         self.step_no: int = step_no
         self.experiment_rate: float = experiment_rate if is_training else 0.0
-        self.experiment_rate_min: float = 0.05
-        self.experiment_rate_decay: float = 0.995
         self.discount_factor: float = discount_factor
         self.is_training: bool = is_training
-        self.available_actions = ["STEP_FORWARD", "TURN_LEFT", "TURN_RIGHT", "ATTACK"]
+        
+        self.available_actions = ["STEP_FORWARD", "TURN_LEFT", "TURN_RIGHT", "STEP_BACKWARD"]
         
         self.q: dict[tuple[tuple, str], float] = collections.defaultdict(float)
         self._load_q_table()
@@ -144,7 +143,7 @@ class KarakinController(controller.Controller):
                 "STEP_FORWARD": characters.Action.STEP_FORWARD,
                 "TURN_LEFT": characters.Action.TURN_LEFT,
                 "TURN_RIGHT": characters.Action.TURN_RIGHT,
-                "ATTACK": characters.Action.ATTACK
+                "STEP_BACKWARD": characters.Action.STEP_BACKWARD
             }
             return action_map[action]
 
@@ -163,9 +162,6 @@ class KarakinController(controller.Controller):
                 self._perform_update(update_step)
                 
             self._save_q_table()
-            
-            if self.experiment_rate > self.experiment_rate_min:
-                self.experiment_rate *= self.experiment_rate_decay
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.current_step = 0
@@ -183,36 +179,50 @@ class KarakinController(controller.Controller):
         own_tile = visible.get(pos)
         
         if not own_tile or not own_tile.character:
-            return ("None", "11+", False, False)
+            return ("Healthy", "None", "None", "11+", False, False, False)
             
         facing = own_tile.character.facing
-        dist = "11+"
-        if self._center:
-            d = abs(pos.x - self._center.x) + abs(pos.y - self._center.y)
-            if d <= 5: dist = "0-5"
-            elif d <= 10: dist = "6-10"
-
-        enemy_in_range = False
-        path_blocked = False
-        tile_in_front_pos = coordinates.add_coords(pos, facing.value)
-        tile_in_front = visible.get(tile_in_front_pos)
         
-        if tile_in_front:
-            if tile_in_front.type in ("wall", "sea"):
-                path_blocked = True
-            if tile_in_front.character:
-                path_blocked = True
-                enemy_in_range = True
+        health_status = "Healthy" if own_tile.character.health > 15 else "Critical"
 
-        mist_dir = "None"
-        for d_name, d_vec in [("Front", facing.value), ("Back", facing.opposite().value), 
-                              ("Left", facing.turn_left().value), ("Right", facing.turn_right().value)]:
-            check_pos = coordinates.add_coords(pos, d_vec)
-            if check_pos in visible and any(e.type == "mist" for e in visible[check_pos].effects):
-                mist_dir = d_name
-                break
+        dist = "9+"
+        target_dir = "None"
+        
+        if self._center:
+            d = abs(pos[0] - self._center[0]) + abs(pos[1] - self._center[1])
+            if d <= 3: dist = "0-3"
+            elif d <= 8: dist = "4-8"
 
-        return (mist_dir, dist, enemy_in_range, path_blocked)
+            min_d = float('inf')
+            for d_name, d_vec in [("Front", facing.value), ("Back", facing.opposite().value), 
+                                  ("Left", facing.turn_left().value), ("Right", facing.turn_right().value)]:
+                neighbor_pos = coordinates.add_coords(pos, d_vec)
+                neighbor_d = abs(neighbor_pos[0] - self._center[0]) + abs(neighbor_pos[1] - self._center[1])
+                if neighbor_d < min_d:
+                    min_d = neighbor_d
+                    target_dir = d_name
+
+        def is_blocked(c: coordinates.Coords) -> bool:
+            t = visible.get(c)
+            if t:
+                return t.type in ("wall", "sea") or t.character is not None
+            return False
+
+        path_blocked = is_blocked(coordinates.add_coords(pos, facing.value))
+        wall_left = is_blocked(coordinates.add_coords(pos, facing.turn_left().value))
+        wall_right = is_blocked(coordinates.add_coords(pos, facing.turn_right().value))
+
+        mist_threat = "None"
+        for t_pos, tile in visible.items():
+            if any(e.type == "mist" for e in tile.effects):
+                if mist_threat == "None":
+                    mist_threat = "Far"
+                
+                if abs(pos[0] - t_pos[0]) + abs(pos[1] - t_pos[1]) == 1:
+                    mist_threat = "Adjacent"
+                    break
+
+        return (health_status, mist_threat, target_dir, dist, path_blocked, wall_left, wall_right)
 
     def _calculate_reward(self, knowledge: characters.ChampionKnowledge) -> float:
         reward = -0.1
