@@ -23,22 +23,17 @@ class QStrategy(Strategy):
 
         self.visited: set[Coords] = set()
 
-        self.menhir_position: Optional[Coords] = None
-
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.last_state = None
         self.last_action = None
         self.last_position = None
         self.visited = set()
-        self.menhir_position = None
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
 
         current_position = knowledge.position
         current_state = self._build_state(knowledge)
 
-        if self.menhir_position is None and self._find_menhir(knowledge) is not None:
-            self.menhir_position = self._find_menhir(knowledge)
 
         reward = self._compute_step_reward(
             knowledge=knowledge,
@@ -143,6 +138,9 @@ class QStrategy(Strategy):
 
         reward = -0.05
 
+        if self._is_mist_visible(knowledge):
+            reward -= 0.4
+
         if current_position == previous_position:
             reward -= 0.4
         else:
@@ -213,12 +211,10 @@ class QStrategy(Strategy):
             if tile.consumable is not None:
                 return True
         return False
+
+    def _is_mist_visible(self, knowledge: characters.ChampionKnowledge) -> bool:
+        return any(
+            any(effect.type == "mist" for effect in tile.effects)
+            for tile in knowledge.visible_tiles.values()
+        )
     
-    def _find_menhir(self, knowledge: characters.ChampionKnowledge) -> Optional[Coords]:
-        for coords, tile in knowledge.visible_tiles.items():
-            if tile.type == "menhir":
-                return coords
-        return None
-    
-    def _distance(self, a: Coords, b: Coords) -> int:
-        return abs(a.x - b.x) + abs(a.y - b.y)
