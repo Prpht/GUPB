@@ -13,7 +13,7 @@ CONFIGURATION = {
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        keyboard_controller,
+        # keyboard_controller,
         bigbot.BIGbot("BIGbot"),
     ],
     'start_balancing': False,

@@ -1,7 +1,6 @@
-from .bigbot import BIGbot, POTENTIAL_CONTROLLERS, network_predict
+from .bigbot import BIGbot, POTENTIAL_CONTROLLERS
 
 __all__ = [
     "BIGbot",
     "POTENTIAL_CONTROLLERS",
-    "network_predict",
 ]
