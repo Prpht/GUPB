@@ -1,26 +1,27 @@
 from gupb import controller
 from gupb.model import arenas, characters
 
+from .strategies.q_learning import QLearningStrategy
+
 class TheTrooper(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name = first_name
-    
+        self.strategy = QLearningStrategy()
+
     def __hash__(self):
         return hash(self.first_name)
-    
+
     def __eq__(self, value):
-        if isinstance(value, TheTrooper):
-            return self.first_name == value.first_name
-        return False
+        return isinstance(value, TheTrooper) and self.first_name == value.first_name
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        raise NotImplementedError
+        return self.strategy.decide(knowledge)
 
     def praise(self, score: int) -> None:
-        raise NotImplementedError
+        self.strategy.praise(score)
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        raise NotImplementedError
+        self.strategy.reset(game_no, arena_description)
 
     @property
     def name(self) -> str:
