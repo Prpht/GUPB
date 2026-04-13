@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+"""
+BenjaminNetanyahu ma 3 gotowe tryby heurystyczne:
+- `normal`
+- `aggressive`
+- `passive`
+
+W wersji z inferencja bot korzysta z malej sieci (40 x 64 x 64 x 3).
+Wagi sa zapisane w pliku `benjamin_weights.pt`.
+
+W praktyce bot patrzy na aktualny stan gry, siec wybiera jeden z 3 trybow,
+a wybrany tryb prowadzi postac przez kolejne 3 tury.
+Potem wybor jest odswiezany ponownie.
+"""
+
 from enum import Enum
 from typing import Callable, Optional
 

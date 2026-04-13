@@ -60,6 +60,7 @@ class _CPUModePolicy:
 class BenjaminNetanyahuDQN(BenjaminNetanyahu):
     """
     Final CPU-only inference bot for Benjamin mode selection.
+    Fallback to heuristic selector is allowed only when loading weights fails.
     """
 
     def __init__(
@@ -72,9 +73,15 @@ class BenjaminNetanyahuDQN(BenjaminNetanyahu):
         resolved_checkpoint_path = checkpoint_path or DEFAULT_BUNDLED_CHECKPOINT_PATH
         self.checkpoint_path = resolved_checkpoint_path
         self.policy: Optional[_CPUModePolicy] = None
+        self._fallback_after_load_error: bool = False
+        self._load_error: Optional[str] = None
         self._feature_tracker = TemporalFeatureTracker()
-        if os.path.exists(resolved_checkpoint_path):
+        try:
             self.policy = _CPUModePolicy(resolved_checkpoint_path)
+        except Exception as exc:
+            self.policy = None
+            self._fallback_after_load_error = True
+            self._load_error = f"{type(exc).__name__}: {exc}"
 
         super().__init__(
             bot_name=bot_name,
@@ -87,6 +94,16 @@ class BenjaminNetanyahuDQN(BenjaminNetanyahu):
         self._feature_tracker.reset()
         super().reset(game_no, arena_description)
 
+    def _resolve_mode_choice(self, knowledge: characters.ChampionKnowledge) -> BenjaminMode:
+        if self._pending_mode is not None:
+            chosen_mode = self._pending_mode
+            self._pending_mode = None
+            return chosen_mode
+        if self._mode_selector is None:
+            raise RuntimeError("Mode selector is not configured for BenjaminNetanyahuDQN.")
+        mode_choice = self._mode_selector(knowledge, self.current_mode, self._turns_taken)
+        return self._normalise_mode_choice(mode_choice)
+
     def _select_mode(
             self,
             knowledge: characters.ChampionKnowledge,
@@ -96,7 +113,10 @@ class BenjaminNetanyahuDQN(BenjaminNetanyahu):
         _ = turns_taken
         temporal = self._feature_tracker.update(knowledge)
         if self.policy is None:
-            return self._choose_mode(knowledge)
+            if self._fallback_after_load_error:
+                # Explicit fallback: only when loading DQN weights failed.
+                return self._choose_mode(knowledge)
+            raise RuntimeError("DQN policy is missing and no load-error fallback is allowed.")
 
         features = extract_benjamin_features(
             knowledge=knowledge,
@@ -110,10 +130,13 @@ class BenjaminNetanyahuDQN(BenjaminNetanyahu):
             was_hit_recently_override=temporal.was_hit_recently,
         )
         if int(features.shape[0]) != self.policy.input_dim:
-            return self._choose_mode(knowledge)
+            raise RuntimeError(
+                f"Feature size mismatch: got {int(features.shape[0])}, "
+                f"checkpoint expects {self.policy.input_dim}."
+            )
 
         mode_index = self.policy.select_mode_index(features)
         try:
             return self.mode_from_index(mode_index)
         except ValueError:
-            return self._choose_mode(knowledge)
+            raise RuntimeError(f"Invalid mode index predicted by policy: {mode_index}.")
