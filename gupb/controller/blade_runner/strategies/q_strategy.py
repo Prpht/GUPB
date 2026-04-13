@@ -187,7 +187,7 @@ class QStrategy(Strategy):
             reward -= 0.4
 
         if current_position == previous_position:
-            reward -= 0.3
+            reward -= 0.4
         else:
             reward += 0.1
 
@@ -198,7 +198,7 @@ class QStrategy(Strategy):
                 reward -= 0.2
 
         if current_position in self.visited:
-            reward -= 0.2
+            reward -= 0.1
 
         return reward
 
