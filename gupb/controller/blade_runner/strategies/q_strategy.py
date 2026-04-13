@@ -8,6 +8,8 @@ from .strategy_api import Strategy
 from gupb.model import characters, arenas
 from gupb.model.coordinates import Coords
 
+from gupb.controller.blade_runner.strategies.navigation import Navigator
+
 
 class QStrategy(Strategy):
     def __init__(self) -> None:
@@ -22,14 +24,19 @@ class QStrategy(Strategy):
         self.last_position: Optional[Coords] = None
 
         self.visited: set[Coords] = set()
+        self.blocking_tiles: set[Coords] = set()
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         self.last_state = None
         self.last_action = None
         self.last_position = None
         self.visited = set()
+        self.blocking_tiles: set[Coords] = set()
 
-    def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
+    def decide(
+            self, 
+            knowledge: characters.ChampionKnowledge,
+        ) -> characters.Action:
 
         current_position = knowledge.position
         current_state = self._build_state(knowledge)
@@ -48,9 +55,17 @@ class QStrategy(Strategy):
                 prev_action=self.last_action,
                 reward=reward,
                 next_state=current_state,
+                knowledge=knowledge
             )
 
-        action = self._choose_action(current_state)
+        self.blocking_tiles = Navigator.update_blocking_tiles(knowledge=knowledge, blocking_tiles=self.blocking_tiles)
+        
+        fight_action = self._fight_policy(knowledge)
+
+        if not Navigator._is_mist_visible(knowledge) and fight_action is not None:
+            action = fight_action
+        else:
+            action = self._choose_action(current_state, knowledge)
 
         self.last_state = current_state
         self.last_action = action
@@ -68,16 +83,16 @@ class QStrategy(Strategy):
 
     def _build_state(self, knowledge: characters.ChampionKnowledge) -> tuple:
         position = knowledge.position
-        facing = self._get_my_facing(knowledge)
+        facing = Navigator._get_my_facing(knowledge)
 
-        front_coords = self._get_front_coords(position, facing)
-        front_tile = self._get_tile(knowledge, front_coords)
+        front_coords = Navigator._get_front_coords(position, facing)
+        front_tile = Navigator._get_tile(knowledge, front_coords)
 
-        blocked_front = int(self._is_blocked(front_tile))
-        enemy_in_front = int(self._enemy_ahead(knowledge))
-        enemy_visible = int(self._enemy_visible(knowledge))
-        loot_visible = int(self._loot_visible(knowledge))
-        consumable_visible = int(self._consumable_visible(knowledge))
+        blocked_front = int(Navigator._is_blocked(front_tile))
+        enemy_in_front = int(Navigator._enemy_ahead(knowledge))
+        enemy_visible = int(Navigator._enemy_visible(knowledge))
+        loot_visible = int(Navigator._loot_visible(knowledge))
+        consumable_visible = int(Navigator._consumable_visible(knowledge))
         repeated_position = int(position in self.visited)
 
         return (
@@ -89,20 +104,49 @@ class QStrategy(Strategy):
             repeated_position,
         )
 
-    def _available_actions(self) -> list[characters.Action]:
-        return [
-            characters.Action.TURN_LEFT,
-            characters.Action.TURN_RIGHT,
-            characters.Action.STEP_FORWARD,
+    def _available_actions(self, knowledge: characters.ChampionKnowledge) -> list[characters.Action]:
+        available_actions = [
             characters.Action.ATTACK,
-            #characters.Action.STEP_LEFT, caused worse results, maybe the state is too simple
-            #characters.Action.STEP_RIGHT,
-            #characters.Action.STEP_BACKWARD,
-            #characters.Action.DO_NOTHING,
         ]
 
-    def _choose_action(self, state: tuple) -> characters.Action:
-        actions = self._available_actions()
+        if self.last_action is not characters.Action.TURN_LEFT:
+            available_actions.append(characters.Action.TURN_RIGHT)
+
+        if self.last_action is not characters.Action.TURN_RIGHT:
+            available_actions.append(characters.Action.TURN_LEFT)
+
+        position = knowledge.position
+
+        facing = Navigator._get_my_facing(knowledge=knowledge)
+        facing_vec = Navigator._facing_to_vector(facing=facing)
+
+        # FORWARD
+        if position + facing_vec not in self.blocking_tiles:
+            available_actions.append(characters.Action.STEP_FORWARD)
+
+        # BACKWARD
+        back_facing = facing.turn_left().turn_left()
+        back_vec = Navigator._facing_to_vector(back_facing)
+        if position + back_vec not in self.blocking_tiles:
+            available_actions.append(characters.Action.STEP_BACKWARD)
+
+        # LEFT
+        left_facing = facing.turn_left()
+        left_vec = Navigator._facing_to_vector(left_facing)
+        if position + left_vec not in self.blocking_tiles:
+            available_actions.append(characters.Action.STEP_LEFT)
+
+        # RIGHT
+        right_facing = facing.turn_right()
+        right_vec = Navigator._facing_to_vector(right_facing)
+        if position + right_vec not in self.blocking_tiles:
+            available_actions.append(characters.Action.STEP_RIGHT)
+
+        return available_actions
+
+
+    def _choose_action(self, state: tuple, knowledge: characters.ChampionKnowledge) -> characters.Action:
+        actions = self._available_actions(knowledge=knowledge)
 
         if random.random() < self.epsilon:
             return random.choice(actions)
@@ -117,9 +161,10 @@ class QStrategy(Strategy):
         prev_action: characters.Action,
         reward: float,
         next_state: tuple,
+        knowledge: characters.ChampionKnowledge
     ) -> None:
         old_q = self._get_q(prev_state, prev_action)
-        max_next_q = max(self._get_q(next_state, action) for action in self._available_actions())
+        max_next_q = max(self._get_q(next_state, action) for action in self._available_actions(knowledge))
         new_q = old_q + self.alpha * (reward + self.gamma * max_next_q - old_q) # page 131
         self.q_table[(prev_state, prev_action)] = new_q
 
@@ -135,86 +180,63 @@ class QStrategy(Strategy):
     ) -> float:
         if previous_position is None:
             return 0.0
-
+        
         reward = -0.05
 
-        if self._is_mist_visible(knowledge):
+        if Navigator._is_mist_visible(knowledge):
             reward -= 0.4
 
         if current_position == previous_position:
-            reward -= 0.4
+            reward -= 0.3
         else:
             reward += 0.1
 
         if previous_action == characters.Action.ATTACK:
-            if self._enemy_ahead(knowledge):
+            if Navigator._enemy_ahead(knowledge):
                 reward += 0.4
             else:
                 reward -= 0.2
 
         if current_position in self.visited:
-            reward -= 0.1
+            reward -= 0.2
 
         return reward
 
-    def _get_my_facing(self, knowledge: characters.ChampionKnowledge):
-        my_tile = knowledge.visible_tiles[knowledge.position]
-        return my_tile.character.facing
+    def _fight_policy(self, knowledge: characters.ChampionKnowledge) -> Optional[characters.Action]:
 
-    def _facing_to_vector(self, facing) -> Coords:
-        if facing == characters.Facing.UP:
-            return Coords(0, -1)
-        if facing == characters.Facing.DOWN:
-            return Coords(0, 1)
-        if facing == characters.Facing.LEFT:
-            return Coords(-1, 0)
-        return Coords(1, 0)
+        # Don't use fighting policy if enemy is far
+        enemy = Navigator._closest_enemy(knowledge)
+        if enemy is None:
+            return None
 
-    def _get_front_coords(self, position: Coords, facing) -> Coords:
-        return position + self._facing_to_vector(facing)
+        my_pos = knowledge.position
 
-    def _get_tile(self, knowledge: characters.ChampionKnowledge, coords: Coords):
-        return knowledge.visible_tiles.get(coords)
+        if Navigator._is_blocking_in_line(my_pos, Coords(*enemy), blocking_tiles=self.blocking_tiles):
+            return None
 
-    def _is_blocked(self, tile) -> bool:
-        if tile is None:
-            return True
-        return tile.type in {"wall", "sea"}
+        # Escape if hp is low
+        agent_hp = knowledge.visible_tiles[knowledge.position].character.health
+        enemy_hp = knowledge.visible_tiles[Coords(*enemy)].character.health
 
-    def _enemy_ahead(self, knowledge: characters.ChampionKnowledge) -> bool:
-        position = knowledge.position
-        facing = self._get_my_facing(knowledge)
-        front_coords = self._get_front_coords(position, facing)
-        front_tile = self._get_tile(knowledge, front_coords)
+        if agent_hp < min(enemy_hp, characters.CHAMPION_STARTING_HP/3):
+            return None
+        
+        # Fight
+        if Navigator._enemy_ahead(knowledge):
+            return characters.Action.ATTACK
 
-        if front_tile is None:
-            return False
-        return front_tile.character is not None
+        dx = enemy[0] - my_pos[0]
+        dy = enemy[1] - my_pos[1]
 
-    def _enemy_visible(self, knowledge: characters.ChampionKnowledge) -> bool:
-        my_position = knowledge.position
-        for coords, tile in knowledge.visible_tiles.items():
-            if coords == my_position:
-                continue
-            if tile.character is not None:
-                return True
-        return False
+        if abs(dx) > abs(dy):
+            target = characters.Facing.RIGHT if dx > 0 else characters.Facing.LEFT
+        else:
+            target = characters.Facing.DOWN if dy > 0 else characters.Facing.UP
 
-    def _loot_visible(self, knowledge: characters.ChampionKnowledge) -> bool:
-        for _, tile in knowledge.visible_tiles.items():
-            if tile.loot is not None:
-                return True
-        return False
 
-    def _consumable_visible(self, knowledge: characters.ChampionKnowledge) -> bool:
-        for _, tile in knowledge.visible_tiles.items():
-            if tile.consumable is not None:
-                return True
-        return False
-
-    def _is_mist_visible(self, knowledge: characters.ChampionKnowledge) -> bool:
-        return any(
-            any(effect.type == "mist" for effect in tile.effects)
-            for tile in knowledge.visible_tiles.values()
-        )
+        facing = Navigator._get_my_facing(knowledge)
+        if facing == target:
+            return random.choice([characters.Action.STEP_FORWARD, characters.Action.ATTACK])
+        else:
+            return None
     
