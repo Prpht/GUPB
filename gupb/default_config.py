@@ -1,6 +1,7 @@
 from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller import bigbot
+from gupb.controller.the_trooper import TheTrooper
 
 keyboard_controller = keyboard.KeyboardController()
 
@@ -15,6 +16,7 @@ CONFIGURATION = {
         random.RandomController("Darius"),
         keyboard_controller,
         bigbot.BIGbot("BIGbot"),
+        TheTrooper("The Trooper"),
     ],
     'start_balancing': False,
     'visualise': True,
