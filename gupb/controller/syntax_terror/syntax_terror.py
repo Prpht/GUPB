@@ -25,11 +25,11 @@ ACTIONS = [
 class SyntaxTerror(Controller):
     def __init__(
         self,
-        bot_name: str,
+        first_name: str,
         network=None,
         weights: str = "gupb/controller/syntax_terror/syntax_terror_v3.pth",
     ):
-        self.bot_name = bot_name
+        self.first_name = first_name
         self.wrapper = GUPBWrapper()
         self.mcts = MCTS(num_simulations=10, num_actions=len(ACTIONS))
 
@@ -48,15 +48,15 @@ class SyntaxTerror(Controller):
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SyntaxTerror):
-            return self.bot_name == other.bot_name
+            return self.first_name == other.first_name
         return False
 
     def __hash__(self) -> int:
-        return hash(self.bot_name)
+        return hash(self.first_name)
 
     @property
     def name(self) -> str:
-        return f"{self.bot_name}"
+        return self.first_name
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
