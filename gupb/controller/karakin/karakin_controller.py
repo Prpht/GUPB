@@ -25,7 +25,9 @@ class KarakinController(controller.Controller):
         ) -> None:
         self.first_name: str = first_name
         self._center: coordinates.Coords | None = None
-        self.file_path = f"{self.first_name}_qtable.pkl"
+
+        file_dir = os.path.dirname(os.path.abspath(__file__))
+        self.file_path = f"{file_dir}/{self.first_name}_qtable.pkl"
         
         self.step_size: float = step_size if is_training else 0.0
         self.step_no: int = step_no
