@@ -72,7 +72,7 @@ class MCTS:
         with torch.no_grad():
             hidden_state, policy_logits, value = network.initial_inference(obs_tensor)
             root.expand(hidden_state, 1, 0, policy_logits)
-            root.add_exploration_noise(dirichlet_alpha=0.3, exploration_fraction=0.25)
+            root.add_exploration_noise(dirichlet_alpha=0.1, exploration_fraction=0.2)
         
         for _ in range(self.num_simulations):
             node = root

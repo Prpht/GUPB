@@ -150,7 +150,7 @@ class SimSiamHead(nn.Module):
         return z, p
 
 
-class MuZeroNetwork(nn.Module):
+class SyntaxTerrorNetwork(nn.Module):
     def __init__(self, input_channels=8, action_space_size=8, hidden_channels=32):
         super().__init__()
         self.representation = RepresentationNetwork(input_channels, hidden_channels)

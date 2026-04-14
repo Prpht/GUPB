@@ -8,5 +8,5 @@ __all__ = [
 
 
 POTENTIAL_CONTROLLERS = [
-    SyntaxTerror("Syntax Terror"),
+    SyntaxTerror("SyntaxTerror"),
 ]
