@@ -1,5 +1,6 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import syntax_terror
 from gupb.controller import bigbot
 
 keyboard_controller = keyboard.KeyboardController()
@@ -14,6 +15,7 @@ CONFIGURATION = {
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
         keyboard_controller,
+        syntax_terror.SyntaxTerror("Syntax Terror"),
         bigbot.BIGbot("BIGbot"),
     ],
     'start_balancing': False,
