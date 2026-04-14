@@ -27,7 +27,7 @@ class SyntaxTerror(Controller):
         self,
         bot_name: str,
         network=None,
-        weights: str = "gupb/controller/syntax_terror/syntax_terror_v2.pth",
+        weights: str = "gupb/controller/syntax_terror/syntax_terror_v3.pth",
     ):
         self.bot_name = bot_name
         self.wrapper = GUPBWrapper()
@@ -60,7 +60,7 @@ class SyntaxTerror(Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.BLUE
+        return characters.Tabard.RED
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         pass
