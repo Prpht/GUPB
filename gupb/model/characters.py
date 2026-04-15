@@ -36,6 +36,8 @@ class ChampionDescription(NamedTuple):
 class Tabard(Enum):
     BLUE = 'Blue'
     BENJAMIN_NETANYAHU = 'Benjamin Netanyahu'
+    CZAK_NORIS = 'Czak Noris'
+    PUDZIAN = 'Pudzian'
     THE_TROOPER = 'The Trooper'
     BOB = 'Bob'
     BROWN = 'Brown'
@@ -61,6 +63,7 @@ class Tabard(Enum):
     KIRBY = 'Kirby'
     KIMDZONGNEAT = 'KimDzongNeat'
     CAMPER = 'Camper'
+    SYNTAX_TERROR = 'SyntaxTerror'
     JEFFREY_E = 'JeffreyE'
     KARAKIN = 'Karakin'
 

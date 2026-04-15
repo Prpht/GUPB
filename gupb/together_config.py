@@ -1,9 +1,11 @@
 from gupb.controller import random
+from gupb.controller.benjamin_netanyahu import BenjaminNetanyahu
 from gupb.scripts import arena_generator
 
 CONFIGURATION = {
     'arenas': arena_generator.generate_arenas(10, arena_generator.random_size_generator()),
     'controllers': [
+        BenjaminNetanyahu("BenjaminNetanyahu"),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),

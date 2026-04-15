@@ -2,15 +2,13 @@ from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
 
-from .strategies.q_strategy import QStrategy
 
-class BladeRunner(controller.Controller):
+class SyntaxTerror(controller.Controller):
     def __init__(self, first_name: str):
         self.first_name: str = first_name
-        self.strategy = QStrategy()
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, BladeRunner):
+        if isinstance(other, SyntaxTerror):
             return self.first_name == other.first_name
         return False
 
@@ -18,13 +16,13 @@ class BladeRunner(controller.Controller):
         return hash(self.first_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return self.strategy.decide(knowledge)
+        return characters.Action.TURN_LEFT
 
     def praise(self, score: int) -> None:
-        self.strategy.praise(score)
+        pass
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self.strategy.reset(game_no, arena_description)
+        pass
 
     @property
     def name(self) -> str:

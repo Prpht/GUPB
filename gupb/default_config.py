@@ -2,6 +2,7 @@ from gupb.controller import keyboard
 from gupb.controller import random
 from gupb.controller import bigbot
 from gupb.controller.the_trooper import TheTrooper
+from gupb.controller.benjamin_netanyahu import BenjaminNetanyahu
 
 keyboard_controller = keyboard.KeyboardController()
 
@@ -10,11 +11,12 @@ CONFIGURATION = {
         'ordinary_chaos'
     ],
     'controllers': [
+        BenjaminNetanyahu("BenjaminNetanyahu"),
         random.RandomController("Alice"),
         random.RandomController("Bob"),
         random.RandomController("Cecilia"),
         random.RandomController("Darius"),
-        keyboard_controller,
+        # keyboard_controller,
         bigbot.BIGbot("BIGbot"),
         TheTrooper("The Trooper"),
     ],
