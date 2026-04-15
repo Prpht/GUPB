@@ -1,26 +1,34 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 from gupb import controller
 from gupb.model import arenas, characters
 
+from .brain import SurvivorBrain
+
+
+@dataclass
 class BiwakSpot(controller.Controller):
-    def __init__(self, first_name: str):
-        self.first_name = first_name
-    
-    def __hash__(self):
+    first_name: str
+
+    def __post_init__(self) -> None:
+        self._brain = SurvivorBrain()
+
+    def __hash__(self) -> int:
         return hash(self.first_name)
-    
-    def __eq__(self, value):
-        if isinstance(value, BiwakSpot):
-            return self.first_name == value.first_name
-        return False
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, BiwakSpot) and self.first_name == other.first_name
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        raise NotImplementedError
+        return self._brain.decide(knowledge)
 
     def praise(self, score: int) -> None:
-        raise NotImplementedError
+        self._brain.note_score(score)
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        raise NotImplementedError
+        self._brain.reset(game_no, arena_description.name)
 
     @property
     def name(self) -> str:
