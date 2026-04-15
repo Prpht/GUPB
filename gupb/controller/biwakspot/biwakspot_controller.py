@@ -36,4 +36,4 @@ class BiwakSpot(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.BLUE
+        return characters.Tabard.STRIPPED

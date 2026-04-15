@@ -113,7 +113,7 @@ class Pudzian(controller.Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.RED
+        return characters.Tabard.LIME
 
     def _idx_to_action(self, idx: int) -> characters.Action:
         actions = [

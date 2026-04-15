@@ -1,41 +1,42 @@
 from gupb.controller import keyboard
 from gupb.controller import random
+from gupb.controller import benjamin_netanyahu
+from gupb.controller import karakin
+from gupb.controller import blade_runner
 from gupb.controller import syntax_terror
+from gupb.controller import jeffrey_e
 from gupb.controller import bigbot
-from gupb.controller.pudzian import Pudzian
+from gupb.controller import czak_noris
 from gupb.controller import bob
-from gupb.controller.jeffrey_e.jeffrey_e_controller import JeffreyEController
-from gupb.controller.the_trooper import TheTrooper
-from gupb.controller.benjamin_netanyahu import BenjaminNetanyahu
+from gupb.controller import the_trooper
+from gupb.controller import pudzian
+from gupb.controller import biwakspot
 
 keyboard_controller = keyboard.KeyboardController()
-pudzian_controller = Pudzian("Pudzian")
+
 
 CONFIGURATION = {
     'arenas': [
         'ordinary_chaos'
     ],
     'controllers': [
-        BenjaminNetanyahu("BenjaminNetanyahu"),
         random.RandomController("Alice"),
-        random.RandomController("Bob"),
-        random.RandomController("Cecilia"),
-        random.RandomController("Darius"),
-        pudzian_controller,
-        # keyboard_controller,
-        # bigbot.BIGbot("BIGbot"),
-        keyboard_controller,
+        benjamin_netanyahu.BenjaminNetanyahu("BenjaminNetanyahu"),
+        karakin.KarakinController("Karakin"),
+        blade_runner.BladeRunner("BladeRunner"),
         syntax_terror.SyntaxTerror("Syntax Terror"),
-        # keyboard_controller,
+        jeffrey_e.jeffrey_e_controller.JeffreyEController("JeffreyE"),
         bigbot.BIGbot("BIGbot"),
+        czak_noris.czak_noris.CzakNoris("CzakNoris"),
         bob.Bob("BobMinion"),
-        JeffreyEController("JeffreyE")
-        TheTrooper("The Trooper"),
+        the_trooper.TheTrooper("The Trooper"),
+        pudzian.Pudzian("Pudzian"),
+        biwakspot.biwakspot_controller.BiwakSpot("BiwakSpot"),
     ],
     'start_balancing': False,
-    'visualise': False,
-    'show_sight': pudzian_controller,
-    'runs_no': 256,
+    'visualise': True,
+    'show_sight': None,
+    'runs_no': 10,
     'profiling_metrics': [],
 }
 

@@ -35,11 +35,6 @@ class ChampionDescription(NamedTuple):
 
 class Tabard(Enum):
     BLUE = 'Blue'
-    BENJAMIN_NETANYAHU = 'Benjamin Netanyahu'
-    CZAK_NORIS = 'Czak Noris'
-    PUDZIAN = 'Pudzian'
-    THE_TROOPER = 'The Trooper'
-    BOB = 'Bob'
     BROWN = 'Brown'
     GREY = 'Grey'
     GREEN = 'Green'
@@ -52,20 +47,14 @@ class Tabard(Enum):
     VIOLET = 'Violet'
     WHITE = 'White'
     YELLOW = 'Yellow'
-    KERAMZYTOWY_MOCARZ = 'Keramzytowy Mocarz'
-    ROOMBA = 'Roomba'
-    PIRAT = 'Pirat'
-    MINION = 'Minion'
-    RUSTLER = 'Rustler'
-    GAREK = "G.A.R.E.K."
-    REINFORCEDROGUE = 'ReinforcedRogue'
-    NORGUL = 'Norgul'
-    KIRBY = 'Kirby'
-    KIMDZONGNEAT = 'KimDzongNeat'
-    CAMPER = 'Camper'
     SYNTAX_TERROR = 'SyntaxTerror'
     JEFFREY_E = 'JeffreyE'
     KARAKIN = 'Karakin'
+    BENJAMIN_NETANYAHU = 'Benjamin Netanyahu'
+    CZAK_NORIS = 'Czak Noris'
+    PUDZIAN = 'Pudzian'
+    THE_TROOPER = 'The Trooper'
+    BOB = 'Bob'
 
 
 class Champion:

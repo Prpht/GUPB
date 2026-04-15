@@ -60,7 +60,7 @@ class SyntaxTerror(Controller):
 
     @property
     def preferred_tabard(self) -> characters.Tabard:
-        return characters.Tabard.RED
+        return characters.Tabard.PINK
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
         pass
