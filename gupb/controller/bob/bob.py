@@ -1,11 +1,15 @@
 from gupb import controller
 from gupb.model import arenas
 from gupb.model import characters
+from .bob_utils import determine_facing_action
+from collections import deque
 
 
 class Bob(controller.Controller):
     def __init__(self, bot_name: str) -> None:
         self.bot_name = bot_name
+        self.prev_pos = None
+        self.previous_positions = deque(maxlen=16)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Bob):
@@ -16,7 +20,10 @@ class Bob(controller.Controller):
         return hash(self.bot_name)
 
     def decide(self, knowledge: characters.ChampionKnowledge) -> characters.Action:
-        return characters.Action.TURN_LEFT
+        pos = knowledge.position
+        action = determine_facing_action(knowledge, self.previous_positions)
+        self.previous_positions.appendleft(pos)
+        return action
 
     def praise(self, score: int) -> None:
         pass
@@ -31,3 +38,7 @@ class Bob(controller.Controller):
     @property
     def preferred_tabard(self) -> characters.Tabard:
         return characters.Tabard.BOB
+
+POTENTIAL_CONTROLLERS = [
+    Bob("Bob"),
+]
