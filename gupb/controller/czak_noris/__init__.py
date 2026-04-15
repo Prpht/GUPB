@@ -1,4 +1,4 @@
-from .czak_norris import CzakNoris
+from .czak_noris import CzakNoris
 
 __all__ = [
     "CzakNoris",
@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    CzakNoris("Czak Norris"),
+    CzakNoris("Czak Noris"),
 ]
