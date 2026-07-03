@@ -35,7 +35,7 @@ CONFIGURATION = {
     'start_balancing': False,
     'visualise': False,
     'show_sight': pudzian_controller,
-    'runs_no': 256,
+    'runs_no': 20,
     'profiling_metrics': [],
 }
 
