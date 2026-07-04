@@ -22,7 +22,7 @@ CONFIGURATION = {
     'controllers': [
         random.RandomController("Alice"),
         benjamin_netanyahu.BenjaminNetanyahu("BenjaminNetanyahu"),
-        karakin.KarakinController("Karakin"),
+        karakin.KarakinController("Karakin", use_sb3=True).eval(),
         blade_runner.BladeRunner("BladeRunner"),
         syntax_terror.SyntaxTerror("Syntax Terror"),
         jeffrey_e.jeffrey_e_controller.JeffreyEController("JeffreyE"),
