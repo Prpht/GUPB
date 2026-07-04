@@ -167,7 +167,7 @@ class Menhir(Tile):
 
     @staticmethod
     def terrain_solid() -> bool:
-        return True
+        return False
 
 
 @dataclass(frozen=True)

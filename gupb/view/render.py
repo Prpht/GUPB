@@ -62,7 +62,9 @@ class SpriteRepository:
             consumables.Potion: load_sprite('consumables', 'potion', BLACK),
 
             characters.Tabard.BLUE: load_sprite('characters', 'champion_blue', BLACK),
+            characters.Tabard.PUDZIAN: load_sprite('characters', 'champion_blue', BLACK),
             characters.Tabard.BENJAMIN_NETANYAHU: load_sprite('characters', 'champion_benjamin_netanyahu', BLACK),
+            characters.Tabard.CZAK_NORIS: load_sprite('characters', 'champion_czak_noris', BLACK),
             characters.Tabard.THE_TROOPER: load_sprite('characters', 'champion_the_trooper', BLACK),
             characters.Tabard.BOB: load_sprite('characters', 'champion_bob', BLACK),
             characters.Tabard.BROWN: load_sprite('characters', 'champion_brown', BLACK),
@@ -96,7 +98,9 @@ class SpriteRepository:
             for tabard, facing in itertools.product(
                 [
                     characters.Tabard.BLUE,
+                    characters.Tabard.PUDZIAN,
                     characters.Tabard.BENJAMIN_NETANYAHU,
+                    characters.Tabard.CZAK_NORIS,
                     characters.Tabard.THE_TROOPER,
                     characters.Tabard.BOB,
                     characters.Tabard.BROWN,

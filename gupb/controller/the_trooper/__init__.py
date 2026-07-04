@@ -1,4 +1,4 @@
-from the_trooper.the_trooper_controller import TheTrooper
+from .the_trooper_controller import TheTrooper
 
 __all__ = [
     "TheTrooper",
