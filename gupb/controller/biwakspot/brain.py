@@ -43,7 +43,10 @@ class SurvivorBrain:
 
         if route is not None:
             action = self.navigator.move_action(self.world, route.next_step)
-            if self.world.idle_ticks >= 12 and action in {characters.Action.ATTACK, characters.Action.DO_NOTHING}:
+            if self.world.idle_ticks >= 12 and action in {
+                characters.Action.ATTACK,
+                characters.Action.DO_NOTHING,
+            }:
                 return characters.Action.TURN_RIGHT
             return action
 
@@ -68,7 +71,9 @@ class SurvivorBrain:
                 targets.append((potion, 12.0 + 2.0 * max(0, 8 - hp)))
 
         for coords, weapon in self.world.last_seen_loot.items():
-            gain = self._weapon_value(weapon) - self._weapon_value(self.world.weapon_name)
+            gain = self._weapon_value(weapon) - self._weapon_value(
+                self.world.weapon_name
+            )
             if gain > 0:
                 bonus = 8.0 + 2.0 * gain
                 if weapon.startswith("bow") and alive_count > 3:
@@ -102,7 +107,9 @@ class SurvivorBrain:
                     ):
                         targets.append((flank, 13.0 if alive_count <= 4 else 6.5))
         elif self.world.mist_tiles:
-            targets.extend((coord, bonus) for coord, bonus in self._mist_escape_targets(pressure))
+            targets.extend(
+                (coord, bonus) for coord, bonus in self._mist_escape_targets(pressure)
+            )
         else:
             targets.extend((coord, 3.8) for coord in self._exploration_frontier())
 
@@ -111,7 +118,8 @@ class SurvivorBrain:
                 self.world.turn_no - enemy.seen_at <= 2
                 and hp >= 6
                 and alive_count > 3
-                and self._weapon_value(self.world.weapon_name) >= self._weapon_value(enemy.weapon_name)
+                and self._weapon_value(self.world.weapon_name)
+                >= self._weapon_value(enemy.weapon_name)
             ):
                 ambush = enemy.position + enemy.facing.opposite().value
                 if self.world.passable(ambush) and ambush not in pressure:
@@ -126,17 +134,29 @@ class SurvivorBrain:
         pressure: set[coordinates.Coords],
     ) -> list[tuple[coordinates.Coords, float]]:
         candidates: list[tuple[float, coordinates.Coords]] = []
+        search_radius = 25
         for coords, terrain in self.world.known_terrain.items():
+            distance = abs(coords.x - self.world.position.x) + abs(
+                coords.y - self.world.position.y
+            )
+            if distance > search_radius:
+                # Bound the scan so this stays cheap on large (e.g. generated) maps:
+                # without this, every land tile gets checked against every mist
+                # tile each turn, which is O(map_size * mist_size) per decision.
+                continue
             if terrain not in {"land", "forest", "menhir"}:
                 continue
             if not self.world.passable(coords):
                 continue
-            if coords in pressure or coords in self.world.fire_tiles or self.world.predicted_mist(coords, 4):
+            if (
+                coords in pressure
+                or coords in self.world.fire_tiles
+                or self.world.predicted_mist(coords, 4)
+            ):
                 continue
             nearest_mist = self.world.nearest_mist_distance(coords)
             if nearest_mist is None:
                 continue
-            distance = abs(coords.x - self.world.position.x) + abs(coords.y - self.world.position.y)
             score = 0.9 * nearest_mist - 0.25 * distance
             candidates.append((score, coords))
         candidates.sort(reverse=True, key=lambda item: item[0])
@@ -150,13 +170,20 @@ class SurvivorBrain:
             if coords in self.world.seen_tiles:
                 if self.world.arena_size is not None:
                     continue
-                if not any(coords + direction not in self.world.known_terrain for direction in DIRS):
+                if not any(
+                    coords + direction not in self.world.known_terrain
+                    for direction in DIRS
+                ):
                     continue
             elif self.world.arena_size is None:
                 continue
             if coords in self.world.fire_tiles or self.world.predicted_mist(coords, 6):
                 continue
-            if abs(coords.x - self.world.position.x) + abs(coords.y - self.world.position.y) > 30:
+            if (
+                abs(coords.x - self.world.position.x)
+                + abs(coords.y - self.world.position.y)
+                > 30
+            ):
                 continue
             front.append(coords)
         front.sort(
