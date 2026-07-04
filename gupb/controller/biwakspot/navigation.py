@@ -24,6 +24,70 @@ class PathChoice:
 
 
 class Navigator:
+    def emergency_move(
+        self,
+        world: WorldState,
+        pressure_tiles: set[coordinates.Coords],
+    ) -> characters.Action | None:
+        current_risk = self._risk(world, world.position, pressure_tiles)
+        current_in_hazard = (
+            world.position in world.fire_tiles
+            or world.position in world.mist_tiles
+            or world.predicted_mist(world.position, 1)
+            or (world.health <= 3 and world.position in pressure_tiles)
+        )
+        if not current_in_hazard:
+            return None
+
+        best_step: coordinates.Coords | None = None
+        best_score = current_risk
+        for direction in DIRS:
+            candidate = world.position + direction
+            if not world.passable(candidate):
+                continue
+            score = self._risk(world, candidate, pressure_tiles)
+            if world.menhir_position is not None and world.nearest_mist_distance() is not None:
+                score += 0.2 * (
+                    abs(candidate.x - world.menhir_position.x)
+                    + abs(candidate.y - world.menhir_position.y)
+                )
+            if score < best_score:
+                best_score = score
+                best_step = candidate
+
+        if best_step is None:
+            return None
+        return self.move_action(world, best_step)
+
+    def exploratory_move(
+        self,
+        world: WorldState,
+        pressure_tiles: set[coordinates.Coords],
+    ) -> characters.Action | None:
+        best_step: coordinates.Coords | None = None
+        best_score = 1e18
+        for direction in DIRS:
+            candidate = world.position + direction
+            if not world.passable(candidate):
+                continue
+            score = self._risk(world, candidate, pressure_tiles)
+            if candidate in world.recent_positions:
+                score += 2.5
+            unknown_neighbors = sum(1 for neighbor in DIRS if candidate + neighbor not in world.known_terrain)
+            score -= 0.35 * unknown_neighbors
+            if world.menhir_position is not None and world.nearest_mist_distance() is not None:
+                score += 0.08 * (
+                    abs(candidate.x - world.menhir_position.x)
+                    + abs(candidate.y - world.menhir_position.y)
+                )
+            if score < best_score:
+                best_score = score
+                best_step = candidate
+
+        if best_step is None:
+            return None
+        return self.move_action(world, best_step)
+
     def pick_route(
         self,
         world: WorldState,
@@ -85,12 +149,15 @@ class Navigator:
     def _risk(self, world: WorldState, coords: coordinates.Coords, pressure_tiles: set[coordinates.Coords]) -> float:
         risk = 0.0
         if coords in world.fire_tiles:
-            risk += 50
+            risk += 80
         if coords in world.mist_tiles:
-            risk += 25
+            risk += 55
+        elif world.predicted_mist(coords, 1):
+            risk += 30
         if coords in pressure_tiles:
-            risk += 6
-        if coords in set(world.recent_positions):
+            risk += 12 if world.health <= 4 else 7
+        recent = set(world.recent_positions)
+        if coords in recent:
             risk += 0.8
         near_walls = 0
         for d in DIRS:
