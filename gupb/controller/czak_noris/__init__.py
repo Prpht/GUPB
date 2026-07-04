@@ -6,5 +6,5 @@ __all__ = [
 ]
 
 POTENTIAL_CONTROLLERS = [
-    CzakNoris("Czak Noris"),
+    CzakNoris("CzakNoris"),
 ]
