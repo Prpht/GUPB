@@ -105,10 +105,13 @@ COMBAT_MINIMAX_BRANCHING = 4
 COMBAT_MINIMAX_TRIGGER_DISTANCE = 7
 
 COMBAT_MCTS_ITERATIONS = 144
+COMBAT_MCTS_ITERATIONS_ENDGAME = 700   # rare 2-alive turns can afford deep search (p95 budget)
 COMBAT_MCTS_ROLLOUT_DEPTH = 6
 COMBAT_MCTS_ACTION_WIDTH = 5
 COMBAT_MCTS_EXPLORATION = 1.15
 COMBAT_MCTS_TRIGGER_DISTANCE = 3
+COMBAT_MCTS_ENDGAME_TRIGGER_DISTANCE = 7   # 1v1 endgame duels are decided at bow range
+COMBAT_MCTS_ENDGAME_ALIVE = 2   # only the pure final duel: placement risk is zero there
 
 MIST_CLOSE_DISTANCE = 3
 MIST_CRITICAL_DISTANCE = 2
@@ -183,6 +186,41 @@ SETUP_TURN_THREAT_SCALE = 0.6
 SETUP_TURN_THREAT_ADJACENT_SCALE = 0.4
 ATTACK_ACTION_PRESSURE_DISCOUNT = 0.3
 MENHIR_COMBAT_ATTACK_BONUS = 150.0
+
+# --- trade-race combat model ---
+TRADE_SIM_MAX_TURNS = 24
+# sustained damage per own action when standing at closed distance
+CLOSE_DPS = {
+    "knife": 2.0,
+    "sword": 2.0,
+    "axe": 3.0,
+    "scroll": 3.0,
+    "amulet": 2.0,
+    "bow": 1.5,
+    "bow_loaded": 1.5,
+    "bow_unloaded": 1.5,
+}
+CHASE_MIN_MARGIN = 1
+CHASE_ENDGAME_ALIVE = 4          # with few players left, take even trades too
+RETREAT_MATCHUP_DISTANCE = 5
+RETREAT_MIN_ALIVE = 4            # never flee 2-3 player endgames: mist forces the fight
+WEAPON_GEOMETRY_ALIGN_BONUS = 26.0   # step into a tile our weapon can actually hit from
+BOW_ALIGN_BAND_BONUS = 16.0          # extra for bow alignment at kiting distance
+
+# --- deterministic mist model (see GAME_MECHANICS.md) ---
+MIST_MODEL_TTH_PER_CHAMPION = 2          # mirrors games.MIST_TTH_PER_CHAMPION
+MENHIR_CANDIDATE_ESTIMATE_MAX = 90       # trust candidate centroid once this narrow
+MENHIR_INFER_MAX_TILES = 20              # constraint tiles used per turn (soundness-preserving cap)
+MENHIR_INFER_CAP_THRESHOLD = 400         # only cap while the candidate set is huge (big arenas)
+NEVER_MISTED = 9999
+MIST_PREDICT_HORIZON = 8                 # penalise tiles misted within this many turns
+MIST_FUTURE_STEP_PENALTY = 6.0
+MIST_EVAC_MOVE_FACTOR = 1.4              # pessimism multiplier on travel estimate
+MIST_EVAC_SAFETY_BUFFER = 12             # start evacuating this many turns early
+MIST_EVAC_INNER_MARGIN = 3               # aim this many rings inside the safe circle
+MIST_EVAC_CORE_RING = 3                  # "safe core": rings <= this around the menhir
+MIST_TARGET_SAFETY_FACTOR = 1.3          # target unsafe if misted before ~1.3x travel
+MIST_TARGET_SAFETY_SLACK = 4
 
 
 ENABLE_JEFFREY_PROFILING = os.getenv("GUPB_JEFFREY_PROFILE", "0").lower() in {
@@ -285,6 +323,7 @@ class JeffreyEController(controller.Controller):
         self._reactive_scan_remaining: int = 0
         self._reactive_scan_left_first: bool = True
         self._last_reactive_scan_turn: int = 0
+        self._unexplained_damage_streak: int = 0
 
         self._turn_no: int = 0
         self._games_played: int = 0
@@ -293,6 +332,15 @@ class JeffreyEController(controller.Controller):
         self._cut_positions_cache: dict[tuple[str, coordinates.Coords, characters.Facing, bool], tuple[coordinates.Coords, ...]] = {}
         self._duel_state_value_cache: dict[DuelState, float] = {}
         self._mcts_root: MCTSNode | None = None
+
+        self._mist_radius: int | None = None
+        self._mist_counter: int = 0
+        self._arena_size: tuple[int, int] | None = None
+        self._max_ring: int = 0
+        self._menhir_candidates: set[coordinates.Coords] | None = None
+        self._menhir_anchor: coordinates.Coords | None = None
+        self._last_alive_count: int = 0
+        self._tum_cache: dict[coordinates.Coords, int] = {}
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, JeffreyEController):
@@ -320,6 +368,7 @@ class JeffreyEController(controller.Controller):
         self._duel_state_value_cache.clear()
         self._memorise_tiles(knowledge)
         self._decay_tracked_enemies()
+        self._update_mist_model(knowledge)
 
         self_desc = self._self_description(knowledge)
         if self_desc is None:
@@ -333,13 +382,24 @@ class JeffreyEController(controller.Controller):
         my_weapon_name = self_desc.weapon.name
         visible_enemies = self._visible_enemies(knowledge)
         self._update_kill_potion_target(knowledge, visible_enemies)
-        mist_positions = self._visible_mist_positions(knowledge)
+        mist_positions = self._all_mist_positions(knowledge)
         mist_distance_lookup = self._mist_distance_lookup(mist_positions)
         policy_mode = self._policy_mode(knowledge, my_health, my_weapon_name, visible_enemies)
         if not (self._use_mcts and policy_mode == "combat" and len(visible_enemies) == 1):
             self._mcts_root = None
 
-        if self._last_health is not None and my_health < self._last_health and not visible_enemies:
+        own_tile = self._tile_from_visible(position, knowledge.visible_tiles)
+        own_effects = {effect.type for effect in own_tile.effects} if own_tile is not None else set()
+        damage_is_environmental = "mist" in own_effects or "fire" in own_effects
+        evacuation_targets = self._evacuation_targets(knowledge)
+
+        if (
+            self._last_health is not None
+            and my_health < self._last_health
+            and not visible_enemies
+            and not damage_is_environmental
+        ):
+            self._unexplained_damage_streak += 1
             self._reactive_scan_remaining = 2
             panic_action = self._reactive_damage_action(
                 position=position,
@@ -350,29 +410,31 @@ class JeffreyEController(controller.Controller):
                 mist_positions=mist_positions,
             )
             return self._commit_decision_state(position, my_health, panic_action)
+        self._unexplained_damage_streak = 0
 
         if self._should_force_attack(position, facing, my_weapon_name, my_health, knowledge, visible_enemies):
             return self._commit_decision_state(position, my_health, characters.Action.ATTACK)
 
-        reactive_scan_action = self._reactive_scan_action(
-            knowledge=knowledge,
-            position=position,
-            facing=facing,
-            policy_mode=policy_mode,
-            visible_enemies=visible_enemies,
-        )
-        if reactive_scan_action is not None:
-            return self._commit_decision_state(position, my_health, reactive_scan_action)
+        if evacuation_targets is None:
+            reactive_scan_action = self._reactive_scan_action(
+                knowledge=knowledge,
+                position=position,
+                facing=facing,
+                policy_mode=policy_mode,
+                visible_enemies=visible_enemies,
+            )
+            if reactive_scan_action is not None:
+                return self._commit_decision_state(position, my_health, reactive_scan_action)
 
-        scan_action = self._exploration_scan_action(
-            knowledge=knowledge,
-            position=position,
-            facing=facing,
-            policy_mode=policy_mode,
-            visible_enemies=visible_enemies,
-        )
-        if scan_action is not None:
-            return self._commit_decision_state(position, my_health, scan_action)
+            scan_action = self._exploration_scan_action(
+                knowledge=knowledge,
+                position=position,
+                facing=facing,
+                policy_mode=policy_mode,
+                visible_enemies=visible_enemies,
+            )
+            if scan_action is not None:
+                return self._commit_decision_state(position, my_health, scan_action)
 
         objective_targets = self._choose_objective_targets(
             knowledge,
@@ -380,6 +442,7 @@ class JeffreyEController(controller.Controller):
             my_weapon_name,
             visible_enemies,
             mist_positions,
+            evacuation_targets,
         )
         blocked_positions = {enemy_position for enemy_position, _ in visible_enemies}
         blocked_positions.discard(position)
@@ -391,11 +454,19 @@ class JeffreyEController(controller.Controller):
             knowledge=knowledge,
             blocked_positions=blocked_positions,
             visible_enemies=visible_enemies,
+            mist_positions=mist_positions,
         )
 
         query_positions: set[coordinates.Coords] = {position}
         for simulated in simulated_actions.values():
             query_positions.add(simulated.position)
+        # The facing gradient below reads all four neighbours — make them
+        # explicit query positions so the focused A* settles them exactly
+        # (mist-filtered/blocked neighbours are not candidate destinations).
+        for direction in CARDINAL_DIRECTIONS:
+            neighbour = position + direction
+            if self._is_known_passable(neighbour):
+                query_positions.add(neighbour)
 
         enemy_pressure_map = self._enemy_pressure_map(knowledge, visible_enemies, position)
         distance_map = self._distance_map(
@@ -442,7 +513,12 @@ class JeffreyEController(controller.Controller):
         if policy_mode == "combat" and len(visible_enemies) == 1:
             enemy_position, enemy_description = visible_enemies[0]
             enemy_distance = self._manhattan(position, enemy_position)
-            if self._use_mcts and enemy_distance <= COMBAT_MCTS_TRIGGER_DISTANCE:
+            mcts_trigger = (
+                COMBAT_MCTS_ENDGAME_TRIGGER_DISTANCE
+                if knowledge.no_of_champions_alive <= COMBAT_MCTS_ENDGAME_ALIVE
+                else COMBAT_MCTS_TRIGGER_DISTANCE
+            )
+            if self._use_mcts and enemy_distance <= mcts_trigger:
                 mcts_bonuses = self._combat_mcts_bonuses(
                     knowledge=knowledge,
                     my_position=position,
@@ -501,10 +577,20 @@ class JeffreyEController(controller.Controller):
         self._reactive_scan_remaining = 0
         self._reactive_scan_left_first = True
         self._last_reactive_scan_turn = 0
+        self._unexplained_damage_streak = 0
         self._turn_no = 0
         self._games_played += 1
         self._duel_state_value_cache.clear()
         self._mcts_root = None
+
+        self._mist_radius = None
+        self._mist_counter = 0
+        self._arena_size = None
+        self._max_ring = 0
+        self._menhir_candidates = None
+        self._menhir_anchor = None
+        self._last_alive_count = 0
+        self._tum_cache.clear()
 
         self._menhir_position = arenas.FIXED_MENHIRS.get(arena_description.name)
         self._preload_arena_knowledge(arena_description.name)
@@ -520,6 +606,8 @@ class JeffreyEController(controller.Controller):
     def _preload_arena_knowledge(self, arena_name: str) -> None:
         try:
             arena = arenas.Arena.load(arena_name)
+            size_x, size_y = 0, 0
+            menhir_candidates: set[coordinates.Coords] = set()
             for coords_, tile in arena.terrain.items():
                 tile_type = tile.__class__.__name__.lower()
                 self._known_tile_type[coords_] = tile_type
@@ -527,6 +615,17 @@ class JeffreyEController(controller.Controller):
                     self._known_loot[coords_] = tile.loot.description().name
                 if tile.consumable is not None:
                     self._known_consumables[coords_] = tile.consumable.description().name
+                size_x = max(size_x, coords_[0] + 1)
+                size_y = max(size_y, coords_[1] + 1)
+                if tile_type in ("land", "forest") and tile.loot is None:
+                    menhir_candidates.add(coords_)
+
+            self._arena_size = (size_x, size_y)
+            self._mist_radius = int(size_x * 2 ** 0.5) + 1
+            self._mist_counter = 0
+            self._max_ring = int((size_x * size_x + size_y * size_y) ** 0.5) + 1
+            if self._menhir_position is None:
+                self._menhir_candidates = menhir_candidates
         except Exception:
             pass
 
@@ -560,13 +659,18 @@ class JeffreyEController(controller.Controller):
         knowledge: characters.ChampionKnowledge,
     ) -> list[tuple[coordinates.Coords, characters.ChampionDescription]]:
         enemies: list[tuple[coordinates.Coords, characters.ChampionDescription]] = []
+        # Late game the menhir tile is the only mist-free spot: campers there MUST
+        # be fought, otherwise we bleed out in the mist right next to them.
+        menhir_fight = knowledge.no_of_champions_alive <= 3 or (
+            self._mist_radius is not None and self._mist_radius <= 4
+        )
         for raw_coords, tile in knowledge.visible_tiles.items():
             coords_ = self._to_coords(raw_coords)
             if tile.character is None:
                 continue
             if tile.character.controller_name == self.name:
                 continue
-            if tile.type == "menhir" or coords_ == self._menhir_position:
+            if (tile.type == "menhir" or coords_ == self._menhir_position) and not menhir_fight:
                 continue
 
             enemies.append((coords_, tile.character))
@@ -584,9 +688,35 @@ class JeffreyEController(controller.Controller):
     ) -> bool:
         if not visible_enemies:
             return False
-        enemy_positions = {coords_ for coords_, _ in visible_enemies}
+        enemy_by_position = {coords_: enemy for coords_, enemy in visible_enemies}
         threatened = self._weapon_cut_positions(weapon_name, position, facing, knowledge.visible_tiles)
-        return any(coords_ in enemy_positions for coords_ in threatened)
+        hittable = [
+            (coords_, enemy_by_position[coords_])
+            for coords_ in threatened
+            if coords_ in enemy_by_position
+        ]
+        if not hittable:
+            return False
+
+        my_damage = self._weapon_damage(weapon_name)
+        if my_damage > 0 and any(enemy.health <= my_damage for _, enemy in hittable):
+            return True
+
+        # Only lock into the exchange if we win (or can't lose) the ensuing trade.
+        target_position, target = min(
+            hittable,
+            key=lambda pair: self._manhattan(position, pair[0]),
+        )
+        outcome = self._trade_outcome(
+            my_health=my_health,
+            my_weapon_name=weapon_name,
+            my_position=position,
+            enemy_health=target.health,
+            enemy_weapon_name=target.weapon.name,
+            enemy_position=target_position,
+            extra_enemy_dps=self._bystander_dps(position, visible_enemies, target_position),
+        )
+        return outcome >= 0
 
     def _choose_objective_targets(
         self,
@@ -595,13 +725,20 @@ class JeffreyEController(controller.Controller):
         my_weapon_name: str,
         visible_enemies: list[tuple[coordinates.Coords, characters.ChampionDescription]],
         mist_positions: list[coordinates.Coords],
+        evacuation_targets: set[coordinates.Coords] | None = None,
     ) -> set[coordinates.Coords]:
-        kill_potion_target = self._current_kill_potion_target(knowledge.position)
+        position = knowledge.position
+        menhir_anchor = self._menhir_estimate()
+
+        if evacuation_targets:
+            return evacuation_targets
+
+        kill_potion_target = self._current_kill_potion_target(position)
         if kill_potion_target is not None:
-            if self._is_safe_target(kill_potion_target, mist_positions):
+            if self._is_safe_target(position, kill_potion_target, mist_positions):
                 return {kill_potion_target}
-            if self._menhir_position is not None:
-                return {self._menhir_position}
+            if menhir_anchor is not None:
+                return {menhir_anchor}
 
         visible_potion_targets = {
             self._to_coords(raw_coords)
@@ -609,15 +746,31 @@ class JeffreyEController(controller.Controller):
             if tile.consumable is not None and tile.consumable.name == "potion"
         }
         if visible_potion_targets:
-            return self._safe_targets_or_menhir(visible_potion_targets, mist_positions)
+            return self._safe_targets_or_menhir(position, visible_potion_targets, mist_positions)
 
         if my_health <= 5:
             potion_targets = {coords_ for coords_, name in self._known_consumables.items() if name == "potion"}
             if potion_targets:
-                return self._safe_targets_or_menhir(potion_targets, mist_positions)
+                return self._safe_targets_or_menhir(position, potion_targets, mist_positions)
 
         if visible_enemies:
-            return {coords_ for coords_, _ in visible_enemies}
+            # Fight selection: only chase enemies we would beat in a close-range
+            # trade with a clear tempo margin (the defender usually hits first).
+            # With few players left even trades must be taken — wins need kills.
+            chase_margin = (
+                0 if knowledge.no_of_champions_alive <= CHASE_ENDGAME_ALIVE else CHASE_MIN_MARGIN
+            )
+            beatable = {
+                coords_
+                for coords_, enemy in visible_enemies
+                if enemy.health <= self._weapon_damage(my_weapon_name)
+                or self._matchup_margin(my_health, my_weapon_name, enemy.health, enemy.weapon.name)
+                >= chase_margin
+            }
+            if beatable:
+                return beatable
+            # No winnable fight in sight: fall through to loot/exploration
+            # objectives; local danger terms handle keeping distance.
 
         own_weapon_rank = self._weapon_rank(my_weapon_name)
         better_weapon_targets = {
@@ -626,37 +779,37 @@ class JeffreyEController(controller.Controller):
             if self._weapon_rank(weapon_name) > own_weapon_rank
         }
         if better_weapon_targets and own_weapon_rank <= self._weapon_rank("scroll"):
-            return self._safe_targets_or_menhir(better_weapon_targets, mist_positions)
+            return self._safe_targets_or_menhir(position, better_weapon_targets, mist_positions)
 
         tracked = self._get_recently_tracked_enemies()
         if tracked:
             tracked_targets = {coords_ for coords_, _ in tracked[:2]}
-            return self._safe_targets_or_menhir(tracked_targets, mist_positions)
+            return self._safe_targets_or_menhir(position, tracked_targets, mist_positions)
 
         if better_weapon_targets and own_weapon_rank < self._weapon_rank("bow_loaded"):
-            return self._safe_targets_or_menhir(better_weapon_targets, mist_positions)
+            return self._safe_targets_or_menhir(position, better_weapon_targets, mist_positions)
 
         nearest_mist = self._nearest_mist_distance(knowledge.position, mist_positions)
         mist_critical = nearest_mist is not None and nearest_mist <= MIST_CRITICAL_DISTANCE
         mist_close = nearest_mist is not None and nearest_mist <= MIST_CLOSE_DISTANCE
-        if self._menhir_position is not None:
+        if menhir_anchor is not None:
             if mist_critical:
-                return {self._menhir_position}
+                return {menhir_anchor}
             if knowledge.no_of_champions_alive <= MENHIR_ENDGAME_ALIVE_TRIGGER:
-                return {self._menhir_position}
+                return {menhir_anchor}
             if mist_close and my_health <= 4:
-                return {self._menhir_position}
+                return {menhir_anchor}
 
         exploration_targets = self._exploration_targets(knowledge.position)
         if exploration_targets:
-            return self._safe_targets_or_menhir(exploration_targets, mist_positions)
+            return self._safe_targets_or_menhir(position, exploration_targets, mist_positions)
 
         frontier = self._frontier_tiles(knowledge.position)
         if frontier:
-            return self._safe_targets_or_menhir(frontier, mist_positions)
+            return self._safe_targets_or_menhir(position, frontier, mist_positions)
 
-        if self._menhir_position is not None and knowledge.no_of_champions_alive <= MENHIR_ENDGAME_ALIVE_TRIGGER:
-            return {self._menhir_position}
+        if menhir_anchor is not None and knowledge.no_of_champions_alive <= MENHIR_ENDGAME_ALIVE_TRIGGER:
+            return {menhir_anchor}
 
         if self._known_tile_type:
             avg_x = sum(coords_[0] for coords_ in self._known_tile_type) // len(self._known_tile_type)
@@ -680,6 +833,25 @@ class JeffreyEController(controller.Controller):
         if my_health <= 4 or "mist" in own_effects or "fire" in own_effects:
             return "retreat"
         if visible_enemies:
+            # Clearly losing matchup nearby: disengage instead of duelling —
+            # unless it is the endgame (mist forces the fight) or we hold a bow
+            # (kiting logic keeps distance on its own).
+            if (
+                knowledge.no_of_champions_alive >= RETREAT_MIN_ALIVE
+                and self._weapon_base(my_weapon_name) != "bow"
+            ):
+                nearest_position, nearest_enemy = min(
+                    visible_enemies,
+                    key=lambda pair: self._manhattan(knowledge.position, pair[0]),
+                )
+                if (
+                    self._manhattan(knowledge.position, nearest_position) <= RETREAT_MATCHUP_DISTANCE
+                    and nearest_enemy.health > self._weapon_damage(my_weapon_name)
+                    and self._matchup_margin(
+                        my_health, my_weapon_name, nearest_enemy.health, nearest_enemy.weapon.name
+                    ) <= -1
+                ):
+                    return "retreat"
             return "combat"
         if my_health <= 6 and any(name == "potion" for name in self._known_consumables.values()):
             return "recovery"
@@ -734,6 +906,14 @@ class JeffreyEController(controller.Controller):
         knowledge: characters.ChampionKnowledge,
         mist_positions: list[coordinates.Coords],
     ) -> characters.Action:
+        # Being hit by someone we cannot see. Turning in place only helps once:
+        # a bow shooter on our row/column (or an amulet on our diagonal) will
+        # keep hitting us for free until we DISPLACE and break the firing line.
+        if self._unexplained_damage_streak >= 2:
+            evasive = self._evasive_step(position, facing, my_weapon_name, knowledge, mist_positions)
+            if evasive is not None:
+                return evasive
+
         recent_enemies = self._recent_unseen_enemy_positions()
         if recent_enemies:
             last_enemy_pos = recent_enemies[0][0]
@@ -742,6 +922,46 @@ class JeffreyEController(controller.Controller):
                 return self._turn_towards_action(facing, desired)
 
         return characters.Action.TURN_LEFT
+
+    def _evasive_step(
+        self,
+        position: coordinates.Coords,
+        facing: characters.Facing,
+        my_weapon_name: str,
+        knowledge: characters.ChampionKnowledge,
+        mist_positions: list[coordinates.Coords],
+    ) -> characters.Action | None:
+        mist_position_set = set(mist_positions)
+        best_action: characters.Action | None = None
+        best_score = -math.inf
+        for action in MOVEMENT_ACTIONS:
+            simulated = self._simulate_action(
+                action=action,
+                position=position,
+                facing=facing,
+                weapon_name=my_weapon_name,
+                knowledge=knowledge,
+                blocked_positions=(),
+            )
+            if not simulated.moved:
+                continue
+            if simulated.position in mist_position_set:
+                continue
+            tile = self._tile_from_visible(simulated.position, knowledge.visible_tiles)
+            if tile is not None and any(effect.type in ("mist", "fire") for effect in tile.effects):
+                continue
+
+            score = 0.0
+            score -= 6.0 * self._recent_positions.count(simulated.position)
+            turns_until_mist = self._turns_until_mist(simulated.position)
+            if turns_until_mist is not None and turns_until_mist <= MIST_PREDICT_HORIZON:
+                score -= 25.0
+            for enemy_position, _ in self._recent_unseen_enemy_positions():
+                score += 0.5 * self._manhattan(simulated.position, enemy_position)
+            if score > best_score:
+                best_score = score
+                best_action = action
+        return best_action
 
     def _enemy_likely_behind(
         self,
@@ -823,6 +1043,170 @@ class JeffreyEController(controller.Controller):
             if any(effect.type == "mist" for effect in tile.effects):
                 mist_positions.append(self._to_coords(raw_coords))
         return mist_positions
+
+    # --- deterministic mist model -------------------------------------------------
+    # The engine shrinks a Euclidean circle centred on the menhir by 1 every
+    # MIST_TTH_PER_CHAMPION * alive episodes; a tile is misted iff
+    # int(euclid_dist(tile, menhir)) >= current radius. Both the radius and the
+    # countdown are exactly reproducible from ChampionKnowledge, and menhir
+    # location can be narrowed down from mist/no-mist observations before it is
+    # ever seen. See GAME_MECHANICS.md.
+
+    @staticmethod
+    def _ring_index(tile: CoordsLike, center: CoordsLike) -> int:
+        dx = tile[0] - center[0]
+        dy = tile[1] - center[1]
+        return int((dx * dx + dy * dy) ** 0.5)
+
+    def _update_mist_model(self, knowledge: characters.ChampionKnowledge) -> None:
+        self._tum_cache.clear()
+        alive = max(1, knowledge.no_of_champions_alive)
+        self._last_alive_count = alive
+
+        if self._mist_radius is not None:
+            self._mist_counter += 1
+            if self._mist_counter >= MIST_MODEL_TTH_PER_CHAMPION * alive:
+                if self._mist_radius > 0:
+                    self._mist_radius -= 1
+                self._mist_counter = 0
+
+        if (
+            self._menhir_position is None
+            and self._menhir_candidates
+            and self._mist_radius is not None
+            and self._mist_radius <= self._max_ring
+        ):
+            radius = self._mist_radius
+            radius_sq = radius * radius
+            candidates = self._menhir_candidates
+            # int(sqrt(d2)) >= R  <=>  d2 >= R*R for integer R, so the whole
+            # elimination runs on squared distances — no sqrt per pair. Using
+            # only a subset of the visible tiles keeps elimination SOUND (the
+            # surviving set is a superset); it just narrows over more turns.
+            tile_cap = (
+                MENHIR_INFER_MAX_TILES
+                if len(candidates) > MENHIR_INFER_CAP_THRESHOLD
+                else len(knowledge.visible_tiles)
+            )
+            mist_tiles: list[tuple[int, int]] = []
+            clear_tiles: list[tuple[int, int]] = []
+            for raw_coords, tile in knowledge.visible_tiles.items():
+                if any(effect.type == "mist" for effect in tile.effects):
+                    if len(mist_tiles) < tile_cap:
+                        mist_tiles.append((raw_coords[0], raw_coords[1]))
+                elif len(clear_tiles) < tile_cap:
+                    clear_tiles.append((raw_coords[0], raw_coords[1]))
+            if len(candidates) > 1 and (mist_tiles or clear_tiles):
+                surviving: set[coordinates.Coords] = set()
+                for c in candidates:
+                    cx, cy = c[0], c[1]
+                    for mx, my in mist_tiles:
+                        dx = mx - cx
+                        dy = my - cy
+                        if dx * dx + dy * dy < radius_sq:
+                            break
+                    else:
+                        for vx, vy in clear_tiles:
+                            dx = vx - cx
+                            dy = vy - cy
+                            if dx * dx + dy * dy >= radius_sq:
+                                break
+                        else:
+                            surviving.add(c)
+                candidates = surviving
+            # An empty set means our replica desynced somehow: disable inference.
+            self._menhir_candidates = candidates if candidates else None
+
+        self._menhir_anchor = self._compute_menhir_anchor()
+
+    def _compute_menhir_anchor(self) -> coordinates.Coords | None:
+        if self._menhir_position is not None:
+            return self._menhir_position
+        candidates = self._menhir_candidates
+        if not candidates or len(candidates) > MENHIR_CANDIDATE_ESTIMATE_MAX:
+            return None
+        avg_x = sum(c[0] for c in candidates) / len(candidates)
+        avg_y = sum(c[1] for c in candidates) / len(candidates)
+        return min(
+            candidates,
+            key=lambda c: (c[0] - avg_x) ** 2 + (c[1] - avg_y) ** 2,
+        )
+
+    def _menhir_estimate(self) -> coordinates.Coords | None:
+        return self._menhir_anchor
+
+    def _turns_until_mist(self, tile: coordinates.Coords) -> int | None:
+        if self._mist_radius is None:
+            return None
+        center = self._menhir_anchor
+        if center is None:
+            return None
+        cached = self._tum_cache.get(tile)
+        if cached is not None:
+            return cached
+
+        ring = self._ring_index(tile, center)
+        radius = self._mist_radius
+        if ring == 0:
+            result = NEVER_MISTED  # the menhir tile itself is never misted
+        elif ring >= radius:
+            result = 0
+        else:
+            period = MIST_MODEL_TTH_PER_CHAMPION * self._last_alive_count
+            result = (period - self._mist_counter) + (radius - ring - 1) * period
+        self._tum_cache[tile] = result
+        return result
+
+    def _all_mist_positions(
+        self,
+        knowledge: characters.ChampionKnowledge,
+    ) -> list[coordinates.Coords]:
+        visible = self._visible_mist_positions(knowledge)
+        center = self._menhir_anchor
+        radius = self._mist_radius
+        if center is None or radius is None or radius > self._max_ring:
+            return visible
+
+        mist_tiles = set(visible)
+        threshold = max(radius, 1)
+        threshold_sq = threshold * threshold
+        cx, cy = center[0], center[1]
+        for coords_ in self._known_tile_type:
+            dx = coords_[0] - cx
+            dy = coords_[1] - cy
+            if dx * dx + dy * dy >= threshold_sq:
+                mist_tiles.add(coords_)
+        return list(mist_tiles)
+
+    def _evacuation_targets(
+        self,
+        knowledge: characters.ChampionKnowledge,
+    ) -> set[coordinates.Coords] | None:
+        center = self._menhir_anchor
+        radius = self._mist_radius
+        if center is None or radius is None:
+            return None
+        position = knowledge.position
+        turns_left = self._turns_until_mist(position)
+        if turns_left is None or turns_left >= NEVER_MISTED:
+            return None
+
+        my_ring = self._ring_index(position, center)
+        inner_target_ring = max(0, radius - MIST_EVAC_INNER_MARGIN)
+        steps_needed = max(0, my_ring - inner_target_ring)
+        if turns_left > MIST_EVAC_MOVE_FACTOR * steps_needed + MIST_EVAC_SAFETY_BUFFER:
+            return None
+
+        core_ring = min(MIST_EVAC_CORE_RING, max(0, radius - 1))
+        targets: set[coordinates.Coords] = set()
+        for coords_, tile_type in self._known_tile_type.items():
+            if tile_type not in PASSABLE_TILE_TYPES:
+                continue
+            if self._ring_index(coords_, center) <= core_ring:
+                targets.add(coords_)
+        if self._is_known_passable(center):
+            targets.add(center)
+        return targets or None
 
     def _update_kill_potion_target(
         self,
@@ -911,9 +1295,19 @@ class JeffreyEController(controller.Controller):
 
     def _is_safe_target(
         self,
+        origin: coordinates.Coords,
         target_position: coordinates.Coords,
         mist_positions: list[coordinates.Coords],
     ) -> bool:
+        turns_until_mist = self._turns_until_mist(target_position)
+        if turns_until_mist is not None:
+            if turns_until_mist >= NEVER_MISTED:
+                return True
+            travel_estimate = self._manhattan(origin, target_position)
+            return turns_until_mist > (
+                MIST_TARGET_SAFETY_FACTOR * travel_estimate + MIST_TARGET_SAFETY_SLACK
+            )
+
         if self._menhir_position is None or not mist_positions:
             return True
 
@@ -937,18 +1331,20 @@ class JeffreyEController(controller.Controller):
 
     def _safe_targets_or_menhir(
         self,
+        origin: coordinates.Coords,
         targets: set[coordinates.Coords],
         mist_positions: list[coordinates.Coords],
     ) -> set[coordinates.Coords]:
         if not targets:
             return set()
 
-        safe_targets = {target for target in targets if self._is_safe_target(target, mist_positions)}
+        safe_targets = {target for target in targets if self._is_safe_target(origin, target, mist_positions)}
         if safe_targets:
             return safe_targets
 
-        if self._menhir_position is not None:
-            return {self._menhir_position}
+        menhir_anchor = self._menhir_estimate()
+        if menhir_anchor is not None:
+            return {menhir_anchor}
         return targets
 
     def _nearest_mist_distance(
@@ -1025,10 +1421,14 @@ class JeffreyEController(controller.Controller):
         knowledge: characters.ChampionKnowledge,
         blocked_positions: set[coordinates.Coords],
         visible_enemies: list[tuple[coordinates.Coords, characters.ChampionDescription]],
+        mist_positions: Collection[coordinates.Coords] = (),
     ) -> tuple[tuple[characters.Action, ...], dict[characters.Action, SimulatedState]]:
         candidate_actions: list[characters.Action] = []
+        mist_position_set = set(mist_positions)
         own_tile = self._tile_from_visible(position, knowledge.visible_tiles)
-        currently_in_mist = own_tile is not None and any(effect.type == "mist" for effect in own_tile.effects)
+        currently_in_mist = position in mist_position_set or (
+            own_tile is not None and any(effect.type == "mist" for effect in own_tile.effects)
+        )
 
         enemy_positions = {coords_ for coords_, _ in visible_enemies}
         threatened = self._weapon_cut_positions(my_weapon_name, position, facing, knowledge.visible_tiles)
@@ -1050,8 +1450,10 @@ class JeffreyEController(controller.Controller):
             if simulated.moved:
                 if not visible_enemies and not currently_in_mist:
                     simulated_tile = self._tile_from_visible(simulated.position, knowledge.visible_tiles)
-                    entering_mist = simulated_tile is not None and any(
-                        effect.type == "mist" for effect in simulated_tile.effects
+                    entering_mist = simulated.position in mist_position_set or (
+                        simulated_tile is not None and any(
+                            effect.type == "mist" for effect in simulated_tile.effects
+                        )
                     )
                     if entering_mist:
                         continue
@@ -1288,6 +1690,46 @@ class JeffreyEController(controller.Controller):
                 else:
                     score += -20.0 * distance_delta
 
+            # Weapon-geometry seeking: bows need a shared row/column, amulets a
+            # diagonal, swords an axis within reach — reward stepping into a
+            # tile from which the held weapon can actually hit. Without this the
+            # bot circles enemies at radial distances its weapon cannot use.
+            if (
+                policy_mode != "retreat"
+                and self._weapon_base(my_weapon_name) in ("bow", "amulet", "sword")
+                and self._can_actually_hit(
+                    my_weapon_name,
+                    simulated.position,
+                    nearest_enemy_pos,
+                    simulated.facing,
+                    knowledge.visible_tiles,
+                )
+                and self._trade_outcome(
+                    my_health=my_health,
+                    my_weapon_name=my_weapon_name,
+                    my_position=simulated.position,
+                    enemy_health=nearest_enemy.health,
+                    enemy_weapon_name=nearest_enemy.weapon.name,
+                    enemy_position=nearest_enemy_pos,
+                ) >= 0
+            ):
+                score += WEAPON_GEOMETRY_ALIGN_BONUS
+                if (
+                    self._weapon_base(my_weapon_name) == "bow"
+                    and BOW_KITE_MIN_DISTANCE_LOADED <= new_enemy_distance <= BOW_KITE_MAX_DISTANCE
+                ):
+                    score += BOW_ALIGN_BAND_BONUS
+                desired_facing = self._desired_facing_towards(simulated.position, nearest_enemy_pos)
+                if desired_facing is not None and simulated.facing == desired_facing:
+                    score += 12.0
+
+            if policy_mode != "retreat" and self._weapon_base(my_weapon_name) in ("bow", "amulet"):
+                # Shaping: one-step lookahead cannot see an alignment 2+ steps
+                # away, so reward each step that reduces steps-to-alignment.
+                align_before = self._alignment_steps(my_weapon_name, current_position, nearest_enemy_pos)
+                align_after = self._alignment_steps(my_weapon_name, simulated.position, nearest_enemy_pos)
+                score += 7.0 * float(align_before - align_after)
+
         if distance_map:
             current_distance = distance_map.get(current_position, math.inf)
             new_distance = distance_map.get(simulated.position, math.inf)
@@ -1500,6 +1942,140 @@ class JeffreyEController(controller.Controller):
     def _combat_power(self, health: int, weapon_name: str) -> float:
         return float(health) + 1.5 * self._weapon_rank(weapon_name)
 
+    # --- trade-race combat model -------------------------------------------------
+    # Answers "if we both stand here and attack, who dies first?" — the previous
+    # combat_power heuristic could not tell a winning trade from a losing one,
+    # which made the bot face-tank fights it deterministically lost.
+
+    def _weapon_can_hit_geometry(
+        self,
+        weapon_name: str,
+        attacker_pos: CoordsLike,
+        target_pos: CoordsLike,
+    ) -> bool:
+        """Optimistic reach check: can this weapon hit at this relative offset,
+        assuming the attacker faces the right way (facing costs at most a turn)."""
+        base = self._weapon_base(weapon_name)
+        dx = abs(attacker_pos[0] - target_pos[0])
+        dy = abs(attacker_pos[1] - target_pos[1])
+        d = dx + dy
+        if base in ("knife", "scroll"):
+            return d == 1
+        if base == "sword":
+            return (dx == 0 or dy == 0) and 1 <= d <= 3
+        if base == "axe":
+            return d == 1 or (dx == 1 and dy == 1)
+        if base == "bow":
+            return (dx == 0 or dy == 0) and d >= 1
+        if base == "amulet":
+            return dx == dy and dx in (1, 2)
+        return d == 1
+
+    def _close_dps(self, weapon_name: str) -> float:
+        return CLOSE_DPS.get(weapon_name, CLOSE_DPS.get(self._weapon_base(weapon_name), 2.0))
+
+    def _matchup_margin(
+        self,
+        my_health: int,
+        my_weapon_name: str,
+        enemy_health: int,
+        enemy_weapon_name: str,
+    ) -> int:
+        """Turns-to-kill advantage assuming both close in and trade.
+        Positive: we kill first with margin; negative: we lose the race."""
+        my_ttk = math.ceil(max(1, enemy_health) / self._close_dps(my_weapon_name))
+        enemy_ttk = math.ceil(max(1, my_health) / self._close_dps(enemy_weapon_name))
+        return enemy_ttk - my_ttk
+
+    def _trade_outcome(
+        self,
+        my_health: int,
+        my_weapon_name: str,
+        my_position: CoordsLike,
+        enemy_health: int,
+        enemy_weapon_name: str,
+        enemy_position: CoordsLike,
+        extra_enemy_dps: float = 0.0,
+    ) -> int:
+        """Simulate a stationary trade at the current geometry, us acting first.
+        Returns 1 if the enemy dies first, -1 if we do, 0 if neither can win."""
+        my_can = self._weapon_can_hit_geometry(my_weapon_name, my_position, enemy_position)
+        enemy_can = self._weapon_can_hit_geometry(enemy_weapon_name, enemy_position, my_position)
+        if not my_can:
+            return -1 if (enemy_can or extra_enemy_dps > 0.0) else 0
+        my_weapon = my_weapon_name
+        enemy_weapon = enemy_weapon_name if enemy_weapon_name != "bow" else "bow_loaded"
+        me = float(my_health)
+        enemy = float(enemy_health)
+        for _ in range(TRADE_SIM_MAX_TURNS):
+            if my_weapon == "bow_unloaded":
+                my_weapon = "bow_loaded"
+            elif my_weapon == "bow_loaded":
+                enemy -= WEAPON_DAMAGE["bow_loaded"]
+                my_weapon = "bow_unloaded"
+            else:
+                enemy -= self._weapon_damage(my_weapon)
+            if enemy <= 0.0:
+                return 1
+            if enemy_can:
+                if enemy_weapon == "bow_unloaded":
+                    enemy_weapon = "bow_loaded"
+                elif enemy_weapon == "bow_loaded":
+                    me -= WEAPON_DAMAGE["bow_loaded"]
+                    enemy_weapon = "bow_unloaded"
+                else:
+                    me -= self._weapon_damage(enemy_weapon)
+            me -= extra_enemy_dps
+            if me <= 0.0:
+                return -1
+        return 0
+
+    @staticmethod
+    def _alignment_steps(weapon_name: str, from_position: CoordsLike, target_position: CoordsLike) -> int:
+        """Approximate steps needed before the weapon geometry can hit at all:
+        bow wants a shared axis (min offset), amulet wants |dx| == |dy| <= 2."""
+        dx = abs(from_position[0] - target_position[0])
+        dy = abs(from_position[1] - target_position[1])
+        base = WEAPON_BASE_BY_NAME.get(weapon_name, weapon_name)
+        if base == "bow":
+            return min(dx, dy)
+        if base == "amulet":
+            # steps to the nearest valid cut offset: (±1,±1) or (±2,±2)
+            return min(abs(dx - k) + abs(dy - k) for k in (1, 2))
+        return 0
+
+    def _can_actually_hit(
+        self,
+        weapon_name: str,
+        from_position: coordinates.Coords,
+        target_position: coordinates.Coords,
+        current_facing: characters.Facing,
+        visible_tiles: dict[CoordsLike, Any],
+    ) -> bool:
+        """Geometry + line-of-sight check: could we hit target from this tile
+        after (at most) turning to face it?"""
+        if not self._weapon_can_hit_geometry(weapon_name, from_position, target_position):
+            return False
+        facing = self._desired_facing_towards(from_position, target_position) or current_facing
+        cut_positions = self._weapon_cut_positions(
+            weapon_name, from_position, facing, visible_tiles
+        )
+        return target_position in cut_positions
+
+    def _bystander_dps(
+        self,
+        my_position: coordinates.Coords,
+        visible_enemies: list[tuple[coordinates.Coords, characters.ChampionDescription]],
+        exclude_position: coordinates.Coords,
+    ) -> float:
+        chip = 0.0
+        for enemy_position, enemy in visible_enemies:
+            if enemy_position == exclude_position:
+                continue
+            if self._weapon_can_hit_geometry(enemy.weapon.name, enemy_position, my_position):
+                chip += self._close_dps(enemy.weapon.name)
+        return chip
+
     def _weapon_damage(self, weapon_name: str) -> int:
         return WEAPON_DAMAGE_BY_NAME.get(weapon_name, 2)
 
@@ -1624,7 +2200,7 @@ class JeffreyEController(controller.Controller):
         destination: coordinates.Coords,
         visible_tiles: dict[CoordsLike, Any],
         visible_enemy_positions: list[coordinates.Coords],
-        mist_positions: list[coordinates.Coords],
+        mist_positions: Collection[coordinates.Coords],
         dynamic_mist_cost: float,
     ) -> float:
         step_cost = STEP_COST_BASE
@@ -1645,6 +2221,10 @@ class JeffreyEController(controller.Controller):
                 step_cost += STEP_COST_ENEMY_ADJACENT
             elif nearest_enemy == 2:
                 step_cost += STEP_COST_ENEMY_NEAR
+
+        turns_until_mist = self._turns_until_mist(destination)
+        if turns_until_mist is not None and 0 < turns_until_mist <= MIST_PREDICT_HORIZON:
+            step_cost += MIST_FUTURE_STEP_PENALTY * (MIST_PREDICT_HORIZON + 1 - turns_until_mist)
 
         forward_facing = self._desired_facing_towards(current, destination)
         if forward_facing is not None:
@@ -1680,6 +2260,7 @@ class JeffreyEController(controller.Controller):
         distances: dict[coordinates.Coords, float] = {}
         queue: list[tuple[float, int, coordinates.Coords]] = []
         push_order = 0
+        mist_positions = set(mist_positions)
         visible_enemy_positions = [coords_ for coords_, _ in visible_enemies]
         pending_queries = set(query_positions) if query_positions is not None else None
         dynamic_mist_cost = self._dynamic_mist_step_cost(my_health)
@@ -1694,16 +2275,30 @@ class JeffreyEController(controller.Controller):
             and nearest_mist_to_agent <= MENHIR_PATH_MIST_TRIGGER_DISTANCE
         )
 
+        # A* toward the agent: step costs are >= 0.1, so 0.1 * manhattan to
+        # the nearest query position is an admissible, consistent heuristic —
+        # every query position still pops with its exact distance, and the
+        # search no longer floods the whole arena to reach far-away targets.
+        heuristic_anchor = agent_position if agent_position is not None else None
+
+        def heuristic(node: coordinates.Coords) -> float:
+            if heuristic_anchor is None:
+                return 0.0
+            return 0.1 * float(
+                abs(node[0] - heuristic_anchor[0]) + abs(node[1] - heuristic_anchor[1])
+            )
+
         for target in targets:
             distances[target] = 0.0
-            heapq.heappush(queue, (0.0, push_order, target))
+            heapq.heappush(queue, (heuristic(target), push_order, target))
             push_order += 1
             if pending_queries is not None:
                 pending_queries.discard(target)
 
         while queue:
-            current_distance, _, current = heapq.heappop(queue)
-            if current_distance > distances.get(current, math.inf):
+            current_priority, _, current = heapq.heappop(queue)
+            current_distance = distances.get(current, math.inf)
+            if current_priority - heuristic(current) > current_distance + 1e-9:
                 continue
 
             if pending_queries is not None and current in pending_queries:
@@ -1746,7 +2341,9 @@ class JeffreyEController(controller.Controller):
 
                 if neighbour_distance < distances.get(neighbour, math.inf):
                     distances[neighbour] = neighbour_distance
-                    heapq.heappush(queue, (neighbour_distance, push_order, neighbour))
+                    heapq.heappush(
+                        queue, (neighbour_distance + heuristic(neighbour), push_order, neighbour)
+                    )
                     push_order += 1
         return distances
 
@@ -1997,7 +2594,12 @@ class JeffreyEController(controller.Controller):
 
         root = self._prepare_mcts_root(initial_state, root_actions)
 
-        for _ in range(COMBAT_MCTS_ITERATIONS):
+        iterations = (
+            COMBAT_MCTS_ITERATIONS_ENDGAME
+            if knowledge.no_of_champions_alive <= COMBAT_MCTS_ENDGAME_ALIVE
+            else COMBAT_MCTS_ITERATIONS
+        )
+        for _ in range(iterations):
             node = root
             search_depth = 0
 
@@ -2529,8 +3131,13 @@ class JeffreyEController(controller.Controller):
         )
         if state.enemy_position in my_threatened_tiles:
             value += 42.0 + 7.0 * self._weapon_damage(state.my_weapon_name)
+        elif self._weapon_can_hit_geometry(state.my_weapon_name, state.my_position, state.enemy_position):
+            # aligned but not yet facing: one turn away from a real threat
+            value += 18.0
         if state.my_position in enemy_threatened_tiles:
             value -= 58.0 + 7.0 * self._weapon_damage(state.enemy_weapon_name)
+        elif self._weapon_can_hit_geometry(state.enemy_weapon_name, state.enemy_position, state.my_position):
+            value -= 24.0
 
         my_mobility = self._duel_mobility(state.my_position, state.enemy_position)
         enemy_mobility = self._duel_mobility(state.enemy_position, state.my_position)
@@ -2538,6 +3145,16 @@ class JeffreyEController(controller.Controller):
 
         value -= 0.5 * self._position_effect_penalty(state.my_position, knowledge.visible_tiles)
         value += 0.5 * self._position_effect_penalty(state.enemy_position, knowledge.visible_tiles)
+
+        # Mist-aware duelling: at the end the map is a shrinking circle — a
+        # position misting in k turns is a promise of 1 dmg/turn. The duel is
+        # often won by holding the safe core, not by out-fencing the enemy.
+        my_tum = self._turns_until_mist(state.my_position)
+        enemy_tum = self._turns_until_mist(state.enemy_position)
+        if my_tum is not None and my_tum < NEVER_MISTED:
+            value -= max(0.0, 44.0 - 4.0 * float(min(my_tum, 11)))
+        if enemy_tum is not None and enemy_tum < NEVER_MISTED:
+            value += max(0.0, 44.0 - 4.0 * float(min(enemy_tum, 11)))
         return value
 
     def _position_effect_penalty(
